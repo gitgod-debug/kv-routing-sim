@@ -1,0 +1,65 @@
+"""How many KV blocks a replica can hold — and an honest admission that we have not measured it.
+
+⛔ EVERY NUMBER IN THIS FILE IS UNCALIBRATED. It is derived from arithmetic, not from an engine.
+The Phase-0/Phase-3 calibration replaces it with what vLLM actually reports, and until then anything
+computed from it is a shape, not a prediction. The code refuses to call itself calibrated
+(`CalibrationProfile.calibrated is False`), so a number cannot quietly acquire authority it has not
+earned.
+
+The arithmetic, so a reader can disagree with it:
+
+    bytes per token = 2 (K and V) x layers x kv_heads x head_dim x dtype_bytes
+    bytes per block = bytes per token x block_size
+    blocks          = (gpu_memory x utilization - weights) / bytes per block
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+GIB = 1024**3
+
+
+@dataclass(frozen=True, slots=True)
+class ModelShape:
+    """Just enough of a model to size its KV cache."""
+
+    name: str
+    layers: int
+    kv_heads: int
+    head_dim: int
+    dtype_bytes: int = 2  # fp16/bf16
+    weight_bytes: int = 0
+
+    def bytes_per_token(self) -> int:
+        return 2 * self.layers * self.kv_heads * self.head_dim * self.dtype_bytes
+
+
+def kv_blocks_for(
+    model: ModelShape,
+    gpu_memory_gib: float,
+    *,
+    block_size: int = 16,
+    gpu_memory_utilization: float = 0.90,
+) -> int:
+    """Blocks that fit on one replica. ⚠️ Arithmetic, not a measurement — see the module docstring.
+
+    Replaced by the calibration. Until then it is a shape, not a prediction.
+    """
+    usable = gpu_memory_gib * GIB * gpu_memory_utilization - model.weight_bytes
+    if usable <= 0:
+        raise ValueError(
+            f"no room for a KV cache: {gpu_memory_gib} GiB at {gpu_memory_utilization} "
+            f"utilization does not fit {model.weight_bytes / GIB:.1f} GiB of weights"
+        )
+    return max(1, int(usable // (model.bytes_per_token() * block_size)))
+
+
+# Reference shapes, for making the default workload runnable. Architecture figures are public;
+# ⚠️ none of these has been checked against a running engine on our hardware.
+SHAPES = {
+    # Llama-3-8B: 32 layers, 8 KV heads (GQA), head_dim 128, ~16 GiB of fp16 weights
+    "llama3-8b": ModelShape("llama3-8b", 32, 8, 128, 2, 16 * GIB),
+    # Qwen3-0.6B-class: small enough to serve on almost anything, useful for the spike
+    "qwen3-0.6b": ModelShape("qwen3-0.6b", 28, 8, 128, 2, 1_200_000_000),
+}
