@@ -81,8 +81,45 @@ pip install kv-routing-sim          # CPU-only. No GPU dependency, by design.
 kvsim replay trace.jsonl --policies all --replicas 1-8 --format md
 ```
 
-The inference engine is an optional extra (`pip install "kv-routing-sim[calib]"`) needed **only** to
-reproduce the calibration. A simulator that drags in vLLM to answer a CPU question has broken its own pitch.
+Runs on your laptop. **Your trace never leaves your machine**, and prompts are hashed at the adapter
+boundary, so prompt text never enters the simulator at all.
+
+The inference engine is an optional extra (`pip install "kv-routing-sim[calib]"`), needed only to
+**calibrate against your own hardware**:
+
+```bash
+kvsim calibrate --engine http://localhost:8000 --out configs/profiles/my-fleet.yaml   # ~30 min, your GPU
+```
+
+## ⭐ What transfers to your fleet, and what doesn't
+
+**Read this before trusting a number.** A calibration is fitted to one GPU, one model, one block size —
+so the honest answer comes in three tiers, and they must not be blended (ADR-010):
+
+| | What you get | What it costs you |
+|---|---|---|
+| **Policy ranking** | *Which* policy wins on your workload shape, and roughly by how much | **Nothing.** No GPU, no calibration. Depends on workload shape, not hardware — *pending* **H6**, which tests exactly that rather than assuming it |
+| **The crossover boundary** | Whether prefix-affinity is worth implementing at *your* sharing ratio and utilization | **Nothing** (same caveat) |
+| **Absolute ms and ₹** | p95 TTFT and ₹/1k requests for your fleet | **`kvsim calibrate` on your own hardware.** ⛔ Our error bar was measured on our GPU and our model. It does **not** transfer, and this README will never imply that it does |
+
+> **So: why trust our numbers on your hardware?** You shouldn't. Run `kvsim calibrate` and use your own.
+> That is the same posture as the cost model, which ships every constant in a config with a source and a
+> date so you can disagree with it and re-run. **Handing the skeptic the means to disagree, twice.**
+
+## Where it runs — nobody's GPU is involved
+
+The GPU appears **once**, on our calibration box, offline, before anything is published. Everything
+deployed is pure CPU Python:
+
+- **PyPI** — on your machine. The real usage path.
+- **HF Space (free CPU)** — a browser demo on bundled and generated traces, so you can see a Pareto curve
+  in ten seconds with nothing installed. It is a **shop window, not a service**. ⛔ It deliberately does
+  not accept uploaded production traces: those are your users' prompts, and they belong on your machine.
+- **Docs** — static.
+
+Replaying 100k requests through a dict-based trie is milliseconds of CPU work. There is nothing for a GPU
+to do. That is the point of a simulator: **pay the GPU cost once, then answer "what if" thousands of times
+for free.**
 
 ---
 

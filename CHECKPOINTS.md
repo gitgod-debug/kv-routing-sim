@@ -9,8 +9,9 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-09-20 (repo scaffolded: docs 00–09, ADR-001…009, H1–H5 pre-registered, pinned
-deps, Phase-0 spike scripts written but **not yet run**)
+**Last updated:** 2026-09-20 (repo scaffolded: docs 00–09, **ADR-001…010**, **H1–H6** pre-registered,
+pinned deps, Phase-0 spike scripts written but **not yet run**. ADR-010 + H6 added after a *"who can
+actually use this?"* review found the transfer question unaddressed)
 **Current phase:** Phase 0 — Spike & de-risk · **gate NOT passed; no simulator code may start**
 
 > ## 🆕 2026-09-20 — two decisions recorded, both of which the spec said were owed
@@ -39,7 +40,7 @@ deps, Phase-0 spike scripts written but **not yet run**)
 | 1 | Trace schema + ingestion + generator | `[ ]` | A real log **and** a generated agentic trace both load into one versioned schema; malformed lines log-and-continue with a count |
 | 2 | Block-level KV cache model | `[ ]` | Known prefix sequence → known hit/miss pattern, in tests; partial-block rule holds; memory ceiling measured |
 | 3 | **Real-Engine Calibration Report** | `[ ]` | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
-| 4 | Six policies + Pareto sweep | `[ ]` | A curve naming a recommended policy + replica count with a quantified ₹ delta, multi-seed bootstrap CIs — tests **H1 + H5** |
+| 4 | Six policies + Pareto sweep | `[ ]` | A curve naming a recommended policy + replica count with a quantified ₹ delta, multi-seed bootstrap CIs — tests **H1 + H5 + H6** |
 | 5 | **The crossover finding** | `[ ]` | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
 | 6 | Sim-to-real 2-replica validation | `[ ]` | Predicted vs measured across two MIG instances, or the documented fallback and why |
 | 7 | Package · CLI · Space · hardening | `[ ]` | `pip install` + `kvsim replay` + HF Space + "what breaks at 10×/100×" answered with measured numbers |
@@ -179,6 +180,10 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       round-robin
 - [ ] Property test: prefix-affinity never scores below round-robin on perfectly-shared prefixes
 - [ ] Golden-file test on a small sweep; CI green gate
+- [ ] ⭐ **Test H6 — re-run the sweep under a rescaled cost function** (a "faster GPU", and a different
+      prefill/decode ratio) and compute Kendall's τ between the policy orderings. **Pure CPU, no extra GPU
+      time, the sweep already exists.** ⛔ Do this *before* the README makes any tier-1 claim: H6 is what
+      says whether a user without a GPU can trust the recommendation at all (ADR-010)
 
 ---
 
@@ -210,7 +215,19 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 
 - [ ] `pip install kv-routing-sim`; `kvsim replay trace.jsonl --policies all --replicas 1-8
       --format json|md|html`; semver + changelog
-- [ ] HF Space (free CPU) + docs on Render free
+- [ ] ⭐ **`kvsim calibrate`** — expose the Phase-3 harness so a USER can fit a profile to their own GPU
+      and model (~30 min). The ADR-010 mechanism, and the answer to *"why trust your numbers on my
+      hardware?"* — *"you shouldn't; run this."* Needs the `[calib]` extra
+- [ ] **`configs/profiles/`** — committed calibration profiles keyed by
+      `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
+      from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no
+      measured basis
+- [ ] HF Space (free CPU) — ⛔ **bundled + generated traces only.** No upload box for production traces:
+      those are someone's users' prompts. If uploads ever ship, hashing happens client-side
+- [ ] ⚠️ **Render: cut or justify.** A 512 MB sleeping container serving static docs is worse than GitHub
+      Pages at the same price. Either it hosts something genuinely dynamic (a thin HTTP recommender, which
+      would be a real production artifact) or it is cut and docs go to Pages. See the open question in
+      `docs/07-environment.md`
 - [ ] ⭐ **"What breaks at 10× and 100×"** as a named README section, answered with **measured** numbers:
       RSS ceiling and sweep wall-clock at 10× trace length; at 100×, which gives out first — block-hash
       memory, the policy inner loop, or the report renderer; at 10× replicas, does cache-model fidelity
@@ -249,6 +266,9 @@ Check every one before anything is published.
 - [ ] **Every artifact in `artifacts/results/` is regenerable** by a script in `scripts/`
 - [ ] **Every cost constant is cited and dated** in a committed config
 - [ ] **No TTFT percentile from the memory-split hardware path**
+- [ ] ⛔ **No sentence blends a calibrated error bar with an uncalibrated recommendation.** Our error bar
+      belongs to our GPU and our model; the ranking is what transfers (ADR-010, pending H6). *"Validated
+      within X%"* and *"your serving log in, a recommendation out"* are true separately and false together
 - [ ] **Bootstrap CIs resample sessions/segments, not requests** — and every caption says which
 - [ ] **A hypothesis that failed is reported as a finding**, not deleted
 - [ ] **No trace containing user prompt text is committed**, ever — hashes only

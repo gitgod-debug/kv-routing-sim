@@ -3,6 +3,11 @@
 Target contract (from the spec, and it is a packaging promise as much as a UX one):
 
     kvsim replay trace.jsonl --policies all --replicas 1-8 --format json|md|html
+    kvsim calibrate --engine http://localhost:8000 --out configs/profiles/<name>.yaml
+
+`calibrate` is the ADR-010 mechanism, and the reason the calibration harness is built as a
+library rather than as a script: it lets a USER fit a profile to their own GPU and model, which
+is what makes "your log, your fleet" literally true instead of aspirational. Needs `[calib]`.
 
 Error semantics (ADR-004): an unparseable policy or sweep config FAILS LOUDLY AT STARTUP. It must
 never fail silently mid-sweep, because a sweep that dies at hour three having written half a Pareto

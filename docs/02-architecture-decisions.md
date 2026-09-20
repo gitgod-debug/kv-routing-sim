@@ -401,3 +401,75 @@ extra strictly separate means that kind of discovery can never break the core in
 ### What would reverse this
 
 Nothing foreseeable.
+
+---
+
+## ADR-010: ⭐ What a calibration transfers — and what it does not
+
+**Status:** Accepted · 2026-09-20 *(added after a "who can actually use this?" review of the scaffold)*
+
+### The problem this exists to fix
+
+A calibration is **fitted to one specific setup**: one GPU, one model, one block size, one set of flags.
+The scaffold's README claimed *"your real serving log in → a recommendation out"* and separately claimed
+*"matches the live engine within X%"* — and silently invited the reader to combine them.
+
+**Those two claims do not compose.** A user on H100s serving Llama-70B gets nothing from an error bar
+measured on an A100 serving a small instruct model. Left unfixed, the first knowledgeable reader to ask
+*"transfers to my fleet how?"* collapses the headline, and they will ask.
+
+### The decision — three tiers, stated separately, never blended
+
+| Tier | What is claimed | What it needs |
+|---|---|---|
+| **1. Policy ranking** | *"Prefix-affinity beats least-loaded on your workload shape"* — the **ordering** of policies, and roughly how big the gap is | **Nothing.** No calibration, no GPU. Depends on workload shape, not hardware. ⚠️ **This is a hypothesis (H6), not an assumption** — it is the load-bearing claim for every user who never calibrates, so it gets tested, not asserted. |
+| **2. The crossover boundary** | *"At your sharing ratio and utilization, prefix-affinity stops paying"* — the finding | Nothing, **if H6 holds**. It is a statement about workload geometry. The *position* of the boundary may shift with hardware; H6's test is what says how much. |
+| **3. Absolute numbers** | *"Your p95 TTFT will be 84 ms and it will cost ₹Y per 1k requests"* | **A calibration on the user's own hardware and model.** Ours does not transfer, and the README must not imply it does. |
+
+**Tiers 1 and 2 are the product. Tier 3 is a feature you opt into.**
+
+### The three mechanisms that implement this
+
+1. **Say it in the README, in the scope section.** Absolute numbers belong to the calibrated setup;
+   what a user gets for free is the ranking and the boundary. ⛔ No sentence may blend a tier-3 error
+   bar with a tier-1 claim.
+2. **Ship calibration profiles.** A profile is keyed by `(gpu, model, block_size, max_num_seqs,
+   engine_version)` and committed under `configs/profiles/`. A user picks the nearest and is told, in
+   the output, **how far from it they are** and that error grows with that distance. ⛔ A profile that
+   does not record its provenance is worse than no profile.
+3. **⭐ Ship `kvsim calibrate`.** The user points it at their own running vLLM for ~30 minutes and gets
+   their own profile. This is the important one: it converts the calibration from **a credential we own**
+   into **a capability the user has**, and it is what makes *"your log, your fleet"* literally true
+   instead of aspirational.
+
+### Why `kvsim calibrate` is worth the build cost
+
+It is the same code path as our own Phase-3 calibration, exposed with a CLI in front. Building it costs
+little *because the calibration harness has to exist anyway* — and it changes the project's answer to
+the hardest question anyone can ask about a simulator:
+
+> *"Why should I trust your numbers on my hardware?"*
+> → **"You shouldn't. Run `kvsim calibrate` and use your own."**
+
+That answer is stronger than any error bar we could publish, and it is the same move ADR-006 makes on
+cost constants: **hand the skeptic the means to disagree.** Consistent posture, twice.
+
+⚠️ `vllm` stays in the `[calib]` extra (ADR-009), so `kvsim calibrate` is available only to users who
+opt into the heavier install. The CPU-only core is unaffected.
+
+### Rejected alternatives
+
+| Rejected | Why |
+|---|---|
+| **Claim the calibration transfers** | False, and checkable in one question. It would make the credential the weakest part of the project rather than the strongest. |
+| **Publish only tier 3, and tell everyone else to calibrate first** | Kills the tool for everyone who has not yet committed a GPU-hour — i.e. the exact audience deciding *whether* to invest in cache-aware routing. That decision is the main use case. |
+| **Drop absolute numbers entirely, ship only rankings** | Throws away the credential, which is the part that proves rigor. And ₹/1k requests is the number the project set out to own. |
+| **Auto-detect the user's hardware and interpolate between profiles** | Sounds helpful, is fabrication: an interpolated error bar has no measured basis. A nearest-profile lookup that *states its distance* is honest; interpolation dressed as prediction is not. |
+
+### What would reverse this
+
+**H6 failing.** If policy *ranking* turns out to be hardware-dependent — e.g. the crossover moves so much
+between an A100 and an H100 that the recommended policy flips — then tiers 1 and 2 collapse into tier 3,
+`kvsim calibrate` stops being optional and becomes **mandatory**, and the project is a
+calibrate-then-decide tool rather than a decide-now tool. That is a materially smaller product, and H6 is
+how we find out before the README claims otherwise.

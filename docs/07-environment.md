@@ -161,10 +161,78 @@ drew about `Mike-Ew/kv-cache-routing` (see `04-prior-art.md`).
 
 ---
 
+## ⭐ What runs where — and whose GPU
+
+*(Added 2026-09-20. It was not written down anywhere, and "does the deployed thing use the user's GPU?"
+is the first question a reader asks. The answer is no, and the reason is the whole design.)*
+
+**No GPU is involved in anything that is deployed. Not ours, not the user's.** The GPU appears exactly
+once, on the calibration box, offline, before anything is published.
+
+```
+  MACHINE 2 — the A100/H100          run ONCE, offline (Phase 3 + Phase 6).
+  ┌──────────────────────────┐       Produces ~20 numbers and some committed JSON.
+  │ live vLLM + /metrics     │       Then the GPU is finished, forever.
+  └──────────────────────────┘
+               │  the fitted cost function + the calibration profile are
+               │  committed to the repo as static artifacts
+               ▼
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  Everything below is pure CPU Python. No weights, no CUDA, no engine.    │
+  ├──────────────────────────────────────────────────────────────────────────┤
+  │  PyPI  `pip install kv-routing-sim`                                      │
+  │    → runs on the USER'S OWN machine or CI. Their trace never leaves it.  │
+  │    → this is the real usage path.                                        │
+  │                                                                          │
+  │  HF Space (free CPU, 2 vCPU / 16 GB)                                     │
+  │    → a browser demo on bundled + generated traces. Ten seconds to a      │
+  │      Pareto curve with nothing installed. A SHOP WINDOW, not the product. │
+  │                                                                          │
+  │  Render free (512 MB, sleeps when idle)                                  │
+  │    → docs/landing only. No compute. ⚠️ See the open question below.       │
+  └──────────────────────────────────────────────────────────────────────────┘
+```
+
+**Why this works at all:** the simulator replays a trace through a dict-based trie. Replaying 100k
+requests through six policies is *milliseconds* of CPU work — there is nothing for a GPU to do. That is
+the point of a simulator: **pay the GPU cost once, then answer "what if" thousands of times for free.**
+
+**A user never grants GPU access and never needs a GPU.** They hand over a **log file**, not a fleet. And
+because prompts are hashed at the adapter boundary (ADR-002), a real trace can be processed without its
+prompt text ever entering the simulator.
+
+> ### ⛔ The one thing not to get wrong about the HF Space: traces are user content
+> A Space that invites strangers to upload a production serving log is asking them to send their users'
+> prompts to a third-party host. **The Space demo runs on bundled sample traces and the synthetic
+> generator only.** Real traces belong to the local CLI, on the user's own machine, where they already
+> are. If an upload box ever appears in the Space, hashing must happen client-side or it must not ship.
+
+### What a user gets without a GPU — and what they don't
+
+See **ADR-010** for the full decision. In short: the **policy ranking** and the **crossover boundary**
+transfer (pending **H6**); **absolute ms and ₹** do not, and need `kvsim calibrate` on the user's own
+hardware. ⛔ Never blend a calibrated error bar with an uncalibrated recommendation.
+
+### ⚠️ OPEN QUESTION — what is each deployment actually *for*?
+
+Recorded as open rather than answered, because it is a positioning decision and not a technical one:
+
+- **PyPI** — clearly justified. It is how anyone actually uses the tool.
+- **HF Space** — justified as **distribution, not as a product surface**: it exists so a reader arriving
+  from the README or a Show HN post believes the repo is real without installing anything. That is a
+  legitimate job. It should be *called* that, in the README, rather than implied to be a service.
+- **Render docs site** — ⚠️ **weakest of the three, and possibly cut.** A 512 MB container that sleeps,
+  serving a static docs page, is strictly worse than GitHub Pages at the same price. It is on the list
+  because the project plan's deployment list has it, not because this project needs it.
+  **Decide at Phase 7:** either it hosts something genuinely dynamic (a thin API that serves the
+  recommender over HTTP, which would be a real production artifact), or it is cut and the docs go to Pages.
+
+---
+
 ## Deployment targets (Phase 7)
 
 | Need | Where | Constraint |
 |---|---|---|
-| Public demo | **HF Space, free CPU** | 2 vCPU / 16 GB. The simulator is CPU work, so this is a natural fit — and it only works because of ADR-009. |
-| Docs site | Render free | 512 MB, sleeps when idle. No model weights, ever. |
-| Package | PyPI | `pip install kv-routing-sim` + semver + changelog |
+| Public demo | **HF Space, free CPU** | 2 vCPU / 16 GB. The simulator is CPU work, so this is a natural fit — and it only works because of ADR-009. **Bundled + generated traces only.** |
+| Docs site | Render free | 512 MB, sleeps when idle. No model weights, ever. ⚠️ Cut-or-justify at Phase 7 — see the open question above. |
+| Package | PyPI | `pip install kv-routing-sim` + semver + changelog. **The real usage path.** |

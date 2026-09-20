@@ -146,6 +146,51 @@ replica), so the cost model's SKU price is what sets its size.
 
 ---
 
+## H6 — ⭐ Policy *ranking* is invariant to hardware, even when absolute latency is not
+
+*(Added 2026-09-20, still before any code. This is the hypothesis ADR-010 rests on, and it is the most
+load-bearing one in the file for anyone who is not us: it is what every user who never runs a calibration
+is implicitly trusting.)*
+
+**Prediction.** The **ordering** of routing policies — and the **existence and rough position** of the H2
+crossover — depend on **workload shape** (prefix-sharing ratio, offered load, session structure) and
+**not** on the GPU model, the LLM, or the absolute speed of prefill. Concretely:
+
+- Re-run the Phase-4 sweep with the prefill/decode cost function scaled by a constant factor (a "faster
+  GPU") and by a different prefill/decode *ratio* (a different model shape). **The recommended policy at
+  each (sharing ratio, load) point should not change**, even though every latency number does.
+- The crossover boundary **S\*** may **shift**, but should not **invert** — prefix-affinity should not
+  become the wrong answer at high sharing just because the hardware got faster.
+- ⭐ The strongest form, and the one to actually test: a **rank correlation** (Kendall's τ) between the
+  policy orderings under two different cost-function regimes should be **high (τ > 0.8)** at matched
+  workload points.
+
+**Falsified if.** The recommended policy flips at any swept point under a pure cost-function rescale, or
+τ drops below ~0.8, or the crossover boundary inverts rather than shifting.
+
+**Why it is plausible but not obvious — state both halves.** The mechanism behind the crossover is a
+*competition between two effects*: cache locality reduces work, and concentration increases queueing. Both
+scale with the same prefill cost, so their **ratio** — which is what decides the winner — should be
+largely invariant. ⚠️ But that argument is not airtight: `max_num_seqs` and the KV-cache block capacity are
+**absolute** limits, not scaled ones, so a faster GPU with the same memory reaches saturation at a
+different point. **That is precisely why this is a hypothesis and not an assumption.**
+
+**Decision it changes.** ⭐ **Everything about who can use the tool.**
+
+- **If H6 holds:** tiers 1 and 2 of ADR-010 are real. A user gets a trustworthy policy recommendation
+  **without owning a GPU or running a calibration**, and `kvsim calibrate` is an optional upgrade for
+  people who want absolute numbers. The project is a **decide-now** tool.
+- **If H6 fails:** tiers 1 and 2 collapse into tier 3. `kvsim calibrate` becomes **mandatory**, the README
+  can promise nothing to a user who has not run it, and the project is a **calibrate-then-decide** tool —
+  a materially smaller product with a much narrower audience.
+
+**Cost to test: near zero, and it needs no extra GPU time.** It is a re-run of the Phase-4 sweep under a
+rescaled cost function — pure CPU, and the sweep already exists. ⛔ **There is no excuse for shipping the
+ADR-010 claims untested**, and testing it early is what stops the README from writing a cheque the
+calibration cannot cash.
+
+---
+
 ## Status
 
 | | Hypothesis | Tested in | Status |
@@ -155,5 +200,6 @@ replica), so the cost model's SKU price is what sets its size.
 | **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[ ]` untested |
 | **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[ ]` untested · ⚠️ gated on a Phase-0 check |
 | **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[ ]` untested |
+| **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 (CPU-only re-run) | `[ ]` untested · **gates ADR-010's tier-1/2 claims** |
 
 **Amendments:** *(none yet — add dated entries below, never edit above)*
