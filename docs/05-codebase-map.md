@@ -1,9 +1,12 @@
 # 05 — Codebase map
 
-**Status: 2026-09-20 — this is the Phase-0 scaffold.** Every module below exists as a package with a
-docstring stating its contract; **none of them is implemented yet.** That is deliberate: the layout is a
-decision (ADRs 001–004), and writing it down before the code exists is what keeps the contract from
-drifting into whatever the first implementation happened to do.
+**Status: 2026-09-20 — built, except the three numbers that need an engine.** The contracts below were
+written before the code (ADRs 001–004), and the code now implements them. 73 tests, `ruff` clean.
+
+⛔ **What is deliberately NOT built: `calib/`, and the four cost coefficients in `sim/cost_model.py`.**
+Those are claims about how a real GPU behaves, and no GPU has been run. They sit behind
+`CostProfile.calibrated = False`, and `eval/` refuses in code to present an uncalibrated run as a
+prediction.
 
 Each section marks status: `📐 designed` (contract written, no code) · `🔨 building` · `✅ done + tested`.
 
@@ -26,7 +29,7 @@ one file each. Everything else is core and changes rarely.
 
 ---
 
-## `src/kv_routing_sim/traces/` — 📐 designed
+## `src/kv_routing_sim/traces/` — ✅ built + tested
 
 **Contract:** turn any input format into one versioned, streamed record type.
 
@@ -45,7 +48,7 @@ must be stated, not discovered.
 **Invariants:** a malformed line **logs and continues**, and the skipped count lands in the results header.
 A run that dropped 12% of its input must say so.
 
-## `src/kv_routing_sim/cache/` — 📐 designed
+## `src/kv_routing_sim/cache/` — ✅ built + tested
 
 **Contract:** given a sequence of requests routed to this replica, report cached-prefix length per request
 and maintain residency.
@@ -60,20 +63,26 @@ and maintain residency.
 and the partial-block rule must hold (sharing 47 of 48 tokens at block size 16 shares **two** blocks, not
 three). If these are wrong, every downstream number is wrong and nothing else will reveal it.
 
-## `src/kv_routing_sim/policies/` — 📐 designed
+## `src/kv_routing_sim/policies/` — ✅ built + tested (**seven**, not six — see below)
 
 **Contract:** `choose(fleet_state, request, rng) -> replica_index`. One file per policy. No global state.
 No policy may mutate the fleet.
 
 `round_robin.py` · `least_loaded.py` · `power_of_two.py` · `consistent_hash_prefix.py` ·
-`radix_affinity.py` · `session_sticky.py` · `base.py` (the interface) · `registry.py` (name → class, so
-the CLI's `--policies all` has one source of truth).
+`radix_affinity.py` · **`radix_affinity_balanced.py`** · `session_sticky.py` · `base.py` · `registry.py`.
+
+⭐ **A seventh policy exists that the spec did not list, and the reason is a measurement.** Pure
+`radix-affinity` degenerates: every request shares the system-prompt first block, so one replica wins
+every longest-prefix match forever (measured: `[0, 0, 0, 900]` across 4 replicas, ~450x worse tail
+latency). Real routers — SGLang, Dynamo, and `disagg-sim`'s `kv_aware` — all carry a load term.
+Publishing pure affinity as "the prefix-aware policy" would be comparing prior art's blend against our
+strawman. So pure affinity stays as the honest extreme, and the balanced variant is the realistic one.
 
 **Every tie is broken from the injected `rng`.** A `min()` over a dict silently prefers low replica indices
 and fabricates locality the real engine does not have — that is a correctness bug that looks like a
 result (ADR-003).
 
-## `src/kv_routing_sim/sim/` — 📐 designed
+## `src/kv_routing_sim/sim/` — ✅ built + tested (timings uncalibrated)
 
 **Contract:** the fleet, the clock, and the numbers that come out.
 
@@ -84,7 +93,7 @@ result (ADR-003).
 | `metrics.py` | The collector: per-request TTFT, per-replica hit/query counters, queue depths. Emits **distributions, not means** (ADR-006 / methodology §1). |
 | `engine.py` | `run(trace, policy, n_replicas, seed) -> RunResult`. The one function the sweep calls. |
 
-## `src/kv_routing_sim/eval/` — 📐 designed
+## `src/kv_routing_sim/eval/` — ✅ built + tested
 
 | Piece | Responsibility |
 |---|---|
@@ -94,7 +103,7 @@ result (ADR-003).
 | `recommend.py` | Frontier + an SLO → *one* policy, *one* replica count, and the ₹ delta vs round-robin. **This is the output nobody else produces** — see `04-prior-art.md`. |
 | `crossover.py` | The H2 finding: sweep the sharing ratio as its own axis, locate the flip boundary, publish it with CIs. |
 
-## `src/kv_routing_sim/calib/` — 📐 designed · ⚠️ the only GPU-touching module
+## `src/kv_routing_sim/calib/` — 📐 designed, NOT built · ⚠️ the only GPU-touching module
 
 | Piece | Responsibility |
 |---|---|
@@ -105,7 +114,7 @@ result (ADR-003).
 ⚠️ **Imports `vllm`/`httpx` lazily, inside functions** (ADR-009), and raises a message naming the
 `[calib]` extra. Core install must never need a GPU wheel.
 
-## `src/kv_routing_sim/cli.py` — 📐 designed
+## `src/kv_routing_sim/cli.py` — ✅ built + tested
 
 `kvsim replay trace.jsonl --policies all --replicas 1-8 --format json|md|html`. Fails **loudly at startup**
 on a bad config; never silently mid-sweep (ADR-004).

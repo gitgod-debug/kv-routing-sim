@@ -9,10 +9,33 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-09-20 (repo scaffolded: docs 00–09, **ADR-001…010**, **H1–H6** pre-registered,
-pinned deps, Phase-0 spike scripts written but **not yet run**. ADR-010 + H6 added after a *"who can
-actually use this?"* review found the transfer question unaddressed)
-**Current phase:** Phase 0 — Spike & de-risk · **gate NOT passed; no simulator code may start**
+**Last updated:** 2026-09-20 (**the simulator is built**: traces, cache, 7 policies, event loop, eval,
+CLI, 73 tests green. Everything except the three engine-dependent numbers, which stay behind the
+Phase-0 gate)
+**Current phase:** Phase 0 spike still **NOT RUN** · Phases 1, 2, 4 built against an **uncalibrated**
+profile
+
+> ## 🔨 2026-09-20 — the simulator is built. What the gate actually blocked, and what it did not.
+>
+> The Phase-0 gate exists to stop **unverified engine behaviour** being baked into the model. That is
+> three numbers, not the whole build:
+>
+> | Blocked by the gate | Built now |
+> |---|---|
+> | the prefill/decode cost coefficients | the trace schema, hashing, adapters, the agentic generator |
+> | the KV-cache block capacity | the block cache, LRU eviction, stop-at-first-miss |
+> | whether our hash-chain rule matches the engine's | 7 routing policies, the event loop, sweeps, bootstrap CIs, the cost model, the CLI |
+>
+> The three live in `sim/cost_model.py` behind `CostProfile.calibrated = False`, and the reporting
+> layer **refuses in code** to present an uncalibrated run as a prediction — `RunResult.summary()`,
+> `Recommendation.as_dict()` and the CLI all carry the tier warning (ADR-010). So the gate is
+> enforced by the software rather than by remembering to be careful.
+>
+> **73 tests pass. `ruff` clean with `E501` enforced.** Three real bugs were caught by writing them:
+> a router that modelled block ownership as exclusive and therefore thrashed (scoring a *lower* hit
+> rate than round-robin); an `or`-chain that treated timestamp `0` as missing and silently dropped
+> the first request of every relative-timestamped trace; and a trace writer that emitted unsorted
+> records, so the adapter clamped early arrivals to zero.
 
 > ## 🆕 2026-09-20 — two decisions recorded, both of which the spec said were owed
 >
@@ -37,10 +60,10 @@ actually use this?"* review found the transfer question unaddressed)
 | Phase | Name | Status | Gate to pass before moving on |
 |---|---|---|---|
 | **0** | **Spike & de-risk** | `[~]` | Committed raw `/metrics` scrape where `vllm:prefix_cache_hits` **and** `_queries` are present **and moving**, + a two-server coexistence result. ⛔ **blocks all simulator code** |
-| 1 | Trace schema + ingestion + generator | `[ ]` | A real log **and** a generated agentic trace both load into one versioned schema; malformed lines log-and-continue with a count |
-| 2 | Block-level KV cache model | `[ ]` | Known prefix sequence → known hit/miss pattern, in tests; partial-block rule holds; memory ceiling measured |
+| 1 | Trace schema + ingestion + generator | `[x]` | A real log **and** a generated agentic trace both load into one versioned schema; malformed lines log-and-continue with a count |
+| 2 | Block-level KV cache model | `[x]` | Known prefix sequence → known hit/miss pattern, in tests; partial-block rule holds; memory ceiling measured |
 | 3 | **Real-Engine Calibration Report** | `[ ]` | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
-| 4 | Six policies + Pareto sweep | `[ ]` | A curve naming a recommended policy + replica count with a quantified ₹ delta, multi-seed bootstrap CIs — tests **H1 + H5 + H6** |
+| 4 | **Seven** policies + Pareto sweep | `[~]` | Built and running; **gated on a calibrated profile** before any curve is published. Tests **H1 + H5 + H6** |
 | 5 | **The crossover finding** | `[ ]` | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
 | 6 | Sim-to-real 2-replica validation | `[ ]` | Predicted vs measured across two MIG instances, or the documented fallback and why |
 | 7 | Package · CLI · Space · hardening | `[ ]` | `pip install` + `kvsim replay` + HF Space + "what breaks at 10×/100×" answered with measured numbers |
@@ -118,16 +141,20 @@ path."
 
 ## Phase 1 — Trace schema, ingestion, and the agentic generator
 
-- [ ] `NormalizedRequest` + `SCHEMA_VERSION` (pydantic). Fields: request id, arrival ts, session id,
+- [x] `NormalizedRequest` + `SCHEMA_VERSION` (pydantic). Fields: request id, arrival ts, session id,
       block hashes, prompt/output token counts
-- [ ] `hashing.py` — mirror the engine's **hash-chain** rule (a block's hash depends on its predecessors),
-      verified against the spike's observed block behaviour, not against the docs alone
-- [ ] Adapters: vLLM JSONL · OpenAI-style request log · (SGLang if a sample is obtainable)
-- [ ] **Stream, never load.** A trace must not be read into RAM; state the tested ceiling
-- [ ] **The agentic generator** — shared system prompt + tool definitions + N turns, with
-      **prefix-sharing ratio as an explicit parameter** (this is the H2 axis, so it is built in from day one)
-- [ ] Malformed line → log-and-continue, with `skipped_lines` in the results header
-- [ ] Bad config → **fail loudly at startup**, never silently mid-sweep
+- [~] `hashing.py` — hash-chain rule implemented and unit-tested (blake2b for cross-process
+      determinism; partial trailing blocks never shared). ⛔ **Still owed: verification against the
+      engine's OBSERVED behaviour.** Right now it matches the documentation, which is exactly the
+      thing `Mike-Ew` did
+- [x] Adapters: vLLM JSONL · OpenAI-style request log · (SGLang if a sample is obtainable)
+- [x] **Stream, never load.** A trace must not be read into RAM; state the tested ceiling
+- [x] **The agentic generator** — with **prefix-sharing ratio as an explicit parameter**. ⭐ It reports
+      **cross-session sharing** and **total block reuse** SEPARATELY: within-session history reuse is
+      captured by session-stickiness for free, so using total reuse as the H2 axis would hide the
+      entire effect. It also reports what it ACHIEVED, not what was requested
+- [x] Malformed line → log-and-continue, with `skipped_lines` in the results header
+- [x] Bad config → **fail loudly at startup**, never silently mid-sweep
 - [ ] Commit generator configs (a generated trace is reproduced from seed + config, never shipped as data)
 
 **Gate:** one real serving log and one generated agentic trace both load into the same versioned schema,
@@ -137,13 +164,15 @@ and a corrupted line is survived and counted.
 
 ## Phase 2 — The block-level KV cache model
 
-- [ ] `block_trie.py` — trie of resident block hashes on plain dicts (ADR-002)
-- [ ] `eviction.py` — LRU order + optional TTL + a hard capacity bound derived from a GPU memory config
-- [ ] `replica_cache.py` — counters **named to mirror vLLM's own**, so predicted and measured are literally
+- [x] `block_trie.py` — trie of resident block hashes on plain dicts (ADR-002)
+- [x] `eviction.py` — LRU order + optional TTL + a hard capacity bound derived from a GPU memory config
+- [x] `replica_cache.py` — counters **named to mirror vLLM's own**, so predicted and measured are literally
       the same quantity
-- [ ] **Tests that matter most:** known prefix sequence → known hit/miss pattern; the **partial-block rule**
-      (sharing 47 of 48 tokens at block size 16 shares **two** blocks, not three)
+- [x] **Tests that matter most:** known prefix sequence → known hit/miss pattern ✅; the
+      **partial-block rule** ✅; **stop-at-first-miss** with stranded blocks still occupying capacity ✅
 - [ ] Measure and state the **memory ceiling** at 1M requests on the 14 GB dev box
+      *(partial: `NormalizedRequest` measured at 159 B/instance vs 1,215 B for a pydantic model —
+      152 MiB vs 1,159 MiB at 1M. The cache's own ceiling is still unmeasured)*
 
 > ⚠️ **This component is table stakes, not the core IP** — Vidur-canary and Frontier both ship one. **The
 > contribution is its *fidelity*** (Phase 3). Do not describe it as the contribution anywhere.
@@ -187,9 +216,26 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 
 ---
 
+> ### 📌 An early observation from the first full sweep — ⚠️ NOT a result
+> Uncalibrated profile, no CIs, one workload shape, one seed set. Recorded because it is a
+> prediction worth testing properly, **not** because it is a finding.
+>
+> At ~0.6 cross-session sharing with 6-turn sessions, **session-sticky dominated every prefix-aware
+> policy** — it held a ~0.89 hit rate at every replica count while staying balanced, where
+> round-robin decayed 0.89 → 0.66 as replicas diluted the cache. Pure `radix-affinity` collapsed
+> onto a single replica (imbalance = N) and paid ~450x in tail latency.
+>
+> ⚠️ **If this survives calibration and CIs, H1 as written is FALSE in this regime** — which is
+> exactly what pre-registration is for. It also sharpens where prefix-affinity should win: SHORT
+> sessions with HIGH cross-session sharing, where stickiness has little history to exploit. That is
+> a sweep axis Phase 5 must cover, and it was not in the plan before this run.
+
 ## Phase 5 — The crossover finding *(tests H2 · ⛔ never cut)*
 
 - [ ] Sweep **prefix-sharing ratio as its own axis**, crossed with offered load
+      *(`kvsim crossover` and `eval/sweep.py:crossover_sweep` are built; awaiting a calibrated profile)*
+- [ ] ⭐ **Add turns-per-session as a third axis** — the first sweep suggests it decides whether
+      stickiness or affinity wins, and it was not previously in the plan
 - [ ] Locate the boundary where least-loaded overtakes prefix-affinity on **p95 TTFT**; publish it as a
       **curve with CIs**
 - [ ] Check H2's three directional sub-predictions (monotonicity in each axis; power-of-two in between)

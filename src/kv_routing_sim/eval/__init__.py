@@ -13,3 +13,15 @@
   * `crossover.py`  — the H2 finding: sharing ratio as its own axis, the flip boundary published
                       as a curve with CIs.
 """
+
+from .bootstrap import CI, bootstrap_ci_grouped, paired_bootstrap_delta
+from .cost import CostModel, UnfilledCostModel
+from .pareto import Point, frontier, to_point
+from .recommend import Recommendation, recommend
+from .sweep import crossover_sweep, sweep
+
+__all__ = [
+    "CI", "CostModel", "Point", "Recommendation", "UnfilledCostModel",
+    "bootstrap_ci_grouped", "crossover_sweep", "frontier", "paired_bootstrap_delta",
+    "recommend", "sweep", "to_point",
+]
