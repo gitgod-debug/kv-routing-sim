@@ -188,8 +188,8 @@ once, on the calibration box, offline, before anything is published.
   │    → a browser demo on bundled + generated traces. Ten seconds to a      │
   │      Pareto curve with nothing installed. A SHOP WINDOW, not the product. │
   │                                                                          │
-  │  Render free (512 MB, sleeps when idle)                                  │
-  │    → docs/landing only. No compute. ⚠️ See the open question below.       │
+  │  GitHub Pages (static)                                                   │
+  │    → docs only. No compute. (Render was cut 2026-09-20 — see doc 10.)    │
   └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -213,7 +213,9 @@ See **ADR-010** for the full decision. In short: the **policy ranking** and the 
 transfer (pending **H6**); **absolute ms and ₹** do not, and need `kvsim calibrate` on the user's own
 hardware. ⛔ Never blend a calibrated error bar with an uncalibrated recommendation.
 
-### ⚠️ OPEN QUESTION — what is each deployment actually *for*?
+### ✅ ANSWERED 2026-09-20 — see the deployment notes
+
+**Render is CUT; docs go to GitHub Pages.** The reasoning below is kept as the record of why.
 
 Recorded as open rather than answered, because it is a positioning decision and not a technical one:
 
@@ -234,5 +236,5 @@ Recorded as open rather than answered, because it is a positioning decision and 
 | Need | Where | Constraint |
 |---|---|---|
 | Public demo | **HF Space, free CPU** | 2 vCPU / 16 GB. The simulator is CPU work, so this is a natural fit — and it only works because of ADR-009. **Bundled + generated traces only.** |
-| Docs site | Render free | 512 MB, sleeps when idle. No model weights, ever. ⚠️ Cut-or-justify at Phase 7 — see the open question above. |
+| Docs site | **GitHub Pages** (static) | ✅ Render **CUT** 2026-09-20 — a 512 MB sleeping container serving static docs is worse than Pages at the same price. It returns only if we build the thin HTTP recommender. |
 | Package | PyPI | `pip install kv-routing-sim` + semver + changelog. **The real usage path.** |

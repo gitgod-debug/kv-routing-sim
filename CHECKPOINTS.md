@@ -222,12 +222,16 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
       from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no
       measured basis
-- [ ] HF Space (free CPU) — ⛔ **bundled + generated traces only.** No upload box for production traces:
-      those are someone's users' prompts. If uploads ever ship, hashing happens client-side
-- [ ] ⚠️ **Render: cut or justify.** A 512 MB sleeping container serving static docs is worse than GitHub
-      Pages at the same price. Either it hosts something genuinely dynamic (a thin HTTP recommender, which
-      would be a real production artifact) or it is cut and docs go to Pages. See the open question in
-      `docs/07-environment.md`
+- [ ] **HF Space** — the one-screen design in the deployment notes:
+      finding + crossover curve + calibration table **static above the fold**, then three sliders
+      (sharing / load / replicas) whose payoff is watching the recommendation **flip**.
+      ⛔ **Bundled + generated traces only, no upload box** — a serving log is someone's users' prompts
+- [ ] ⭐ **The same curve images and calibration table go IN THE README.** Free Spaces sleep, so a cold
+      visitor waits 30–60 s. The finding must never sit behind a cold start
+- [x] ✅ **Render: CUT** (decided 2026-09-20). Docs go to **GitHub Pages** — Render's 512 MB sleeping
+      container is worse than Pages at the same price. Render only returns if we build the thin HTTP
+      recommender, which would be real production evidence. See the deployment notes
+- [ ] Docs published to GitHub Pages
 - [ ] ⭐ **"What breaks at 10× and 100×"** as a named README section, answered with **measured** numbers:
       RSS ceiling and sweep wall-clock at 10× trace length; at 100×, which gives out first — block-hash
       memory, the policy inner loop, or the report renderer; at 10× replicas, does cache-model fidelity
@@ -241,6 +245,11 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 ## Phase 8 — Write-up and launch
 
 - [ ] README **numbers-first**, with **the credential and the finding in separate sections**
+- [ ] Write the README against the **three readers** in
+      the deployment notes: the 30-second reader (needs the
+      grep targets *visible* — engine, version, metric names, GPU), the 2-minute reader (needs four
+      lines), and the 30–60-minute engineer who asks *"isn't this just Vidur?"* (needs the ADRs and the
+      residual)
 - [ ] Scope discipline in the README from day one: vs `cachetrace` (multi-replica policy choice, not
       single-path linting) · vs **Vidur** (cache-aware *policy* choice, not parallelism/capacity planning) ·
       vs **Frontier** (reads *your* log and *recommends*, rather than being configured by hand)
