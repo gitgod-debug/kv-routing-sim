@@ -1,0 +1,32 @@
+# The synthetic agentic-traffic generator. A generated trace is reproduced from THIS FILE plus a
+# seed — never shipped as data (docs/06-methodology.md §1, determinism contract).
+#
+# Why agentic traffic is the default shape: an agent re-sends the system prompt, the tool
+# definitions and the whole conversation every turn, so prompt sharing is most of the workload
+# rather than an edge case (docs/03-background-concepts.md §3).
+
+schema_version: 1
+seed: 0
+
+shape:
+  # ⭐ THE H2 AXIS. Phase 5 sweeps this; everything else here is held fixed while it moves.
+  # Fraction of prompt tokens that are shared prefix across requests.
+  prefix_sharing_ratio: <TBD>
+
+  system_prompt_tokens: <TBD>      # the span every request shares
+  tool_definition_tokens: <TBD>    # also shared, and re-sent every turn
+  turns_per_session: <TBD>         # distribution, not a scalar — agents are not uniform
+  user_turn_tokens: <TBD>
+  output_tokens: <TBD>
+
+arrivals:
+  process: <TBD>                   # e.g. poisson | trace-replay | bursty
+  requests_per_second: <TBD>       # ⭐ the second H2 axis (offered load)
+  duration_s: <TBD>
+
+engine:
+  # Must MATCH the calibrated engine's configuration, or the cache model is fitted to one setup and
+  # evaluated on another. Record what the live engine actually reported, not what was intended.
+  block_size: <TBD>                # vLLM default is 16
+  max_num_seqs: <TBD>
+  kv_cache_blocks_per_replica: <TBD>   # derived from GPU memory; set from the calibration run

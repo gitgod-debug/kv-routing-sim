@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kv-routing-sim"
+version = "0.0.1"
+description = "Trace-driven simulator and recommender for multi-replica LLM KV-cache routing policies, calibrated against a live inference engine"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# The core dependency set is deliberately tiny and CPU-only. See ADR-009.
+#
+# `pip install kv-routing-sim` must never pull a GPU dependency. The user-facing promise is
+# "no GPU dependency for users; GPU only for your own calibration runs" — a simulator that
+# drags in vLLM (and therefore torch, and therefore CUDA wheels) to answer a CPU question has
+# broken its own pitch. The engine lives in the `[calib]` extra, installed only on the
+# calibration box.
+#
+# Versions carry the date they were checked. Confirm no newer release at install time and
+# record what ACTUALLY installed — into docs/07-environment.md and into every results header.
+# See docs/06-methodology.md §3 (reproducibility contract).
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+dependencies = [
+    "numpy>=1.26",            # checked 2026-09-20
+    "pyyaml>=6.0",            # config files: cost model, workload grids, policy grids
+    "pydantic>=2.7",          # the normalized request schema is validated, and it is VERSIONED (ADR-004)
+    "matplotlib>=3.8",        # Pareto curves. The only plotting dependency; no seaborn.
+]
+
+[project.optional-dependencies]
+# ── The calibration box only. NOT installed locally, NOT a user dependency. ──────────────────
+# ⚠️ This extra is expected to be installed on the A100/H100 box and nowhere else. Its
+# resolution has NOT been attempted as of 2026-09-20 — recording that honestly, because the
+# sibling project (`colpali-lite`) shipped an extra that turned out not to install at all
+# (`ResolutionImpossible` between optimum and transformers), and the lesson is that an
+# unattempted resolution is an assumption, not a fact.
+#
+# `vllm` is pinned to the version the metric names were verified against: v0.29.0, released
+# 2026-09-09, read from `vllm/v1/metrics/loggers.py`. See ADR-008 — `vllm:prefix_cache_hit_rate`
+# does NOT exist at this version; the hit rate is `vllm:prefix_cache_hits` ÷
+# `vllm:prefix_cache_queries`, two counters.
+# ⛔ Re-check at Phase-0 run time and record the version that actually installed. If the wheel
+# available on that box is not 0.29.0, the metric-name audit must be re-run against ITS
+# loggers.py before any number is trusted — that check is a Phase-0 checkbox, not a formality.
+calib = [
+    "vllm==0.29.0",
+    "httpx>=0.27",                 # /metrics scraping + the load generator
+    "prometheus-client>=0.20",     # parsing the exposition format, rather than regexing it
+]
+# Phase 4+: the sweep is embarrassingly parallel across (policy, replica-count, seed)
+sweep = ["joblib>=1.4"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.5"]
+
+[project.scripts]
+# The CLI contract from the spec: `kvsim replay trace.jsonl --policies all --replicas 1-8`
+kvsim = "kv_routing_sim.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# E501 is NOT in ruff's default set, so a declared line-length would otherwise be decorative.
+# If the number is in the config, it should be enforced.
+extend-select = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

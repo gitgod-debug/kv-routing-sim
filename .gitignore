@@ -1,0 +1,37 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Private working notes — this repo goes public at ship time.
+# Planning notes, kept beside the build for convenience. They are not part of this repository
+# and stay out of its history.
+# They remain on disk; `git add -f <file>` if that decision is ever reversed.
+FLAGSHIP_PROJECTS.md
+PERSONALIZED_TRACKS.md
+TRACK_A_4MONTH_PLAN.md
+
+# Regenerable outputs — results tables and raw metric scrapes ARE committed (they are the
+# calibration evidence), bulk artifacts are not.
+artifacts/traces/
+artifacts/logs/
+artifacts/sweeps/
+
+# Traces are other people's request logs. Never commit one, even a small one, even redacted:
+# prompt prefixes are user content. Committed traces are the *generated* ones only, which live
+# in configs/ as a seed + generator config rather than as data.
+*.trace.jsonl
+*.trace.jsonl.gz
+
+# vLLM / model junk, in case a calibration run happens in-tree
+*.safetensors
+*.bin
+.cache/
+hf_cache/
