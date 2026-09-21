@@ -46,7 +46,7 @@ TRACKED_PACKAGES = (
 )
 
 # The valid values for `hardware_path`. See ADR-005 for what each one permits reporting.
-HARDWARE_PATHS = ("single-replica", "mig", "memory-split", "cpu-only")
+HARDWARE_PATHS = ("single-replica", "multi-gpu", "mig", "memory-split", "cpu-only")
 
 
 def _git(*args: str) -> str:

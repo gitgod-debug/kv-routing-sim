@@ -12,8 +12,8 @@
 **Last updated:** 2026-09-20 (**the simulator is built**: traces, cache, 7 policies, event loop, eval,
 CLI, 73 tests green. Everything except the three engine-dependent numbers, which stay behind the
 Phase-0 gate)
-**Current phase:** Phase 0 spike still **NOT RUN** · Phases 1, 2, 4 built against an **uncalibrated**
-profile
+**Current phase:** ✅ **Phase 0 PASSED 2026-09-21.** Notebook v2 pending (finishes the three items v1
+could not). Phase 3 (calibration) is next, and needs a hardware decision — see the Phase 0 verdict.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -74,7 +74,7 @@ profile
 
 | Phase | Name | Status | Gate to pass before moving on |
 |---|---|---|---|
-| **0** | **Spike & de-risk** | `[~]` | Committed raw `/metrics` scrape where `vllm:prefix_cache_hits` **and** `_queries` are present **and moving**, + a two-server coexistence result. ⛔ **blocks all simulator code** |
+| **0** | **Spike & de-risk** | `[x]` | Committed raw `/metrics` scrape where `vllm:prefix_cache_hits` **and** `_queries` are present **and moving**, + a two-server coexistence result. ⛔ **blocks all simulator code** |
 | 1 | Trace schema + ingestion + generator | `[x]` | A real log **and** a generated agentic trace both load into one versioned schema; malformed lines log-and-continue with a count |
 | 2 | Block-level KV cache model | `[x]` | Known prefix sequence → known hit/miss pattern, in tests; partial-block rule holds; memory ceiling measured |
 | 3 | **Real-Engine Calibration Report** | `[ ]` | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
@@ -165,9 +165,37 @@ Phase-0 equivalent until now.
 counters are present and increasing, plus a recorded answer to "can two servers coexist, and by which
 path."
 
-> ⛔ **NOT PASSED as of 2026-09-20.** Nothing in `src/` may be written until it is. Every assumption in the
-> calibration plan — prefix caching behaving as documented, the counters existing and moving, two servers
-> coexisting — has **never been executed once**.
+> ### ✅ PASSED 2026-09-21 — vLLM 0.29.0 · Qwen/Qwen3-0.6B · Kaggle 2x Tesla T4
+> Evidence: [`artifacts/results/phase0_kaggle_t4/`](artifacts/results/phase0_kaggle_t4/) — the verdict
+> JSON, **both raw `/metrics` scrapes**, both server logs, and the executed notebook with its outputs.
+>
+> | Question | Answer | How we know |
+> |---|---|---|
+> | Counters present? | ✅ yes | metric-name audit of 0.29.0's own source; both in the scrape |
+> | Counters **move**? | ✅ yes | +33,344 queried, +32,768 hit |
+> | `prefix_cache_hit_rate` absent? | ✅ absent | ADR-008 confirmed |
+> | ⭐ **Blocks or tokens?** | ⛔ **TOKENS** | vLLM's own HELP text **and** 512 sent → +512, not +32 |
+> | Partial trailing block? | ⭐ in `queries`, never in `hits` | each 513-token request hit exactly 512 |
+> | Does the mechanism work? | ✅ **513x less prefill** | `prompt_tokens_by_source{local_compute}`: 64 vs 32,832 |
+> | Our KV arithmetic right? | ✅ to 0.11% | engine: 114,819 B/token · `capacity.py`: 114,688 |
+> | `kv_block_*` histograms? | ⚠️ **not tested** | wrong flag — `--kv-cache-metrics` enables them (ADR-008 amendment) |
+> | Two servers coexist? | ⚠️ **not tested properly** | both died on `max_model_len` 40,960 — and the box had **two GPUs**, which v1 never used |
+>
+> **What it changed in the code:** the cache model counted blocks over full blocks only; vLLM counts
+> tokens over *all* prompt tokens. Fixed, and **the model now reproduces the engine's counters to the
+> token** — 33,344 / 32,768 / 576 — pinned by four regression tests (77 tests green).
+>
+> ⚠️ **Three of v1's secondary verdicts were wrong, and all three were notebook bugs, not findings.**
+> `caching_on_beats_off: false` compared an undefined hit rate (the real answer is 513x);
+> `kv_block_histograms: false` used the wrong flag; `two_servers_coexist: false` was a
+> `max_model_len` config error on a box with a spare GPU. **Notebook v2 fixes all three** — and was
+> dry-run across three hardware scenarios, which surfaced a fourth bug (a stale server on the port
+> could mask a failed start) before it could cost a run.
+>
+> ⚠️ **Hardware: this ran on T4, not A100/H100.** The log confirms ADR-005 exactly — no bf16 (fell back to
+> fp16), no FlashAttention-2 (*"only supported on compute capability >= 8"*), attention on TRITON_ATTN.
+> Everything above is hardware-independent and stands. **TTFT and cost coefficients from this box do
+> not transfer** to datacenter serving.
 
 ---
 

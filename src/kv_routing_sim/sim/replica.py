@@ -39,7 +39,7 @@ class Replica:
     def __init__(self, index: int, profile: CostProfile) -> None:
         self.index = index
         self.profile = profile
-        self.cache = BlockCache(profile.kv_cache_blocks)
+        self.cache = BlockCache(profile.kv_cache_blocks, block_size=profile.block_size)
         self.running: list[InFlight] = []
         self.queue: deque[NormalizedRequest] = deque()
         self.next_free_ts = 0.0
@@ -64,7 +64,7 @@ class Replica:
 
         while len(self.running) < p.max_num_seqs and self.queue:
             req = self.queue.popleft()
-            matched = self.cache.query(req.block_hashes)
+            matched = self.cache.query(req.block_hashes, req.prompt_tokens)
             cached_tokens = matched * p.block_size
             uncached = max(0, req.prompt_tokens - cached_tokens)
             prefill_s += p.prefill_s(uncached)

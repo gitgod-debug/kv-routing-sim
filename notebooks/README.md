@@ -6,10 +6,29 @@ shell.
 
 ---
 
+## Status
+
+✅ **v1 ran 2026-09-21 and the Phase-0 gate PASSED** (vLLM 0.29.0, Qwen3-0.6B, Kaggle 2x T4). Results:
+[`../artifacts/results/phase0_kaggle_t4/`](../artifacts/results/phase0_kaggle_t4/).
+
 ## Which file to run
 
-**`phase0_spike_vllm.ipynb`** — and nothing else, yet. It is the gate: no simulator number is
-trustworthy until it passes (`../CHECKPOINTS.md` Phase 0).
+**`phase0_spike_vllm.ipynb` — now v2.** Same self-contained rules. It finishes the three things v1
+could not, all of which were notebook bugs rather than findings about vLLM:
+
+| v1 got wrong | v2 does instead |
+|---|---|
+| compared an undefined hit rate with caching off | compares prefill tokens actually computed (`local_compute`) |
+| used `--kv-cache-metrics-sample` to enable histograms | passes **`--kv-cache-metrics`** (the real enable flag) and reads the answer from the engine's config dump, never from `--help` |
+| died on the 40,960-token default context | `--max-model-len 4096` |
+| put both servers on GPU 0 of a two-GPU box | one server per physical GPU |
+
+⭐ **And v2 is the first multi-replica sim-to-real check.** Its round-robin arm has a prediction from our
+simulator, committed before it runs: **1,088 prefill tokens computed, hit rate 0.966862**. The notebook
+compares and reports the error itself.
+
+**Run it on the same Kaggle dual-T4 box.** Every question v2 asks is hardware-independent, and two
+physical GPUs are the best possible 2-replica setup.
 
 **It is self-contained.** It does not import `kv_routing_sim`, needs no repo checkout, no dataset, and
 no HF token. Only `vllm` plus the standard library. Copy the one `.ipynb` to the box and run it top to

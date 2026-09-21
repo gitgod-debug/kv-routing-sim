@@ -1,0 +1,72 @@
+{
+  "script": "notebooks/phase0_spike_vllm.ipynb",
+  "date_utc": "2026-09-21T18:19:54+00:00",
+  "model": "Qwen/Qwen3-0.6B",
+  "vllm_version": "0.29.0",
+  "block_size": 16,
+  "environment": {
+    "date_utc": "2026-09-21T18:09:21+00:00",
+    "platform": "Linux-6.12.90+-x86_64-with-glibc2.35",
+    "python": "3.12.13",
+    "cpu_count": 4,
+    "nvidia_smi_gpus": "Tesla T4, 15360 MiB, 7.5, 580.159.04\nTesla T4, 15360 MiB, 7.5, 580.159.04",
+    "nvidia_smi_L": "GPU 0: Tesla T4 (UUID: GPU-10407b19-8305-401c-84c5-40fddb9a1935)\nGPU 1: Tesla T4 (UUID: GPU-97b45840-cd14-0403-8884-e1f96838320e)",
+    "mig_mode": "[N/A]\n[N/A]",
+    "cuda_version": "Build cuda_12.8.r12.8/compiler.35583870_0"
+  },
+  "metric_name_audit": {
+    "prefix_cache_queries": true,
+    "prefix_cache_hits": true,
+    "time_to_first_token_seconds": true,
+    "num_requests_waiting": true,
+    "request_prefill_kv_computed_tokens": true,
+    "kv_block_lifetime_seconds": true,
+    "kv_block_idle_before_evict_seconds": true,
+    "kv_block_reuse_gap_seconds": true,
+    "prefix_cache_hit_rate_EXPECTED_ABSENT": false
+  },
+  "hit_rate_on": 0.9980506822612085,
+  "hit_rate_off": null,
+  "gate": {
+    "counters_present": true,
+    "counters_moved": true,
+    "hit_rate_metric_correctly_absent": true,
+    "query_unit": "tokens",
+    "caching_on_beats_off": false,
+    "kv_block_histograms_present": {
+      "vllm:kv_block_lifetime_seconds": false,
+      "vllm:kv_block_idle_before_evict_seconds": false,
+      "vllm:kv_block_reuse_gap_seconds": false
+    },
+    "kv_sample_flag_supported": false,
+    "two_servers_coexist": false,
+    "hardware_path": "memory-split",
+    "PHASE_0_PASSED": true
+  },
+  "server_argv": {
+    "8000": [
+      "vllm",
+      "serve",
+      "Qwen/Qwen3-0.6B",
+      "--port",
+      "8000",
+      "--block-size",
+      "16",
+      "--gpu-memory-utilization",
+      "0.42",
+      "--enable-prefix-caching"
+    ],
+    "8001": [
+      "vllm",
+      "serve",
+      "Qwen/Qwen3-0.6B",
+      "--port",
+      "8001",
+      "--block-size",
+      "16",
+      "--gpu-memory-utilization",
+      "0.42",
+      "--enable-prefix-caching"
+    ]
+  }
+}

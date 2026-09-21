@@ -239,6 +239,31 @@ the report.
 
 ---
 
+### ⚠️ AMENDMENT 2026-09-22 — the spike ran on Kaggle 2x T4, and that sharpened this ADR
+
+**The T4 limitations this ADR predicted are now measured, from the engine's own log:**
+*"Your device 'Tesla T4' (with compute capability 7.5) doesn't support torch.bfloat16. Falling back to
+torch.float16"* · *"FA2 is only supported on devices with compute capability >= 8"* ·
+*"Using TRITON_ATTN attention backend"*.
+
+**So the hardware question splits cleanly by what is being measured:**
+
+| Measurement | Hardware-dependent? | Where it can run |
+|---|---|---|
+| Cache accounting, hit rates, the partial-block rule | **No** | anywhere — T4 results stand |
+| 2-replica **routing** behaviour (hit rate, prefill computed) | **No** | anywhere — and dual-T4 is ideal, see below |
+| **TTFT and the prefill/decode cost coefficients** | **Yes** — attention kernel + dtype | A100/H100 only. T4's TRITON_ATTN + fp16 path is not how datacenter GPUs serve |
+
+**⭐ A fourth 2-replica path this ADR missed: separate physical GPUs.** Kaggle's box has two T4s. One
+server per GPU (`CUDA_VISIBLE_DEVICES=0` / `=1`) gives **complete** isolation — separate SMs, memory,
+and PCIe — which is *stronger* than MIG. v1 of the notebook only knew MIG and memory-split, so it put
+both servers on GPU 0 and never used the second card. v2 detects physical GPUs first.
+
+Revised order of preference: **separate GPUs > MIG > memory-split**. The first two permit TTFT
+percentiles; memory-split still does not.
+
+---
+
 ## ADR-006: Every cost constant lives in a committed, cited, dated config
 
 **Status:** Accepted · 2026-09-20
@@ -366,6 +391,52 @@ difference between a careful answer and a plausible one, and it is why H4 is tes
 
 The installed vLLM version differs from 0.29.0 and names things differently. **Then re-read ITS
 `loggers.py` and update this ADR before trusting any number** — a Phase-0 checkbox, not a formality.
+
+---
+
+### ⚠️ AMENDMENT 2026-09-22 — the live engine corrected this ADR in two places
+
+The Phase-0 spike ran (vLLM **0.29.0** — the pinned version installed exactly — Qwen/Qwen3-0.6B,
+Kaggle 2x T4). Evidence: `artifacts/results/phase0_kaggle_t4/`. **The core of this ADR held**: every
+metric name we planned against exists, and `vllm:prefix_cache_hit_rate` is correctly absent. Two
+details did not:
+
+**1. ⛔ The counters count TOKENS, not blocks — and the denominator includes the partial block.**
+Settled two independent ways:
+
+- vLLM's own HELP strings: *"Prefix cache queries, **in terms of number of queried tokens**"* and
+  *"Prefix cache hits, **in terms of number of cached tokens**."*
+- Empirically: 512 tokens on a cold cache moved `prefix_cache_queries` by **512**, not 32.
+
+And the full scrape reconciles to the token: 1 cold probe of 512 + 64 requests of 513 gives
+`queries = 33,344` (= all prompt tokens), `hits = 32,768` (= 64 x 32 full blocks x 16), and
+`computed = 576`. So **`queries` counts every prompt token, including the partial trailing block,
+while `hits` can only ever be full blocks.** Our cache model counted full blocks on both sides, so it
+was biased upward — 0.2% on these 513-token prompts, **20% on a 20-token prompt**. Fixed in
+`cache/block_trie.py`; four regression tests now pin the model to the engine's measured counters.
+
+**2. ⛔ `--kv-cache-metrics-sample` does NOT enable the `kv_block_*` histograms.** The engine's own
+config dump: `ObservabilityConfig(... kv_cache_metrics=False, kv_cache_metrics_sample=0.01 ...)`.
+The **enable** switch is **`--kv-cache-metrics`**; the sample flag only sets the rate. This ADR and
+`FLAGSHIP_PROJECTS.md` both said the sample flag enables them — wrong, and it is why v1 of the spike
+collected no histograms. H4 is **not dead**; it was never tested (see the H4 amendment).
+
+**3. ⭐ Metrics we did not know about, and they are better for calibration:**
+
+| Metric | Why it is better |
+|---|---|
+| `vllm:prompt_tokens_by_source{source="local_compute"}` | Prefill tokens **actually computed** — the quantity that drives TTFT and cost. Defined **even with caching off**, where a hit *rate* is undefined |
+| `vllm:prompt_tokens_by_source{source="local_cache_hit"}` | Equals `prefix_cache_hits`; a useful cross-check |
+| `vllm:prompt_tokens_by_source{source="external_kv_transfer"}` | Cross-instance KV transfer (LMCache-style). Zero here; relevant if ADR-002's per-replica assumption is ever relaxed |
+| `vllm:prompt_tokens_cached_total` | Cached prompt tokens, as a plain counter |
+
+`local_compute` is now the primary calibration target alongside the hit rate: it is what the
+caching-off comparison needs (v1's notebook compared an undefined hit rate there and wrongly reported
+that caching does not help — the real figure is **513x less prefill**).
+
+**4. ✅ Our KV-size arithmetic matches the engine.** vLLM reported *"4.38 GiB KV cache is needed"* for
+40,960 tokens = 114,819 B/token; `cache/capacity.py` computes 114,688. The 0.11% gap is vLLM's own
+rounding of "4.38".
 
 ---
 

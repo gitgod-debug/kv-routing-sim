@@ -202,4 +202,21 @@ calibration cannot cash.
 | **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[ ]` untested |
 | **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 (CPU-only re-run) | `[ ]` untested · **gates ADR-010's tier-1/2 claims** |
 
-**Amendments:** *(none yet — add dated entries below, never edit above)*
+**Amendments:** *(add dated entries below, never edit above)*
+
+### 2026-09-22 — H4 is NOT dead. It has not been tested yet, because we used the wrong flag.
+v1 of the spike reported the `kv_block_*` histograms absent. The engine's own config dump shows why:
+`kv_cache_metrics=False, kv_cache_metrics_sample=0.01`. The **enable** switch is `--kv-cache-metrics`;
+`--kv-cache-metrics-sample` (the flag this file and ADR-008 named) only sets the rate. The metric
+names ARE in vLLM 0.29.0's source. H4 stands as written; notebook v2 passes the right flag.
+
+### 2026-09-22 — H3 gets its first data point, and it is honest about how small it is.
+On the spike workload (one shared 512-token prefix, 64 requests) the corrected cache model reproduces
+vLLM's counters **to the token**: 33,344 queried, 32,768 hit, 576 computed. That validates the
+*accounting* — unit, denominator, the partial-block rule. It says nothing about eviction, because the
+workload never evicts. It is the first calibration point, not the calibration.
+
+### 2026-09-22 — a pre-registered sim-to-real prediction for notebook v2
+For v2's round-robin arm (the same workload alternated across 2 replicas) the simulator predicts
+**1,088 prefill tokens computed, hit rate 0.966862** — versus 576 for affinity routing, i.e. **1.89x
+more prefill without affinity**. Committed before v2 runs. The notebook scores itself against it.
