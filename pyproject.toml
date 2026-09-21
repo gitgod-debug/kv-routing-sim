@@ -71,7 +71,7 @@ target-version = "py311"
 # Exception` is correct when probing an unfamiliar box where any import or binary may be missing.
 # The notebook is validated instead by compiling every cell and dry-running its logic against a mock
 # engine across five failure scenarios — see the Phase 0 entry in CHECKPOINTS.md.
-extend-exclude = ["notebooks"]
+extend-exclude = ["*.ipynb"]  # notebooks anywhere, including executed ones kept as evidence
 
 [tool.ruff.lint]
 # E501 is NOT in ruff's default set, so a declared line-length would otherwise be decorative.

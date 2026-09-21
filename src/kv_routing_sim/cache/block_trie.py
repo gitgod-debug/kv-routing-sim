@@ -35,21 +35,54 @@ from collections.abc import Sequence
 class BlockCache:
     """A single replica's prefix cache: LRU over a bounded pool of blocks.
 
-    Counter names deliberately mirror vLLM's own (`queries`, `hits`) so the predicted and the
-    measured quantity are literally the same quantity rather than two things that sound alike
-    (ADR-008).
+    ⭐ COUNTED IN TOKENS, EXACTLY AS vLLM COUNTS — corrected 2026-09-21 from a live engine.
+
+    `queries` and `hits` mirror vLLM's own counters in name AND unit, so a predicted and a measured
+    hit rate are literally the same quantity (ADR-008). The Phase-0 spike (vLLM 0.29.0, 2x T4)
+    settled the unit two independent ways:
+
+      * vLLM's own HELP text: "Prefix cache queries, in terms of number of queried TOKENS" and
+        "Prefix cache hits, in terms of number of cached TOKENS".
+      * Empirically: 512 tokens sent on a cold cache moved `queries` by exactly 512, not 32.
+
+    And it exposed a SECOND discrepancy that a block->token conversion alone would not have fixed:
+
+      * vLLM's `queries` is ALL prompt tokens, including the partial trailing block.
+      * `hits` can only ever be FULL blocks (the partial-block rule).
+
+    So for a 513-token prompt whose 32 full blocks are all cached, vLLM reports 512/513 = 0.99805,
+    not 1.0. Before this fix we counted full blocks on BOTH sides and reported 1.0 — biased upward,
+    and badly so on short prompts: a 20-token prompt has one 16-token block, so we would have said
+    16/16 = 100% where vLLM says 16/20 = 80%.
+
+    `queries_blocks` / `hits_blocks` are kept for internal use (eviction reasoning, capacity).
+    Everything that is compared against the engine uses the token counters.
     """
 
-    __slots__ = ("_resident", "capacity_blocks", "evictions", "hits", "queries")
+    __slots__ = (
+        "_resident",
+        "block_size",
+        "capacity_blocks",
+        "evictions",
+        "hits",
+        "hits_blocks",
+        "queries",
+        "queries_blocks",
+    )
 
-    def __init__(self, capacity_blocks: int) -> None:
+    def __init__(self, capacity_blocks: int, block_size: int = 16) -> None:
         if capacity_blocks <= 0:
             raise ValueError(f"capacity_blocks must be > 0, got {capacity_blocks}")
+        if block_size <= 0:
+            raise ValueError(f"block_size must be > 0, got {block_size}")
         self.capacity_blocks = capacity_blocks
+        self.block_size = block_size
         # OrderedDict as an LRU: leftmost is least-recently-used.
         self._resident: OrderedDict[int, None] = OrderedDict()
-        self.queries = 0
-        self.hits = 0
+        self.queries = 0  # TOKENS — every prompt token, as vLLM counts
+        self.hits = 0  # TOKENS — cached full blocks x block_size
+        self.queries_blocks = 0
+        self.hits_blocks = 0
         self.evictions = 0
 
     def __len__(self) -> int:
@@ -57,7 +90,7 @@ class BlockCache:
 
     @property
     def hit_rate(self) -> float:
-        """⛔ DERIVED, never a stored gauge. hits / queries — the same shape as ADR-008 requires."""
+        """⛔ DERIVED, never stored. Cached tokens / ALL prompt tokens — vLLM's own definition."""
         return self.hits / self.queries if self.queries else 0.0
 
     def lookup(self, block_hashes: Sequence[int]) -> int:
@@ -94,18 +127,21 @@ class BlockCache:
         self._resident.popitem(last=False)  # drop the least-recently-used block
         self.evictions += 1
 
-    def query(self, block_hashes: Sequence[int]) -> int:
-        """Lookup + admit + count, as one admission would do. Returns matched blocks.
+    def query(self, block_hashes: Sequence[int], prompt_tokens: int | None = None) -> int:
+        """Lookup + admit + count, as one admission would do. Returns matched BLOCKS.
 
-        ⚠️ UNIT NOTE — a Phase-0 spike question, not a settled fact. We count `queries` and `hits`
-        in BLOCKS. Whether vLLM's `vllm:prefix_cache_queries` counts blocks or tokens must be read
-        off the live engine before any predicted-vs-measured comparison is trusted; if it counts
-        tokens, multiply by block size. Comparing a block-rate against a token-rate would produce a
-        confident, wrong calibration error. See `CHECKPOINTS.md` Phase 0.
+        `prompt_tokens` is the request's full prompt length, INCLUDING any partial trailing block
+        that `block_hashes` omits. It is what vLLM counts as queried, so pass it whenever the real
+        length is known — every real request has it. When omitted, it falls back to full blocks
+        only (`len(block_hashes) * block_size`), which is exact for block-aligned prompts and
+        biased upward otherwise.
         """
         matched = self.lookup(block_hashes)
-        self.queries += len(block_hashes)
-        self.hits += matched
+        tokens = prompt_tokens if prompt_tokens is not None else len(block_hashes) * self.block_size
+        self.queries += tokens
+        self.hits += matched * self.block_size
+        self.queries_blocks += len(block_hashes)
+        self.hits_blocks += matched
         self.admit(block_hashes, matched)
         return matched
 
@@ -113,4 +149,6 @@ class BlockCache:
         """Zero the counters but keep residency — for discarding a warm-up period."""
         self.queries = 0
         self.hits = 0
+        self.queries_blocks = 0
+        self.hits_blocks = 0
         self.evictions = 0
