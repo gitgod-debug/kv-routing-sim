@@ -15,6 +15,21 @@ Phase-0 gate)
 **Current phase:** Phase 0 spike still **NOT RUN** · Phases 1, 2, 4 built against an **uncalibrated**
 profile
 
+> ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
+> Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
+> **paid plan (PRO, $9/month personal) to create a Gradio or Docker Space** — only Static Spaces are
+> free. Phase 7's demo was therefore **undeliverable as written**, and nobody had checked.
+>
+> ✅ **The demo is now a STATIC page driven by a precomputed grid**, on GitHub Pages and a free Static
+> Space. It is the better answer regardless of price: it **never sleeps** (the cold-start defect this
+> plan had already flagged and could only hedge around — and which PRO would not fix either, since a
+> paid Space still sleeps after 48 h), and a precomputed grid is **reproducible from a committed
+> script** where a live app is not.
+>
+> 📏 **Method lesson, and it is the same one that killed the Aug-25 OSS-PR target:** platform terms and
+> free tiers change, and a plan that names a specific free tier has a **shelf life**. Re-check every
+> hosting assumption the week before it is used — not the month it was written.
+
 > ## 🔨 2026-09-20 — the simulator is built. What the gate actually blocked, and what it did not.
 >
 > The Phase-0 gate exists to stop **unverified engine behaviour** being baked into the model. That is
@@ -66,7 +81,7 @@ profile
 | 4 | **Seven** policies + Pareto sweep | `[~]` | Built and running; **gated on a calibrated profile** before any curve is published. Tests **H1 + H5 + H6** |
 | 5 | **The crossover finding** | `[ ]` | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
 | 6 | Sim-to-real 2-replica validation | `[ ]` | Predicted vs measured across two MIG instances, or the documented fallback and why |
-| 7 | Package · CLI · Space · hardening | `[ ]` | `pip install` + `kvsim replay` + HF Space + "what breaks at 10×/100×" answered with measured numbers |
+| 7 | Package · CLI · static demo · hardening | `[~]` | `pip install` + `kvsim replay` + a **static** demo page (ADR-011) + "what breaks at 10×/100×" answered with measured numbers |
 | 8 | Write-up & launch | `[ ]` | README numbers-first, Show HN, **the `guidellm` PR open** |
 
 ### ⛔ Two ordering rules, written down now so a compressed week does not decide them under pressure
@@ -257,7 +272,7 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 
 ---
 
-## Phase 7 — Package, CLI, Space, hardening
+## Phase 7 — Package, CLI, the static demo, hardening
 
 - [ ] `pip install kv-routing-sim`; `kvsim replay trace.jsonl --policies all --replicas 1-8
       --format json|md|html`; semver + changelog
@@ -268,15 +283,26 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
       from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no
       measured basis
-- [ ] **HF Space** — the one-screen design in the deployment notes:
-      finding + crossover curve + calibration table **static above the fold**, then three sliders
-      (sharing / load / replicas) whose payoff is watching the recommendation **flip**.
+- [ ] ⭐ **`scripts/build_grid.py`** — sweep sharing × load × replicas × policy and emit ONE JSON file.
+      This is the demo's whole backend (ADR-011). Parallel via `joblib` (`[sweep]` extra); commit the
+      grid plus its wall-clock and byte size, since both are currently estimates
+- [ ] **The static demo page** — the one-screen design in
+      the deployment notes: finding + crossover curve +
+      calibration table above the fold, then three sliders that **look up** the grid (no server, no
+      wait) and whose payoff is watching the recommendation **flip**.
       ⛔ **Bundled + generated traces only, no upload box** — a serving log is someone's users' prompts
-- [ ] ⭐ **The same curve images and calibration table go IN THE README.** Free Spaces sleep, so a cold
-      visitor waits 30–60 s. The finding must never sit behind a cold start
-- [x] ✅ **Render: CUT** (decided 2026-09-20). Docs go to **GitHub Pages** — Render's 512 MB sleeping
-      container is worse than Pages at the same price. Render only returns if we build the thin HTTP
-      recommender, which would be real production evidence. See the deployment notes
+- [ ] Publish that page to **GitHub Pages** AND to a **free Static Space** — same build, two URLs
+- [ ] ⭐ **The same curve images and calibration table go IN THE README**, for the reader who never
+      leaves GitHub. *(No longer a workaround for cold starts — a static page does not sleep — just
+      belt-and-braces.)*
+- [x] ✅ **Render: CUT.** Verified 2026-09-21: free web services **spin down after 15 minutes** idle,
+      take **~1 minute** to wake, run on 512 MB / 0.1 CPU, and the 750 hours are a **monthly cap**, not
+      always-on. Returns only if we build the thin HTTP recommender (real production evidence)
+- [x] ✅ **Demo platform decided: STATIC** (2026-09-21, **ADR-011**). ⛔ The free Gradio Space this plan
+      assumed **no longer exists** — HF now requires a paid plan (PRO, $9/mo personal) to create a
+      Gradio or Docker Space; only Static is free. The one free exception is 2 Gradio Spaces on
+      **ZeroGPU** — rationed GPU, absurd for a CPU-only simulator. Static is also *better*: it never
+      sleeps, and a precomputed grid is reproducible from a committed script where a live app is not
 - [ ] Docs published to GitHub Pages
 - [ ] ⭐ **"What breaks at 10× and 100×"** as a named README section, answered with **measured** numbers:
       RSS ceiling and sweep wall-clock at 10× trace length; at 100×, which gives out first — block-hash

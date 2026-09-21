@@ -58,7 +58,8 @@ six 1.17.0 · typing-inspection 0.4.4 · typing_extensions 4.16.0        (+ pip,
 ```
 
 The `kvsim` console script resolves and exits 2 with its Phase-0 message, so the declared entry
-point is real rather than aspirational. **The free-CPU HF Space in Phase 7 is therefore reachable**;
+point is real rather than aspirational. **The static demo page in Phase 7 is therefore reachable** —
+and so would a CPU Space be, if one were free (it is not; see ADR-011);
 that deployment target only exists because of this property.
 
 ---
@@ -184,9 +185,10 @@ once, on the calibration box, offline, before anything is published.
   │    → runs on the USER'S OWN machine or CI. Their trace never leaves it.  │
   │    → this is the real usage path.                                        │
   │                                                                          │
-  │  HF Space (free CPU, 2 vCPU / 16 GB)                                     │
-  │    → a browser demo on bundled + generated traces. Ten seconds to a      │
-  │      Pareto curve with nothing installed. A SHOP WINDOW, not the product. │
+  │  Static demo page — GitHub Pages + a free Static Space                   │
+  │    → precomputed grid + sliders. Instant, never sleeps, no compute.      │
+  │      A SHOP WINDOW, not the product. (ADR-011, corrected 2026-09-21:     │
+  │      free Gradio Spaces now need PRO.)                                   │
   │                                                                          │
   │  GitHub Pages (static)                                                   │
   │    → docs only. No compute. (Render was cut 2026-09-20 — see doc 10.)    │
@@ -201,7 +203,7 @@ the point of a simulator: **pay the GPU cost once, then answer "what if" thousan
 because prompts are hashed at the adapter boundary (ADR-002), a real trace can be processed without its
 prompt text ever entering the simulator.
 
-> ### ⛔ The one thing not to get wrong about the HF Space: traces are user content
+> ### ⛔ The one thing not to get wrong about the demo: traces are user content
 > A Space that invites strangers to upload a production serving log is asking them to send their users'
 > prompts to a third-party host. **The Space demo runs on bundled sample traces and the synthetic
 > generator only.** Real traces belong to the local CLI, on the user's own machine, where they already
@@ -235,6 +237,6 @@ Recorded as open rather than answered, because it is a positioning decision and 
 
 | Need | Where | Constraint |
 |---|---|---|
-| Public demo | **HF Space, free CPU** | 2 vCPU / 16 GB. The simulator is CPU work, so this is a natural fit — and it only works because of ADR-009. **Bundled + generated traces only.** |
-| Docs site | **GitHub Pages** (static) | ✅ Render **CUT** 2026-09-20 — a 512 MB sleeping container serving static docs is worse than Pages at the same price. It returns only if we build the thin HTTP recommender. |
+| Public demo | **Static page** — GitHub Pages **+** a free Static Space | ⚠️ **Corrected 2026-09-21 (ADR-011): a free Gradio Space no longer exists** — "Gradio and Docker Spaces … require a paid plan to create: PRO for personal accounts." Only Static is free. A precomputed grid + sliders needs no compute, **never sleeps**, and is reproducible from a committed script. **Bundled + generated traces only.** |
+| Docs site | **GitHub Pages** (static) | ✅ Render **CUT** — free web services spin down after **15 min** idle, take **~1 min** to wake, and the 750 hours are a monthly cap. Returns only if we build the thin HTTP recommender. |
 | Package | PyPI | `pip install kv-routing-sim` + semver + changelog. **The real usage path.** |

@@ -112,9 +112,11 @@ The GPU appears **once**, on our calibration box, offline, before anything is pu
 deployed is pure CPU Python:
 
 - **PyPI** — on your machine. The real usage path.
-- **HF Space (free CPU)** — a browser demo on bundled and generated traces, so you can see a Pareto curve
-  in ten seconds with nothing installed. It is a **shop window, not a service**. ⛔ It deliberately does
-  not accept uploaded production traces: those are your users' prompts, and they belong on your machine.
+- **A static demo page** — a precomputed grid with sliders, so you can see the recommendation flip in
+  ten seconds with nothing installed. No server, so **nothing to wake up**, and every number on it comes
+  from a committed script with a pinned seed. It is a **shop window, not a service**. ⛔ It deliberately
+  does not accept uploaded production traces: those are your users' prompts, and they belong on your
+  machine.
 - **Docs** — static.
 
 Replaying 100k requests through a dict-based trie is milliseconds of CPU work. There is nothing for a GPU

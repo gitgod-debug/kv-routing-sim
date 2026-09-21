@@ -384,7 +384,9 @@ and `httpx` lazily, inside functions, and fails with a message naming the extra.
 The user-facing promise is *no GPU dependency for users; GPU only for your own calibration runs.* A
 simulator that drags in vLLM — and therefore torch, and therefore multi-gigabyte CUDA wheels — to answer
 a CPU question has broken its own pitch before the user reaches the README's second paragraph. It also
-makes the free-CPU HF Space deployment possible at all.
+makes the static-page deployment possible at all — a precomputed grid is only cheap to build because
+the simulator needs no GPU (and see ADR-011: the free *Gradio* Space this originally referred to no
+longer exists).
 
 There is a second reason, learned from the sibling project: `colpali-lite`'s `[serving]` extra turned out
 **not to install at all** (`ResolutionImpossible` between `optimum` and `transformers`). Keeping the heavy
@@ -394,7 +396,7 @@ extra strictly separate means that kind of discovery can never break the core in
 
 | Rejected | Why |
 |---|---|
-| **vLLM as a core dependency** | Breaks CPU-only install, the HF Space, and the pitch. |
+| **vLLM as a core dependency** | Breaks the CPU-only install, the static demo build, and the pitch. |
 | **A separate `kv-routing-sim-calib` package** | Two packages, two release processes, for one module. The extra is the right size for this. |
 | **Shelling out to a vLLM CLI instead of importing** | Actually fine for *starting servers* (and the spike scripts do exactly that), but `calib/` also parses the exposition format, which wants `prometheus-client`. Both stay in the extra. |
 
@@ -473,3 +475,96 @@ between an A100 and an H100 that the recommended policy flips — then tiers 1 a
 `kvsim calibrate` stops being optional and becomes **mandatory**, and the project is a
 calibrate-then-decide tool rather than a decide-now tool. That is a materially smaller product, and H6 is
 how we find out before the README claims otherwise.
+
+---
+
+## ADR-011: ⭐ The demo is a STATIC page with a precomputed grid
+
+**Status:** Accepted · 2026-09-21 · **Supersedes the "free CPU Gradio Space" assumption in ADR-009,
+`07-environment.md` and the deployment notes**
+
+### What was wrong
+
+Every deployment note in this repo assumed a **free Gradio Space on CPU Basic (2 vCPU / 16 GB)**. That
+is no longer available. Verified against Hugging Face's own docs, 2026-09-21:
+
+> *"Static Spaces are free for everyone. Gradio and Docker Spaces run on compute and **require a paid
+> plan to create**: PRO for personal accounts, Team or Enterprise for organizations. Free personal
+> accounts in good standing can still host up to 2 Gradio Spaces running on ZeroGPU."*
+
+So Phase 7's demo was **undeliverable as written**. Note the gate precisely, because it is easy to
+misread: CPU Basic still costs nothing per hour — what requires PRO ($9/month personal) is *creating a
+compute-backed Space at all*.
+
+And the free exception does not rescue it: the ZeroGPU route is **GPU-backed with a small daily
+quota**. Pointing a CPU-only simulator at a rationed GPU would exhaust the quota on a handful of
+visitors, and a reader who noticed would conclude we do not understand our own workload.
+
+Render was already cut; the reasons are now the measured ones rather than half-remembered. Per Render's
+docs: a free web service **spins down after 15 minutes** without inbound traffic, takes **about one
+minute** to wake, and the 750 instance-hours are a **monthly cap, not always-on**. Keeping it awake by
+pinging is against the spirit of the free tier, so that is not an option either.
+
+### The decision
+
+**Ship a static page driven by a precomputed grid**, published to **GitHub Pages** and (the same build)
+to a **free Static Space**. One artifact, two URLs, no compute, no rent, nothing to fall asleep.
+
+`scripts/build_grid.py` sweeps sharing × load × replicas × policy, writes one JSON file, and the page
+renders it with sliders. The interaction the demo exists for — *drag prefix-sharing down and watch the
+recommendation flip* — works identically against a grid.
+
+### ⭐ Why this is the RIGHT answer, not merely the affordable one
+
+The cost was never the deciding argument. Three things are:
+
+1. **It fixes the defect we had already identified and could not solve.** the deployment notes
+   flagged that a sleeping Space makes a cold visitor wait 30–60 s — "3–6× longer than their attention
+   lasts" — and the mitigation was a hedge (put the images in the README too). A static page **never
+   sleeps**. The problem disappears rather than being worked around. Note that PRO would *not* have
+   fixed this: a paid Space still sleeps after 48 h idle.
+2. **A precomputed grid is a reproducibility artifact; a live app is not.** Every number on the page
+   comes from a committed script, a committed config and a pinned seed — auditable exactly like
+   everything in `artifacts/results/`. A Gradio app computing on demand is *less* falsifiable, because
+   nobody can check what it computed. The apparent downside ("visitors can only pick grid points")
+   inverts into the thing this project claims to care about.
+3. **It matches what we already said the demo is for.** This repo's own position is that the Space is
+   **distribution, not a product surface**, and that anyone with a real serving log should run the CLI
+   locally. Paying monthly rent so strangers can run arbitrary scenarios buys capability for a job
+   nobody asked the page to do.
+
+### ✅ The grid, MEASURED — 2026-09-21, not estimated
+
+`scripts/build_grid.py` has run. The estimates in the first draft of this ADR were wrong by an order of
+magnitude, in the favourable direction:
+
+| | Estimated | **Measured** |
+|---|---|---|
+| Grid | 21 × 12 × 8 × 7 | **19 sharing × 8 rates × 8 replicas × 7 policies** |
+| Cells | ~14,000 | **8,512** (from 25,536 simulator runs over 152 traces) |
+| File, raw | "a few MB" | **327 KiB** |
+| File, gzipped | — | ⭐ **79 KiB** |
+| Build time | ~8 min on 12 cores | **291 s (4.8 min)**, `joblib` across all cores |
+
+⭐ **79 KiB is the number that settles the argument.** The *entire answer space* — every policy at every
+replica count across the full sharing range, measured cross-session sharing spanning 0.000 → 0.900 —
+ships in less than the weight of one photograph, on a host that never sleeps, for nothing. There is no
+version of a live server that improves on that for this page's job.
+
+The committed grid (`artifacts/results/demo_grid.json`) carries its own provenance header, axes, and
+`calibrated: false`, so the page cannot present uncalibrated millisecond figures as predictions.
+
+### Rejected alternatives
+
+| Rejected | Why |
+|---|---|
+| **PRO Gradio Space, $9/month** | Buys live arbitrary scenarios — a capability for a job the page does not have. Still sleeps (48 h). Recurring rent for a shop window, and the first thing to lapse when attention moves on. Revisit only if a real user asks for scenarios the grid cannot express. |
+| **Render free** | 15-minute spin-down, ~60 s wake, 512 MB / 0.1 CPU. Strictly worse than a static host for a static payload, on every axis including honesty. |
+| **The free ZeroGPU Gradio exception** | Rationed GPU for a workload with no GPU in it. Quota dies on a few visitors, and it advertises a misunderstanding of our own project. |
+| **Pyodide — run the real simulator client-side** | Genuinely attractive: free, static, *and* arbitrary scenarios. But ~10 MB of runtime download, and `pydantic-core` is a compiled Rust extension that is not a given under Pyodide. A real project for a small increment over the grid. ⭐ **Keep as the upgrade path** if someone actually wants arbitrary scenarios. |
+| ⛔ **Re-implement the cache model and policies in JavaScript** | **The worst option, and worth stating so a future pass does not revisit it.** It would mean two implementations of the exact thing this project's credibility rests on being *measured for fidelity* — and they would drift, silently, with no test able to see it. Shipping a second unvalidated copy of the component under audit is self-defeating. |
+
+### What would reverse this
+
+A paid plan already being bought for another reason, **plus** a concrete request for a scenario the grid
+cannot express. Both, not either.
