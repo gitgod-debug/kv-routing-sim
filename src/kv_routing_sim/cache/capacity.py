@@ -60,6 +60,11 @@ def kv_blocks_for(
 SHAPES = {
     # Llama-3-8B: 32 layers, 8 KV heads (GQA), head_dim 128, ~16 GiB of fp16 weights
     "llama3-8b": ModelShape("llama3-8b", 32, 8, 128, 2, 16 * GIB),
-    # Qwen3-0.6B-class: small enough to serve on almost anything, useful for the spike
-    "qwen3-0.6b": ModelShape("qwen3-0.6b", 28, 8, 128, 2, 1_200_000_000),
+    # ✅ Read from each model's own config.json on 2026-09-21, not guessed:
+    # Qwen3-0.6B — the Phase-0 spike model. Ungated, ~1.5 GB of weights.
+    #   28 layers, 8 KV heads, head_dim 128 -> 112 KiB of KV per token.
+    "qwen3-0.6b": ModelShape("qwen3-0.6b", 28, 8, 128, 2, 1_500_000_000),
+    # Qwen3-8B — the Phase-3 calibration model. Ungated, unlike meta-llama/* (gated=manual).
+    #   36 layers, 8 KV heads, head_dim 128 -> 144 KiB of KV per token, ~16 GB of bf16 weights.
+    "qwen3-8b": ModelShape("qwen3-8b", 36, 8, 128, 2, 16 * GIB),
 }

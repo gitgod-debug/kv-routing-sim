@@ -36,7 +36,3 @@ artifacts/sweeps/
 *.bin
 .cache/
 hf_cache/
-
-
-# A personal status note, kept untracked.
-harshit.md
