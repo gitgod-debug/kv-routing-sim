@@ -95,6 +95,14 @@ depended on them. This project had no Phase-0 equivalent until now.
 
 ## The runbook — Phase 0, on the calibration box
 
+> ### ⭐ The box is a JUPYTER environment, so run the notebook
+> **[`../notebooks/phase0_spike_vllm.ipynb`](../notebooks/phase0_spike_vllm.ipynb)** — self-contained,
+> no repo checkout, no dataset, no HF token. Model: **`Qwen/Qwen3-0.6B`** (ungated). See
+> [`../notebooks/README.md`](../notebooks/README.md).
+>
+> The shell commands below are the same checks for a box where you do have a terminal. Either path is
+> fine; the notebook is the one that fits the hardware we actually have.
+
 Copy the repo (or just `scripts/`) to the box, then:
 
 ```bash

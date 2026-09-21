@@ -144,6 +144,23 @@ Phase-0 equivalent until now.
 - [ ] Log every friction point hit along the way into the upstream log — **this is
       the upstream PR's seed and it is free, because the friction happens anyway**
 
+> ### ⭐ HOW to run it — the box is a Jupyter environment, so use the notebook
+> **[`notebooks/phase0_spike_vllm.ipynb`](notebooks/phase0_spike_vllm.ipynb)** — one self-contained
+> file: no repo checkout, no dataset, no HF token, only `vllm` + the standard library. Run it top to
+> bottom, then copy `phase0_results/` into `artifacts/results/` and commit it **including the raw
+> `.txt` scrapes**.
+>
+> **Model: `Qwen/Qwen3-0.6B`** for the spike (ungated — verified 2026-09-21; ~1.5 GB; 112 KiB of KV per
+> token) and **`Qwen/Qwen3-8B`** for the Phase-3 calibration (also ungated; 144 KiB/token).
+> ⛔ **Not `meta-llama/*` — verified `gated=manual`**, i.e. a licence click and a token for no benefit.
+>
+> The notebook's logic was **dry-run against a mock engine across five failure scenarios** before
+> handover, including the two that matter: **flat counters correctly FAIL the gate**, and the
+> **token-unit trap is detected** without failing it. See [`notebooks/README.md`](notebooks/README.md).
+>
+> *`scripts/spike_vllm_metrics.py` and `scripts/spike_two_servers.py` remain for a box with a shell —
+> same checks, also stdlib-only.*
+
 **Phase 0 exit gate:** a committed `/metrics` scrape from a live engine in which the two prefix-cache
 counters are present and increasing, plus a recorded answer to "can two servers coexist, and by which
 path."

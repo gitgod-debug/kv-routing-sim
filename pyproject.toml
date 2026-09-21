@@ -65,6 +65,14 @@ where = ["src"]
 line-length = 100
 target-version = "py311"
 
+# Notebooks are excluded on purpose. A notebook legitimately breaks rules this config wants for
+# library code: imports live in the cell that needs them (so a cell can be re-run alone), the server
+# log handle is deliberately long-lived across cells rather than scoped to a `with`, and `except
+# Exception` is correct when probing an unfamiliar box where any import or binary may be missing.
+# The notebook is validated instead by compiling every cell and dry-running its logic against a mock
+# engine across five failure scenarios — see the Phase 0 entry in CHECKPOINTS.md.
+extend-exclude = ["notebooks"]
+
 [tool.ruff.lint]
 # E501 is NOT in ruff's default set, so a declared line-length would otherwise be decorative.
 # If the number is in the config, it should be enforced.
