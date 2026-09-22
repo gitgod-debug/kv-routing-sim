@@ -14,6 +14,9 @@ from kv_routing_sim.cache.block_pool import VllmBlockPool, max_hit_blocks
 
 BS = 16
 
+# ⚠️ vLLM reserves ONE block as the null block (block_pool.py:193), so `VllmBlockPool(n)` has n - 1
+# usable. Pool sizes below are written as `usable + 1` so each test states the capacity it means.
+
 
 def _admit(pool: VllmBlockPool, rid: str, hashes: tuple[int, ...], tokens: int, now: float = 0.0):
     hit = pool.lookup(pool.chain_for(rid, hashes), tokens)
@@ -55,7 +58,7 @@ def test_blocks_are_freed_tail_first_so_the_tail_is_evicted_first():
     """single_type_kv_cache_manager.py:580 — "Free blocks in reverse order so that the tail blocks
     are freed first." With the pool full of one request's freed blocks, the next allocation takes
     the TAIL, and the shared head survives — the opposite of plain LRU."""
-    pool = VllmBlockPool(4, BS)
+    pool = VllmBlockPool(4 + 1, BS)
     _admit(pool, "a", (10, 11, 12, 13), 4 * BS)  # exactly 4 full blocks, all cached
     pool.free("a")
     _admit(pool, "b", (), BS)  # one unrelated block: must evict exactly one of a's
@@ -66,7 +69,7 @@ def test_blocks_are_freed_tail_first_so_the_tail_is_evicted_first():
 
 def test_uncached_blocks_are_reused_first_lifo():
     """block_pool.py:789 — "LIFO reuse of non-cached blocks"; prepended to the front."""
-    pool = VllmBlockPool(6, BS)
+    pool = VllmBlockPool(6 + 1, BS)
     _admit(pool, "a", (1, 2), 2 * BS + 5)  # 2 cached blocks + 1 partial (no hash)
     pool.free("a")
     # The partial block is at the FRONT, so the next allocation recycles it — not a cached block.
@@ -78,7 +81,7 @@ def test_uncached_blocks_are_reused_first_lifo():
 def test_cached_blocks_are_evicted_fifo_by_free_time():
     """block_pool.py:792 — "FIFO reuse of cached blocks for LRU eviction behavior": the request
     freed FIRST is evicted first."""
-    pool = VllmBlockPool(4, BS)
+    pool = VllmBlockPool(4 + 1, BS)
     _admit(pool, "old", (1, 2), 2 * BS)
     _admit(pool, "new", (3, 4), 2 * BS)
     pool.free("old")
@@ -90,7 +93,7 @@ def test_cached_blocks_are_evicted_fifo_by_free_time():
 
 def test_a_hit_moves_a_block_to_the_back():
     """block_pool.py `touch` removes a free block from the queue; freeing it again appends it."""
-    pool = VllmBlockPool(4, BS)
+    pool = VllmBlockPool(4 + 1, BS)
     _admit(pool, "a", (1, 2), 2 * BS)
     _admit(pool, "b", (3, 4), 2 * BS)
     pool.free("a")
@@ -107,7 +110,7 @@ def test_a_hit_moves_a_block_to_the_back():
 def test_blocks_in_use_cannot_be_evicted():
     """Only ref_cnt == 0 blocks are in the free queue (block_pool.py `free_blocks`). A running
     request's blocks are pinned: allocation FAILS rather than evicting them."""
-    pool = VllmBlockPool(4, BS)
+    pool = VllmBlockPool(4 + 1, BS)
     _admit(pool, "running", (1, 2, 3, 4), 4 * BS)  # all 4 blocks held
     assert not pool.can_admit([], BS)
     assert not pool.admit("x", [], (), BS, 0.0)
@@ -127,7 +130,7 @@ def test_shared_block_is_freed_only_when_its_last_user_finishes():
 
 def test_admission_counts_free_hit_blocks_against_capacity():
     """Hitting a FREE block pulls it out of the free queue, so it cannot also back a new block."""
-    pool = VllmBlockPool(3, BS)
+    pool = VllmBlockPool(3 + 1, BS)
     _admit(pool, "a", (1, 2), 2 * BS)
     pool.free("a")  # 3 free, two of them cached
     hit = pool.lookup((1, 2), 3 * BS + 1)  # hits both, needs 2 more new blocks (4 total)
@@ -161,7 +164,7 @@ def test_full_decode_blocks_are_cached():
 
 def test_grow_fails_when_no_block_is_free():
     """The caller must then preempt (scheduler.py:726-800)."""
-    pool = VllmBlockPool(2, BS)
+    pool = VllmBlockPool(2 + 1, BS)
     _admit(pool, "a", (1,), BS + 1)  # 2 blocks
     assert not pool.grow("a", 2 * BS + 1, 0.0)
 
@@ -210,7 +213,7 @@ def test_recycling_an_uncached_block_is_reported_as_an_eviction():
 
 def test_reuse_gaps_keep_only_the_last_four_accesses():
     """kv_cache_metrics.py:24 — deque(maxlen=4): at most three gaps per block."""
-    pool = VllmBlockPool(3, BS, track_block_metrics=True)
+    pool = VllmBlockPool(3 + 1, BS, track_block_metrics=True)
     _admit(pool, "a", (1,), BS, now=0.0)
     pool.free("a")
     for t in range(1, 7):  # six hits at t=1..6
@@ -251,3 +254,14 @@ def test_no_block_is_ever_stranded_under_random_traffic():
         assert pool.stranded_hashes() == [], f"stranded after step {i}"
     pool.check_consistency()
     assert pool.real_evictions > 100  # the test only means something if eviction really happened
+
+
+def test_one_block_is_reserved_as_the_null_block():
+    """block_pool.py:193 — `self.null_block = self.free_block_queue.popleft()`. With
+    `--num-gpu-blocks-override 1024` the engine has 1,023 usable blocks, and so must we."""
+    pool = VllmBlockPool(1024, BS)
+    assert pool.usable_blocks == 1023
+    assert pool.num_free == 1023
+    assert pool.can_admit([], 1023 * BS)
+    assert not pool.can_admit([], 1024 * BS)
+    pool.check_consistency()

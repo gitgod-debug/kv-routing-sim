@@ -20,6 +20,7 @@ which is exactly the regime where routing matters:
   full DECODE blocks are cached too                     kv_cache_manager.py:595-599
   a fully cached prompt still recomputes a block        kv_cache_manager.py:295
   eviction events fire on ANY recycle                   block_pool.py:739 (before the check at 741)
+  ONE block is reserved as the null block, never used   block_pool.py:193
 
 ⭐ AN INVARIANT THIS PRODUCES, checked by a property test: a cached block's parent is never evicted
 before the block itself. Freeing is tail-first, and a hit on a child always touches its parent too
@@ -97,13 +98,20 @@ class VllmBlockPool:
     def __init__(
         self, num_blocks: int, block_size: int = 16, track_block_metrics: bool = False
     ) -> None:
-        if num_blocks <= 0:
-            raise ValueError(f"num_blocks must be > 0, got {num_blocks}")
+        """`num_blocks` is vLLM's `num_gpu_blocks` — what `--num-gpu-blocks-override` sets and what
+        the engine's log reports. ONE of those is the null block (below), so `num_blocks - 1` are
+        usable."""
+        if num_blocks <= 1:
+            raise ValueError(f"num_blocks must be > 1 (one is the null block), got {num_blocks}")
         self.num_blocks = num_blocks
         self.block_size = block_size
 
         # kv_cache_utils.py:255 — "The queue is ordered by block ID in the beginning."
         self._free: OrderedDict[int, None] = OrderedDict((b, None) for b in range(num_blocks))
+        # block_pool.py:193 — `self.null_block = self.free_block_queue.popleft()`: block 0 is
+        # reserved as a placeholder and never allocated. Invisible while the cache has room;
+        # with a deliberately small cache it moves every prediction by a block.
+        self.null_block, _ = self._free.popitem(last=False)
         self._ref = [0] * num_blocks
         self._hash: list[int | None] = [None] * num_blocks
         # cached hash -> its parent's hash, for the no-stranding invariant
@@ -136,6 +144,10 @@ class VllmBlockPool:
     @property
     def num_free(self) -> int:
         return len(self._free)
+
+    @property
+    def usable_blocks(self) -> int:
+        return self.num_blocks - 1  # the null block is never allocated
 
     @property
     def hit_rate(self) -> float:
@@ -341,6 +353,10 @@ class VllmBlockPool:
     def check_consistency(self) -> None:
         """Every block is either free (ref 0) or referenced — never both, never neither."""
         for b in range(self.num_blocks):
+            if b == self.null_block:
+                if b in self._free or self._ref[b] != 0:
+                    raise AssertionError("the null block must never be allocated or freed")
+                continue
             in_free = b in self._free
             if in_free and self._ref[b] != 0:
                 raise AssertionError(f"block {b} is in the free queue with ref_cnt {self._ref[b]}")

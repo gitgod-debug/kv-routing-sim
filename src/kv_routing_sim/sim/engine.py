@@ -41,6 +41,7 @@ def run(
     trace_info: dict[str, Any] | None = None,
     cache_model: str = "vllm",
     track_block_metrics: bool = False,
+    record_per_request: bool = False,
 ) -> RunResult:
     """Replay a trace through one policy on N replicas.
 
@@ -73,11 +74,12 @@ def run(
         # that could never be scheduled.
         if cache_model == "vllm":
             need = -(-(req.prompt_tokens + req.output_tokens) // profile.block_size)
-            if need > profile.kv_cache_blocks:
+            usable = profile.kv_cache_blocks - 1  # one is vLLM's null block (block_pool.py:193)
+            if need > usable:
                 raise ValueError(
                     f"request {req.request_id!r} needs {need} KV blocks "
                     f"({req.prompt_tokens} prompt + {req.output_tokens} output tokens) but a "
-                    f"replica only has {profile.kv_cache_blocks}. vLLM would refuse to start "
+                    f"replica only has {usable} usable. vLLM would refuse to start "
                     "with this max_model_len; so does the simulator."
                 )
         heapq.heappush(events, (req.arrival_ts, next(counter), _ARRIVAL, req))
@@ -133,6 +135,13 @@ def run(
                 result.ttft_ms.append((seq.first_token_ts - seq.arrival_ts) * 1000.0)
             result.completed += 1
             result.makespan_s = max(result.makespan_s, end)
+            if record_per_request:
+                # First-admission cached tokens, as vLLM's `num_cached_tokens` reports them.
+                result.per_request[seq.request.request_id] = {
+                    "cached_tokens": seq.matched_blocks * profile.block_size,
+                    "ttft_ms": (seq.first_token_ts - seq.arrival_ts) * 1000.0,
+                    "preemptions": seq.num_preemptions,
+                }
 
         if replica.has_work:
             schedule(idx, end)

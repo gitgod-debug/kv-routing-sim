@@ -40,6 +40,21 @@ _SHARED_BASE = 0
 _SESSION_BASE = 10_000_000
 _TURN_BASE = 500_000_000
 
+# ⚠️ Those raw ids are far outside any real vocabulary, and a live engine REJECTS them. Found while
+# building the Phase-3 notebook, 2026-09-22: the generator had only ever fed the simulator, which
+# just hashes. So by default every raw id is mapped into ENGINE_SAFE_IDS. Qwen3's vocabulary is
+# 151,936 with special tokens at 151,643-151,668; [1000, 100000) is ordinary text tokens there and
+# in every mainstream tokenizer. The map is applied HERE, in the one generator, so the simulator and
+# the engine see byte-identical ids. Accidental sharing needs all 16 ids of a block to collide at
+# once — ~(1/99,000)^16 per pair of blocks, i.e. never.
+ENGINE_SAFE_IDS = (1000, 100_000)
+_MIX_MUL, _MIX_ADD, _MASK64 = 0x9E3779B97F4A7C15, 0x632BE59BD9B4E019, 0xFFFFFFFFFFFFFFFF
+
+
+def _to_engine_id(raw: int, low: int, high: int) -> int:
+    # A fixed 64-bit multiplicative mix: deterministic across processes, platforms and versions.
+    return low + ((raw * _MIX_MUL + _MIX_ADD) & _MASK64) % (high - low)
+
 
 class AgenticWorkload:
     """Generates multi-turn agentic traffic with a controllable cross-session sharing ratio.
@@ -63,6 +78,7 @@ class AgenticWorkload:
         think_time_s: float = 1.5,  # gap between a session's turns
         block_size: int = DEFAULT_BLOCK_SIZE,
         seed: int = 0,
+        token_id_range: tuple[int, int] | None = ENGINE_SAFE_IDS,
     ) -> None:
         if not 0.0 <= prefix_sharing_ratio < 1.0:
             raise ValueError(f"prefix_sharing_ratio must be in [0, 1), got {prefix_sharing_ratio}")
@@ -82,6 +98,7 @@ class AgenticWorkload:
         self.think_time_s = think_time_s
         self.block_size = block_size
         self.seed = seed
+        self.token_id_range = token_id_range
         self.shared_prefix_tokens = self._solve_shared_tokens()
 
     def _solve_shared_tokens(self) -> int:
@@ -136,73 +153,43 @@ class AgenticWorkload:
         return requests, report
 
     def write_jsonl(self, path: str) -> dict[str, object]:
-        """Write the trace as vLLM-style JSONL carrying REAL token ids.
+        """Write the trace as vLLM-style JSONL carrying the REAL token ids.
 
         The in-memory `NormalizedRequest` deliberately drops token ids (ADR-002), so writing a
-        trace has to regenerate them. Emitting placeholders instead would make every prompt in the
-        file start 0,1,2,... — i.e. share a prefix with everything — and the round-trip would report
-        a ~99% hit rate that is an artifact of the writer, not a property of the workload.
+        trace regenerates them from the same loop. The ids are what a live engine will be sent, so
+        they are engine-safe by default (`token_id_range`).
         """
         import json
 
         _, report = self.generate()
-        # MUST be sorted the same way generate() sorts, or the written trace is a different trace:
-        # the adapter normalizes timestamps against the FIRST line, so an unsorted file silently
-        # clamps early arrivals to 0.
         ordered = sorted(self._iter_with_tokens(), key=lambda pair: pair[0].arrival_ts)
-        lines: list[str] = []
-        for req, ids in ordered:
-            lines.append(
-                json.dumps(
-                    {
-                        "request_id": req.request_id,
-                        "timestamp": req.arrival_ts,
-                        "session_id": req.session_id,
-                        "num_prompt_tokens": req.prompt_tokens,
-                        "num_generated_tokens": req.output_tokens,
-                        "prompt_token_ids": ids,
-                    }
-                )
-                + "\n"
+        lines = [
+            json.dumps(
+                {
+                    "request_id": req.request_id,
+                    "timestamp": req.arrival_ts,
+                    "session_id": req.session_id,
+                    "num_prompt_tokens": req.prompt_tokens,
+                    "num_generated_tokens": req.output_tokens,
+                    "prompt_token_ids": ids,
+                }
             )
+            + "\n"
+            for req, ids in ordered
+        ]
         with open(path, "w", encoding="utf-8") as fh:
             fh.writelines(lines)
         return report
 
+    def iter_with_tokens(self) -> Iterator[tuple[NormalizedRequest, list[int]]]:
+        """Public: every request with the exact token ids an engine must be sent, arrival-sorted."""
+        return iter(sorted(self._iter_with_tokens(), key=lambda pair: pair[0].arrival_ts))
+
     def _iter_with_tokens(self) -> Iterator[tuple[NormalizedRequest, list[int]]]:
-        """Same generation, but keeping the token ids. Used only by `write_jsonl`."""
+        """THE generation loop. Every other view of the trace is derived from this one."""
         rng = random.Random(self.seed)
         shared = self._shared_tokens()
-        clock = 0.0
-        for s in range(self.n_sessions):
-            clock += rng.expovariate(self.arrival_rate)
-            session_id = f"s{s}"
-            ctx_base = _SESSION_BASE + s * 100_000
-            private = [ctx_base + i for i in range(self.session_context_tokens)]
-            history: list[int] = []
-            for turn in range(self.turns_per_session):
-                turn_base = _TURN_BASE + s * 100_000 + turn * 1_000
-                user = [turn_base + i for i in range(self.user_turn_tokens)]
-                prompt_ids = shared + private + history + user
-                yield (
-                    NormalizedRequest(
-                        request_id=f"{session_id}-t{turn}",
-                        arrival_ts=round(clock + turn * self.think_time_s, 6),
-                        block_hashes=chain_hashes(prompt_ids, self.block_size),
-                        prompt_tokens=len(prompt_ids),
-                        output_tokens=self.output_tokens,
-                        session_id=session_id,
-                    ),
-                    prompt_ids,
-                )
-                history = history + user + [
-                    turn_base + 500 + i for i in range(self.assistant_turn_tokens)
-                ]
-
-    def _iter_requests(self) -> Iterator[NormalizedRequest]:
-        rng = random.Random(self.seed)
-        shared = self._shared_tokens()
-
+        remap = self.token_id_range
         clock = 0.0
         for s in range(self.n_sessions):
             # Poisson arrivals => exponential gaps between session starts.
@@ -210,22 +197,29 @@ class AgenticWorkload:
             session_id = f"s{s}"
             ctx_base = _SESSION_BASE + s * 100_000
             private = [ctx_base + i for i in range(self.session_context_tokens)]
-
             history: list[int] = []
             for turn in range(self.turns_per_session):
                 turn_base = _TURN_BASE + s * 100_000 + turn * 1_000
                 user = [turn_base + i for i in range(self.user_turn_tokens)]
                 # The real agentic structure: turn N's full prompt is a prefix of turn N+1's.
-                prompt_ids = shared + private + history + user
-                yield NormalizedRequest(
-                    request_id=f"{session_id}-t{turn}",
-                    arrival_ts=round(clock + turn * self.think_time_s, 6),
-                    block_hashes=chain_hashes(prompt_ids, self.block_size),
-                    prompt_tokens=len(prompt_ids),
-                    output_tokens=self.output_tokens,
-                    session_id=session_id,
+                raw = shared + private + history + user
+                ids = [_to_engine_id(x, *remap) for x in raw] if remap else raw
+                yield (
+                    NormalizedRequest(
+                        request_id=f"{session_id}-t{turn}",
+                        arrival_ts=round(clock + turn * self.think_time_s, 6),
+                        block_hashes=chain_hashes(ids, self.block_size),
+                        prompt_tokens=len(ids),
+                        output_tokens=self.output_tokens,
+                        session_id=session_id,
+                    ),
+                    ids,
                 )
                 # What the assistant said becomes part of the next turn's prompt.
                 history = history + user + [
                     turn_base + 500 + i for i in range(self.assistant_turn_tokens)
                 ]
+
+    def _iter_requests(self) -> Iterator[NormalizedRequest]:
+        for req, _ in self._iter_with_tokens():
+            yield req

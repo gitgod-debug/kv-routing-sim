@@ -43,6 +43,10 @@ class RunResult:
     preempted_queries: int = 0
     preempted_hits: int = 0
     eviction_events: list[Any] = field(default_factory=list)  # only with track_block_metrics
+    # request_id -> {cached_tokens, ttft_ms, preemptions}; only with record_per_request. The engine
+    # reports the same `cached_tokens` per request (`usage.prompt_tokens_details`), so a calibration
+    # can say WHICH requests diverge, not just whether the total does.
+    per_request: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     ttft_ms: list[float] = field(default_factory=list)
     completed: int = 0
