@@ -8,8 +8,14 @@ shell.
 
 ## Status
 
-✅ **v1 ran 2026-09-21 and the Phase-0 gate PASSED** (vLLM 0.29.0, Qwen3-0.6B, Kaggle 2x T4). Results:
-[`../artifacts/results/phase0_kaggle_t4/`](../artifacts/results/phase0_kaggle_t4/).
+✅ **Phase 0 is complete.** v1 (2026-09-21, vLLM 0.29.0) passed the gate; **v2 (2026-09-22, vLLM 0.30.0)
+closed every open item** — including an **exact** 2-replica sim-to-real prediction (1,088 tokens, 0 error).
+Results: [`phase0_kaggle_t4/`](../artifacts/results/phase0_kaggle_t4/) ·
+[`phase0_v2_kaggle_t4/`](../artifacts/results/phase0_v2_kaggle_t4/).
+
+**Nothing here needs running right now.** The next notebook is Phase 3's, and it waits on a CPU-only
+rebuild of the cache model (Phase 2b in `../CHECKPOINTS.md`). The vLLM install is now **pinned to 0.30.0**
+— unpinned, it floated between the two runs.
 
 ## Which file to run
 

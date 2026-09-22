@@ -1,0 +1,65 @@
+{
+  "script": "notebooks/phase0_spike_vllm.ipynb (v2)",
+  "model": "Qwen/Qwen3-0.6B",
+  "block_size": 16,
+  "max_model_len": 4096,
+  "environment": {
+    "date_utc": "2026-09-22T06:26:43+00:00",
+    "platform": "Linux-6.12.90+-x86_64-with-glibc2.35",
+    "python": "3.12.13",
+    "cpu_count": 4,
+    "gpus": "Tesla T4, 15360 MiB, 7.5, 580.159.04\nTesla T4, 15360 MiB, 7.5, 580.159.04",
+    "nvidia_smi_L": "GPU 0: Tesla T4 (UUID: GPU-d44da6c3-7f3b-fd4d-125f-e2d2c00dbfc3)\nGPU 1: Tesla T4 (UUID: GPU-e13ac187-293d-6f22-9b01-aa492ef0d05c)",
+    "mig_mode": "[N/A]\n[N/A]"
+  },
+  "metric_name_audit": {
+    "prefix_cache_queries": true,
+    "prefix_cache_hits": true,
+    "prompt_tokens_by_source": true,
+    "prompt_tokens_cached": true,
+    "time_to_first_token_seconds": true,
+    "num_requests_waiting": true,
+    "kv_block_lifetime_seconds": true,
+    "kv_block_idle_before_evict_seconds": true,
+    "kv_block_reuse_gap_seconds": true,
+    "prefix_cache_hit_rate_EXPECTED_ABSENT": false
+  },
+  "gate": {
+    "vllm_version": "0.30.0",
+    "query_unit": "tokens",
+    "reproduced_v1_counters": true,
+    "prefill_reduction_x": 513.0,
+    "kv_cache_metrics_enabled": true,
+    "kv_block_histograms_present": {
+      "vllm:kv_block_lifetime_seconds": true,
+      "vllm:kv_block_idle_before_evict_seconds": true,
+      "vllm:kv_block_reuse_gap_seconds": true
+    },
+    "H4_testable": true,
+    "two_replica_path": "multi-gpu",
+    "two_replicas_coexist": true,
+    "round_robin_two_replicas": {
+      "queries": 32832.0,
+      "hits": 31744.0,
+      "computed": 1088.0,
+      "hit_rate": 0.9668615984405458,
+      "predicted": {
+        "computed": 1088,
+        "hit_rate": 0.966862
+      },
+      "computed_error": 0.0,
+      "hit_rate_error": -4.0155945424391604e-07
+    },
+    "timing_hardware_caveat": "T4/SM75: TRITON_ATTN + fp16. Cache accounting and routing are hardware-independent; TTFT and cost figures are T4 figures."
+  },
+  "on": {
+    "queries": 33344.0,
+    "hits": 32768.0,
+    "computed": 576.0,
+    "wall_s": 5.108920574188232
+  },
+  "off": {
+    "computed": 32832.0,
+    "wall_s": 8.461974859237671
+  }
+}

@@ -94,6 +94,51 @@ changes the whole routing question, not just this data structure.
 
 ---
 
+### ⚠️ AMENDMENT 2026-09-22 — vLLM's block pool is NOT an LRU trie. Four structural gaps, from its source.
+
+Phase 0 v2 passed cleanly — but only because its workloads never filled the cache (99,024 tokens of room,
+~33,000 used). Every gap below is invisible without capacity pressure, and capacity pressure is exactly
+the regime Phase 3 must calibrate and the regime where routing matters. Found by **reading vLLM 0.30.0's
+block pool before designing Phase 3**, not by guessing — citations are to the `v0.30.0` tag.
+
+| # | vLLM does | Our `BlockCache` does | Source |
+|---|---|---|---|
+| 1 | Frees a finished request's blocks **in reverse** — *"so that the tail blocks are freed first"* — so a prompt's **tail** is evicted before its head | Touches blocks head→tail, so under LRU the **head** is the oldest and is evicted first — destroying all downstream reuse and stranding the tail | `single_type_kv_cache_manager.py:580` |
+| 2 | Only blocks with `ref_cnt == 0` sit in the free queue; a block held by a running request **cannot** be evicted | No reference counts — under pressure we can evict a block a running request is using | `block_pool.py:770–795` |
+| 3 | Splits freed blocks: **no-hash blocks are reused first, LIFO** (*"for better GPU locality"*); **cached blocks FIFO** (*"for LRU eviction behavior"*) | One undifferentiated LRU | `block_pool.py:789, 792` |
+| 4 | Capacity includes each request's **partial tail block and its decode blocks** — and **full decode blocks are cached too** (`num_tokens_to_cache` is capped at `request.num_tokens`, which includes output) | Counts full **prompt** blocks only; never inserts output blocks | `kv_cache_manager.py:595–599` |
+
+**What each gap does to accuracy, as pre-registered predictions rather than conclusions** — Phase 3 measures them:
+
+- Gaps 1 and 3 together mean vLLM keeps shared prompt **heads** alive under pressure while we throw them
+  away. So under capacity pressure the current model should **UNDER-predict** hit rate — **the opposite
+  direction to the one H4 originally predicted.** (See the H4 amendment.)
+- Gap 2 matters under concurrency: many in-flight requests pin blocks vLLM cannot evict.
+- Gap 4 makes our effective capacity too **large** (we ignore partial and decode blocks), pushing the
+  other way. And on real **closed-loop** agentic traffic — where the client re-sends the model's actual
+  output — vLLM will *hit* on the previous turn's generated blocks where we miss. On our open-loop
+  synthetic replay the re-sent "assistant" tokens never match what the engine generated, so the engine
+  misses there too; this gap is real for production traces and invisible in our calibration.
+
+### ✅ Decision: build a faithful block-pool model, and keep the naive LRU as the ablation baseline
+
+Not a silent fix. The Calibration Report is stronger for showing both:
+
+> *"The first model used plain LRU and evicted prompt heads first; vLLM frees tail-first and reuses
+> uncached blocks LIFO. Against the live engine, the naive model's error was X%; the block-pool model's
+> was Y%."*
+
+That is the **explained residual** the spec asks for — with a measured before/after, not
+a narrative. So the block-pool model is an **option** (`eviction="vllm"`), `eviction="lru"` stays, and
+Phase 3 replays every workload through both against the same engine run.
+
+⚠️ **This is implementing the engine's documented algorithm from its source, not fitting to data.**
+The distinction matters: a model tuned until it matches measurements proves nothing, while a model
+that implements the engine's published policy and *then* matches is evidence. Every behaviour the new
+model adopts must cite a line of vLLM's source.
+
+---
+
 ## ADR-003: Policies are strategy objects behind one interface
 
 **Status:** Accepted · 2026-09-20
@@ -474,6 +519,12 @@ collected no histograms. H4 is **not dead**; it was never tested (see the H4 ame
 `local_compute` is now the primary calibration target alongside the hit rate: it is what the
 caching-off comparison needs (v1's notebook compared an undefined hit rate there and wrongly reported
 that caching does not help — the real figure is **513x less prefill**).
+
+**3b. ✅ Re-confirmed on vLLM 0.30.0 (v2, 2026-09-22).** Every name present, `prefix_cache_hit_rate`
+still absent, and the counters reproduced v1's exactly across the version change. ⚠️ And the three
+`kv_block_*` histograms — now enabled with `--kv-cache-metrics` — record every **recycled** tracked block,
+not only real evictions: `on_block_evicted` runs before the hash check (`block_pool.py:739` vs `741`).
+See the H4 amendment and the upstream log #1.
 
 **4. ✅ Our KV-size arithmetic matches the engine.** vLLM reported *"4.38 GiB KV cache is needed"* for
 40,960 tokens = 114,819 B/token; `cache/capacity.py` computes 114,688. The 0.11% gap is vLLM's own

@@ -12,8 +12,9 @@
 **Last updated:** 2026-09-20 (**the simulator is built**: traces, cache, 7 policies, event loop, eval,
 CLI, 73 tests green. Everything except the three engine-dependent numbers, which stay behind the
 Phase-0 gate)
-**Current phase:** ✅ **Phase 0 PASSED 2026-09-21.** Notebook v2 pending (finishes the three items v1
-could not). Phase 3 (calibration) is next, and needs a hardware decision — see the Phase 0 verdict.
+**Current phase:** ✅ **Phase 0 COMPLETE** (v1 2026-09-21, v2 2026-09-22 — every check passed, including an
+**exact** 2-replica sim-to-real prediction). **Next: Phase 2b — rebuild the cache model as vLLM's block pool**
+(CPU-only, no GPU), then Phase 3 on Kaggle 2x T4 with Qwen3-4B.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -78,6 +79,7 @@ could not). Phase 3 (calibration) is next, and needs a hardware decision — see
 | **0** | **Spike & de-risk** | `[x]` | Committed raw `/metrics` scrape where `vllm:prefix_cache_hits` **and** `_queries` are present **and moving**, + a two-server coexistence result. ⛔ **blocks all simulator code** |
 | 1 | Trace schema + ingestion + generator | `[x]` | A real log **and** a generated agentic trace both load into one versioned schema; malformed lines log-and-continue with a count |
 | 2 | Block-level KV cache model | `[x]` | Known prefix sequence → known hit/miss pattern, in tests; partial-block rule holds; memory ceiling measured |
+| **2b** | **Cache model = vLLM's block pool** 🆕 | `[ ]` | Every eviction behaviour cites a line of vLLM's source; naive LRU kept as the ablation; both still reproduce v1/v2 exactly |
 | 3 | **Real-Engine Calibration Report** | `[ ]` | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
 | 4 | **Seven** policies + Pareto sweep | `[~]` | Built and running; **gated on a calibrated profile** before any curve is published. Tests **H1 + H5 + H6** |
 | 5 | **The crossover finding** | `[ ]` | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
@@ -182,6 +184,31 @@ path."
 > | `kv_block_*` histograms? | ⚠️ **not tested** | wrong flag — `--kv-cache-metrics` enables them (ADR-008 amendment) |
 > | Two servers coexist? | ⚠️ **not tested properly** | both died on `max_model_len` 40,960 — and the box had **two GPUs**, which v1 never used |
 >
+> ### ✅ v2 — 2026-09-22 — vLLM **0.30.0**, Qwen3-0.6B, Kaggle 2x T4 — every open item closed
+> Evidence: [`artifacts/results/phase0_v2_kaggle_t4/`](artifacts/results/phase0_v2_kaggle_t4/).
+>
+> | v1 left open | v2 answer |
+> |---|---|
+> | Reproducible? | ✅ **33,344 / 32,768 / 576 again, identically** — on a different vLLM version, a different day, and a **different physical machine** (other GPU UUIDs) |
+> | ⭐ Does the sim predict a real 2-replica run? | ✅ **EXACT.** Round-robin over two T4s: **1,088** computed, hit rate **0.966862** — both predicted and committed before the run. Each replica paid for exactly one cold prefix (544 each) |
+> | Two replicas coexist? | ✅ one server per physical T4 |
+> | `kv_block_*` histograms? | ✅ present with `--kv-cache-metrics` — ⚠️ but they record *recycled* blocks, not only evictions (below) |
+> | Caching on vs off | ✅ **513x** less prefill · TTFT **41.7 → 75.1 ms** mean (T4) |
+>
+> **Three findings v2 surfaced that change Phase 3:**
+> 1. ⭐ **vLLM's block pool is not an LRU trie** — it frees tail-first, pins in-use blocks, reuses uncached
+>    blocks LIFO, and caches decode blocks. Invisible on v1/v2 (the cache never filled), decisive under
+>    pressure. Read from vLLM's source, not guessed. **ADR-002 amendment.**
+> 2. ⚠️ **The eviction histograms over-count.** `on_block_evicted` fires before the hash check, so the 64
+>    samples v2 recorded are recycled tail blocks, not evictions. **H4 amended**; logged upstream as
+>    **upstream finding #1** — our first real friction entry, with a repro.
+> 3. **Capacity must be read per run.** `capacity.py` overestimates by 7–12.5%, and two launches with
+>    identical flags differed by 4.8% (94,496 vs 99,024 tokens).
+>
+> Also: 513x less prefill bought only **1.8x** lower TTFT — a fixed floor of ~40 ms dominates a 0.6B model
+> on T4. That is a real input to the crossover: the cheaper the prefill, the less locality is worth. Another
+> reason Phase 3 uses the 4B.
+>
 > **What it changed in the code:** the cache model counted blocks over full blocks only; vLLM counts
 > tokens over *all* prompt tokens. Fixed, and **the model now reproduces the engine's counters to the
 > token** — 33,344 / 32,768 / 576 — pinned by four regression tests (77 tests green).
@@ -239,20 +266,47 @@ and a corrupted line is survived and counted.
 
 ---
 
+## Phase 2b — Rebuild the cache model as vLLM's block pool *(CPU-only · added 2026-09-22)*
+
+**Why this comes before Phase 3:** v2 proved the accounting exact, but vLLM's source shows our eviction
+model is structurally different from the engine's (ADR-002 amendment). Calibrating a model already known
+to be wrong wastes GPU time and produces a residual nobody can interpret.
+
+- [ ] `eviction="vllm"` — a block-pool model where **every behaviour cites a line of vLLM 0.30.0's
+      source**: reference counts (in-use blocks cannot be evicted) · free a finished request's blocks
+      **in reverse** · uncached blocks reused **LIFO**, cached blocks **FIFO** · capacity includes the
+      partial tail block and decode blocks · full decode blocks get hashed
+- [ ] Keep `eviction="lru"` unchanged, as the **ablation baseline** — the Calibration Report shows both
+- [ ] Emit eviction events by vLLM's **own** rule — on every recycle of a tracked block, cached or not,
+      with the last-4-accesses truncation — so H4 compares like with like
+- [ ] The replica must **release** a request's blocks when it finishes (today nothing is ever freed)
+- [ ] Regression: both models still reproduce v1/v2 exactly (33,344 / 32,768 / 576 and 1,088)
+- [ ] ⭐ **Pre-register, before any Phase-3 run**: per workload, the hit rate and prefill tokens each
+      model predicts. H4's new direction says LRU under-predicts under pressure and the block-pool
+      model closes most of the gap
+
+---
+
 ## Phase 3 — The Real-Engine Calibration Report *(the credential · tests H3 + H4)*
 
 - [ ] ⭐ **Model: `Qwen/Qwen3-4B`** on one T4 — not 8B, whose 15.26 GiB of fp16 weights exceed the card.
       4B's KV cache is architecturally identical to 8B's (144 KiB/token), which is what matters here
-- [ ] **Read the true KV block count from the engine's log** ("Available KV cache memory: X GiB") —
-      `capacity.py`'s ~2,736 is arithmetic and ignores CUDA-graph reservations, so it overestimates
+- [ ] **Read the true KV block count from EACH run's log** ("GPU KV cache size: N tokens") — measured
+      2026-09-22: `capacity.py` overestimates by 7–12.5%, and identical launches differ by 4.8%
 - [ ] Profile identity recorded: `gpu="Tesla T4"`, `model="Qwen/Qwen3-4B"`, `engine_version="0.29.0"`
 - [ ] Calibrate against **`prompt_tokens_by_source{local_compute}`** as well as the hit rate — prefill
       work actually done, and defined even with caching off (ADR-008 amendment)
 - [ ] `calib/metrics_scrape.py` — parse the exposition format; **derive** the hit rate from two counters
-- [ ] Calibrate on **≥2 workload shapes**, **≥3 live runs each** (a single run has no error bar)
+- [ ] Calibrate on **≥2 workload shapes**, **≥3 live runs each** (a single run has no error bar) — and at
+      least one must **overflow the cache**, or eviction (the whole point of H4) is never exercised
+- [ ] Traces are generated **locally by our generator** and uploaded with the notebook — never
+      re-implemented inside it (two generators would drift; ADR-011's reasoning)
+- [ ] Keep the replay **open-loop and deterministic** (`temperature=0`); record that closed-loop
+      decode-block reuse is a known, unmeasured limitation (ADR-002 amendment, gap 4)
 - [ ] Predicted-vs-measured table with error bars — ⛔ **published whatever it says** (H3)
-- [ ] **Explain the residual with a measurement**, not a narrative: check the `kv_block_*` histograms
-      against H4's directional predictions, and try the capacity-matching intervention
+- [ ] **Explain the residual with a measurement**, not a narrative: compare the engine's `kv_block_*`
+      **distributions** against the simulator's own, emitted by vLLM's rules (H4 amendment) — and report
+      naive-LRU vs block-pool error side by side
 - [ ] The **limits section** — what the simulator gets wrong, one failure mode owned publicly
 - [ ] Commit raw scrapes + the notebook/script + pinned deps
 - [ ] README section names: engine, **version**, flags, block size, `max_num_seqs`, model, quantization, the

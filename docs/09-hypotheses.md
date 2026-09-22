@@ -197,8 +197,8 @@ calibration cannot cash.
 |---|---|---|---|
 | **H1** | Prefix-affinity dominates hit rate under high sharing | Phase 4 | `[ ]` untested |
 | **H2** | ⭐ The crossover boundary exists and is monotonic | Phase 5 | `[ ]` untested |
-| **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[ ]` untested |
-| **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[ ]` untested · ⚠️ gated on a Phase-0 check |
+| **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[~]` **accounting: exact** (v1 + v2, incl. 2 replicas) · eviction: untested |
+| **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[ ]` untested · ⚠️ **amended 2026-09-22**: direction likely reversed; instruments verified present (v2) but mix two populations |
 | **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[ ]` untested |
 | **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 (CPU-only re-run) | `[ ]` untested · **gates ADR-010's tier-1/2 claims** |
 
@@ -215,6 +215,47 @@ On the spike workload (one shared 512-token prefix, 64 requests) the corrected c
 vLLM's counters **to the token**: 33,344 queried, 32,768 hit, 576 computed. That validates the
 *accounting* — unit, denominator, the partial-block rule. It says nothing about eviction, because the
 workload never evicts. It is the first calibration point, not the calibration.
+
+### 2026-09-22 — ✅ v2's prediction HELD EXACTLY. First multi-replica sim-to-real point.
+Round-robin across two physical T4s (vLLM 0.30.0): **1,088 prefill tokens computed, hit rate 0.966862 —
+predicted 1,088 and 0.966862, committed before the run. Error: 0 tokens.** Per replica: 32 requests,
+16,416 queried, 15,872 hit, 544 computed — each replica paid for exactly one cold copy of the prefix. The
+1.89x cost of routing without affinity was measured on real hardware, not simulated.
+
+⚠️ **Scope, stated as plainly as the result:** sequential requests, one shared prefix, no eviction, no
+concurrency. It validates the *accounting* across replicas — not eviction, not batching, not timing. It
+is the first sim-to-real point, and a strong one, not the calibration.
+
+### 2026-09-22 — ⛔ H4 AMENDED. Its direction is probably wrong, and one sub-prediction cannot be measured.
+Reading vLLM 0.30.0's block pool before designing Phase 3 changed H4 in three ways. The original text
+above stands as what was predicted; this is what the engine's source says.
+
+**1. The direction probably reverses.** H4 predicted the simulator would **over**-predict hit rate
+because modelled blocks outlive real ones. But vLLM frees a finished request's blocks **tail-first**
+(`single_type_kv_cache_manager.py:580`) and reuses uncached blocks LIFO (`block_pool.py:789`), so under
+pressure it keeps shared prompt **heads** alive. Our plain LRU evicts **heads** first — the worst
+possible choice for prefix reuse, since a missing head strands everything after it. So under pressure
+the current model should **under**-predict. *New prediction, pre-registered here:* on an eviction-heavy
+workload the naive-LRU model under-predicts the engine's hit rate, and the block-pool model (ADR-002
+amendment) closes most of that gap.
+
+**2. ⛔ The `reuse_gap_seconds` sub-prediction was mis-specified — withdrawn.** It said the histogram
+would show "reuse attempts arriving after the block is gone". The instrument cannot see those: it
+records gaps between **successful** accesses within one block's life (`kv_cache_metrics.py`), and an
+attempt after eviction is a miss on a block that no longer exists. It also keeps only the **last 4**
+accesses (`deque(maxlen=4)`, line 24) — at most three gaps per block, biased toward the end of its life.
+
+**3. ⚠️ The three `*_evict_*` histograms mix two populations.** `on_block_evicted` is called **before**
+the check for whether the block held a cached prefix (`block_pool.py:739` vs `741`), so recycling a
+block that never held one — e.g. every request's partial tail block, reused LIFO — is recorded as an
+"eviction". v2 shows it exactly: **64 samples with the cache never under pressure**, lifetime ≈ idle ≈
+81 ms (one request), zero reuse gaps — the 64 tail blocks, not evictions.
+
+**So H4 is tested differently from now on:** the simulator emits the **same** events by the **same**
+rules — an event whenever a tracked block is recycled, hashed or not, with the last-4-accesses
+truncation — and the **distributions** of lifetime, idle-before-evict and reuse-gap are compared against
+the engine's. Comparing an idealised quantity against a differently-defined instrument would make the
+"residual" an artefact of the definitions.
 
 ### 2026-09-22 — a pre-registered sim-to-real prediction for notebook v2
 For v2's round-robin arm (the same workload alternated across 2 replicas) the simulator predicts
