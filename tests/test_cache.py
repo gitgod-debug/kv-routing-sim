@@ -9,16 +9,19 @@ from kv_routing_sim.cache.capacity import SHAPES, kv_blocks_for
 
 
 def test_known_sequence_gives_known_hit_miss_pattern():
+    """These prompts are block-ALIGNED (no prompt_tokens given = exactly len x 16), so vLLM's
+    lookup cap applies: a fully cached prompt recomputes its last block (kv_cache_manager.py:295).
+    Before 2026-09-22 this test expected 4 and 6 — the model then ignored the cap."""
     c = BlockCache(capacity_blocks=100)
     a = (1, 2, 3, 4)
     b = (1, 2, 3, 4, 5, 6)
     assert c.query(a) == 0  # cold
-    assert c.query(a) == 4  # fully warm
-    assert c.query(b) == 4  # shares a's prefix, computes 5 and 6
+    assert c.query(a) == 3  # fully cached — but the last block is always recomputed
+    assert c.query(b) == 4  # shares a's four blocks; the cap (5) does not bite
     assert c.query((9, 9, 9)) == 0  # unrelated
-    assert c.query(b) == 6  # now fully warm
+    assert c.query(b) == 5  # fully cached again: 6 blocks, the last recomputed
     assert c.queries_blocks == 4 + 4 + 6 + 3 + 6
-    assert c.hits_blocks == 0 + 4 + 4 + 0 + 6
+    assert c.hits_blocks == 0 + 3 + 4 + 0 + 5
     # Token counters are the block counters x block_size when prompts are block-aligned.
     assert c.queries == c.queries_blocks * 16
     assert c.hits == c.hits_blocks * 16
@@ -51,9 +54,10 @@ def test_hit_rate_is_derived_from_two_counters():
     """ADR-008: never a stored gauge."""
     c = BlockCache(capacity_blocks=10)
     assert c.hit_rate == 0.0  # no division by zero on an untouched cache
-    c.query((1, 2))
-    c.query((1, 2))
-    assert c.hit_rate == pytest.approx(2 / 4)
+    c.query((1, 2))  # 32 tokens, cold
+    c.query((1, 2))  # fully cached: the cap leaves 1 of 2 blocks hittable
+    assert c.hits == 16 and c.queries == 64
+    assert c.hit_rate == pytest.approx(16 / 64)
 
 
 def test_capacity_rejects_nonsense():

@@ -31,6 +31,8 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Sequence
 
+from .block_pool import max_hit_blocks
+
 
 class BlockCache:
     """A single replica's prefix cache: LRU over a bounded pool of blocks.
@@ -136,8 +138,11 @@ class BlockCache:
         only (`len(block_hashes) * block_size`), which is exact for block-aligned prompts and
         biased upward otherwise.
         """
-        matched = self.lookup(block_hashes)
         tokens = prompt_tokens if prompt_tokens is not None else len(block_hashes) * self.block_size
+        # vLLM's lookup cap (kv_cache_manager.py:295): a fully cached prompt still recomputes its
+        # last block. A LOOKUP rule, not an eviction rule, so both cache models apply it — which
+        # keeps the lru-vs-vllm ablation about eviction alone.
+        matched = self.lookup(block_hashes[: max_hit_blocks(tokens, self.block_size)])
         self.queries += tokens
         self.hits += matched * self.block_size
         self.queries_blocks += len(block_hashes)
