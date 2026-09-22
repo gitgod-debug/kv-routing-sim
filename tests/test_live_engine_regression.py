@@ -1,17 +1,24 @@
 """The full simulator against numbers MEASURED on a live engine.
 
-Source: artifacts/results/phase0_kaggle_t4/ (v1, vLLM 0.29.0) and phase0_v2_kaggle_t4/ (v2, vLLM
-0.30.0) — Qwen/Qwen3-0.6B, block_size 16, Kaggle 2x Tesla T4.
+Sources: artifacts/results/phase0_kaggle_t4/ (v1, vLLM 0.29.0) and phase0_v2_kaggle_t4/ (v2, vLLM
+0.30.0) — Qwen/Qwen3-0.6B — and phase3_kaggle_t4/ (Phase 3, vLLM 0.30.0, Qwen/Qwen3-4B, a 512-block
+cache under eviction pressure). Block size 16, Kaggle Tesla T4.
 
 These replay the exact workloads the notebooks sent, through `engine.run`, and demand the engine's
 counters to the token. A failure means the simulator has drifted from real vLLM behaviour.
 
-⚠️ What these do and do not prove: v1/v2 never filled the cache and sent requests one at a time. So
-they pin ACCOUNTING — the token unit, the partial-block rule, the lookup cap, per-replica cold
-prefixes, and the eviction-event quirk — not eviction under pressure and not batching.
+⚠️ What these do and do not prove: v1/v2 never filled the cache, so they pin ACCOUNTING — the token
+unit, the partial-block rule, the lookup cap, per-replica cold prefixes, the eviction-event quirk.
+Phase 3 adds EVICTION UNDER PRESSURE: 120 agentic requests through 511 usable blocks, reproduced to
+the token, request by request. Still one request at a time — batching is tested by W3, whose
+numbers depend on a fitted timing profile and so are pinned in the calibration report, not here.
 """
 
 from __future__ import annotations
+
+import json
+import pathlib
+import sys
 
 import pytest
 
@@ -110,3 +117,44 @@ def test_lookup_cap_is_applied_by_both_models():
         r = run(reqs, policy="round-robin", n_replicas=1, profile=T4_06B_ON, cache_model=model)
         # first: cold. Then each repeat hits 31 blocks (496 tokens), not 32.
         assert r.cache_hits == 2 * 496, model
+
+
+# ── Phase 3: eviction under pressure (vLLM 0.30.0, Qwen3-4B, 511 usable blocks) ──────────────────
+
+REPO = pathlib.Path(__file__).resolve().parents[1]
+PHASE3 = REPO / "artifacts" / "results" / "phase3_kaggle_t4" / "phase3.json"
+
+
+def _phase3():
+    sys.path.insert(0, str(REPO / "scripts"))
+    import phase3_prepare as prep
+
+    prereg = json.loads(prep.PREREG.read_text())
+    _, _, _, predictions = prep.make_predictions(prereg["config"])
+    return json.loads(PHASE3.read_text()), predictions
+
+
+@pytest.mark.parametrize("workload", ["W1_long", "W2_short"])
+def test_vllm_model_reproduces_phase3_on_the_live_engine(workload):
+    """⭐ Every counter, every run, every request — recomputed from the model NOW, not read from
+    the committed predictions. If a model change breaks agreement with the real engine, this fails.
+    Measured: W1 28,304 hits / 29,656 computed / 1,880 histogram events; W2 35,296 / 22,664 / 963.
+    """
+    res, predictions = _phase3()
+    p = predictions["workloads"][workload]["predictions"]["vllm"]
+    runs = [r for r in res["runs"] if r["workload"] == workload]
+    assert len(runs) == 3 and all(r["valid"] for r in runs)
+    for r in runs:
+        for k in predictions["compared_counters"]:
+            assert r["measured"][k] == p[k], (workload, r["run"], k)
+        engine = {q["request_id"]: q["cached_tokens"] for q in r["requests"]}
+        assert engine == p["per_request_cached_tokens"], (workload, r["run"])
+
+
+def test_lru_model_misses_phase3_w1_by_what_it_ignores():
+    """The ablation, on a real engine: LRU leaves decode blocks out of capacity, so it over-predicts
+    W1 by 6,896 hit tokens (11.90 points) — the size of what the block-pool model adds."""
+    res, predictions = _phase3()
+    lru = predictions["workloads"]["W1_long"]["predictions"]["lru"]
+    for r in (x for x in res["runs"] if x["workload"] == "W1_long"):
+        assert lru["prefix_cache_hits"] - r["measured"]["prefix_cache_hits"] == 6_896

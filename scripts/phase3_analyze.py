@@ -322,8 +322,8 @@ def markdown(rep: dict[str, Any]) -> str:
         "## 1 · Sequential workloads — exact predictions",
         "",
         (
-            "| workload | model | exact runs | hit-rate error (pts) | computed-token error | "
-            "requests matching |"
+            "| workload | model | exact runs | hit-rate error, pts (measured − predicted) | "
+            "computed-token error | requests matching |"
         ),
         "|---|---|---|---|---|---|",
     ]
@@ -365,7 +365,7 @@ def markdown(rep: dict[str, Any]) -> str:
         "",
         f"## 3 · {rep['w3']['workload']} — predicted with the fitted profile, never tuned on it",
         "",
-        "| metric | engine mean [min, max] | vllm model | lru model |",
+        "| metric | engine mean [min, max] | vllm model (vs engine) | lru model (vs engine) |",
         "|---|---|---|---|",
     ]
     for k, v in rep["w3"]["summary"].items():

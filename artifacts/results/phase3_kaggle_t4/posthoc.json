@@ -1,0 +1,363 @@
+{
+ "NOT_PRE_REGISTERED": true,
+ "decode_by_batch": {
+  "rows": [
+   {
+    "batch": 1,
+    "measured_ms": 63.56151860317159,
+    "fitted_ms": 54.14340141121524,
+    "source": "W1, median of 360 requests"
+   },
+   {
+    "batch": 1,
+    "measured_ms": 64.06726397872649,
+    "fitted_ms": 54.14340141121524,
+    "source": "decode sweep"
+   },
+   {
+    "batch": 2,
+    "measured_ms": 47.797077659574725,
+    "fitted_ms": 55.37556402308262,
+    "source": "decode sweep"
+   },
+   {
+    "batch": 4,
+    "measured_ms": 58.00458557446968,
+    "fitted_ms": 57.83988924681738,
+    "source": "decode sweep"
+   },
+   {
+    "batch": 8,
+    "measured_ms": 57.21491848936103,
+    "fitted_ms": 62.76853969428689,
+    "source": "decode sweep"
+   },
+   {
+    "batch": 12,
+    "measured_ms": 67.62056121276166,
+    "fitted_ms": 67.69719014175641,
+    "source": "decode sweep"
+   },
+   {
+    "batch": 16,
+    "measured_ms": 75.74601819149083,
+    "fitted_ms": 72.62584058922592,
+    "source": "decode sweep"
+   }
+  ],
+  "w1_batch1_ms": 63.56151860317159,
+  "w1_batch1_min_ms": 60.48188698412646
+ },
+ "w3_concurrency": [
+  {
+   "run": 1,
+   "span_s": 52.2,
+   "mean": 22.3,
+   "max": 46,
+   "share_of_time_at_8_or_more": 0.978
+  },
+  {
+   "run": 2,
+   "span_s": 52.7,
+   "mean": 22.2,
+   "max": 46,
+   "share_of_time_at_8_or_more": 0.98
+  },
+  {
+   "run": 3,
+   "span_s": 52.8,
+   "mean": 22.2,
+   "max": 46,
+   "share_of_time_at_8_or_more": 0.978
+  }
+ ],
+ "w1_histogram_attribution": [
+  {
+   "run": "W1_long_r1",
+   "profile": "pre-registered fit",
+   "cache_hits": 28304,
+   "max_cdf_distance": 0.042,
+   "under_2s": {
+    "engine": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     29.0,
+     79.0,
+     96.0,
+     119.0
+    ],
+    "model": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     79,
+     117
+    ],
+    "edges": [
+     0.001,
+     0.002,
+     0.005,
+     0.01,
+     0.02,
+     0.05,
+     0.1,
+     0.2,
+     0.5,
+     1.0,
+     2.0
+    ]
+   }
+  },
+  {
+   "run": "W1_long_r1",
+   "profile": "batch-1 step = measured (post-hoc)",
+   "cache_hits": 28304,
+   "max_cdf_distance": 0.0154,
+   "under_2s": {
+    "engine": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     29.0,
+     79.0,
+     96.0,
+     119.0
+    ],
+    "model": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     10,
+     26,
+     50,
+     67,
+     119
+    ],
+    "edges": [
+     0.001,
+     0.002,
+     0.005,
+     0.01,
+     0.02,
+     0.05,
+     0.1,
+     0.2,
+     0.5,
+     1.0,
+     2.0
+    ]
+   }
+  },
+  {
+   "run": "W1_long_r2",
+   "profile": "pre-registered fit",
+   "cache_hits": 28304,
+   "max_cdf_distance": 0.042,
+   "under_2s": {
+    "engine": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     33.0,
+     79.0,
+     93.0,
+     119.0
+    ],
+    "model": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     79,
+     118
+    ],
+    "edges": [
+     0.001,
+     0.002,
+     0.005,
+     0.01,
+     0.02,
+     0.05,
+     0.1,
+     0.2,
+     0.5,
+     1.0,
+     2.0
+    ]
+   }
+  },
+  {
+   "run": "W1_long_r2",
+   "profile": "batch-1 step = measured (post-hoc)",
+   "cache_hits": 28304,
+   "max_cdf_distance": 0.0144,
+   "under_2s": {
+    "engine": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     33.0,
+     79.0,
+     93.0,
+     119.0
+    ],
+    "model": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     8,
+     25,
+     52,
+     68,
+     119
+    ],
+    "edges": [
+     0.001,
+     0.002,
+     0.005,
+     0.01,
+     0.02,
+     0.05,
+     0.1,
+     0.2,
+     0.5,
+     1.0,
+     2.0
+    ]
+   }
+  },
+  {
+   "run": "W1_long_r3",
+   "profile": "pre-registered fit",
+   "cache_hits": 28304,
+   "max_cdf_distance": 0.042,
+   "under_2s": {
+    "engine": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     30.0,
+     79.0,
+     89.0,
+     119.0
+    ],
+    "model": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     79,
+     118
+    ],
+    "edges": [
+     0.001,
+     0.002,
+     0.005,
+     0.01,
+     0.02,
+     0.05,
+     0.1,
+     0.2,
+     0.5,
+     1.0,
+     2.0
+    ]
+   }
+  },
+  {
+   "run": "W1_long_r3",
+   "profile": "batch-1 step = measured (post-hoc)",
+   "cache_hits": 28304,
+   "max_cdf_distance": 0.0176,
+   "under_2s": {
+    "engine": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     30.0,
+     79.0,
+     89.0,
+     119.0
+    ],
+    "model": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     11,
+     25,
+     46,
+     65,
+     119
+    ],
+    "edges": [
+     0.001,
+     0.002,
+     0.005,
+     0.01,
+     0.02,
+     0.05,
+     0.1,
+     0.2,
+     0.5,
+     1.0,
+     2.0
+    ]
+   }
+  }
+ ],
+ "prefill_fixed_cost": {
+  "ttft_intercept_ms": 33.32797173516671,
+  "fitted_decode_step_batch1_ms": 54.14340141121524,
+  "measured_decode_step_batch1_ms": 63.56151860317159
+ }
+}
