@@ -25,7 +25,9 @@ memory-bandwidth-bound and scales with how many sequences share the step.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+import json
+from dataclasses import asdict, dataclass, fields
+from pathlib import Path
 
 from ..cache.capacity import SHAPES, kv_blocks_for
 
@@ -72,6 +74,27 @@ class CostProfile:
             else f"calibrated on {self.gpu} / {self.model} / {self.engine_version}"
         )
         return d
+
+
+def load_profile(path: str | Path) -> CostProfile:
+    """A profile from a JSON file — e.g. `configs/profiles/t4-qwen3-4b-vllm0.30.0.json`.
+
+    Fails LOUDLY on a missing or unknown field (ADR-004): a mistyped key quietly falling back to a
+    default is exactly how an uncalibrated number ends up published as a calibrated one. Keys that
+    start with `_` are provenance for the reader, and are ignored here.
+    """
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise TypeError(f"{path}: a profile must be a JSON object")
+    data = {k: v for k, v in raw.items() if not k.startswith("_")}
+    known = {f.name for f in fields(CostProfile)}
+    unknown = sorted(set(data) - known)
+    if unknown:
+        raise ValueError(f"{path}: unknown profile field(s) {unknown}; known: {sorted(known)}")
+    try:
+        return CostProfile(**data)
+    except TypeError as exc:  # a required field is missing
+        raise ValueError(f"{path}: {exc}") from None
 
 
 # ⛔ A GUESS. Order-of-magnitude shapes for a Tesla T4 serving Qwen3-4B in fp16 — the hardware and

@@ -742,3 +742,57 @@ The committed grid (`artifacts/results/demo_grid.json`) carries its own provenan
 
 A paid plan already being bought for another reason, **plus** a concrete request for a scenario the grid
 cannot express. Both, not either.
+
+---
+
+## ADR-012: Phase 4 sweeps on the Phase-3 timing model AS FITTED — its two limits owned, not tuned
+
+**Status:** Accepted · 2026-09-22 · Phase 4
+
+### Context
+
+Phase 3 fitted the timing model on runs that were not the validation run, then predicted the
+concurrent workload (W3) with it: hit rate **+0.3%**, TTFT p50 **−3.8%**, p95 **−6.7%**. The same
+analysis surfaced two things the model gets wrong, both measured
+([`posthoc.md`](../artifacts/results/phase3_kaggle_t4/posthoc.md)):
+
+1. **One sequence decodes slower than two.** 63.6 ms per token at batch 1, 43–58 ms at batches 2–8,
+   rising again past 8. A straight line through that has R² 0.58, and under-states batch 1 by ~15%.
+2. **A step that prefills is double-charged.** The simulator bills `prefill + decode` for it; the engine
+   emits the first token from the prefill pass itself. On an idle replica that is **~20 ms** of TTFT
+   the engine does not pay.
+
+### Decision
+
+**Phase 4 uses the fitted profile unchanged** — `configs/profiles/t4-qwen3-4b-vllm0.30.0.json`
+(fitted timings, plus the engine's own natural capacity of **1,537 blocks**, read from its log).
+
+### Why
+
+- **It was validated where routing is decided.** Policies differ when replicas are loaded — queues,
+  preemption, memory pressure. That is exactly W3's regime (≥ 8 sequences decoding 98% of the time),
+  and there the model was within 7% on the tail. At low load every policy's TTFT is the same
+  single-request prefill, so a fixed +20 ms moves all of them together and cannot reorder them.
+- **Changing it now could not be validated.** Any fix would be fitted on data we have already seen.
+  The only honest fix is one tested on a *new*, pre-registered workload — which needs GPU time.
+- **H6 tests whether it matters at all.** Phase 4 re-runs the sweep under rescaled costs and measures
+  whether the policy ranking moves (Kendall's τ). If a 15% change to one decode constant flips a
+  ranking, H6 will show it, on CPU, without anyone arguing about it.
+
+### Rejected
+
+- **Re-fit the timings to W3.** W3 has been seen; fitting to it would turn the one validation result
+  into a training result. ⛔ Forbidden by the Phase 3 decision rules.
+- **A lookup table of decode cost per batch size** from the sweep. It would fit the sweep better and
+  explain nothing, and between the measured points it is as unvalidated as the line.
+- **A single fixed cost per step (`base + a × prefill_tokens + b × decode_seqs`).** Physically cleaner,
+  and probably right — but a prefill pass's fixed cost (≤ 33 ms) and a decode step's (48–64 ms) were
+  *measured* to differ, and a model with one base cannot express that either. Worth testing, not
+  worth assuming.
+
+### What would reverse it
+
+- **H6 fails** — the policy ranking moves under a plausible rescaling of the decode constants. Then the
+  step model is load-bearing and gets a pre-registered validation run before any curve is published.
+- **Phase 6's 2-replica run** misses TTFT by more than W3 did, at the loads where the crossover lands.
+- A **Phase-3b GPU run** that pre-registers a step-model change and validates it on a fresh workload.

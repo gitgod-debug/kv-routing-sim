@@ -17,6 +17,7 @@ from __future__ import annotations
 import random
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 DEFAULT_RESAMPLES = 1_000
 HEADLINE_RESAMPLES = 10_000  # anything in the README headline
@@ -51,14 +52,18 @@ def _percentile(sorted_vals: list[float], q: float) -> float:
 
 
 def bootstrap_ci_grouped(
-    groups: Sequence[Sequence[float]],
-    statistic: Callable[[list[float]], float],
+    groups: Sequence[Sequence[Any]],
+    statistic: Callable[[list[Any]], float],
     *,
     n_resamples: int = DEFAULT_RESAMPLES,
     confidence: float = 0.95,
     seed: int = 0,
 ) -> CI:
-    """Percentile bootstrap, resampling whole GROUPS (sessions) with replacement."""
+    """Percentile bootstrap, resampling whole GROUPS (sessions) with replacement.
+
+    Items may be any type the statistic understands — e.g. `(cached, prompt)` token pairs, so a
+    hit rate is resampled as a RATIO of sums, which is what the engine's counters compute.
+    """
     flat = [v for g in groups for v in g]
     if not flat:
         return CI(float("nan"), float("nan"), float("nan"), n_resamples, "session")
@@ -81,9 +86,9 @@ def bootstrap_ci_grouped(
 
 
 def paired_bootstrap_delta(
-    groups_a: Sequence[Sequence[float]],
-    groups_b: Sequence[Sequence[float]],
-    statistic: Callable[[list[float]], float],
+    groups_a: Sequence[Sequence[Any]],
+    groups_b: Sequence[Sequence[Any]],
+    statistic: Callable[[list[Any]], float],
     *,
     n_resamples: int = DEFAULT_RESAMPLES,
     confidence: float = 0.95,

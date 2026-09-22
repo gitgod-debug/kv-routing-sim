@@ -51,13 +51,17 @@ def sweep(
 
 
 def _average_cell(cell: list[RunResult], cost: CostModel | None) -> Point:
-    """Average a cell's seeds into one point.
+    """Average a cell's seeds into one point."""
+    return average_points([to_point(r, cost) for r in cell])
+
+
+def average_points(pts: list[Point]) -> Point:
+    """One (policy, replicas) cell's per-seed points -> one point.
 
     ⚠️ Percentiles are averaged ACROSS SEEDS, not pooled. Pooling every seed's TTFTs into one list
     and taking p95 of that would answer a different question — "the p95 of a mixture of runs" rather
     than "the typical p95 of a run" — and would systematically understate run-to-run variation.
     """
-    pts = [to_point(r, cost) for r in cell]
     n = len(pts)
     finite = [p.inr_per_1k for p in pts if p.inr_per_1k != float("inf")]
     return Point(

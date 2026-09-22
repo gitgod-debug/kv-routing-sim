@@ -369,3 +369,29 @@ double-charges the fixed per-pass cost when a step prefills (fitted prefill base
 Neither touches a cache count; both are owned in the README's limits rather than tuned away. And
 everything here is open-loop: closed-loop decode-block reuse remains unmeasured.
 
+
+### 2026-09-22 (night) — Phase 4's first calibrated sweep, REGISTERED before it runs: H1 and H5
+Design and rules in [`configs/phase4_sweep.yaml`](../configs/phase4_sweep.yaml); procedure in
+`scripts/run_phase4_sweep.py`. Both committed before the sweep was run.
+
+**The setup.** The Phase-3 T4 profile at the engine's own natural capacity (**1,537 blocks**, ADR-012);
+cost on AWS **g4dn.xlarge** ($0.526/h, one T4) at ₹95.87/$; SLO **p95 TTFT ≤ 2,000 ms** (MLPerf's
+Conversational TTFT limit, applied at p95). Two agentic shapes — **low sharing** (achieved 0.300) and
+**high sharing** (0.804, above H1's "≳70%") — at six loads (1–8 sessions/s), all seven policies, replicas
+1–8, five seeds. 3,360 runs. The load range was chosen from a probe of **round-robin alone**: no
+comparison between policies was looked at before this entry.
+
+**How H1 is tested** (high sharing, at every load): radix-affinity — and, reported separately,
+radix-affinity-balanced — against least-loaded on hit rate, replicas 2–8. *Strictly higher* = the
+paired session-bootstrap 95% CI of the difference has its lower bound above zero at every replica count.
+*Widens* = the difference at 8 replicas exceeds the one at 2, with no step down larger than 0.005.
+Holds only if both hold at every load.
+
+**How H5 is tested** (per shape): R = the fewest replicas whose cell meets the SLO on every seed.
+Holds if at some load round-robin needs more than prefix-affinity, and at no load does
+prefix-affinity need more than round-robin.
+
+**What would be uncomfortable, written down now:** the uncalibrated first sweep saw pure
+radix-affinity collapse onto one replica at high sharing. If that survives calibration, it will need
+*more* replicas, not fewer — and **H5 fails for it** while perhaps holding for the balanced variant.
+That outcome gets reported as it lands.
