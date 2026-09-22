@@ -45,6 +45,11 @@ def kv_blocks_for(
     """Blocks that fit on one replica. ⚠️ Arithmetic, not a measurement — see the module docstring.
 
     Replaced by the calibration. Until then it is a shape, not a prediction.
+
+    ⚠️ MEASURED 2026-09-22 (vLLM 0.30.0, Qwen3-0.6B, T4 @ 0.85): this OVERESTIMATES the engine
+    by 7-12.5%, because vLLM also reserves memory for CUDA graphs and activations. Two launches with
+    identical flags differed by 4.8% (94,496 vs 99,024 tokens). So never calibrate with this —
+    read "GPU KV cache size: N tokens" from each run's own log.
     """
     usable = gpu_memory_gib * GIB * gpu_memory_utilization - model.weight_bytes
     if usable <= 0:
