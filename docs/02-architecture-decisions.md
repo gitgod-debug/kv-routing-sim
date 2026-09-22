@@ -120,7 +120,18 @@ block pool before designing Phase 3**, not by guessing — citations are to the 
   synthetic replay the re-sent "assistant" tokens never match what the engine generated, so the engine
   misses there too; this gap is real for production traces and invisible in our calibration.
 
+> ### ⛔ MEASURED later the same day: the first bullet above is wrong, and the third is what matters
+> Built and compared (sim vs sim, sequential agentic replay). The eviction-ORDER effect (gaps 1 + 3) is
+> real, has the predicted sign, and is **≤ 0.2 points** of hit rate — negligible. The CAPACITY effect
+> (gap 4: vLLM's cache also holds decode and partial blocks) is **up to ~2 points the other way** and
+> dominates. So under pressure the naive model **over**-predicts — H4's *original* direction. Full
+> decomposition in `docs/09-hypotheses.md`. The prediction above is left as written, so the miss stays
+> visible.
+
 ### ✅ Decision: build a faithful block-pool model, and keep the naive LRU as the ablation baseline
+**✅ BUILT 2026-09-22** — `cache/block_pool.py`, now the default. It reproduces every live-engine
+number to the token through the full simulator, including the engine's eviction histograms (64, and
+31 + 31 per replica), with nothing fitted.
 
 Not a silent fix. The Calibration Report is stronger for showing both:
 

@@ -198,7 +198,7 @@ calibration cannot cash.
 | **H1** | Prefix-affinity dominates hit rate under high sharing | Phase 4 | `[ ]` untested |
 | **H2** | ⭐ The crossover boundary exists and is monotonic | Phase 5 | `[ ]` untested |
 | **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[~]` **accounting: exact** (v1 + v2, incl. 2 replicas) · eviction: untested |
-| **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[ ]` untested · ⚠️ **amended 2026-09-22**: direction likely reversed; instruments verified present (v2) but mix two populations |
+| **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[ ]` untested vs the engine · ⚠️ sim-vs-sim (2026-09-22): the ORIGINAL direction holds — LRU over-predicts — but the cause is **capacity** accounting, not order |
 | **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[ ]` untested |
 | **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 (CPU-only re-run) | `[ ]` untested · **gates ADR-010's tier-1/2 claims** |
 
@@ -215,6 +215,12 @@ On the spike workload (one shared 512-token prefix, 64 requests) the corrected c
 vLLM's counters **to the token**: 33,344 queried, 32,768 hit, 576 computed. That validates the
 *accounting* — unit, denominator, the partial-block rule. It says nothing about eviction, because the
 workload never evicts. It is the first calibration point, not the calibration.
+
+### 2026-09-22 — H2 must be tested on the vLLM cache model, not the lru one
+H2 is defined on **p95 TTFT**. Building the block-pool model showed that under memory pressure TTFT is
+dominated by memory-based admission control and preemption — which only that model has. On the
+T4-shaped profile the two models' hit rates differ by ≤ 1.6 points while their p95 TTFT differs by
+**1.8–8.5×**. The prediction itself is unchanged; only the instrument that can test it is now fixed.
 
 ### 2026-09-22 — ✅ v2's prediction HELD EXACTLY. First multi-replica sim-to-real point.
 Round-robin across two physical T4s (vLLM 0.30.0): **1,088 prefill tokens computed, hit rate 0.966862 —
@@ -256,6 +262,38 @@ rules — an event whenever a tracked block is recycled, hashed or not, with the
 truncation — and the **distributions** of lifetime, idle-before-evict and reuse-gap are compared against
 the engine's. Comparing an idealised quantity against a differently-defined instrument would make the
 "residual" an artefact of the definitions.
+
+### 2026-09-22 (later) — ⛔ the H4 amendment above got the DIRECTION wrong. Measured, not argued.
+With the block-pool model built, I compared it against the plain-LRU model on the same agentic traces
+(sequential replay, so pinning and preemption are out of the picture) before writing the amendment's
+prediction into anything else. **It predicted the pool would score higher. It scores lower.**
+
+Decomposed by varying only the output length, at 60% cross-session sharing across capacities:
+
+| Effect | Isolated by | pool − LRU | Size |
+|---|---|---|---|
+| **Eviction order** (tail-first, LIFO/FIFO) — what the amendment argued | 1-token outputs (no decode blocks) | **+0.0000 to +0.0020** | real, the predicted sign, and **negligible** |
+| **Capacity accounting** — vLLM's cache also holds decode and partial blocks; LRU ignores them | 120-token outputs | **−0.0015 to −0.0192** | **dominates** |
+
+So under pressure plain LRU **over**-predicts the faithful model's hit rate — **H4's original direction**.
+The original's *mechanism* ("modelled blocks survive longer than real ones") also turns out closer to
+right than the amendment's: LRU's blocks do survive longer, because LRU thinks it has more room. What
+the original called *eviction-order skew* is really **capacity skew**. The order argument was correct
+and irrelevant.
+
+**Two consequences for Phase 3:**
+1. **The quantity to calibrate is capacity accounting, not eviction order.** A workload whose outputs
+   are long relative to its prompts should show the largest LRU-vs-engine gap; one with 1-token outputs
+   almost none. That contrast is a sharper test than any histogram — and it costs nothing to run both.
+2. **Open-loop replay understates vLLM's real agentic hit rate.** Here the cached output blocks are
+   dead weight: no replayed prompt contains the engine's real output, so they only crowd out prompt
+   blocks. In closed-loop agent traffic the next turn re-sends that output and those same blocks
+   *hit*. Our calibration can only measure the first case, which is worth saying in the report, not
+   discovering in review.
+
+*The lesson is the one this file exists for: the amendment's reasoning was careful and still wrong, and
+only the measurement knew. The prediction stood in the file for a few hours; this entry records it
+failing, and neither is edited.*
 
 ### 2026-09-22 — a pre-registered sim-to-real prediction for notebook v2
 For v2's round-robin arm (the same workload alternated across 2 replicas) the simulator predicts

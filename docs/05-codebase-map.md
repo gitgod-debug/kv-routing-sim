@@ -58,6 +58,7 @@ and maintain residency.
 | `block_trie.py` | The trie of resident blocks (plain dicts, ADR-002). `lookup(block_hashes) -> matched_depth`. |
 | `eviction.py` | LRU order + optional TTL, with a hard block-capacity bound derived from a GPU memory config. |
 | `replica_cache.py` | Trie + eviction + counters (`queries`, `hits`) named to mirror vLLM's own (ADR-008), so predicted and measured quantities are literally the same quantity. |
+| ⭐ **`block_pool.py`** | ✅ **The default cache model (`cache_model="vllm"`), added 2026-09-22.** vLLM's block pool, every behaviour cited to its v0.30.0 source: reference counts, tail-first free, uncached-LIFO / cached-FIFO, partial and decode blocks in capacity, decode blocks hashed, the lookup cap, and eviction events by vLLM's own (quirky) rule. `block_trie.py` stays as the `"lru"` ablation baseline. |
 
 **The tests that matter most live here:** a known prefix sequence must produce a known hit/miss pattern,
 and the partial-block rule must hold (sharing 47 of 48 tokens at block size 16 shares **two** blocks, not
@@ -88,7 +89,7 @@ result (ADR-003).
 
 | Piece | Responsibility |
 |---|---|
-| `replica.py` | One replica: continuous-batching admission bounded by `max_num_seqs`, a prefill/decode cost function **fitted** to the live engine (ADR-001), a waiting queue. |
+| `replica.py` | One replica: continuous-batching admission bounded by `max_num_seqs`, a prefill/decode cost function **fitted** to the live engine (ADR-001), a waiting queue. Under `cache_model="vllm"` it also follows vLLM's scheduler: running requests first, FCFS preemption of the most recent when one cannot grow, memory-based admission, no admission in a step that preempted. |
 | `fleet.py` | N replicas + the router + the arrival stream; the event loop. |
 | `metrics.py` | The collector: per-request TTFT, per-replica hit/query counters, queue depths. Emits **distributions, not means** (ADR-006 / methodology §1). |
 | `engine.py` | `run(trace, policy, n_replicas, seed) -> RunResult`. The one function the sweep calls. |

@@ -32,11 +32,17 @@ class RunResult:
     n_replicas: int
     seed: int
 
-    # Cache — counted in BLOCKS, mirroring vLLM's counters (ADR-008, and the unit note in
-    # cache/block_trie.py that Phase 0 must confirm).
+    cache_model: str = "vllm"
+
+    # Cache — in TOKENS, as vLLM counts (ADR-008, confirmed on a live engine 2026-09-21).
+    # `cache_queries`/`cache_hits` exclude preempted re-lookups, exactly like vllm:prefix_cache_*.
     cache_queries: int = 0
     cache_hits: int = 0
-    evictions: int = 0
+    evictions: int = 0  # REAL evictions: a block that held a cached prefix was reused
+    preemptions: int = 0
+    preempted_queries: int = 0
+    preempted_hits: int = 0
+    eviction_events: list[Any] = field(default_factory=list)  # only with track_block_metrics
 
     ttft_ms: list[float] = field(default_factory=list)
     completed: int = 0
@@ -91,7 +97,9 @@ class RunResult:
             "hit_rate": round(self.hit_rate, 6),
             "cache_queries": self.cache_queries,
             "cache_hits": self.cache_hits,
+            "cache_model": self.cache_model,
             "evictions": self.evictions,
+            "preemptions": self.preemptions,
             "ttft": self.ttft_percentiles(),
             "completed": self.completed,
             "arrived": self.arrived,

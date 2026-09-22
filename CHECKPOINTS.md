@@ -12,9 +12,9 @@
 **Last updated:** 2026-09-20 (**the simulator is built**: traces, cache, 7 policies, event loop, eval,
 CLI, 73 tests green. Everything except the three engine-dependent numbers, which stay behind the
 Phase-0 gate)
-**Current phase:** ✅ **Phase 0 COMPLETE** (v1 2026-09-21, v2 2026-09-22 — every check passed, including an
-**exact** 2-replica sim-to-real prediction). **Next: Phase 2b — rebuild the cache model as vLLM's block pool**
-(CPU-only, no GPU), then Phase 3 on Kaggle 2x T4 with Qwen3-4B.
+**Current phase:** ✅ **Phase 0 COMPLETE** · ✅ **Phase 2b COMPLETE** (2026-09-22) — the cache model is now
+vLLM's block pool, reproducing every live-engine number to the token, histograms included. **Next: the
+Phase 3 calibration notebook** (Qwen3-4B, Kaggle 2x T4), with its predictions pre-registered.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -79,7 +79,7 @@ Phase-0 gate)
 | **0** | **Spike & de-risk** | `[x]` | Committed raw `/metrics` scrape where `vllm:prefix_cache_hits` **and** `_queries` are present **and moving**, + a two-server coexistence result. ⛔ **blocks all simulator code** |
 | 1 | Trace schema + ingestion + generator | `[x]` | A real log **and** a generated agentic trace both load into one versioned schema; malformed lines log-and-continue with a count |
 | 2 | Block-level KV cache model | `[x]` | Known prefix sequence → known hit/miss pattern, in tests; partial-block rule holds; memory ceiling measured |
-| **2b** | **Cache model = vLLM's block pool** 🆕 | `[ ]` | Every eviction behaviour cites a line of vLLM's source; naive LRU kept as the ablation; both still reproduce v1/v2 exactly |
+| **2b** | **Cache model = vLLM's block pool** 🆕 | `[x]` | Every eviction behaviour cites a line of vLLM's source; naive LRU kept as the ablation; both still reproduce v1/v2 exactly |
 | 3 | **Real-Engine Calibration Report** | `[ ]` | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
 | 4 | **Seven** policies + Pareto sweep | `[~]` | Built and running; **gated on a calibrated profile** before any curve is published. Tests **H1 + H5 + H6** |
 | 5 | **The crossover finding** | `[ ]` | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
@@ -272,18 +272,41 @@ and a corrupted line is survived and counted.
 model is structurally different from the engine's (ADR-002 amendment). Calibrating a model already known
 to be wrong wastes GPU time and produces a residual nobody can interpret.
 
-- [ ] `eviction="vllm"` — a block-pool model where **every behaviour cites a line of vLLM 0.30.0's
-      source**: reference counts (in-use blocks cannot be evicted) · free a finished request's blocks
-      **in reverse** · uncached blocks reused **LIFO**, cached blocks **FIFO** · capacity includes the
-      partial tail block and decode blocks · full decode blocks get hashed
-- [ ] Keep `eviction="lru"` unchanged, as the **ablation baseline** — the Calibration Report shows both
-- [ ] Emit eviction events by vLLM's **own** rule — on every recycle of a tracked block, cached or not,
-      with the last-4-accesses truncation — so H4 compares like with like
-- [ ] The replica must **release** a request's blocks when it finishes (today nothing is ever freed)
-- [ ] Regression: both models still reproduce v1/v2 exactly (33,344 / 32,768 / 576 and 1,088)
-- [ ] ⭐ **Pre-register, before any Phase-3 run**: per workload, the hit rate and prefill tokens each
-      model predicts. H4's new direction says LRU under-predicts under pressure and the block-pool
-      model closes most of the gap
+- [x] ✅ **`cache/block_pool.py`** — `cache_model="vllm"`, now the **default**. Every behaviour cites
+      vLLM 0.30.0: reference counts · tail-first free · uncached LIFO / cached FIFO · partial and decode
+      blocks in capacity · decode blocks hashed · the lookup cap (a fully cached prompt recomputes its
+      last block) · first-lookup-only counters. **Plus the scheduler rules it needs to be usable**:
+      memory-based admission (a request that does not fit stops admission), FCFS preemption of
+      `running[-1]`, no admission in a step that preempted — each cited to `scheduler.py`
+- [x] ✅ `cache_model="lru"` kept unchanged as the **ablation baseline** — except the lookup cap, which
+      is a lookup rule, so both apply it and the ablation isolates eviction
+- [x] ✅ Eviction events by vLLM's **own** rule, recycles of uncached blocks included, last 4 accesses
+- [x] ✅ The replica **releases** a request's blocks when it finishes; preempted ones keep their chain
+- [x] ✅ **Regression, through the full simulator, both models:** v1/v2's **33,344 / 32,768 / 576** and
+      **1,088 / 0.966862** exactly. ⭐ And the vLLM model reproduces the engine's **eviction histograms
+      exactly — 64, and 31 + 31 per replica**, idle = lifetime, zero reuse gaps — from source-derived
+      rules alone, nothing fitted. The lru model cannot produce them at all
+- [x] ✅ Invariants checked after **every step** under pressure: no block double-booked, **none ever
+      stranded** (a property the source implies; plain LRU does strand, briefly)
+- [ ] ⭐ **Pre-register the Phase-3 predictions** — moved to the Phase-3 notebook build: they depend on
+      the Phase-3 workloads, and on capacity, which is read from each run's own log. What is fixed in
+      advance is the model, the workload and the procedure; the number follows deterministically
+
+> ### 📏 What building it MEASURED — sim vs sim, uncalibrated profile, 2026-09-22
+> 1. ⛔ **The H4 amendment's prediction was wrong.** Eviction ORDER is worth ≤ 0.2 points of hit rate;
+>    CAPACITY accounting (decode + partial blocks) is worth up to ~2 points the other way and dominates.
+>    Plain LRU **over**-predicts — H4's original direction. See the second H4 amendment.
+> 2. ⭐ **Hit rate barely moves; tail latency moves enormously.** On the T4/Qwen3-4B-shaped profile
+>    (2,736 blocks, 900 agentic requests, 4 replicas): hit rate differs by ≤ 1.6 points, but p95 TTFT
+>    is **1.8× (round-robin) to 8.5× (session-sticky)** higher under the vLLM model, with **147–190
+>    preemptions per run** that the lru model never has. The lru model admits everything and never
+>    waits for memory, so **its TTFT under memory pressure is unrealistically optimistic.** Absolute
+>    milliseconds mean nothing until Phase 3 — the ratio is the finding.
+> 3. **H2 therefore needs the vLLM model.** The crossover is defined on p95 TTFT, and TTFT under
+>    pressure is dominated by admission control and preemption, which only this model has.
+> 4. Cost: **~6× slower** per run (165–236 ms vs 28–82 ms on 900 requests). Fine for Phase 3; the
+>    demo grid goes from ~5 to ~30 minutes.
+> 5. The early observation survives: session-sticky still has the best hit rate and p95 under both.
 
 ---
 
