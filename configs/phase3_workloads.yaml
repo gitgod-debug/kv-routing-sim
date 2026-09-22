@@ -1,0 +1,63 @@
+# Phase 3 — the Real-Engine Calibration experiment. THE source of truth for it.
+#
+# `scripts/phase3_prepare.py` turns this file into (a) the trace, (b) predictions from BOTH cache
+# models, committed BEFORE any GPU run, and (c) the notebook that runs it — all stamped with one trace
+# fingerprint, so none of the three can silently disagree with the others.
+#
+# Designed 2026-09-22 to be DISCRIMINATING: an experiment where both models predict the same number
+# cannot tell you which is right. Chosen by a design sweep (see CHECKPOINTS.md, Phase 3):
+#   * W1 — the two models disagree by ~12 points of hit rate (decode blocks crowding a small cache)
+#   * W2 — the control: identical requests with 1-token outputs, where they agree within ~0.2 points
+#   * W3 — the same trace sent concurrently: the vllm model predicts preemption, lru structurally cannot
+
+schema_version: 1
+
+engine:
+  model: Qwen/Qwen3-4B          # ungated; KV cache identical in shape to Qwen3-8B (144 KiB/token)
+  vllm: "0.30.0"                # pinned — v2 ran here and passed every check
+  hardware: "Kaggle, 1x Tesla T4 (GPU 0 of 2)"
+  block_size: 16
+  # --num-gpu-blocks-override. Makes capacity an exact, CONTROLLED input instead of a measurement
+  # that drifted 4.8% between identical launches. vLLM reserves one as the null block
+  # (block_pool.py:193), so 511 are usable. Small on purpose: eviction under modest traffic.
+  num_gpu_blocks: 512
+  max_model_len: 2048           # 128 blocks: comfortably fits the largest request (583 + 64 tokens)
+  max_num_seqs: 256             # set explicitly so the simulator uses the same value
+  max_num_batched_tokens: 8192  # set explicitly; sequential prompts (<= 583) are never chunked
+
+runs_per_workload: 3
+
+# AgenticWorkload parameters. The trace is REGENERATED from these — never shipped as a data file.
+trace:
+  n_sessions: 40
+  turns_per_session: 3
+  session_context_tokens: 150
+  user_turn_tokens: 40
+  assistant_turn_tokens: 60
+  prefix_sharing_ratio: 0.4
+  arrival_rate: 10.0            # sessions/s — heavy interleaving is what creates cache pressure
+  think_time_s: 1.5
+  seed: 0
+
+workloads:
+  W1_long:
+    mode: sequential            # send, wait for the full response, send the next
+    output_tokens: 64           # with ignore_eos, so every output is exactly this long
+  W2_short:
+    mode: sequential
+    output_tokens: 1            # the control: no decode blocks at all
+  W3_concurrent:
+    mode: concurrent            # each request fired at its own arrival time
+    output_tokens: 64
+
+# NOT a prediction target — an INPUT to the timing fit. W1/W2 run one request at a time, so they can
+# only ever show a batch of one; the decode cost's per-sequence slope needs batches > 1. Measured on
+# prompts that share nothing with the trace, so it cannot leak W3's answer into W3's prediction.
+calibration:
+  decode_batch_sweep:
+    # Context length ~ W3's (prompts 383-583), because attention cost grows with it and the fitted
+    # model has no context term. The largest batch just fits: 16 x ceil((448 + 47) / 16) = 496 <= 511.
+    batch_sizes: [1, 2, 4, 8, 12, 16]
+    prompt_tokens: 448
+    output_tokens: 48
+    seed: 1
