@@ -1,0 +1,15 @@
+{
+ "name": "tesla-t4-qwen3-4b-vllm0.30.0",
+ "prefill_base_s": 0.0,
+ "prefill_per_token_s": 0.0007014400878738409,
+ "decode_base_s": 0.05291123879934786,
+ "decode_per_seq_s": 0.001232162611867379,
+ "kv_cache_blocks": 512,
+ "block_size": 16,
+ "max_num_seqs": 256,
+ "gpu": "Tesla T4",
+ "model": "Qwen/Qwen3-4B",
+ "engine_version": "0.30.0",
+ "calibrated": true,
+ "calibration_error": 0.002901
+}

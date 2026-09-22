@@ -6,11 +6,11 @@ Give it your serving log. It returns a routing policy, a replica count, and a co
 prefix-cache model is calibrated against a live vLLM's own Prometheus counters, and **the calibration error
 is published**.
 
-> ## 🚧 Status: Phase 0 — scaffold. Nothing here is measured yet.
-> Every number below is written as `TBD — not yet measured` and **stays that way until it is measured.** No
-> placeholder in this file will ever be quietly replaced by a plausible figure; see the honesty gates in
-> [`CHECKPOINTS.md`](CHECKPOINTS.md).
-> Start at [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
+> ## 🚧 Status: the calibration is measured (Phase 3, 2026-09-22). The finding is not yet.
+> The Real-Engine Calibration Report below is filled in from a live vLLM, against predictions committed
+> before the run. Every number still written as `TBD — not yet measured` **is exactly that**, and stays
+> so until it is measured — no placeholder here is ever quietly replaced by a plausible figure; see the
+> honesty gates in [`CHECKPOINTS.md`](CHECKPOINTS.md). Start at [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
 
 ---
 
@@ -31,18 +31,44 @@ A README needs both, and needs them apart.
 
 | | |
 |---|---|
-| **Engine + version** | TBD — not yet measured |
-| **Flags** | `--enable-prefix-caching --kv-cache-metrics-sample <rate> --block-size 16 --max-num-seqs <N>` *(exact CLI: TBD)* |
-| **Model + quantization** | TBD |
+| **Engine + version** | **vLLM 0.30.0**, V1 engine, async scheduling on (its default) |
+| **Exact CLI** | `vllm serve Qwen/Qwen3-4B --dtype half --block-size 16 --num-gpu-blocks-override 512 --max-model-len 2048 --max-num-seqs 256 --max-num-batched-tokens 8192 --gpu-memory-utilization 0.85 --enable-prefix-caching --kv-cache-metrics --kv-cache-metrics-sample 1.0 --enable-prompt-tokens-details --seed 0` |
+| **Model + quantization** | `Qwen/Qwen3-4B`, fp16, unquantized. The cache is fixed at **512 blocks (511 usable)** by override, so capacity is a controlled input and the cache overflows |
 | **Hardware** | **Kaggle 2x Tesla T4** (compute 7.5, driver 580.159.04, CUDA 12.8). vLLM runs TRITON_ATTN in fp16 here — so hit rates and routing results are hardware-independent, and every latency/cost figure is a **T4 figure** |
-| **Hit-rate error vs live engine** | TBD — not yet measured, on ≥2 workload shapes, ≥3 live runs each |
-| **The residual, explained** | TBD — measured against the `vllm:kv_block_*` histograms, not narrated |
-| **2-replica validation** | TBD — two MIG instances on one card |
+| **Hit-rate error vs live engine** | ⭐ **Zero** on 2 sequential shapes × 3 runs — every counter, and every one of 120 requests' cached tokens, to the token. **+0.3%** (relative) on the concurrent shape, predicted by a timing profile fitted without it. Plain LRU on the same runs **over-predicts** by **11.9 points** (W1) and **19.7%** (W3) |
+| **The residual, explained** | Sequential: none to explain. The engine's `kv_block_*` histograms: counts exact (963 and 1,880 events); distributions identical bucket for bucket on W2; W1's small residual (max CDF distance 0.042) traced — post-hoc, labelled so — to the **timing** fit, not the cache model |
+| **2-replica validation** | Round-robin across **two physical T4s**: 1,088 prefill tokens computed, **1,088 predicted** (Phase 0 v2). Under pressure: Phase 6 |
 
 **`/metrics` fields consumed, by name:** `vllm:prefix_cache_queries` · `vllm:prefix_cache_hits` ·
-`vllm:time_to_first_token_seconds` · `vllm:num_requests_waiting` ·
-`vllm:request_prefill_kv_computed_tokens` · `vllm:kv_block_lifetime_seconds` ·
-`vllm:kv_block_idle_before_evict_seconds` · `vllm:kv_block_reuse_gap_seconds`.
+`vllm:prompt_tokens_by_source{source="local_compute"|"local_cache_hit"}` · `vllm:num_preemptions` ·
+`vllm:kv_block_lifetime_seconds` · `vllm:kv_block_idle_before_evict_seconds` ·
+`vllm:kv_block_reuse_gap_seconds` (`_count` and `_bucket`) · `vllm:prompt_tokens` · `vllm:generation_tokens` ·
+`vllm:num_requests_running` · `vllm:num_requests_waiting` — plus, per request, the response's
+`usage.prompt_tokens_details.cached_tokens`. TTFT is measured at the client, over streamed responses.
+
+### What was predicted, and what the engine did
+
+Predictions committed before the run
+([`predictions.json`](artifacts/results/phase3_prereg/predictions.json)); measured on the engine above
+([`calibration_report.md`](artifacts/results/phase3_kaggle_t4/calibration_report.md)). 120 agentic
+requests — 40 sessions × 3 turns, one shared system prefix — three runs of each workload.
+
+| Workload | Engine (all 3 runs) | Block-pool model (default) | Plain-LRU model (ablation) |
+|---|---|---|---|
+| **W2** one at a time, 1-token outputs | hit rate **0.6090** · 22,664 computed | **0.6090** · 22,664 — exact | 0.6073 · 22,760 |
+| **W1** one at a time, 64-token outputs | hit rate **0.4883** · 29,656 computed | **0.4883** · 29,656 — exact | 0.6073 · 22,760 |
+| **W3** the same trace, concurrent | hit **0.5076** · **27** preemptions · p95 TTFT **41.0 s** | 0.509 (+0.3%) · 24 · 38.3 s (−6.7%) | 0.6073 (+19.7%) · 0 · 11.2 s (−73%) |
+
+W1 is the experiment's point. The two models agree when requests hold no decode blocks (W2) and part
+by **11.9 points** when they do: vLLM caches full decode blocks, they occupy the same small cache, and
+they evict useful prefixes. The block-pool model says so; LRU cannot see it. On a real engine, the
+block-pool model was right to the token.
+
+**The fitted T4 timing** (all of it a **T4 figure**): prefill **0.70 ms per uncached token**; decode
+**52.9 ms + 1.23 ms × batch** (R² 0.58). ⚠️ Two limits, measured and recorded rather than tuned away —
+[`posthoc.md`](artifacts/results/phase3_kaggle_t4/posthoc.md): one sequence decodes *slower* than two to
+eight do (63.6 ms per token), which a straight line cannot express; and the simulator's step model
+charges a full decode step on top of every prefill, over-estimating an idle replica's TTFT by ~20 ms.
 
 > ⛔ **The hit rate is derived — `vllm:prefix_cache_hits` ÷ `vllm:prefix_cache_queries`, two counters.**
 > `vllm:prefix_cache_hit_rate` **does not exist** (verified against `v1/metrics/loggers.py` at v0.29.0); the

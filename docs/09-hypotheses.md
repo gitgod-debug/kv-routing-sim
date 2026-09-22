@@ -197,8 +197,7 @@ calibration cannot cash.
 |---|---|---|---|
 | **H1** | Prefix-affinity dominates hit rate under high sharing | Phase 4 | `[ ]` untested |
 | **H2** | ⭐ The crossover boundary exists and is monotonic | Phase 5 | `[ ]` untested |
-| **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[~]` **accounting: exact** (v1 + v2, incl. 2 replicas) · eviction: **pre-registered 2026-09-22**, not yet run |
-| **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[ ]` untested vs the engine · **histogram counts pre-registered 2026-09-22** · ⚠️ sim-vs-sim (2026-09-22): the ORIGINAL direction holds — LRU over-predicts — but the cause is **capacity** accounting, not order |
+| **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[x]` ✅ **PASSED 2026-09-22** — **zero** error on 2 sequential shapes under eviction pressure (3 runs each, every| **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[x]` ✅ **supported, in its second amendment's form (2026-09-22):** plain LRU's residual on a live engine is **capacity** skew (−11.9 pts when requests hold decode blocks, 0.17 without); histogram counts exact, W2 distributions identical |-predicts — but the cause is **capacity** accounting, not order |
 | **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[ ]` untested |
 | **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 (CPU-only re-run) | `[ ]` untested · **gates ADR-010's tier-1/2 claims** |
 
@@ -334,4 +333,39 @@ matters only here: vLLM 0.30.0 schedules **asynchronously** by default, the simu
 
 The decision rule for each outcome is in the prereg file (`decision_rules`), written before the run —
 including the one that downgrades concurrent claims from predictive to comparative, with no re-tuning.
+
+### 2026-09-22 (evening) — ✅ Phase 3 RAN. H3 passes with zero error; H4's second amendment holds.
+Kaggle, one Tesla T4, vLLM 0.30.0, Qwen3-4B, 511 usable blocks — against the predictions committed
+above (`055f57c9…`). Full report: [`calibration_report.md`](../artifacts/results/phase3_kaggle_t4/calibration_report.md).
+
+| | Predicted (vllm model) | Engine, 3 runs each |
+|---|---|---|
+| **W2** hits · computed · histogram events · reuse gaps | 35,296 · 22,664 · 963 · 99 | **35,296 · 22,664 · 963 · 99** — all three runs |
+| **W1** hits · computed · histogram events · reuse gaps | 28,304 · 29,656 · 1,880 · 3 | **28,304 · 29,656 · 1,880 · 3** — all three runs |
+| **per-request cached tokens** | 120 values per workload | **120 / 120** match, every run |
+| **W3** preemptions | > 0 | **27**, every run |
+
+**H3 — passed, at a stricter bar than it set itself.** "<10% relative error" became *zero*: on both
+sequential shapes, under real eviction pressure, every counter and every request matched to the
+token, and the three runs were identical. On the concurrent shape — predicted by a timing profile
+fitted without it — hit rate **+0.3%**, computed tokens −0.3%, preemptions 24 vs 27, TTFT p50 −3.8%,
+p95 and p99 −6.7%. The error's sign is consistent where it is not zero.
+
+**H4 — supported in its second amendment's form.** On the same live runs, plain LRU over-predicts by
+**11.9 points** when requests hold decode blocks (W1) and by **0.17** when they do not (W2): the gap is
+**capacity** accounting — decode blocks sharing a small cache — not eviction order, exactly as the
+second amendment predicted, and now measured on a real engine rather than sim-vs-sim. The histograms:
+counts exact on every run; W2's distributions identical bucket for bucket; W1's small distribution
+residual (max CDF distance 0.042) traced — **post-hoc, and labelled so** in
+[`posthoc.md`](../artifacts/results/phase3_kaggle_t4/posthoc.md) — to the *timing* fit's batch-1
+decode step, not the cache model (0.042 → 0.015 with that one number measured; cache counts unchanged).
+
+**The pre-registered alternative was refuted:** the engine commits exactly *prompt + output − 1*
+tokens per request, as its source says — W2 would have read 34,928 otherwise.
+
+**What it did NOT show, stated as plainly:** the timing model is the weak part. Its decode fit has R²
+0.58 — on this T4 one sequence decodes *slower* (63.6 ms) than two to eight — and its step model
+double-charges the fixed per-pass cost when a step prefills (fitted prefill base −21 ms, clamped to 0).
+Neither touches a cache count; both are owned in the README's limits rather than tuned away. And
+everything here is open-loop: closed-loop decode-block reuse remains unmeasured.
 

@@ -13,8 +13,11 @@ shell.
 [`phase0_kaggle_t4/`](../artifacts/results/phase0_kaggle_t4/) ·
 [`phase0_v2_kaggle_t4/`](../artifacts/results/phase0_v2_kaggle_t4/).
 
-▶ **Next to run: `phase3_calibration.ipynb`** — the Real-Engine Calibration. Its predictions are
-committed in [`../artifacts/results/phase3_prereg/predictions.json`](../artifacts/results/phase3_prereg/predictions.json).
+✅ **Phase 3 ran on 2026-09-22 and passed** — the block-pool model matched every pre-registered count on
+both sequential workloads, request by request, and predicted the concurrent one within 0.3% on hit
+rate. Results: [`phase3_kaggle_t4/`](../artifacts/results/phase3_kaggle_t4/) ·
+[`calibration_report.md`](../artifacts/results/phase3_kaggle_t4/calibration_report.md). **Nothing here
+needs running now**; the section below is kept as the record of how it was run.
 
 ---
 

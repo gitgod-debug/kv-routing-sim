@@ -9,11 +9,10 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-09-22 (**Phase 3 is built, dry-run and pre-registered** — the predictions are
-committed, the notebook is generated from the same run, 114 tests green)
-**Current phase:** ✅ **Phase 0 COMPLETE** · ✅ **Phase 2b COMPLETE** · 🔨 **Phase 3: ready to run** — ▶ **next:
-run `notebooks/phase3_calibration.ipynb` on Kaggle (T4 x2, ~40 min)**, bring back `phase3_results.zip`,
-and run `scripts/phase3_analyze.py`. See [`notebooks/README.md`](notebooks/README.md).
+**Last updated:** 2026-09-22 (**Phase 3 RAN and PASSED** — the block-pool model reproduced a live vLLM
+under eviction pressure to the token, against predictions committed before the run; 117 tests green)
+**Current phase:** ✅ **Phase 0** · ✅ **Phase 2b** · ✅ **Phase 3 COMPLETE** — ▶ **next: Phase 4**, starting with
+loading the fitted T4 profile in the CLI, then the calibrated Pareto sweep.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -79,7 +78,7 @@ and run `scripts/phase3_analyze.py`. See [`notebooks/README.md`](notebooks/READM
 | 1 | Trace schema + ingestion + generator | `[x]` | A real log **and** a generated agentic trace both load into one versioned schema; malformed lines log-and-continue with a count |
 | 2 | Block-level KV cache model | `[x]` | Known prefix sequence → known hit/miss pattern, in tests; partial-block rule holds; memory ceiling measured |
 | **2b** | **Cache model = vLLM's block pool** 🆕 | `[x]` | Every eviction behaviour cites a line of vLLM's source; naive LRU kept as the ablation; both still reproduce v1/v2 exactly |
-| 3 | **Real-Engine Calibration Report** | `[~]` built + pre-registered; **not yet run** | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
+| 3 | **Real-Engine Calibration Report** | `[x]` ✅ exact on W1 + W2, +0.3% on W3 | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
 | 4 | **Seven** policies + Pareto sweep | `[~]` | Built and running; **gated on a calibrated profile** before any curve is published. Tests **H1 + H5 + H6** |
 | 5 | **The crossover finding** | `[ ]` | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
 | 6 | Sim-to-real 2-replica validation | `[ ]` | Predicted vs measured across two MIG instances, or the documented fallback and why |
@@ -311,6 +310,22 @@ to be wrong wastes GPU time and produces a residual nobody can interpret.
 
 ## Phase 3 — The Real-Engine Calibration Report *(the credential · tests H3 + H4)*
 
+> ### ✅ 2026-09-22 (evening) — IT RAN. Exact on both sequential shapes; +0.3% on the concurrent one.
+> Kaggle T4, vLLM 0.30.0, Qwen3-4B, 511 usable blocks. **The vllm model matched every pre-registered
+> count in all 6 sequential runs** — hits, computed tokens, all three `kv_block_*` histogram counts, and
+> all 120 requests' `cached_tokens` — and the three runs of each workload were identical. Plain LRU
+> over-predicted W1 by exactly the 11.90 points it was predicted to. The engine refuted the +1-token
+> alternative. W3, predicted by a timing profile fitted without it: hit rate **+0.3%**, p95 TTFT
+> **−6.7%**, 24 vs 27 preemptions (LRU: +19.7% and −73%, zero preemptions).
+> [`calibration_report.md`](artifacts/results/phase3_kaggle_t4/calibration_report.md) ·
+> [`posthoc.md`](artifacts/results/phase3_kaggle_t4/posthoc.md) (labelled post-hoc) · H3 ✅ · H4 ✅
+>
+> ⚠️ **The weak part is timing, and it is owned, not tuned:** decode fit R² 0.58 (one sequence decodes
+> *slower* than two to eight on this T4), and the step model double-charges the fixed per-pass cost when
+> a step prefills (fitted prefill base −21 ms, clamped). Neither touches a cache count.
+>
+> *The build log below is kept as written before the run.*
+>
 > ### 🔨 2026-09-22 — the experiment is built, dry-run and pre-registered. It has NOT run yet.
 > One config ([`configs/phase3_workloads.yaml`](configs/phase3_workloads.yaml)) → one script
 > (`scripts/phase3_prepare.py`) → the trace, **both models' predictions** (committed:
@@ -376,17 +391,19 @@ to be wrong wastes GPU time and produces a residual nobody can interpret.
       request). Closed-loop decode-block reuse stays a known, unmeasured limitation (ADR-002, gap 4)
 - [x] ⭐ **Predictions pre-registered and committed before the run** — with the analysis procedure and
       the decision rules for every outcome (`predictions.json`, `analysis_procedure`, `decision_rules`)
-- [ ] ▶ **Run it** — `notebooks/phase3_calibration.ipynb` on Kaggle T4 x2 — and commit
-      `artifacts/results/phase3_kaggle_t4/`, **raw scrapes included**
-- [ ] Predicted-vs-measured table with error bars — ⛔ **published whatever it says** (H3).
-      `phase3_analyze.py` writes it
-- [ ] **Explain the residual with a measurement**: the engine's `kv_block_*` counts and bucket
-      distributions against the model's own events, emitted by vLLM's rules (H4) — naive-LRU and
-      block-pool error side by side
-- [ ] The **limits section** — what the simulator gets wrong, one failure mode owned publicly
-- [ ] README section names: engine, **version**, flags, block size, `max_num_seqs`, model, quantization, the
-      exact CLI, hardware, and **every `/metrics` field consumed by name**
-- [ ] Load the fitted profile in the CLI (`--profile fitted_profile.json`) — Phase 4's curves need it
+- [x] ✅ **Ran it** (Kaggle T4, 2026-09-22, ~40 min) — `artifacts/results/phase3_kaggle_t4/`, raw scrapes,
+      server log, `server_info.json` and the executed notebook committed
+- [x] ✅ Predicted-vs-measured table, three runs per workload, **published** — `calibration_report.md`
+- [x] ✅ **The residual explained with measurements**: histogram counts exact; W2 distributions identical
+      bucket for bucket; W1's distribution residual traced to the timing fit (`posthoc.md`, labelled
+      post-hoc); naive-LRU and block-pool error side by side
+- [x] ✅ **Limits owned publicly** in the README: the batch-1 decode non-linearity, the prefill
+      double-charge, open-loop only
+- [x] ✅ README calibration section: engine, version, the exact CLI, model, quantization, capacity,
+      hardware, and every `/metrics` field consumed by name
+- [x] ✅ Pinned by tests: `test_live_engine_regression.py` now recomputes the model and demands the
+      engine's Phase-3 counts, request by request
+- [ ] → moved to Phase 4: load `fitted_profile.json` in the CLI (`--profile`) — the curves need it
 
 **Gate:** predicted vs measured on ≥2 shapes with the residual accounted for. ⛔ If H3 fails, downgrade the
 sweep's claim from *predictive* to *comparative* — and say so — rather than re-tuning until it matches.
@@ -395,6 +412,11 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 
 ## Phase 4 — The six policies and the Pareto sweep *(tests H1 + H5)*
 
+- [ ] ▶ **First: load the fitted T4 profile** (`artifacts/results/phase3_kaggle_t4/fitted_profile.json`) in
+      the CLI and sweep (`--profile`). Until then every curve is still on the uncalibrated guess
+- [ ] Decide on the step-cost model's two measured limits (Phase 3 `posthoc.md`): the prefill
+      double-charge and the batch-1 decode step. ⛔ A fix is validated on a **new, pre-registered**
+      workload — never re-fitted to W3, which has been seen
 - [ ] Six policies, one file each, behind one interface (ADR-003), **every tie broken from a seeded RNG**
 - [ ] `sim/` — replica with `max_num_seqs` admission, fitted prefill/decode cost, fleet event loop
 - [ ] Sweep policy × replicas 1–8 on ≥2 traces (one real if obtainable, one generated agentic)
