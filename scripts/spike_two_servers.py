@@ -2,7 +2,8 @@
 """Phase-0 spike: can TWO vLLM servers coexist on this one GPU, and by which path?
 
 The spec planned the 2-replica validation on Kaggle's dual-T4 session and flagged, correctly, that
-nobody had ever checked whether that works. ADR-005 replaces it: one A100/H100, two replicas via two
+nobody had ever checked whether that works. (ADR-005 briefly moved this to A100/H100 + MIG; reversed
+2026-09-22 — Kaggle 2x T4 is the hardware, and two PHYSICAL GPUs beat MIG.) Paths, in order:
 MIG instances, with a memory-split fallback. This script answers which of the three states we are in
 BEFORE Phase 6 depends on the answer.
 

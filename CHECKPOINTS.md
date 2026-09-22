@@ -60,9 +60,10 @@ could not). Phase 3 (calibration) is next, and needs a hardware decision — see
 > *Accepted cost:* `colpali-lite`'s Indic query generation is wall-clock-bound and its own checkpoints say
 > *"do not leave until Phase 4."* Pausing it means that clock is not running. Accepted deliberately.
 >
-> **2. Calibration hardware.** An **A100/H100 replaces Kaggle dual-T4** (ADR-005). Two of the three rows in
-> the spec's 2026-09-20 feasibility risk table are **superseded**; the third (do the `vllm:kv_block_*`
-> histograms exist on the installed version?) survives as a Phase-0 checkbox below.
+> **2. Calibration hardware.** ~~An A100/H100 replaces Kaggle dual-T4~~ — ⛔ **REVERSED 2026-09-22:
+> Kaggle 2x T4 is the hardware for this project; A100/H100 is not available and is not in the plan.**
+> Sufficient, and measured as such: cache accounting and routing are hardware-independent; latency and ₹
+> figures are published as T4 figures. Phase 3 uses **Qwen3-4B** (8B does not fit one T4). ADR-005.
 
 > ### ⭐ Read [`docs/09-hypotheses.md`](docs/09-hypotheses.md) before running any phase that produces a
 > number. H1–H5 were committed **before any code existed**. That ordering is the claim — without it this
@@ -122,7 +123,7 @@ Phase-0 equivalent until now.
 - [x] Write `scripts/spike_vllm_metrics.py` + `scripts/spike_two_servers.py` — **written, not run**
 - [x] Record the two owed decisions with a date, here and in the project plan
 
-### The spike itself — on the A100/H100 box (see the runbook in `docs/07-environment.md`)
+### The spike itself — on the Kaggle 2x T4 box (see the runbook in `docs/07-environment.md`)
 
 - [ ] Create the local `.venv`, `pip install -e ".[dev]"`, and **record what actually installed** in
       `docs/07-environment.md` (pins are intentions; only an install produces facts)
@@ -192,10 +193,9 @@ path."
 > dry-run across three hardware scenarios, which surfaced a fourth bug (a stale server on the port
 > could mask a failed start) before it could cost a run.
 >
-> ⚠️ **Hardware: this ran on T4, not A100/H100.** The log confirms ADR-005 exactly — no bf16 (fell back to
-> fp16), no FlashAttention-2 (*"only supported on compute capability >= 8"*), attention on TRITON_ATTN.
-> Everything above is hardware-independent and stands. **TTFT and cost coefficients from this box do
-> not transfer** to datacenter serving.
+> **Hardware: Kaggle 2x T4 — and that is the project's hardware** (decided 2026-09-22). The log
+> confirms what T4 means: no bf16 (fp16), no FlashAttention-2, attention on TRITON_ATTN. Everything
+> above is hardware-independent. TTFT and cost figures from this box are **T4 figures**, labelled so.
 
 ---
 
@@ -241,6 +241,13 @@ and a corrupted line is survived and counted.
 
 ## Phase 3 — The Real-Engine Calibration Report *(the credential · tests H3 + H4)*
 
+- [ ] ⭐ **Model: `Qwen/Qwen3-4B`** on one T4 — not 8B, whose 15.26 GiB of fp16 weights exceed the card.
+      4B's KV cache is architecturally identical to 8B's (144 KiB/token), which is what matters here
+- [ ] **Read the true KV block count from the engine's log** ("Available KV cache memory: X GiB") —
+      `capacity.py`'s ~2,736 is arithmetic and ignores CUDA-graph reservations, so it overestimates
+- [ ] Profile identity recorded: `gpu="Tesla T4"`, `model="Qwen/Qwen3-4B"`, `engine_version="0.29.0"`
+- [ ] Calibrate against **`prompt_tokens_by_source{local_compute}`** as well as the hit rate — prefill
+      work actually done, and defined even with caching off (ADR-008 amendment)
 - [ ] `calib/metrics_scrape.py` — parse the exposition format; **derive** the hit rate from two counters
 - [ ] Calibrate on **≥2 workload shapes**, **≥3 live runs each** (a single run has no error bar)
 - [ ] Predicted-vs-measured table with error bars — ⛔ **published whatever it says** (H3)
@@ -307,10 +314,13 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 
 ## Phase 6 — Sim-to-real, two replicas
 
-- [ ] Enable MIG, create two instances, record the profile (`docs/07-environment.md` has the commands)
+- [ ] **One vLLM server per physical T4** (`CUDA_VISIBLE_DEVICES=0` / `=1`) — no MIG needed; two real
+      GPUs are complete isolation. Notebook v2 already detects this and does it
 - [ ] Two vLLM servers, one arrival stream, the top recommended policy actually deployed
-- [ ] Predicted vs measured hit rate across the pair
-- [ ] ⛔ **TTFT percentiles only from true MIG isolation** — never from the memory-split fallback (ADR-005)
+- [ ] Predicted vs measured hit rate across the pair *(v2's round-robin arm is the first data point —
+      predicted 1,088 tokens computed, hit rate 0.966862, committed before it ran)*
+- [ ] ⛔ **TTFT percentiles only from separate GPUs** — never from the memory-split fallback (ADR-005).
+      And they are **T4** percentiles
 - [ ] **Fallback, decided in advance:** if 2 replicas prove infeasible, ship a **single-replica calibration
       plus a documented, reproducible account of why**. That beats no calibration, and the failure write-up
       is itself an OSS-PR premise
@@ -336,6 +346,9 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       calibration table above the fold, then three sliders that **look up** the grid (no server, no
       wait) and whose payoff is watching the recommendation **flip**.
       ⛔ **Bundled + generated traces only, no upload box** — a serving log is someone's users' prompts
+- [ ] ⚠️ **Rebuild `demo_grid.json` from the CALIBRATED T4 profile.** The committed grid was built on an
+      A100-shaped guess (2026-09-21) that no longer describes any hardware in the plan. It is a
+      placeholder that proved the pipeline, nothing more
 - [ ] Publish that page to **GitHub Pages** AND to a **free Static Space** — same build, two URLs
 - [ ] ⭐ **The same curve images and calibration table go IN THE README**, for the reader who never
       leaves GitHub. *(No longer a workaround for cold starts — a static page does not sleep — just

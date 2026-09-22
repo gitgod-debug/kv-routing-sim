@@ -27,6 +27,8 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
+from ..cache.capacity import SHAPES, kv_blocks_for
+
 
 @dataclass(frozen=True, slots=True)
 class CostProfile:
@@ -72,15 +74,23 @@ class CostProfile:
         return d
 
 
-# ⛔ A GUESS. Order-of-magnitude shapes for an A100-class GPU serving an 8B model, used so the
-# simulator runs at all before Phase 3. Replaced by a measured profile; not to be cited.
+# ⛔ A GUESS. Order-of-magnitude shapes for a Tesla T4 serving Qwen3-4B in fp16 — the hardware and
+# model this project actually calibrates on (decided 2026-09-22; A100/H100 is not in the plan). Used
+# so the simulator runs before Phase 3 replaces it with a measured profile. Not to be cited.
+#
+# The reasoning, so a reader can disagree: T4 fp16 tensor cores peak ~65 TFLOPS; a 4B model costs
+# ~8 GFLOP per prefill token; at ~35% utilisation that is ~0.35 ms/token. Decode is memory-bound:
+# ~7.5 GiB of weights over ~320 GB/s is ~25 ms per step at batch 1.
 UNCALIBRATED_DEFAULT = CostProfile(
-    name="uncalibrated-default",
-    prefill_base_s=0.004,  # fixed per-batch overhead
-    prefill_per_token_s=0.00002,  # ~20 us/token => ~50k tokens/s of prefill
-    decode_base_s=0.006,  # a decode step with an empty batch
-    decode_per_seq_s=0.0004,  # marginal cost of one more sequence in the batch
-    kv_cache_blocks=28_672,  # from cache.capacity arithmetic: llama3-8b on 80 GiB
+    name="uncalibrated-t4-qwen3-4b-shape",
+    prefill_base_s=0.010,  # fixed per-batch overhead
+    prefill_per_token_s=0.00035,  # ~0.35 ms/token (see above)
+    decode_base_s=0.025,  # one decode step: read every weight once
+    decode_per_seq_s=0.0005,  # marginal cost of one more sequence in the batch
+    # DERIVED, not typed: qwen3-4b on one 15 GiB T4 at 0.90 util (~2,736 blocks). Computed from
+    # cache/capacity.py so the two can never disagree. vLLM also reserves memory for CUDA graphs and
+    # activations, so the real figure is LOWER — Phase 3 reads it from the engine's own log.
+    kv_cache_blocks=kv_blocks_for(SHAPES["qwen3-4b"], 15.0),
     block_size=16,
     max_num_seqs=256,
     calibrated=False,

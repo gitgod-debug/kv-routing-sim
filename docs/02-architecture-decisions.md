@@ -171,9 +171,11 @@ Nothing. This is the differentiator's load-bearing component.
 
 ---
 
-## ADR-005: ⭐ Calibration hardware — one A100/H100, two replicas via MIG
+## ADR-005: ⭐ Calibration hardware — Kaggle 2x T4
 
-**Status:** Accepted · 2026-09-20 · **Supersedes the spec's Kaggle dual-T4 plan**
+**Status:** ⚠️ **Revised 2026-09-22 — Kaggle 2x T4 is the hardware; A100/H100 is not in the plan.**
+The 2026-09-20 text below chose A100/H100 + MIG and is kept as the record of that decision. Read the
+**final amendment** at the end of this ADR for what holds now.
 
 ### What changed
 
@@ -261,6 +263,45 @@ both servers on GPU 0 and never used the second card. v2 detects physical GPUs f
 
 Revised order of preference: **separate GPUs > MIG > memory-split**. The first two permit TTFT
 percentiles; memory-split still does not.
+
+---
+
+### ✅ FINAL AMENDMENT 2026-09-22 — Kaggle 2x T4 is THE hardware. This supersedes the text above.
+
+A100/H100 access does not exist and will not be in the plan. That is **sufficient** for this project,
+for a reason that is structural rather than a consolation:
+
+**The credential is hardware-independent.** The Calibration Report's headline number is the cache
+model's error against the engine's **hit rate** and **prefill tokens computed**. Those are decided by
+which blocks are resident on which replica — identical logic on a T4 and an H100. Phase 0 proved it on
+T4: the corrected model reproduces vLLM's counters to the token.
+
+| | On Kaggle 2x T4 |
+|---|---|
+| Cache accounting, hit rate, partial-block rule | ✅ fully valid — **measured 2026-09-21** |
+| Eviction behaviour (H4) | ✅ valid — and **easier**: a 15 GiB card evicts under modest traffic, an 80 GiB one would need an enormous workload |
+| 2-replica routing (Phase 6) | ✅ **better** — two physical GPUs isolate completely, stronger than MIG |
+| TTFT, prefill/decode coefficients, ₹ | ⚠️ **T4 figures.** TRITON_ATTN + fp16 is not how a datacenter GPU serves. Published labelled as T4, priced at a **T4 instance's** rate |
+| H6 (does the ranking survive a hardware change?) | tested by rescaling the cost function, as already planned — CPU-only |
+
+**What changes:**
+
+1. **Phase 3 model: `Qwen/Qwen3-4B`, not 8B.** Measured: 8B's fp16 weights are 15.26 GiB against 13.5 GiB
+   usable on a T4. 4B is 7.49 GiB, leaving 6 GiB of cache — and its KV cache is **architecturally
+   identical** to 8B's (36 layers, 8 KV heads, head_dim 128, 144 KiB/token). A cache-model calibration
+   calibrates the cache; the FFN width is irrelevant to it.
+   *(Rejected: tensor-parallel 8B across both T4s. It fits, but turns two GPUs into ONE replica, which
+   destroys Phase 6.)*
+2. **Two replicas = one server per physical GPU.** MIG does not exist on T4, and is not needed.
+3. **The claim.** *"Calibrated against live vLLM 0.29.0 on T4"* — the engine and version still go in the
+   one-line description. What is given up is the datacenter-hardware line this ADR was originally chasing; what
+   is kept is **"ran the real engine and published the error"**, which was always the actual point.
+   Nothing ADR-010 permits claiming is lost: it never allowed datacenter latency without datacenter
+   calibration.
+
+**What would reverse it:** A100/H100 time appearing. It would then be a **bonus**, not a requirement — a
+second real profile, and a T4-vs-A100 comparison would turn H6 from a rescaling exercise into a direct
+measurement.
 
 ---
 

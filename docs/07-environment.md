@@ -68,19 +68,32 @@ that deployment target only exists because of this property.
 
 | | |
 |---|---|
-| **Hardware** | **A100 or H100** — one GPU at a time |
-| **Reachability** | **Not reachable from the dev session.** Scripts are written here, run there, artifacts copied back. |
-| **Duties** | Phase 0 spike · Phase 3 single-replica calibration · Phase 6 two-replica validation |
-| **Two replicas** | Two **MIG** instances on the one card; fallback = two servers at `--gpu-memory-utilization 0.45` each (ADR-005) |
+| **Hardware** | ✅ **Kaggle, 2x Tesla T4** — measured 2026-09-21: 15 GiB each, compute 7.5, driver 580.159.04, CUDA 12.8, 4 CPUs, Python 3.12.13 |
+| **Environment** | **Jupyter only — no shell.** Everything runs as a notebook (`notebooks/`) |
+| **Settings** | Accelerator **"GPU T4 x2"** · Internet **ON** (pip install + model download) |
+| **Reachability** | Not reachable from the dev session. Notebooks are written here, run there, results copied back |
+| **Duties** | Phase 0 spike ✅ · Phase 3 calibration · Phase 6 two-replica validation |
+| **Two replicas** | **One server per physical GPU** (`CUDA_VISIBLE_DEVICES=0` / `=1`) — complete isolation, stronger than MIG |
 
-**Why this replaced the spec's Kaggle dual-T4 plan, and why it is an upgrade rather than a substitution:
-see ADR-005.** Briefly: A100 is SM80 (bf16, native FlashAttention backend), H100 is SM90 (adds FP8); T4 is
-SM75 with none of those and vLLM falls back to a different attention backend there. Kaggle remains a
-documented fallback, not the plan.
-
-⚠️ **Record, on the first run, into this file:** the exact GPU, driver, CUDA version, the **vLLM version
-that actually installed** (the pin is 0.29.0 — if the box gives something else, ADR-008's metric-name audit
-must be re-run against *its* `loggers.py`), and whether MIG is available and enabled.
+> ### ✅ Decided 2026-09-22: this is THE hardware. A100/H100 is not in the plan.
+> For two days the plan said A100/H100; that access does not exist, and the project does not need it.
+> What T4 means, measured rather than assumed (engine log, 2026-09-21):
+>
+> - **No bf16** — vLLM falls back to fp16. **No FlashAttention-2** ("only supported on compute
+>   capability >= 8"). Attention runs on **TRITON_ATTN**.
+> - ✅ **Hardware-independent, fully valid on T4:** cache accounting, hit rates, prefill tokens computed,
+>   eviction behaviour, and 2-replica routing. That is the whole credential.
+> - ⚠️ **T4-specific:** TTFT and the prefill/decode cost coefficients. Every latency and ₹ figure is
+>   published as a **T4 figure**, priced at a **T4 instance's** hourly rate — never an A100's.
+> - ⭐ **Two things T4 does better:** a small cache evicts under modest traffic, so H4 is *easier* to
+>   test than on an 80 GB card; and two physical GPUs isolate replicas better than MIG would.
+>
+> **Model for Phase 3: `Qwen/Qwen3-4B`**, not 8B — the 8B's 15.26 GiB of fp16 weights exceed one T4.
+> 4B's KV cache is architecturally identical to 8B's, which is what a cache-model calibration needs.
+>
+> ⚠️ **Kaggle's AUP bans server farming.** Calibration is ordinary interactive experimentation — but
+> always run the notebook's clean-up cell. Quota: ~30 GPU-hours/week, 12 h per session; a full
+> Phase-3 run needs a few hours at most.
 
 ### ⛔ The rule that outranks convenience
 
@@ -132,7 +145,10 @@ grep -rn "prefix_cache_hits\|prefix_cache_queries\|kv_block_" "$(.venv/bin/pytho
 Then **copy `artifacts/results/*.json` and `*.metrics.txt` back into the repo and commit them.** The raw
 scrape is committed, not just the parsed summary — it is the calibration evidence.
 
-### MIG setup, for Phase 6 (needs root; do it once)
+### ~~MIG setup~~ — ⛔ NOT APPLICABLE (T4 has no MIG; kept only as a record)
+
+Phase 6 uses **one server per physical T4** instead — `notebooks/phase0_spike_vllm.ipynb` v2 does this
+automatically. The commands below would only matter on an A100/H100, which is not in the plan.
 
 ```bash
 sudo nvidia-smi -i 0 -mig 1                 # enable MIG on GPU 0 (no processes may be running)
@@ -179,7 +195,7 @@ is the first question a reader asks. The answer is no, and the reason is the who
 once, on the calibration box, offline, before anything is published.
 
 ```
-  MACHINE 2 — the A100/H100          run ONCE, offline (Phase 3 + Phase 6).
+  MACHINE 2 — Kaggle 2x T4          run offline, in a notebook (Phase 0 ✅, 3, 6).
   ┌──────────────────────────┐       Produces ~20 numbers and some committed JSON.
   │ live vLLM + /metrics     │       Then the GPU is finished, forever.
   └──────────────────────────┘

@@ -67,4 +67,10 @@ SHAPES = {
     # Qwen3-8B — the Phase-3 calibration model. Ungated, unlike meta-llama/* (gated=manual).
     #   36 layers, 8 KV heads, head_dim 128 -> 144 KiB of KV per token, ~16 GB of bf16 weights.
     "qwen3-8b": ModelShape("qwen3-8b", 36, 8, 128, 2, 16 * GIB),
+    # ⭐ Qwen3-4B — THE Phase-3 calibration model (decided 2026-09-22, Kaggle 2x T4).
+    #   Qwen3-8B does not fit one T4 in fp16 (15.26 GiB of weights vs 13.5 GiB usable).
+    #   4B's KV cache is architecturally IDENTICAL to 8B's — 36 layers, 8 KV heads, head_dim 128,
+    #   144 KiB/token — so for calibrating a CACHE model it is a stand-in, not a downgrade.
+    #   4.02B params -> 7.49 GiB of fp16 weights (T4 has no bf16).
+    "qwen3-4b": ModelShape("qwen3-4b", 36, 8, 128, 2, 8_040_000_000),
 }

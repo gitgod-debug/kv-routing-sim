@@ -69,7 +69,7 @@ this file is for looking one up.
 | Term | Definition |
 |---|---|
 | **Compute capability** | NVIDIA's arch version. T4 and **GTX 1650 are both 7.5** (Turing); A100 = 8.0; H100 = 9.0. Determines bf16/FP8 support and which vLLM attention backend is used. |
-| **MIG** | Multi-Instance GPU — partitions an A100/H100 into isolated instances with their own SMs and HBM slice. How one card becomes two replicas (ADR-005). |
+| **MIG** | Multi-Instance GPU — partitions an A100/H100 into isolated instances with their own SMs and HBM slice. ⛔ **Not used in this project** — T4 has no MIG; two replicas run on two physical T4s, which isolate completely. |
 | **The memory-split fallback** | Two servers on one un-partitioned card at ~45% memory each. Isolates memory but **not SMs** — so hit rate is reportable, TTFT percentiles are **not**. |
 
 ## Project structure

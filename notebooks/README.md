@@ -39,7 +39,7 @@ bottom.
 | Stage | Model | Why |
 |---|---|---|
 | **Phase 0 spike** | **`Qwen/Qwen3-0.6B`** | Ungated (verified 2026-09-21 — no token, no licence click), ~1.5 GB, starts in a minute or two. 28 layers / 8 KV heads / head_dim 128 → **112 KiB of KV per token**. The spike only needs the counters to exist and move; a big model would just cost you time. |
-| **Phase 3 calibration** | **`Qwen/Qwen3-8B`** | Also ungated. 36 layers → **144 KiB/token**, ~16 GB of bf16 weights, comfortable on an A100/H100. The cost coefficients have to come from a model shape people actually serve. |
+| **Phase 3 calibration** | **`Qwen/Qwen3-4B`** | Ungated. ⛔ **Not Qwen3-8B** — its 15.26 GiB of fp16 weights exceed a T4's 13.5 GiB usable. 4B fits with 6 GiB left for cache, and its KV cache is **architecturally identical to 8B's** (36 layers, 8 KV heads, 144 KiB/token) — so for calibrating a *cache* model it is a stand-in, not a downgrade. |
 
 ⛔ **Not `meta-llama/*`.** Verified `gated=manual`: licence acceptance plus a token. A pointless
 dependency for a spike, and it fails at 3am with an unhelpful 401.

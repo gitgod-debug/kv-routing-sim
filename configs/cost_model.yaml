@@ -21,7 +21,9 @@ fx:
 # The reference SKU. ⚠️ This is NOT the box the calibration happened to run on — it is a named,
 # publicly-priced instance that a reader can look up. State it in every caption that carries a ₹.
 compute:
-  sku: <TBD>               # e.g. "1x A100 80GB, <provider> <instance-name>"
+  sku: <TBD>               # a cloud instance with ONE Tesla T4 — the hardware the profile was measured on
+  # ⛔ NEVER price T4-measured timings with an A100/H100 hourly rate. That mixes hardware and produces
+  # a number that corresponds to no real deployment — the interpolation ADR-010 forbids.
   provider: <TBD>
   region: <TBD>
   gpus_per_instance: <TBD>

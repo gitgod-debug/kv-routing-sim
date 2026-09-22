@@ -155,6 +155,10 @@ to be checked by a reader, and a competitor already got it wrong in public.
 
 ## 7. MIG — how one GPU becomes two replicas
 
+> ⛔ **Not used in this project (decided 2026-09-22).** The hardware is Kaggle 2x T4, which has no MIG
+> — and two physical GPUs isolate replicas completely, which is stronger. Kept because the caveat below
+> about what shared hardware does to TTFT still applies to the memory-split fallback.
+
 **Multi-Instance GPU** partitions an A100/H100 into isolated instances, each with its own SMs and its own
 slice of HBM, each addressable as a separate device. Two vLLM servers on two MIG instances are, for our
 purposes, two replicas.
