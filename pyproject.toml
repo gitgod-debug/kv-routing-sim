@@ -78,5 +78,10 @@ extend-exclude = ["*.ipynb"]  # notebooks anywhere, including executed ones kept
 # If the number is in the config, it should be enforced.
 extend-select = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+# This file IS notebook content — markdown tables and cell source kept as strings — and a markdown
+# table row cannot be wrapped. The notebook it generates is excluded above for the same reason.
+"scripts/_phase3_notebook.py" = ["E501"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -9,12 +9,11 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-09-20 (**the simulator is built**: traces, cache, 7 policies, event loop, eval,
-CLI, 73 tests green. Everything except the three engine-dependent numbers, which stay behind the
-Phase-0 gate)
-**Current phase:** ✅ **Phase 0 COMPLETE** · ✅ **Phase 2b COMPLETE** (2026-09-22) — the cache model is now
-vLLM's block pool, reproducing every live-engine number to the token, histograms included. **Next: the
-Phase 3 calibration notebook** (Qwen3-4B, Kaggle 2x T4), with its predictions pre-registered.
+**Last updated:** 2026-09-22 (**Phase 3 is built, dry-run and pre-registered** — the predictions are
+committed, the notebook is generated from the same run, 114 tests green)
+**Current phase:** ✅ **Phase 0 COMPLETE** · ✅ **Phase 2b COMPLETE** · 🔨 **Phase 3: ready to run** — ▶ **next:
+run `notebooks/phase3_calibration.ipynb` on Kaggle (T4 x2, ~40 min)**, bring back `phase3_results.zip`,
+and run `scripts/phase3_analyze.py`. See [`notebooks/README.md`](notebooks/README.md).
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -80,7 +79,7 @@ Phase 3 calibration notebook** (Qwen3-4B, Kaggle 2x T4), with its predictions pr
 | 1 | Trace schema + ingestion + generator | `[x]` | A real log **and** a generated agentic trace both load into one versioned schema; malformed lines log-and-continue with a count |
 | 2 | Block-level KV cache model | `[x]` | Known prefix sequence → known hit/miss pattern, in tests; partial-block rule holds; memory ceiling measured |
 | **2b** | **Cache model = vLLM's block pool** 🆕 | `[x]` | Every eviction behaviour cites a line of vLLM's source; naive LRU kept as the ablation; both still reproduce v1/v2 exactly |
-| 3 | **Real-Engine Calibration Report** | `[ ]` | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
+| 3 | **Real-Engine Calibration Report** | `[~]` built + pre-registered; **not yet run** | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
 | 4 | **Seven** policies + Pareto sweep | `[~]` | Built and running; **gated on a calibrated profile** before any curve is published. Tests **H1 + H5 + H6** |
 | 5 | **The crossover finding** | `[ ]` | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
 | 6 | Sim-to-real 2-replica validation | `[ ]` | Predicted vs measured across two MIG instances, or the documented fallback and why |
@@ -288,9 +287,9 @@ to be wrong wastes GPU time and produces a residual nobody can interpret.
       rules alone, nothing fitted. The lru model cannot produce them at all
 - [x] ✅ Invariants checked after **every step** under pressure: no block double-booked, **none ever
       stranded** (a property the source implies; plain LRU does strand, briefly)
-- [ ] ⭐ **Pre-register the Phase-3 predictions** — moved to the Phase-3 notebook build: they depend on
-      the Phase-3 workloads, and on capacity, which is read from each run's own log. What is fixed in
-      advance is the model, the workload and the procedure; the number follows deterministically
+- [x] ⭐ **Pre-register the Phase-3 predictions** — done in the Phase-3 build (2026-09-22). Capacity turned
+      out not to need reading per run: `--num-gpu-blocks-override` makes it a controlled input, which
+      the notebook verifies from the engine's own log. See Phase 3
 
 > ### 📏 What building it MEASURED — sim vs sim, uncalibrated profile, 2026-09-22
 > 1. ⛔ **The H4 amendment's prediction was wrong.** Eviction ORDER is worth ≤ 0.2 points of hit rate;
@@ -312,28 +311,82 @@ to be wrong wastes GPU time and produces a residual nobody can interpret.
 
 ## Phase 3 — The Real-Engine Calibration Report *(the credential · tests H3 + H4)*
 
-- [ ] ⭐ **Model: `Qwen/Qwen3-4B`** on one T4 — not 8B, whose 15.26 GiB of fp16 weights exceed the card.
+> ### 🔨 2026-09-22 — the experiment is built, dry-run and pre-registered. It has NOT run yet.
+> One config ([`configs/phase3_workloads.yaml`](configs/phase3_workloads.yaml)) → one script
+> (`scripts/phase3_prepare.py`) → the trace, **both models' predictions** (committed:
+> [`artifacts/results/phase3_prereg/predictions.json`](artifacts/results/phase3_prereg/predictions.json)) and
+> the notebook that tests them — all stamped with one fingerprint, so none can drift from the others.
+> **Designed to discriminate:** an experiment where both models predict the same number cannot say
+> which one is right.
+>
+> | Workload (120 requests, Qwen3-4B, 511 usable blocks) | `vllm` model | `lru` model | Role |
+> |---|---|---|---|
+> | **W2** — sequential, 1-token outputs | hit **0.6090** · 22,664 computed | **0.6073** · 22,760 | control: the accounting alone |
+> | **W1** — sequential, 64-token outputs | hit **0.4883** · 29,656 computed | **0.6073** · 22,760 | **11.9 points apart** — decode blocks crowd the cache, or they don't |
+> | **W3** — concurrent, at arrival times | preemptions **> 0** (15 / 20 / 25 across a 4× timing bracket) | **0** preemptions | admission control and preemption |
+>
+> Sequential counts are **exact integers**, checked timing-independent (identical under a 10× slower
+> profile), and include the three `kv_block_*` histogram counts and every request's `cached_tokens`.
+> W2 also carries a pre-registered **alternative** — the engine committing one token more per request
+> than its source says (hit 0.6026) — so an off-by-one is diagnosed by the run, not argued afterwards.
+>
+> **Three facts read from vLLM 0.30.0's source while building it** — each now an audit line the notebook
+> checks against the *installed* engine before sending anything:
+> 1. ⚠️ **Async scheduling is ON by default** (`config/vllm.py` resolves `None` to `True`); our simulator
+>    schedules synchronously. For one-at-a-time requests both end each request with *prompt + output − 1*
+>    tokens committed (`AsyncScheduler._update_request_with_output` catches up before the free), so W1/W2
+>    do not depend on it. **W3 may** — named in the prereg as a simulator assumption.
+> 2. **A cache query is recorded at admission, not at lookup** (`scheduler.py`: *"Record at admission so
+>    unscheduled lookups are not counted"*): a request that waits for memory counts once. The model
+>    already did this.
+> 3. **`/reset_prefix_cache` also clears the block-metrics collector** (`block_pool.py`), so a reset engine
+>    is, for every predicted count, a fresh one — nine runs need one engine start, not nine.
+>
+> **Dry-run** (`scripts/phase3_dryrun.py`, ~6 min): the notebook, unmodified, against a mock engine — a real
+> HTTP server backed by our own vLLM model — in four scenarios. **A** the real setup: the vllm model exact
+> on all 6 sequential runs, the lru model visibly off (−11.90 pts on W1), W3 evaluated, zip written.
+> **B** no reset endpoint: falls back to a restart per run. **C** the override ignored: stops at the
+> capacity check. **D** a stale server on the port: refuses to launch. ⛔ **D found a real bug** —
+> checking "our process is alive" before `/health` narrows the stale-server race but does not close it
+> (the new process has not died yet on the first check). The notebook now refuses to launch while
+> anything listens on the port.
+>
+> **The analysis is written too** (`scripts/phase3_analyze.py`) and was run end to end on the dry-run's
+> output — so the report's shape, the timing fit and the W3 procedure were fixed before any real number
+> existed. On the mock it recovered the mock's decode cost (0.67 + 2.51 ms × batch, true 0.5 + 2.5) and
+> predicted W3 within 1–3% on hit rate and TTFT.
+
+- [x] ⭐ **Model: `Qwen/Qwen3-4B`** on one T4 — not 8B, whose 15.26 GiB of fp16 weights exceed the card.
       4B's KV cache is architecturally identical to 8B's (144 KiB/token), which is what matters here
-- [ ] **Read the true KV block count from EACH run's log** ("GPU KV cache size: N tokens") — measured
-      2026-09-22: `capacity.py` overestimates by 7–12.5%, and identical launches differ by 4.8%
-- [ ] Profile identity recorded: `gpu="Tesla T4"`, `model="Qwen/Qwen3-4B"`, `engine_version="0.29.0"`
-- [ ] Calibrate against **`prompt_tokens_by_source{local_compute}`** as well as the hit rate — prefill
-      work actually done, and defined even with caching off (ADR-008 amendment)
-- [ ] `calib/metrics_scrape.py` — parse the exposition format; **derive** the hit rate from two counters
-- [ ] Calibrate on **≥2 workload shapes**, **≥3 live runs each** (a single run has no error bar) — and at
-      least one must **overflow the cache**, or eviction (the whole point of H4) is never exercised
-- [ ] Traces are generated **locally by our generator** and uploaded with the notebook — never
-      re-implemented inside it (two generators would drift; ADR-011's reasoning)
-- [ ] Keep the replay **open-loop and deterministic** (`temperature=0`); record that closed-loop
-      decode-block reuse is a known, unmeasured limitation (ADR-002 amendment, gap 4)
-- [ ] Predicted-vs-measured table with error bars — ⛔ **published whatever it says** (H3)
-- [ ] **Explain the residual with a measurement**, not a narrative: compare the engine's `kv_block_*`
-      **distributions** against the simulator's own, emitted by vLLM's rules (H4 amendment) — and report
-      naive-LRU vs block-pool error side by side
+- [x] ~~Read the true KV block count from each run's log~~ — **superseded:** capacity is now a
+      *controlled* input (`--num-gpu-blocks-override 512`, one of them vLLM's null block), and the
+      notebook stops unless the engine's own log reports exactly 8,192 tokens
+- [x] Profile identity recorded — `gpu`, `model`, `engine_version="0.30.0"` (was 0.29.0: the pin moved),
+      written into `fitted_profile.json` by the analysis
+- [x] Calibrate against **`prompt_tokens_by_source{local_compute}`** as well as the hit rate — compared
+      counter by counter, with `prefix_cache_queries`, `_hits`, `num_preemptions` and the histogram counts
+- [x] `/metrics` parsing — in the notebook (stdlib only: it runs where the repo is not) and in
+      `phase3_analyze.py` (histogram buckets). The hit rate is **derived from two counters** everywhere.
+      A `calib/metrics_scrape.py` package module waits for `kvsim calibrate`
+- [x] **≥2 shapes, ≥3 live runs each, one overflowing the cache** — W1 + W2 × 3, plus W3 × 3; the trace
+      needs ~1,000 blocks against 511
+- [x] Traces generated **locally by our generator**, embedded in the notebook and fingerprinted — never
+      re-implemented inside it
+- [x] Open-loop and deterministic (`temperature=0`, `ignore_eos`, exact output lengths checked per
+      request). Closed-loop decode-block reuse stays a known, unmeasured limitation (ADR-002, gap 4)
+- [x] ⭐ **Predictions pre-registered and committed before the run** — with the analysis procedure and
+      the decision rules for every outcome (`predictions.json`, `analysis_procedure`, `decision_rules`)
+- [ ] ▶ **Run it** — `notebooks/phase3_calibration.ipynb` on Kaggle T4 x2 — and commit
+      `artifacts/results/phase3_kaggle_t4/`, **raw scrapes included**
+- [ ] Predicted-vs-measured table with error bars — ⛔ **published whatever it says** (H3).
+      `phase3_analyze.py` writes it
+- [ ] **Explain the residual with a measurement**: the engine's `kv_block_*` counts and bucket
+      distributions against the model's own events, emitted by vLLM's rules (H4) — naive-LRU and
+      block-pool error side by side
 - [ ] The **limits section** — what the simulator gets wrong, one failure mode owned publicly
-- [ ] Commit raw scrapes + the notebook/script + pinned deps
 - [ ] README section names: engine, **version**, flags, block size, `max_num_seqs`, model, quantization, the
       exact CLI, hardware, and **every `/metrics` field consumed by name**
+- [ ] Load the fitted profile in the CLI (`--profile fitted_profile.json`) — Phase 4's curves need it
 
 **Gate:** predicted vs measured on ≥2 shapes with the residual accounted for. ⛔ If H3 fails, downgrade the
 sweep's claim from *predictive* to *comparative* — and say so — rather than re-tuning until it matches.

@@ -8,16 +8,67 @@ shell.
 
 ## Status
 
-✅ **Phase 0 is complete.** v1 (2026-09-21, vLLM 0.29.0) passed the gate; **v2 (2026-09-22, vLLM 0.30.0)
-closed every open item** — including an **exact** 2-replica sim-to-real prediction (1,088 tokens, 0 error).
-Results: [`phase0_kaggle_t4/`](../artifacts/results/phase0_kaggle_t4/) ·
+✅ **Phase 0 is complete** — v1 (2026-09-21) and v2 (2026-09-22) passed every check, including an
+**exact** 2-replica sim-to-real prediction (1,088 tokens, 0 error). Results:
+[`phase0_kaggle_t4/`](../artifacts/results/phase0_kaggle_t4/) ·
 [`phase0_v2_kaggle_t4/`](../artifacts/results/phase0_v2_kaggle_t4/).
 
-**Nothing here needs running right now.** The next notebook is Phase 3's, and it waits on a CPU-only
-rebuild of the cache model (Phase 2b in `../CHECKPOINTS.md`). The vLLM install is now **pinned to 0.30.0**
-— unpinned, it floated between the two runs.
+▶ **Next to run: `phase3_calibration.ipynb`** — the Real-Engine Calibration. Its predictions are
+committed in [`../artifacts/results/phase3_prereg/predictions.json`](../artifacts/results/phase3_prereg/predictions.json).
 
-## Which file to run
+---
+
+## ▶ Phase 3 — `phase3_calibration.ipynb`
+
+**What it does.** Starts one vLLM 0.30.0 server (Qwen3-4B, one T4) with a deliberately small,
+**exactly controlled** cache (`--num-gpu-blocks-override 512`), sends it three workloads three times
+each, and scores every run against predictions both cache models made **before the run**:
+
+| Workload | Sent | `vllm` model | `lru` model |
+|---|---|---|---|
+| **W2** control | 120 requests one at a time, 1-token outputs | hit rate **0.6090** | **0.6073** |
+| **W1** discriminating | the same 120, 64-token outputs | **0.4883** | **0.6073** — 11.9 points apart |
+| **W3** concurrent | the same trace at its own arrival times | preemptions **> 0** | **0** preemptions |
+
+W1 and W2 are exact predictions, not estimates: for one-at-a-time requests vLLM is deterministic, so
+every counter — queries, hits, computed tokens, the three `kv_block_*` histogram counts, and each
+request's own `cached_tokens` — must match to the token, or the model is wrong about something
+specific. The per-request comparison says which request.
+
+**Where and how.** Kaggle, **Accelerator: GPU T4 x2** (one is used), **Internet: on**. Upload the
+one `.ipynb`, **Run All**. Nothing else: no repo checkout, no dataset, no HF token (Qwen3-4B is
+ungated). The trace (57,960 prompt tokens as token ids) and the predictions are **embedded in the
+notebook** and fingerprinted — it refuses to run if they were edited.
+
+**How long.** ≈ 40 min: `pip install` 5–8 · first engine start 5–10 (≈ 8 GB of weights) · W2 ~2 ·
+W1 ~15 · decode sweep ~2 · W3 ~3.
+
+**Bring back** `phase3_results.zip` (right sidebar → *Output*, or `/kaggle/working`). Then:
+
+```bash
+mkdir -p artifacts/results/phase3_kaggle_t4
+unzip phase3_results.zip -d artifacts/results/phase3_kaggle_t4
+.venv_kv/bin/python scripts/phase3_analyze.py        # writes calibration_report.md + fitted_profile.json
+```
+
+Commit the whole folder, **raw scrapes included** — the JSON is a parse; the scrapes are the evidence.
+
+**If a cell stops with ⛔** it says why; download the zip anyway (the server log is in it) and run
+the clean-up cell. It checks, before any measured request: the vLLM version, that the installed
+engine contains every source line the model cites, the fingerprints, the engine's KV capacity (from
+its own log), that each response carries `cached_tokens` and exact lengths, and that nothing else
+is already serving on the port.
+
+**Changing the experiment** means editing `../configs/phase3_workloads.yaml` and re-running
+`scripts/phase3_prepare.py` — which re-makes the predictions too — then
+`scripts/phase3_dryrun.py`, which runs the notebook against a mock engine through four scenarios.
+Never edit the `.ipynb` by hand; it is generated.
+
+---
+
+## Phase 0 — `phase0_spike_vllm.ipynb` *(done; kept as the record of what ran)*
+
+### Which file to run
 
 **`phase0_spike_vllm.ipynb` — now v2.** Same self-contained rules. It finishes the three things v1
 could not, all of which were notebook bugs rather than findings about vLLM:
@@ -40,7 +91,7 @@ physical GPUs are the best possible 2-replica setup.
 no HF token. Only `vllm` plus the standard library. Copy the one `.ipynb` to the box and run it top to
 bottom.
 
-## Which model
+### Which model
 
 | Stage | Model | Why |
 |---|---|---|
@@ -53,18 +104,18 @@ dependency for a spike, and it fails at 3am with an unhelpful 401.
 Both shapes are in `src/kv_routing_sim/cache/capacity.py`, read from each model's own `config.json`
 rather than guessed.
 
-## What data do I need?
+### What data do I need?
 
 **None.** The notebook builds its own prompts as **token id lists**, which is deliberate: sending ids
 instead of text means the prompt length is exact rather than an estimate, so the blocks-vs-tokens
 determination in §7 is a clean measurement and no tokenizer is involved.
 
-## How long
+### How long
 
 ≈ 25–35 min. `pip install vllm` 3–8 min · model download 1–2 min · each server start 1–3 min (there are
 four starts) · the workloads are seconds.
 
-## What to bring back
+### What to bring back
 
 The notebook writes everything to `phase0_results/`:
 
@@ -79,7 +130,7 @@ server_8001.log
 Copy that folder into `../artifacts/results/` and commit it. **The raw `.txt` scrapes matter as much as
 the JSON** — the JSON is a parse, the scrape is the thing parsed.
 
-## What it decides
+### What it decides
 
 | Answer | What changes |
 |---|---|

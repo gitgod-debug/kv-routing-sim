@@ -130,15 +130,28 @@ Two classes, and the distinction is enforced:
   flag, seed, hardware, package versions), because a number without provenance cannot be traced back.
   `spike_vllm_metrics.py` ✅ written · `spike_two_servers.py` ✅ written.
 - **`run_*.py`** — regenerate a README table. Stricter: seeded, config-driven, byte-identical on re-run.
-  None exist yet; they arrive with Phase 1.
+  `run_sweep.py` ✅ · `build_grid.py` ✅ (the static demo's grid, ADR-011).
+- **`phase3_*.py`** — the Real-Engine Calibration, as one pipeline with one source of truth
+  (`configs/phase3_workloads.yaml`):
+
+  | Script | Does | Runs where |
+  |---|---|---|
+  | `phase3_prepare.py` | trace + fingerprint + **both models' predictions** → `artifacts/results/phase3_prereg/predictions.json`, and builds the notebook with all of it embedded | here, **before** the GPU run |
+  | `_phase3_notebook.py` | the notebook's cells, as source (the `.ipynb` is generated, never hand-edited) | imported by `phase3_prepare.py` |
+  | `phase3_dryrun.py` | runs the notebook against a **mock engine** — a real HTTP server backed by our own vLLM model — across four failure scenarios | here, after any notebook change |
+  | `phase3_analyze.py` | the pre-registered analysis: exact comparisons, the timing fit, W3 predicted by the fitted profile, H4 histograms → `calibration_report.md` + `fitted_profile.json` | here, **after** the GPU run |
+
+  `tests/test_phase3_prereg.py` fails if the committed predictions no longer reproduce from the
+  committed code, or if the notebook carries anything else.
 
 `_spike_common.py` holds the shared header/results helpers, adapted from the sibling project
 (`colpali-economics`) so both repos' artifacts are readable the same way.
 
 ## `configs/`, `artifacts/`, `tests/`
 
-- **`configs/`** — `cost_model.yaml` (every constant cited + dated), workload grids, policy grids. A
-  committed config is what makes a sweep re-derivable.
+- **`configs/`** — `cost_model.yaml` (every constant cited + dated), workload grids, policy grids,
+  and `phase3_workloads.yaml` (the calibration experiment). A committed config is what makes a sweep
+  re-derivable.
 - **`artifacts/results/`** — JSON + **raw metric scrapes**, committed (they are the calibration evidence).
   Bulk traces, sweeps and logs are gitignored. **Never hand-edited.**
 - **`tests/`** — cache-model hit/miss tests first; a golden-file test on a small sweep; the property test
