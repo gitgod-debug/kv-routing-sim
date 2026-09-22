@@ -57,6 +57,7 @@ And separately from both, the thing a reader should be able to repeat without op
 | 07 | [`07-environment.md`](07-environment.md) | The two machines, what each can and cannot do, and the calibration runbook |
 | 08 | [`08-glossary.md`](08-glossary.md) | Every term, acronym and metric name, defined |
 | 09 | [`09-hypotheses.md`](09-hypotheses.md) | **The pre-registered predictions (H1–H5).** What we expect, what would falsify each, what decision changes if it holds. **Read before running any phase that produces a number** — a sweep with no hypothesis is a dataset dump |
+| 11 | [`11-where-we-are.md`](11-where-we-are.md) | ⭐ **The whole story so far, in plain words** — what we found, what we decided and why, the mistakes we caught, where we are, what is left. **Read this first if you have been away.** |
 
 **If you have five minutes:** read this file, then §"The claim, precisely" in
 [`01-why-this-project.md`](01-why-this-project.md), then the honesty gates at the bottom of

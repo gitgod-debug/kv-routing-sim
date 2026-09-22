@@ -195,10 +195,10 @@ calibration cannot cash.
 
 | | Hypothesis | Tested in | Status |
 |---|---|---|---|
-| **H1** | Prefix-affinity dominates hit rate under high sharing | Phase 4 | `[ ]` untested |
+| **H1** | Prefix-affinity dominates hit rate under high sharing | Phase 4 | `[x]` ⛔ **FALSIFIED 2026-09-22 — by load.** Holds exactly at 1–2 sessions/s; gone or reversed from 3/s, where concentration forces preemption |
 | **H2** | ⭐ The crossover boundary exists and is monotonic | Phase 5 | `[ ]` untested |
 | **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[x]` ✅ **PASSED 2026-09-22** — **zero** error on 2 sequential shapes under eviction pressure (3 runs each, every| **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[x]` ✅ **supported, in its second amendment's form (2026-09-22):** plain LRU's residual on a live engine is **capacity** skew (−11.9 pts when requests hold decode blocks, 0.17 without); histogram counts exact, W2 distributions identical |-predicts — but the cause is **capacity** accounting, not order |
-| **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[ ]` untested |
+| **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[~]` **holds only for balanced affinity at LOW sharing** (1–3 fewer T4s); falsified elsewhere. Session-sticky (untested) needs the fewest everywhere |
 | **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 (CPU-only re-run) | `[ ]` untested · **gates ADR-010's tier-1/2 claims** |
 
 **Amendments:** *(add dated entries below, never edit above)*
@@ -395,3 +395,54 @@ prefix-affinity need more than round-robin.
 radix-affinity collapse onto one replica at high sharing. If that survives calibration, it will need
 *more* replicas, not fewer — and **H5 fails for it** while perhaps holding for the balanced variant.
 That outcome gets reported as it lands.
+
+### 2026-09-22 (night) — ⛔ Phase 4 RAN. H1 is falsified by load; H5 holds in one case of four
+Report: [`artifacts/results/phase4_sweep_t4/report.md`](../artifacts/results/phase4_sweep_t4/report.md)
+(3,360 runs; re-running reproduced every cell exactly).
+
+**H1 — falsified, and the way it fails is the interesting part.** At **1–2 sessions/s** it holds
+exactly as written: radix-affinity's hit-rate lead over least-loaded is positive at every replica
+count, with every CI's lower bound above zero, and widens from 2 replicas to 8 (**+0.043 → +0.110**
+at 1/s). From **3/s** it collapses. Pure radix-affinity sends *every* request to the one replica
+holding the shared prefix (load imbalance exactly N), preempts **110–212 times per run**, and
+preemption throws away the cached blocks it concentrated traffic to keep — so its lead turns
+**negative** (−0.044 at 4/s on 2 replicas). The balanced variant lasts to 3–4/s and fades to zero at
+6–8/s.
+
+What that falsification does and does not mean. H1 was written as a sanity gate — *"if H1 fails, the
+cache model is broken."* It is not that: wherever there is no memory pressure, H1 holds as predicted,
+so the model does credit locality. What H1 got wrong is an assumption — that hit rate is a property
+of routing alone. Under load, **concentration causes preemption and preemption destroys reuse**. That
+mechanism is precisely what Phase 3's concurrent run validated on a real engine (27 preemptions, hit
+rate within 0.3%). It is H2's crossover showing up in the hit rate itself.
+
+**H5 — holds in one case of four.**
+
+| | round-robin needs (2 → 8 sessions/s) | prefix-affinity needs | verdict |
+|---|---|---|---|
+| low sharing · balanced | 3, 4, 5, 7, 8 | **2, 3, 3, 4, 5** | ✅ holds — 1–3 fewer T4s at every load |
+| low sharing · pure | 3, 4, 5, 7, 8 | never meets the SLO | ⛔ falsified |
+| high sharing · balanced | 3, 4, 5, 7, — | never meets the SLO | ⛔ falsified |
+| high sharing · pure | 3, 4, 5, 7, — | never meets the SLO | ⛔ falsified |
+
+⚠️ **One caveat that must travel with the balanced result.** Its load weight — "one queued request
+costs as much as one matched block" (alpha = 1) — was **never swept**; its own docstring says so. At
+high sharing the shared prefix is **85 blocks**, so that penalty barely registers and it concentrates
+anyway (imbalance 1.6–1.8, up to 121 preemptions). The registered test used alpha = 1 and failed.
+Whether a swept alpha rescues it is a **new experiment, registered separately in Phase 5** — not a
+re-run of this one until it passes.
+
+**Not tested, reported — and it is the result a reader will care about.** **Session-sticky** holds
+the SLO with the fewest T4s at every load on both shapes (tied with balanced affinity at low sharing):
+**2, 3, 3, 4, 5** against round-robin's 3, 4, 5, 7, 8. Wherever round-robin meets the SLO at all, the
+recommendation is **25–42% cheaper** (₹3.89–4.79 per 1,000 requests against ₹6.39–7.25). At 8/s on
+high sharing, round-robin cannot hold the SLO even with 8 T4s; session-sticky holds it with 5. It
+never preempts: it spreads sessions evenly (imbalance ≤ 1.09), and each replica caches the shared
+system prompt once while every conversation's own history stays with it. **The early, uncalibrated
+observation survived calibration.**
+
+**Scope, as plainly:** generated traffic — one system prompt shared by every session, 4-turn
+sessions, open-loop replay — Phase 3's T4 timings, one model. Whether the ranking transfers to other
+hardware is **H6**, not yet tested; until it is, none of this goes in the README as a claim about
+anyone else's fleet.
+

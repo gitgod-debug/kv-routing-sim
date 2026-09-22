@@ -143,6 +143,10 @@ Two classes, and the distinction is enforced:
 
   `tests/test_phase3_prereg.py` fails if the committed predictions no longer reproduce from the
   committed code, or if the notebook carries anything else.
+- **Phase 4:** `phase4_profile.py` builds the calibrated T4 profile (`configs/profiles/`) from Phase 3's
+  artifacts; `run_phase4_sweep.py` runs the registered sweep (`configs/phase4_sweep.yaml`) in parallel
+  and applies its H1/H5 rules → `artifacts/results/phase4_sweep_t4/`. Deterministic: a re-run
+  reproduces every cell.
 
 `_spike_common.py` holds the shared header/results helpers, adapted from the sibling project
 (`colpali-economics`) so both repos' artifacts are readable the same way.
@@ -150,8 +154,9 @@ Two classes, and the distinction is enforced:
 ## `configs/`, `artifacts/`, `tests/`
 
 - **`configs/`** — `cost_model.yaml` (every constant cited + dated), workload grids, policy grids,
-  and `phase3_workloads.yaml` (the calibration experiment). A committed config is what makes a sweep
-  re-derivable.
+  `phase3_workloads.yaml` (the calibration experiment), `phase4_sweep.yaml` (the first calibrated
+  sweep and its decision rules), and `profiles/` (measured timing + capacity profiles, loaded with
+  `--profile`). A committed config is what makes a sweep re-derivable.
 - **`artifacts/results/`** — JSON + **raw metric scrapes**, committed (they are the calibration evidence).
   Bulk traces, sweeps and logs are gitignored. **Never hand-edited.**
 - **`tests/`** — cache-model hit/miss tests first; a golden-file test on a small sweep; the property test

@@ -11,8 +11,9 @@
 
 **Last updated:** 2026-09-22 (**Phase 3 RAN and PASSED** — the block-pool model reproduced a live vLLM
 under eviction pressure to the token, against predictions committed before the run; 117 tests green)
-**Current phase:** ✅ **Phase 0** · ✅ **Phase 2b** · ✅ **Phase 3 COMPLETE** — ▶ **next: Phase 4**, starting with
-loading the fitted T4 profile in the CLI, then the calibrated Pareto sweep.
+**Current phase:** ✅ **Phase 0** · ✅ **Phase 2b** · ✅ **Phase 3** · 🔨 **Phase 4 in progress** — the first calibrated
+sweep ran: **H1 falsified by load**, **H5 holds in one case of four**, and **session-sticky** holds the SLO with
+the fewest T4s — 25–42% cheaper than round-robin. ▶ **Next: H6**, then the alpha sweep and a real trace.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -79,7 +80,7 @@ loading the fitted T4 profile in the CLI, then the calibrated Pareto sweep.
 | 2 | Block-level KV cache model | `[x]` | Known prefix sequence → known hit/miss pattern, in tests; partial-block rule holds; memory ceiling measured |
 | **2b** | **Cache model = vLLM's block pool** 🆕 | `[x]` | Every eviction behaviour cites a line of vLLM's source; naive LRU kept as the ablation; both still reproduce v1/v2 exactly |
 | 3 | **Real-Engine Calibration Report** | `[x]` ✅ exact on W1 + W2, +0.3% on W3 | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
-| 4 | **Seven** policies + Pareto sweep | `[~]` | Built and running; **gated on a calibrated profile** before any curve is published. Tests **H1 + H5 + H6** |
+| 4 | **Seven** policies + Pareto sweep | `[~]` first calibrated sweep done — H1 ⛔ · H5 1 of 4 · H6 next | Tests **H1 + H5 + H6** |
 | 5 | **The crossover finding** | `[ ]` | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
 | 6 | Sim-to-real 2-replica validation | `[ ]` | Predicted vs measured across two MIG instances, or the documented fallback and why |
 | 7 | Package · CLI · static demo · hardening | `[~]` | `pip install` + `kvsim replay` + a **static** demo page (ADR-011) + "what breaks at 10×/100×" answered with measured numbers |
@@ -412,21 +413,39 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 
 ## Phase 4 — The six policies and the Pareto sweep *(tests H1 + H5)*
 
-- [ ] ▶ **First: load the fitted T4 profile** (`artifacts/results/phase3_kaggle_t4/fitted_profile.json`) in
-      the CLI and sweep (`--profile`). Until then every curve is still on the uncalibrated guess
-- [ ] Decide on the step-cost model's two measured limits (Phase 3 `posthoc.md`): the prefill
-      double-charge and the batch-1 decode step. ⛔ A fix is validated on a **new, pre-registered**
-      workload — never re-fitted to W3, which has been seen
-- [ ] Six policies, one file each, behind one interface (ADR-003), **every tie broken from a seeded RNG**
-- [ ] `sim/` — replica with `max_num_seqs` admission, fitted prefill/decode cost, fleet event loop
-- [ ] Sweep policy × replicas 1–8 on ≥2 traces (one real if obtainable, one generated agentic)
-- [ ] **Multi-seed (≥5) + bootstrap CIs, resampled by session/segment** — ⚠️ not by request
-      (requests are not independent; see methodology §1)
-- [ ] `eval/cost.py` from `configs/cost_model.yaml` — every constant cited and dated, **₹ per 1k
-      successful requests**
-- [ ] `eval/pareto.py` + `eval/recommend.py` → **one** policy, **one** replica count, a ₹ delta vs
-      round-robin
-- [ ] Property test: prefix-affinity never scores below round-robin on perfectly-shared prefixes
+> ### 🔨 2026-09-22 (night) — the first CALIBRATED sweep ran, pre-registered
+> 2 shapes × 6 loads × 7 policies × 1–8 T4s × 5 seeds = 3,360 runs, on the Phase-3 profile at the
+> engine's own capacity. [`report.md`](artifacts/results/phase4_sweep_t4/report.md)
+> - ⛔ **H1 falsified by load.** Holds exactly at 1–2 sessions/s; from 3/s, pure radix-affinity puts
+>   every request on one replica, preempts 110–212 times per run, and its hit-rate lead turns negative.
+> - **H5 holds in one case of four:** balanced affinity at LOW sharing needs 1–3 fewer T4s than
+>   round-robin at every load. Pure affinity never holds the SLO above 1/s; balanced affinity at high
+>   sharing neither — ⚠️ with its load weight (alpha = 1) never swept.
+> - ⭐ **Session-sticky** (untested, reported) needs the fewest T4s everywhere — 2, 3, 3, 4, 5 against
+>   round-robin's 3, 4, 5, 7, 8 — **25–42% cheaper** wherever round-robin holds the SLO at all.
+> - Scope: generated traffic, T4 timings, one model. **No README claim until H6.**
+
+- [x] ✅ **Loaded the fitted T4 profile** — `configs/profiles/t4-qwen3-4b-vllm0.30.0.json`
+      (`scripts/phase4_profile.py`): fitted timings + the engine's own capacity, **1,537 blocks** (the
+      arithmetic said 2,394). `--profile` on `replay` and `crossover` — which also fixed `replay`
+      silently ignoring any profile
+- [x] ✅ Decided on the step-cost model's two measured limits — **ADR-012**: kept as fitted; a fix needs
+      a new pre-registered GPU run, never a re-fit to W3
+- [x] Seven policies, one file each, behind one interface (ADR-003), every tie from a seeded RNG
+- [x] `sim/` — replica with memory-based admission and preemption, fitted cost, fleet event loop
+- [~] Sweep policy × replicas 1–8 on ≥2 traces — ✅ two generated shapes × six loads; a **real trace**
+      is still to find (one with prefix-sharing information, e.g. block-hash ids)
+- [~] **Multi-seed (5) + bootstrap CIs by session** — ✅ used for every H1 decision; per-cell p95 CIs
+      for the README tables are still to add
+- [x] ✅ `eval/cost.py` from `configs/cost_model.yaml` — every constant **cited and dated**: g4dn.xlarge
+      $0.526/h, ₹95.87/$, SLO p95 TTFT ≤ 2,000 ms (MLPerf). **₹ per 1k successful requests**
+- [x] ✅ `eval/pareto.py` + `eval/recommend.py` → one policy, one replica count, a ₹ delta vs
+      round-robin — at every (shape, load)
+- [ ] ⭐ **Sweep alpha** for radix-affinity-balanced (its load weight), registered as a NEW experiment
+      before it runs — the one open question in H5's balanced result
+- [ ] Property test: prefix-affinity never scores below round-robin on perfectly-shared prefixes —
+      ⚠️ **restate it first: only without memory pressure.** Phase 4 measured it failing under load
+      (pure affinity 0.815 vs round-robin 0.832 at high sharing, 4/s, 5 replicas), as H1 now explains
 - [ ] Golden-file test on a small sweep; CI green gate
 - [ ] ⭐ **Test H6 — re-run the sweep under a rescaled cost function** (a "faster GPU", and a different
       prefill/decode ratio) and compute Kendall's τ between the policy orderings. **Pure CPU, no extra GPU
