@@ -34,7 +34,7 @@ A README needs both, and needs them apart.
 | **Engine + version** | TBD — not yet measured |
 | **Flags** | `--enable-prefix-caching --kv-cache-metrics-sample <rate> --block-size 16 --max-num-seqs <N>` *(exact CLI: TBD)* |
 | **Model + quantization** | TBD |
-| **Hardware** | A100 or H100 — exact GPU, driver, CUDA and compute capability: TBD |
+| **Hardware** | **Kaggle 2x Tesla T4** (compute 7.5, driver 580.159.04, CUDA 12.8). vLLM runs TRITON_ATTN in fp16 here — so hit rates and routing results are hardware-independent, and every latency/cost figure is a **T4 figure** |
 | **Hit-rate error vs live engine** | TBD — not yet measured, on ≥2 workload shapes, ≥3 live runs each |
 | **The residual, explained** | TBD — measured against the `vllm:kv_block_*` histograms, not narrated |
 | **2-replica validation** | TBD — two MIG instances on one card |

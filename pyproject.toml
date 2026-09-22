@@ -32,7 +32,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # ── The calibration box only. NOT installed locally, NOT a user dependency. ──────────────────
-# ⚠️ This extra is expected to be installed on the A100/H100 box and nowhere else. Its
+# ⚠️ This extra is expected to be installed on the calibration box (Kaggle 2x T4) and nowhere else. Its
 # resolution has NOT been attempted as of 2026-09-20 — recording that honestly, because the
 # sibling project (`colpali-lite`) shipped an extra that turned out not to install at all
 # (`ResolutionImpossible` between optimum and transformers), and the lesson is that an
