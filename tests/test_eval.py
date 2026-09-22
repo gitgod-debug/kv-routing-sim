@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pathlib
 import textwrap
 
 import pytest
@@ -62,10 +63,27 @@ def test_cost_model_refuses_to_run_on_an_unfilled_config(tmp_path):
         CostModel.from_yaml(p)
 
 
-def test_the_shipped_cost_model_is_unfilled_on_purpose():
-    """configs/cost_model.yaml must stay <TBD> until every constant has a source and a date."""
-    with pytest.raises(UnfilledCostModel):
-        CostModel.from_yaml("configs/cost_model.yaml")
+def test_every_shipped_cost_constant_has_a_source_and_a_date():
+    """configs/cost_model.yaml stayed <TBD> until each constant had a source and a date (filled
+    2026-09-22). This keeps it that way: a constant without both is refused."""
+    import datetime
+
+    import yaml
+
+    cm = CostModel.from_yaml("configs/cost_model.yaml")
+    assert cm.sku == "g4dn.xlarge"  # one Tesla T4: the GPU the profile was measured on
+    raw = yaml.safe_load(pathlib.Path("configs/cost_model.yaml").read_text())
+    for section in ("fx", "compute", "slo"):
+        assert str(raw[section]["source"]).startswith("https://"), section
+        assert isinstance(raw[section]["date"], datetime.date), section
+
+
+def test_one_tbd_left_is_refused(tmp_path):
+    shipped = pathlib.Path("configs/cost_model.yaml").read_text()
+    p = tmp_path / "cost.yaml"
+    p.write_text(shipped.replace("price_per_hour_usd: 0.526", "price_per_hour_usd: <TBD>"))
+    with pytest.raises(UnfilledCostModel, match="price_per_hour_usd"):
+        CostModel.from_yaml(p)
 
 
 def test_cost_arithmetic(tmp_path):

@@ -1,8 +1,10 @@
 """The `kvsim` command line.
 
-    kvsim replay    trace.jsonl --policies all --replicas 1-8 --format md
+    kvsim replay    trace.jsonl --policies all --replicas 1-8 --format md \
+                    --profile configs/profiles/t4-qwen3-4b-vllm0.30.0.json \
+                    --cost-model configs/cost_model.yaml
     kvsim generate  --sharing 0.6 --out trace.jsonl
-    kvsim crossover --sharing 0.1,0.3,0.5,0.7,0.9 --rates 4,8,16
+    kvsim crossover --sharing 0.1,0.3,0.5,0.7,0.9 --rates 4,8,16 --profile <profile.json>
     kvsim calibrate --engine http://localhost:8000 --out configs/profiles/mine.yaml
 
 Error semantics (ADR-004): a bad config or an unknown policy FAILS LOUDLY AT STARTUP, before any
@@ -22,7 +24,7 @@ from . import policies as policy_pkg
 from .eval.cost import CostModel, UnfilledCostModel
 from .eval.recommend import recommend
 from .eval.sweep import crossover_sweep, sweep
-from .sim.cost_model import UNCALIBRATED_DEFAULT
+from .sim.cost_model import UNCALIBRATED_DEFAULT, CostProfile, load_profile
 from .traces import adapters
 from .traces.generator import AgenticWorkload
 from .traces.schema import TraceStats
@@ -62,6 +64,16 @@ def _load_cost(path: str | None) -> CostModel | None:
         raise SystemExit(f"error: {exc}") from None
     except (OSError, KeyError, TypeError, ValueError) as exc:
         raise SystemExit(f"error: could not read cost model {path!r}: {exc}") from None
+
+
+def _load_profile(path: str | None) -> CostProfile:
+    """The timing + capacity profile. Without one: the uncalibrated guess, with a banner."""
+    if not path:
+        return UNCALIBRATED_DEFAULT
+    try:
+        return load_profile(path)
+    except (OSError, TypeError, ValueError) as exc:
+        raise SystemExit(f"error: could not read profile {path!r}: {exc}") from None
 
 
 def _emit(payload: dict[str, Any], fmt: str, out: str | None) -> None:
@@ -123,6 +135,14 @@ def cmd_replay(args: argparse.Namespace) -> int:
     names = policy_pkg.resolve(args.policies)
     replicas = _parse_replicas(args.replicas)
     cost = _load_cost(args.cost_model)
+    profile = _load_profile(args.profile)
+    if args.block_size != profile.block_size:
+        # Hashing the trace at one block size and simulating a cache of another would compare
+        # nothing with nothing — fail before any work (ADR-004).
+        raise SystemExit(
+            f"error: --block-size {args.block_size} does not match the profile's block size "
+            f"{profile.block_size} ({profile.name})"
+        )
 
     stats = TraceStats()
     reader = adapters.get(args.format_in)
@@ -139,6 +159,7 @@ def cmd_replay(args: argparse.Namespace) -> int:
         policies=names,
         replica_counts=replicas,
         seeds=tuple(range(args.seeds)),
+        profile=profile,
         cost=cost,
         trace_info=info,
     )
@@ -148,7 +169,7 @@ def cmd_replay(args: argparse.Namespace) -> int:
     _emit(
         {
             "trace": info,
-            "profile": UNCALIBRATED_DEFAULT.provenance(),
+            "profile": profile.provenance(),
             "points": [p.as_dict() for p in points],
             "recommendation": rec.as_dict(),
         },
@@ -174,6 +195,7 @@ def cmd_generate(args: argparse.Namespace) -> int:
 
 def cmd_crossover(args: argparse.Namespace) -> int:
     names = policy_pkg.resolve(args.policies)
+    profile = _load_profile(args.profile)
     rows = crossover_sweep(
         policies=names,
         sharing_ratios=[float(x) for x in args.sharing.split(",")],
@@ -181,9 +203,11 @@ def cmd_crossover(args: argparse.Namespace) -> int:
         n_replicas=args.replicas,
         seeds=tuple(range(args.seeds)),
         n_sessions=args.sessions,
+        profile=profile,
     )
-    print(UNCALIBRATED_BANNER, file=sys.stderr)
-    _emit({"crossover": rows}, "json", args.out)
+    if not profile.calibrated:
+        print(UNCALIBRATED_BANNER, file=sys.stderr)
+    _emit({"profile": profile.provenance(), "crossover": rows}, "json", args.out)
     return 0
 
 
@@ -212,6 +236,7 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--block-size", type=int, default=16)
     r.add_argument("--format-in", default="vllm-jsonl", choices=sorted(adapters.REGISTRY))
     r.add_argument("--cost-model", default=None, help="path to cost_model.yaml")
+    r.add_argument("--profile", default=None, help="timing + capacity profile JSON")
     r.add_argument("--format", default="md", choices=("md", "json"))
     r.add_argument("--out", default=None)
     r.set_defaults(func=cmd_replay)
@@ -232,6 +257,7 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--replicas", type=int, default=4)
     c.add_argument("--seeds", type=int, default=3)
     c.add_argument("--sessions", type=int, default=150)
+    c.add_argument("--profile", default=None, help="timing + capacity profile JSON")
     c.add_argument("--out", default=None)
     c.set_defaults(func=cmd_crossover)
 

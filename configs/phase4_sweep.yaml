@@ -1,0 +1,63 @@
+# Phase 4 — the first CALIBRATED sweep, and its pre-registered tests of H1 and H5.
+#
+# Registered 2026-09-22, BEFORE the sweep ran — with a dated amendment in docs/09-hypotheses.md.
+# `scripts/run_phase4_sweep.py` is the procedure below, and nothing in it is chosen after a result.
+
+schema_version: 1
+
+profile: configs/profiles/t4-qwen3-4b-vllm0.30.0.json  # Phase 3's fitted T4 timings; 1,537 blocks (ADR-012)
+cost_model: configs/cost_model.yaml                    # g4dn.xlarge $0.526/h · ₹95.87/$ · SLO p95 TTFT ≤ 2,000 ms
+cache_model: vllm
+policies: all                                          # all 7
+replicas: [1, 2, 3, 4, 5, 6, 7, 8]
+seeds: [0, 1, 2, 3, 4]                                 # policy tie-breaking; each trace is fixed
+
+# Two shapes. Both fit --max-model-len 2048, the setting the profile's capacity was measured at.
+trace_shape: &shape
+  n_sessions: 200
+  turns_per_session: 4
+  session_context_tokens: 150
+  user_turn_tokens: 40
+  assistant_turn_tokens: 60
+  output_tokens: 64
+  think_time_s: 6.0             # turns spaced past a typical response (~4.5 s on this T4)
+  seed: 0
+traces:
+  low_sharing:
+    <<: *shape
+    prefix_sharing_ratio: 0.3   # achieved cross-session sharing 0.300; prompts 336-636 tokens
+  high_sharing:
+    <<: *shape
+    prefix_sharing_ratio: 0.8   # achieved 0.804 (H1's "≳70%"); prompts 1,550-1,850 tokens
+
+# Offered load, in sessions per second. Chosen from a probe of ROUND-ROBIN ONLY — no comparison
+# between policies was looked at: round-robin needs 1 replica to hold the SLO at 1/s, 3 at 2/s,
+# 5 at 4/s, and more than 8 at 8/s, on both shapes. So the range makes the SLO bind inside 1-8.
+loads: [1, 2, 3, 4, 6, 8]
+
+# ── The decision rules, fixed before the run ─────────────────────────────────────────────────
+# A cell = (trace, load, policy, replicas). Its metrics are the mean over the seeds; it MEETS the SLO
+# only if every seed's p95 TTFT ≤ 2,000 ms. R(policy) = the fewest replicas (1-8) whose cell meets
+# the SLO, or none.
+
+h1:
+  trace: high_sharing
+  policies: [radix-affinity, radix-affinity-balanced]  # the first is H1's "radix-prefix-affinity"
+  versus: least-loaded
+  replicas: [2, 3, 4, 5, 6, 7, 8]
+  # Strictly higher: the paired session-bootstrap 95% CI (1,000 resamples, seed-0 runs, hit rate as a
+  # ratio of token sums) on hit_rate(policy) - hit_rate(least-loaded) has its LOWER bound > 0 at
+  # every replica count. Widens: delta(8) > delta(2), with no step-to-step fall larger than 0.005.
+  # H1 holds for a policy only if both hold at EVERY load.
+  bootstrap_resamples: 1000
+  widen_tolerance: 0.005
+
+h5:
+  policies: [radix-affinity, radix-affinity-balanced]
+  versus: round-robin
+  # Holds, per trace, if at SOME load R(round-robin) > R(policy), and at NO load R(policy) >
+  # R(round-robin). "None" (not met at 8) counts as more than 8.
+
+# Reported, not tested: every policy's R at every load (session-sticky included — the uncalibrated
+# first sweep suggested it dominates), and the recommendation at each (trace, load): the cheapest
+# SLO-meeting configuration, with its ₹ and replica delta against round-robin's.

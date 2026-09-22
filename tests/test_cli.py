@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import pathlib
 
 import pytest
 
@@ -51,11 +52,52 @@ def test_replay_rejects_a_bad_replica_spec(tmp_path):
 
 
 def test_replay_refuses_an_unfilled_cost_model(tmp_path):
-    """The shipped config is all <TBD>; asking for rupees must fail, not default to zero."""
+    """One constant left <TBD>: asking for rupees must fail, not default to zero."""
     trace = tmp_path / "t.jsonl"
     main(["generate", "--out", str(trace), "--sessions", "5"])
+    shipped = pathlib.Path("configs/cost_model.yaml").read_text()
+    unfilled = tmp_path / "cost.yaml"
+    unfilled.write_text(shipped.replace("usd_to_inr: 95.87", "usd_to_inr: <TBD>"))
     with pytest.raises(SystemExit, match="<TBD>"):
-        main(["replay", str(trace), "--cost-model", "configs/cost_model.yaml"])
+        main(["replay", str(trace), "--cost-model", str(unfilled)])
+
+
+PROFILE = "configs/profiles/t4-qwen3-4b-vllm0.30.0.json"
+
+
+def test_replay_on_the_calibrated_profile_carries_it_to_the_output(tmp_path):
+    """The fitted T4 profile must reach the sweep AND the output file. (Before Phase 4 the replay
+    command ignored any profile and wrote the uncalibrated one into its output regardless.)"""
+    trace = tmp_path / "t.jsonl"
+    main(["generate", "--out", str(trace), "--sessions", "10", "--turns", "2"])
+    out = tmp_path / "r.json"
+    rc = main(["replay", str(trace), "--replicas", "2", "--seeds", "1", "--format", "json",
+               "--profile", PROFILE, "--cost-model", "configs/cost_model.yaml",
+               "--out", str(out)])
+    assert rc == 0
+    payload = json.loads(out.read_text())
+    assert payload["profile"]["calibrated"] is True
+    assert payload["profile"]["kv_cache_blocks"] == 1537
+    assert "WARNING" not in payload["recommendation"]
+    assert all(p["inr_per_1k_requests"] is not None for p in payload["points"])
+
+
+def test_a_profile_with_an_unknown_field_is_refused(tmp_path):
+    bad = tmp_path / "p.json"
+    raw = json.loads(pathlib.Path(PROFILE).read_text())
+    raw["decode_per_sequence_s"] = raw.pop("decode_per_seq_s")  # a plausible typo
+    bad.write_text(json.dumps(raw))
+    trace = tmp_path / "t.jsonl"
+    main(["generate", "--out", str(trace), "--sessions", "5"])
+    with pytest.raises(SystemExit, match="unknown profile field"):
+        main(["replay", str(trace), "--profile", str(bad)])
+
+
+def test_replay_refuses_a_block_size_the_profile_was_not_measured_at(tmp_path):
+    trace = tmp_path / "t.jsonl"
+    main(["generate", "--out", str(trace), "--sessions", "5"])
+    with pytest.raises(SystemExit, match="does not match the profile"):
+        main(["replay", str(trace), "--profile", PROFILE, "--block-size", "32"])
 
 
 def test_replay_fails_loudly_on_an_empty_trace(tmp_path):
