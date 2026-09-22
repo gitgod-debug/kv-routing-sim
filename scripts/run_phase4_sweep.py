@@ -253,6 +253,23 @@ def _markdown(pl: dict[str, Any], pols: list[str], loads: list[float]) -> str:
             lines.append(f"| {p} | " + " | ".join("—" if c is None else str(c)
                                                    for c in cells) + " |")
         lines += ["", "— = not met at 8 replicas.", ""]
+    lines += ["## Why — how evenly each policy spreads load, and how often it preempts", "",
+              ("*Descriptive, not a registered test.* Each cell: load imbalance (max ÷ mean "
+               "requests per replica) · preemptions per run, at the replica count round-robin "
+               "needs at that load (8 where it never meets the SLO)."), ""]
+    cell_by = {(c["trace"], c["load"], c["policy"], c["n_replicas"]): c for c in pl["cells"]}
+    for name in cfg["traces"]:
+        lines += [f"### {name}", "",
+                  "| policy | " + " | ".join(f"{ld}/s" for ld in loads) + " |",
+                  "|---|" + "---|" * len(loads)]
+        for p in pols:
+            cells = []
+            for ld in loads:
+                n = pl["required_replicas"][name][str(ld)]["round-robin"] or max(cfg["replicas"])
+                c = cell_by[(name, ld, p, n)]
+                cells.append(f"{c['load_imbalance']:.2f} · {c['preemptions_mean']:.0f}")
+            lines.append(f"| {p} | " + " | ".join(cells) + " |")
+        lines.append("")
     lines += ["## Recommendation at each load (cheapest configuration meeting the SLO)", "",
               "| trace @ load | recommended | ₹ / 1k requests | vs round-robin |",
               "|---|---|---|---|"]
@@ -263,6 +280,8 @@ def _markdown(pl: dict[str, Any], pols: list[str], loads: list[float]) -> str:
         if r["inr_delta_pct_vs_baseline"] is not None:
             vs = (f"{r['inr_delta_pct_vs_baseline']:+.1f}% · "
                   f"{r['replica_delta_vs_baseline']:+d} replicas")
+            if not r["baseline"]["meets_slo"]:
+                vs += " (round-robin misses the SLO even at 8 — vs its best attempt)"
         ok = "" if c["meets_slo"] else " ⚠️ nothing met the SLO"
         lines.append(f"| {key} | {c['policy']} × {c['n_replicas']}{ok} | {inr} | {vs} |")
     lines += ["", "## H1 — prefix-affinity vs least-loaded on hit rate, high sharing", ""]
