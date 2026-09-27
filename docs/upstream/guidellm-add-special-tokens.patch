@@ -1,0 +1,121 @@
+diff --git a/src/guidellm/data/deserializers/trace_common.py b/src/guidellm/data/deserializers/trace_common.py
+index c89e876..a72987d 100644
+--- a/src/guidellm/data/deserializers/trace_common.py
++++ b/src/guidellm/data/deserializers/trace_common.py
+@@ -83,7 +83,10 @@ def generate_token_ids(
+         # The Faker.text() can only generate text of at least 5 characters.
+         num_chars = max(token_count * margin_of_safety * attempt, 5)
+         text = faker.text(num_chars)
+-        token_ids = processor.encode(text)
++        # Special tokens (e.g. a BOS id) would sit at the start of every block and be
++        # dropped by decode_prompt(..., skip_special_tokens=True), leaving the prompt
++        # one token short per hash ID.
++        token_ids = processor.encode(text, add_special_tokens=False)
+         if len(token_ids) >= token_count:
+             return tuple(token_ids[:token_count])
+ 
+diff --git a/tests/integration/scheduler/test_trace_replay_multiprocess.py b/tests/integration/scheduler/test_trace_replay_multiprocess.py
+index 1cc2819..0a8a56e 100644
+--- a/tests/integration/scheduler/test_trace_replay_multiprocess.py
++++ b/tests/integration/scheduler/test_trace_replay_multiprocess.py
+@@ -82,7 +82,7 @@ def _trace_file_source(trace_path: Path) -> FileDataArgs:
+ 
+ def _mock_processor() -> Mock:
+     proc = Mock()
+-    proc.encode.side_effect = lambda text: list(range(len(text.split())))
++    proc.encode.side_effect = lambda text, **_: list(range(len(text.split())))
+     proc.decode.side_effect = lambda tokens, skip_special_tokens=False: " ".join(
+         f"tok{i}" for i, _ in enumerate(tokens)
+     )
+diff --git a/tests/unit/data/deserializers/test_trace_common.py b/tests/unit/data/deserializers/test_trace_common.py
+index 16ac17d..c3e964e 100644
+--- a/tests/unit/data/deserializers/test_trace_common.py
++++ b/tests/unit/data/deserializers/test_trace_common.py
+@@ -32,7 +32,7 @@ from tests.unit.data.deserializers.trace_test_utils import trace_file_source
+ def mock_processor() -> Mock:
+     """Tokenizer where each whitespace-delimited word is one token."""
+     proc = Mock()
+-    proc.encode.side_effect = lambda text: list(range(len(text.split())))
++    proc.encode.side_effect = lambda text, **_: list(range(len(text.split())))
+     proc.decode.side_effect = lambda tokens, skip_special_tokens=False: " ".join(
+         f"tok{t}" for t in tokens
+     )
+@@ -70,6 +70,21 @@ def test_generate_token_ids(token_count, expected):
+     assert res == expected
+ 
+ 
++def test_generate_token_ids_excludes_special_tokens():
++    """Llama, Mistral and Gemma tokenizers prepend a BOS id in ``encode``. Trace
++    blocks are joined mid-prompt and decoded with ``skip_special_tokens=True``, so
++    a BOS inside a block is dropped and the prompt comes out one token short per
++    hash ID."""
++    bos = 10_000
++    proc = Mock()
++    proc.encode.side_effect = lambda text, add_special_tokens=True: (
++        ([bos] if add_special_tokens else []) + list(range(len(text.split())))
++    )
++    res = generate_token_ids(10, proc, Faker())
++    assert len(res) == 10
++    assert bos not in res
++
++
+ class TestTraceFormatRegistry:
+     def test_unknown_kind_raises(self, tmp_path: Path):
+         trace = write_trace(
+diff --git a/tests/unit/data/deserializers/test_trace_minimal.py b/tests/unit/data/deserializers/test_trace_minimal.py
+index 17c3738..5e080ce 100644
+--- a/tests/unit/data/deserializers/test_trace_minimal.py
++++ b/tests/unit/data/deserializers/test_trace_minimal.py
+@@ -23,7 +23,7 @@ from tests.unit.data.deserializers.trace_test_utils import trace_file_source
+ def mock_processor() -> Mock:
+     """Tokenizer where each whitespace-delimited word is one token."""
+     proc = Mock()
+-    proc.encode.side_effect = lambda text: list(range(len(text.split())))
++    proc.encode.side_effect = lambda text, **_: list(range(len(text.split())))
+     proc.decode.side_effect = lambda tokens, skip_special_tokens=False: " ".join(
+         f"tok{i}" for i, _ in enumerate(tokens)
+     )
+diff --git a/tests/unit/data/deserializers/test_trace_mooncake.py b/tests/unit/data/deserializers/test_trace_mooncake.py
+index 8a94d05..81a3076 100644
+--- a/tests/unit/data/deserializers/test_trace_mooncake.py
++++ b/tests/unit/data/deserializers/test_trace_mooncake.py
+@@ -27,7 +27,7 @@ def ascending_processor() -> Mock:
+     traces as there is no way to generate distinct token blocks for sibling
+     nodes."""
+     proc = Mock()
+-    proc.encode.side_effect = lambda text: list(range(len(text.split())))
++    proc.encode.side_effect = lambda text, **_: list(range(len(text.split())))
+     proc.decode.side_effect = lambda tokens, skip_special_tokens=False: " ".join(
+         f"tok{i}" for i, _ in enumerate(tokens)
+     )
+@@ -41,7 +41,7 @@ def compatible_processor() -> Mock:
+     sibling nodes."""
+     random.seed(0)
+     proc = Mock()
+-    proc.encode.side_effect = lambda text: [
++    proc.encode.side_effect = lambda text, **_: [
+         random.randint(0, 1000) for _ in range(len(text.split()))
+     ]
+     proc.decode.side_effect = lambda tokens, skip_special_tokens=False: " ".join(
+diff --git a/tests/unit/data/deserializers/test_trace_weka.py b/tests/unit/data/deserializers/test_trace_weka.py
+index 79abd54..ad16ceb 100644
+--- a/tests/unit/data/deserializers/test_trace_weka.py
++++ b/tests/unit/data/deserializers/test_trace_weka.py
+@@ -28,7 +28,7 @@ def ascending_processor() -> Mock:
+     traces as there is no way to generate distinct token blocks for sibling
+     nodes."""
+     proc = Mock()
+-    proc.encode.side_effect = lambda text: list(range(len(text.split())))
++    proc.encode.side_effect = lambda text, **_: list(range(len(text.split())))
+     proc.decode.side_effect = lambda tokens, skip_special_tokens=False: " ".join(
+         f"tok{i}" for i, _ in enumerate(tokens)
+     )
+@@ -42,7 +42,7 @@ def compatible_processor() -> Mock:
+     sibling nodes."""
+     random.seed(0)
+     proc = Mock()
+-    proc.encode.side_effect = lambda text: [
++    proc.encode.side_effect = lambda text, **_: [
+         random.randint(0, 1000) for _ in range(len(text.split()))
+     ]
+     proc.decode.side_effect = lambda tokens, skip_special_tokens=False: " ".join(
