@@ -1,0 +1,26 @@
+# H6's crossover half — does H2b's flip (session-sticky -> prefix-affinity as tenant prompts multiply)
+# survive a change of hardware? Registered 2026-09-28, BEFORE it runs, with a dated entry in
+# docs/09-hypotheses.md. `scripts/run_h6_crossover.py` is the procedure below.
+
+schema_version: 1
+
+h2b_config: configs/phase5_crossover.yaml    # the H2b grid (K, loads, replicas) and session shape
+phase5_results: artifacts/results/phase5_crossover/phase5.json
+regimes_config: configs/h6_ranking.yaml      # the same five regimes as H6's ranking half
+alpha: 16                                    # alpha* from A1 — FIXED; the script checks it matches
+seeds: [0, 1, 2]                             # as in H2b
+policies_reported: [round-robin, least-loaded, radix-affinity]
+# Guard: in the t4 regime, every policy's required replicas must reproduce Phase 5's H2b table
+# exactly, or the script stops.
+
+# ── The decision rules, fixed before the run ─────────────────────────────────────────────────
+# Per regime, at each (K, load): R = the fewest replicas (1-8) meeting the SLO on every seed, 9 if
+# none. Affinity wins if R(radix-affinity-balanced @ 16) < R(session-sticky); sticky wins if the
+# reverse; otherwise a tie — exactly H2b's rule.
+# H6's text: the boundary "may shift, but should not invert". So a rescaled regime HOLDS only if:
+#   (i)   at the smallest K (1) affinity wins at no load;
+#   (ii)  at the largest K (64) session-sticky wins at no load;
+#   (iii) at every load, no sticky win at a LARGER K than an affinity win.
+# H6's crossover half HOLDS only if every rescaled regime holds.
+# Reported, not tested: whether the flip is still VISIBLE (an affinity win at K = 64), every
+# policy's R, and hit rates — a regime where everything ties has shifted, not inverted.
