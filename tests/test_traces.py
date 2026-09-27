@@ -144,3 +144,38 @@ def test_written_trace_round_trips_with_real_token_ids(tmp_path):
     in_memory, _ = wl.generate()
     assert len(reread) == len(in_memory) == report["requests"]
     assert [r.block_hashes for r in reread] == [r.block_hashes for r in in_memory]
+
+
+def test_one_shared_prefix_is_the_trace_every_earlier_run_used():
+    """K = 1 must draw nothing new: Phase 3's fingerprint and Phase 4's tables depend on it."""
+    kw = {"n_sessions": 30, "turns_per_session": 3, "prefix_sharing_ratio": 0.6, "seed": 4}
+    before, report = AgenticWorkload(**kw).generate()
+    same, report_k1 = AgenticWorkload(**kw, n_shared_prefixes=1).generate()
+    assert [(r.request_id, r.arrival_ts, r.block_hashes) for r in before] == [
+        (r.request_id, r.arrival_ts, r.block_hashes) for r in same
+    ]
+    assert report == report_k1  # no new keys for K = 1, so old reports are unchanged too
+
+
+def test_sessions_share_a_prefix_only_with_sessions_that_drew_the_same_one():
+    """K prompts, one per tenant: prefix k's blocks are shared by k's sessions and nobody else."""
+    wl = AgenticWorkload(n_sessions=40, turns_per_session=1, prefix_sharing_ratio=0.6,
+                         n_shared_prefixes=4, seed=0)
+    trace, report = wl.generate()
+    drawn = wl.prefix_assignment()
+    prefix_blocks = report["shared_prefix_blocks"]
+    first = {r.session_id: r.block_hashes[:prefix_blocks] for r in trace}
+    for a, b in itertools.combinations(range(wl.n_sessions), 2):
+        same_prefix = first[f"s{a}"] == first[f"s{b}"]
+        assert same_prefix == (drawn[a] == drawn[b])
+    assert report["distinct_prefixes_used"] == len(set(drawn)) > 1
+    assert report["shared_working_set_blocks"] == len(set(drawn)) * prefix_blocks
+
+
+def test_generator_rejects_impossible_prefix_counts():
+    with pytest.raises(ValueError, match="n_shared_prefixes"):
+        AgenticWorkload(n_shared_prefixes=0)
+    with pytest.raises(ValueError, match="n_shared_prefixes"):
+        AgenticWorkload(n_shared_prefixes=101)
+    with pytest.raises(ValueError, match="prefix_zipf_s"):
+        AgenticWorkload(n_shared_prefixes=4, prefix_zipf_s=-1.0)

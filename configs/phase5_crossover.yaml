@@ -1,0 +1,73 @@
+# Phase 5 — the crossover. Three experiments, registered 2026-09-28 BEFORE any of them runs, with a
+# dated entry in docs/09-hypotheses.md. `scripts/run_phase5.py` is the procedure below: it runs A1
+# first, takes alpha* by the rule written here, and only then runs H2 and H2b with alpha* fixed.
+# Nothing in it is chosen after a result.
+
+schema_version: 1
+
+profile: configs/profiles/t4-qwen3-4b-vllm0.30.0.json  # Phase 3's fitted T4 timings; 1,537 blocks
+cost_model: configs/cost_model.yaml                    # g4dn.xlarge · ₹95.87/$ · SLO p95 TTFT ≤ 2 s
+cache_model: vllm
+replicas: [1, 2, 3, 4, 5, 6, 7, 8]
+loads: [1, 2, 3, 4, 6, 8]                              # sessions per second, as in Phase 4
+
+# Phase 4's session shape, so every result here sits beside Phase 4's. Every prompt fits the
+# --max-model-len 2048 the profile's capacity was measured at (longest: 1,850 + 64 tokens).
+session_shape:
+  n_sessions: 200
+  turns_per_session: 4
+  session_context_tokens: 150
+  user_turn_tokens: 40
+  assistant_turn_tokens: 60
+  output_tokens: 64
+  think_time_s: 6.0
+  seed: 0
+
+# The policies every H2/H2b cell runs, besides radix-affinity-balanced at alpha*.
+policies_reported: [round-robin, least-loaded, power-of-two, radix-affinity, session-sticky]
+
+# ── A1 — the load weight of radix-affinity-balanced (Phase 4's open question) ────────────────
+alpha:
+  base_sweep: configs/phase4_sweep.yaml                # Phase 4's two traces, unchanged
+  phase4_results: artifacts/results/phase4_sweep_t4/sweep.json
+  values: [1, 2, 4, 8, 16, 32, 64]                     # blocks of matched prefix one queued request is worth
+  seeds: [0, 1, 2, 3, 4]
+  # alpha* = the value whose required replicas, summed over both traces and all six loads (9 for
+  # "not met at 8"), is smallest; ties -> the smaller alpha. alpha* is then FIXED for H2 and H2b.
+  # Guard: alpha = 1 must reproduce Phase 4's radix-affinity-balanced row exactly, or the run stops.
+  # Reported, not tested: H5's rule re-applied at every alpha, and every alpha against
+  # session-sticky's Phase 4 row.
+
+# ── H2, as registered 2026-09-20 — one shared prefix; sharing ratio × load ───────────────────
+h2:
+  sharing: [0.0, 0.2, 0.4, 0.6, 0.8]                   # requested; the achieved value is reported
+  seeds: [0, 1, 2]
+  test_replicas: [4, 8]                                # H2 is about p95 TTFT at a FIXED replica count
+  bootstrap_resamples: 1000
+  # Tested for P = radix-affinity (H2's "prefix-affinity", as in H1) and, with the same rules and
+  # reported separately, P = radix-affinity-balanced at alpha*. At each (sharing, load), seed-0 runs:
+  #   delta = p95(X) - p95(P), paired session bootstrap, 95% CI, for X = least-loaded and
+  #   X = power-of-two. P wins if the CI's lower bound > 0; X wins if its upper bound < 0; else tie.
+  # Crossover at n: at least one P win AND at least one least-loaded win.
+  # Monotone in sharing: in every load row, no least-loaded win at a HIGHER sharing than a P win.
+  # Monotone in load: in every sharing column, no P win at a HIGHER load than a least-loaded win.
+  # Power-of-two in between: in every sharing column where it beats P at all, it first does so at a
+  #   load >= the load where least-loaded first does (and never where least-loaded never does).
+  # H2 HOLDS for P only if all four hold at BOTH n = 4 and n = 8. Reported, not tested: whether the
+  #   win map differs between n = 4 and n = 8 ("the boundary moves with replica count").
+
+# ── H2b (new) — the shared-prefix working set ─────────────────────────────────────────────────
+h2b:
+  sharing: 0.8                                         # an 85-block prompt per tenant
+  n_shared_prefixes: [1, 4, 16, 64]                    # working set 85 · 340 · 1,360 · 4,080 blocks
+  prefix_zipf_s: 1.0                                   # tenant popularity: Zipf, exponent 1
+  seeds: [0, 1, 2]
+  # At each (K, load): R = the fewest replicas (1-8) meeting the SLO on every seed, 9 if none.
+  #   Affinity wins if R(radix-affinity-balanced @ alpha*) < R(session-sticky); sticky wins if the
+  #   reverse; otherwise a tie.
+  # H2b HOLDS only if: (a) at the smallest K (1) affinity wins at no load; (b) at the largest K (64)
+  #   it wins at >= 1 load; (c) monotone in K: at every load, no sticky win at a LARGER K than an
+  #   affinity win.
+  # Reported, not tested: every policy's R, pure radix-affinity, the best alpha per cell (an oracle,
+  #   optimistic by construction), hit rates at 4 replicas, and the working set against one
+  #   replica's cache.
