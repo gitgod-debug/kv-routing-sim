@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kv-routing-sim"
-version = "0.0.1"
+version = "0.1.0"
 description = "Trace-driven simulator and recommender for multi-replica LLM KV-cache routing policies, calibrated against a live inference engine"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,11 +24,11 @@ license = { text = "MIT" }
 # See docs/06-methodology.md §3 (reproducibility contract).
 # ─────────────────────────────────────────────────────────────────────────────────────────────
 dependencies = [
-    "numpy>=1.26",            # checked 2026-09-20
-    "pyyaml>=6.0",            # config files: cost model, workload grids, policy grids
-    "pydantic>=2.7",          # the normalized request schema is validated, and it is VERSIONED (ADR-004)
-    "matplotlib>=3.8",        # Pareto curves. The only plotting dependency; no seaborn.
+    "pyyaml>=6.0",            # configs: the cost model, workloads, sweeps. The ONLY runtime dependency.
 ]
+# 2026-09-28: numpy, pydantic and matplotlib left the core. Nothing in the package imported them
+# (the request schema became a slotted dataclass — see traces/schema.py), so they only made the
+# promised small, CPU-only install bigger. numpy and matplotlib live in the `analysis` extra.
 
 [project.optional-dependencies]
 # ── The calibration box only. NOT installed locally, NOT a user dependency. ──────────────────
@@ -52,6 +52,8 @@ calib = [
 ]
 # Phase 4+: the sweep is embarrassingly parallel across (policy, replica-count, seed)
 sweep = ["joblib>=1.4"]
+# The Phase 3 GPU-result analysis (numpy) and the README's figures (matplotlib)
+analysis = ["numpy>=1.26", "matplotlib>=3.8"]
 dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.5"]
 
 [project.scripts]
