@@ -196,8 +196,8 @@ calibration cannot cash.
 | | Hypothesis | Tested in | Status |
 |---|---|---|---|
 | **H1** | Prefix-affinity dominates hit rate under high sharing | Phase 4 | `[x]` ⛔ **FALSIFIED 2026-09-22 — by load.** Holds exactly at 1–2 sessions/s; gone or reversed from 3/s, where concentration forces preemption |
-| **H2** | ⭐ The crossover boundary exists and is monotonic | Phase 5 | `[~]` procedure **registered 2026-09-28** — `configs/phase5_crossover.yaml` |
-| **H2b** | ⭐ Prefix-affinity pays once the tenants' prompts outgrow one replica's cache | Phase 5 | `[~]` **registered 2026-09-28** (new) |
+| **H2** | ⭐ The crossover boundary exists and is monotonic | Phase 5 | `[x]` ⛔ **FALSIFIED 2026-09-28** — pure affinity loses at every sharing > 0 (the opposite direction); the balanced policy has no monotone boundary |
+| **H2b** | ⭐ Prefix-affinity pays once the tenants' prompts outgrow one replica's cache | Phase 5 | `[x]` ✅ **HOLDS 2026-09-28** — sticky wins at K = 1; affinity holds the SLO at K = 64 where sticky cannot on 8 |
 | **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[x]` ✅ **PASSED 2026-09-22** — **zero** error on 2 sequential shapes under eviction pressure (3 runs each, every counter and all 120 requests' cached tokens); **+0.3%** on the concurrent shape |
 | **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[x]` ✅ **supported, in its second amendment's form (2026-09-22):** plain LRU's residual on a live engine is **capacity** skew (−11.9 pts when requests hold decode blocks, 0.17 without); histogram counts exact, W2 distributions identical |
 | **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[~]` **holds only for balanced affinity at LOW sharing** (1–3 fewer T4s); falsified elsewhere. Session-sticky (untested) needs the fewest everywhere |
@@ -560,3 +560,49 @@ about once.
 outgrow one GPU's cache; otherwise keep each user on one GPU" rather than "session-sticky wins". It also
 decides which real trace matters most: Mooncake (many prompts, global hashes) is where H2b can show up;
 AgentX (hashes scoped to one session) cannot show it.
+
+### 2026-09-28 — Phase 5 RAN. H2 is FALSIFIED for both affinity policies; H2b HOLDS.
+Report: [`artifacts/results/phase5_crossover/report.md`](../artifacts/results/phase5_crossover/report.md)
+— 14,592 runs in 570 s, from a clean tree at `3967a56`. The α = 1 guard reproduced Phase 4 exactly.
+
+**A1 — α\* = 16.** Total replicas over both Phase-4 traces: 64 at α = 1 (Phase 4's setting), falling to
+**45 at α = 16**, then rising again (48 at 32, 49 at 64). Even at α\*, balanced affinity needs more
+replicas than session-sticky did in Phase 4 on the same traces (45 in total against 36).
+
+**H2 — FALSIFIED for both policies, as registered.**
+- *Pure radix-affinity:* a crossover exists, but it runs the opposite way to sub-prediction 1. At
+  sharing 0.0 it beats least-loaded at every load, on 4 and 8 replicas. Above 0.0 it loses at every
+  load from 2 sessions/s — by **60–260 s** of p95 TTFT — and at 1 session/s in 7 of 8 cells (one tie),
+  by 0.1–0.17 s. How long the shared prompt is does not matter; that there is one does. This is the
+  outcome written down as uncomfortable before the run: every new session goes to the one replica
+  holding block 0.
+- *Balanced affinity at α\* = 16:* no monotone boundary. On 4 replicas it beats least-loaded in 23 of 30
+  cells and loses in 1, winning by most under load (+4 to +17 s at 4–8 sessions/s). On 8 replicas
+  least-loaded wins 4 cells, three of them at sharing 0.8, and not monotonically. The shape H2 predicted
+  — least-loaded taking over above some load — does not appear on 4 replicas at all: there, under load,
+  locality helps.
+
+**H2b — HOLDS.** (a) At K = 1 affinity wins nowhere; session-sticky needs fewer replicas at 4 of 6
+loads. (b) At K = 64 (48 prompts actually used: a 4,080-block working set, 2.66× one replica's cache)
+balanced affinity holds the SLO on 5 replicas at 2 sessions/s and on 8 at 3/s, where session-sticky
+cannot hold it on 8. (c) No reversal along K. The mechanism shows in the hit rates (4 replicas,
+2 sessions/s): from K = 1 to 64, round-robin falls from 0.84 to 0.53 and session-sticky from 0.92 to
+0.82, while pure affinity stays at 0.87–0.92.
+
+**Reported, not tested — selected after the run, labelled so.** The best α falls as K grows: 8–16 at
+K = 1 under load, **1** in nearly every cell at K = 16 and K = 64. With that α, affinity already beats
+session-sticky at K = 16 (3 vs 5 replicas at 3/s, 4 vs 6 at 4/s), and pure radix-affinity needs 3, 4,
+5, 5 replicas at 1–4 sessions/s at K = 64, where session-sticky needs 3 and then cannot hold the SLO at
+all. α\* was chosen on one-prompt traffic and is too cautious for many prompts. **The weight on prefix
+matching should grow with the number of distinct prompts** — the kind of evidence a router's hand-set
+prefix and load weights (llm-d's scorers) need.
+
+**Open question, second sighting.** Least-loaded again does worse than round-robin — at K = 64 it needs
+8 replicas at 1 session/s where round-robin needs 5 — as it did with dearer prefill in H6. One candidate
+cause, not yet checked: a balancer that counts requests treats a replica stuck in one long prefill as
+lightly loaded, and keeps sending it more.
+
+**Decision.** The README gets its first measured finding, with its scope: *keep each user on one GPU
+until your tenants' prompts outgrow one GPU's cache; then route by prefix, with a small load weight.*
+It is a T4 result (H6) on generated traffic. Whether the flip survives other hardware is H6's crossover
+half, registered next; Mooncake is the real trace it points at.

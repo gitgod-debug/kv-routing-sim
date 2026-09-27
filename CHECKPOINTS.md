@@ -480,21 +480,25 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 
 ## Phase 5 — The crossover finding *(tests H2 · ⛔ never cut)*
 
-- [~] ⭐ **Registered 2026-09-28** ([`configs/phase5_crossover.yaml`](configs/phase5_crossover.yaml),
+- [x] ⭐ **Registered and RAN 2026-09-28** ([`configs/phase5_crossover.yaml`](configs/phase5_crossover.yaml),
       `scripts/run_phase5.py`, dated entry in `docs/09`): **A1** — sweep radix-affinity-balanced's α on
       Phase 4's traces and fix α\* by a written rule; **H2**'s procedure — sharing × load at 4 and 8
       replicas, paired session-bootstrap CIs; **H2b** (new) — K tenant prompts (the generator's new
       `n_shared_prefixes`), affinity at α\* vs session-sticky on replicas needed
-- [~] Sweep **prefix-sharing ratio as its own axis**, crossed with offered load — in the registered H2 grid
+- [x] Sweep **prefix-sharing ratio as its own axis**, crossed with offered load — the H2 grid
+      ([`report.md`](artifacts/results/phase5_crossover/report.md)): 14,592 runs, clean tree `3967a56`
 - [-] ~~Add turns-per-session as a third axis~~ — **deferred** (2026-09-28): the reason sticky won in
       Phase 4 is more likely that ONE small shared prompt fits in every replica's cache. H2b tests that
       mechanism directly (the number of tenant prompts); turns per session comes back if H2b fails
-- [ ] Locate the boundary where least-loaded overtakes prefix-affinity on **p95 TTFT**; publish it as a
-      **curve with CIs**
-- [ ] Check H2's three directional sub-predictions (monotonicity in each axis; power-of-two in between)
-- [ ] If the effect sits inside the CIs, report **that** — *"no detectable crossover in this region, here is
-      the region and the intervals"* is a real result
-- [ ] Make it the README headline, in one sentence a reader can repeat without opening the repo
+- [x] Locate the boundary where least-loaded overtakes prefix-affinity on **p95 TTFT** — published as a
+      win map with paired session-bootstrap CIs. ⛔ **It is not the boundary H2 predicted:** pure
+      affinity loses at every sharing > 0 (the prompt's existence decides, not its length), and the
+      balanced policy shows no monotone boundary. *The plot for the README is still owed*
+- [x] Check H2's three directional sub-predictions — ⛔ **H2 FALSIFIED** for both policies (docs/09)
+- [-] ~~If the effect sits inside the CIs, report that~~ — not needed: the effects were far outside them
+- [x] ⭐ **H2b HOLDS** — the README headline, scoped (2026-09-28): *keep each user on one GPU until your
+      tenants' prompts outgrow one GPU's cache; then route by prefix, with a small load weight.* ⚠️ A T4
+      result (H6): whether the flip survives other hardware is H6's crossover half — next
 
 ---
 
