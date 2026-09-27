@@ -6,9 +6,11 @@ Give it your serving log. It returns a routing policy, a replica count, and a co
 prefix-cache model is calibrated against a live vLLM's own Prometheus counters, and **the calibration error
 is published**.
 
-> ## 🚧 Status: the calibration is measured (Phase 3, 2026-09-22). The finding is not yet.
+> ## 🚧 Status: the calibration is measured (Phase 3, 2026-09-22), and so is the first finding (Phase 5, 2026-09-28) — on generated traffic, T4 only.
 > The Real-Engine Calibration Report below is filled in from a live vLLM, against predictions committed
-> before the run. Every number still written as `TBD — not yet measured` **is exactly that**, and stays
+> before the run; the finding comes from a test registered before it ran. Real traces, the two-GPU check
+> under pressure, and other hardware are still to come. Every number still written as
+> `TBD — not yet measured` **is exactly that**, and stays
 > so until it is measured — no placeholder here is ever quietly replaced by a plausible figure; see the
 > honesty gates in [`CHECKPOINTS.md`](CHECKPOINTS.md). Start at [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
 
@@ -16,12 +18,31 @@ is published**.
 
 ## The finding
 
-> **TBD — not yet measured.** *(One sentence, stating where prefix-affinity routing stops paying: the
-> prefix-sharing ratio × offered-load boundary at which least-loaded overtakes it on p95 TTFT. See
-> hypothesis H2.)*
+> **Keep each user on one GPU — until your tenants' system prompts outgrow one GPU's KV cache. Then
+> route by prefix, with a small load weight.**
 
-`azrabano23/disagg-sim` has published *that* this locality-vs-load counter-result exists. **Nobody has
-published the boundary.**
+Measured on simulated agentic traffic, with the cache model and the T4 timings calibrated against a live
+vLLM (the credential, below), a 2-second p95 TTFT target, and the test registered before it ran (H2b in
+[`docs/09-hypotheses.md`](docs/09-hypotheses.md)).
+
+| Distinct system prompts (85 blocks each) | Working set ÷ one T4's cache | Fewest T4s that hold the target at 2 sessions/s |
+|---|---:|---|
+| 1 | 0.06 | session-sticky **2** · balanced prefix-affinity 3 · round-robin 3 |
+| 64 | 2.66 | balanced prefix-affinity **5** · session-sticky, round-robin, least-loaded: **not held on 8** |
+
+- **One shared prompt:** session-sticky needed the fewest GPUs at every load — 25–42% fewer than
+  round-robin — and *pure* prefix-affinity collapsed: it sends every session to the one replica holding
+  the prompt, and lost 60–260 s of p95 TTFT from 2 sessions/s (H2, falsified).
+- **Many prompts:** the order flips. Round-robin's hit rate fell from 0.84 to 0.53 and session-sticky's
+  from 0.92 to 0.82; prefix-affinity kept 0.87–0.92.
+- **The load weight matters, and it should shrink as prompts multiply** (reported, not tested): the best
+  weight was 8–16 with one prompt and 1 with 16 or 64.
+
+⚠️ **Scope:** generated traffic, one model (Qwen3-4B), T4 timings. The full ranking of policies does
+**not** transfer to other hardware for free (H6, falsified); whether this flip does is the next
+registered test. `azrabano23/disagg-sim` published that locality can lose to load balancing, and llm-d
+weighs prefix and load scores by hand-set weights; this is the measured condition that decided between
+them, on this setup.
 
 ## The credential — the Real-Engine Calibration Report
 
