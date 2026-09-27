@@ -1,0 +1,4704 @@
+{
+ "script": "scripts/run_h6.py",
+ "date_utc": "2026-09-27T19:01:41+00:00",
+ "git_sha": "ff2ba87",
+ "git_dirty": false,
+ "seed": 0,
+ "hardware_path": "cpu-only",
+ "hardware": {
+  "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+  "python": "3.13.12",
+  "usable_cpus": 12,
+  "gpus": [
+   "NVIDIA GeForce GTX 1650, 4096 MiB, 7.5, 595.71.05"
+  ],
+  "gpu_name": "NVIDIA GeForce GTX 1650",
+  "gpu_memory_total": "4096 MiB",
+  "compute_capability": "7.5",
+  "driver_version": "595.71.05",
+  "mig_enabled": false,
+  "mig_mode_current": [
+   "[N/A]"
+  ]
+ },
+ "packages": {
+  "vllm": "not installed",
+  "torch": "not installed",
+  "numpy": "2.5.3",
+  "pydantic": "2.13.5",
+  "httpx": "not installed",
+  "prometheus-client": "not installed",
+  "matplotlib": "3.11.2"
+ },
+ "config": {
+  "schema_version": 1,
+  "base_sweep": "configs/phase4_sweep.yaml",
+  "phase4_results": "artifacts/results/phase4_sweep_t4/sweep.json",
+  "baseline": "t4",
+  "regimes": {
+   "t4": {
+    "prefill_x": 1.0,
+    "decode_x": 1.0
+   },
+   "faster_2x": {
+    "prefill_x": 0.5,
+    "decode_x": 0.5
+   },
+   "faster_4x": {
+    "prefill_x": 0.25,
+    "decode_x": 0.25
+   },
+   "cheap_prefill": {
+    "prefill_x": 0.5,
+    "decode_x": 1.0
+   },
+   "dear_prefill": {
+    "prefill_x": 2.0,
+    "decode_x": 1.0
+   }
+  },
+  "tau_threshold": 0.8
+ },
+ "base_config": {
+  "schema_version": 1,
+  "profile": "configs/profiles/t4-qwen3-4b-vllm0.30.0.json",
+  "cost_model": "configs/cost_model.yaml",
+  "cache_model": "vllm",
+  "policies": "all",
+  "replicas": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8
+  ],
+  "seeds": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ],
+  "trace_shape": {
+   "n_sessions": 200,
+   "turns_per_session": 4,
+   "session_context_tokens": 150,
+   "user_turn_tokens": 40,
+   "assistant_turn_tokens": 60,
+   "output_tokens": 64,
+   "think_time_s": 6.0,
+   "seed": 0
+  },
+  "traces": {
+   "low_sharing": {
+    "n_sessions": 200,
+    "turns_per_session": 4,
+    "session_context_tokens": 150,
+    "user_turn_tokens": 40,
+    "assistant_turn_tokens": 60,
+    "output_tokens": 64,
+    "think_time_s": 6.0,
+    "seed": 0,
+    "prefix_sharing_ratio": 0.3
+   },
+   "high_sharing": {
+    "n_sessions": 200,
+    "turns_per_session": 4,
+    "session_context_tokens": 150,
+    "user_turn_tokens": 40,
+    "assistant_turn_tokens": 60,
+    "output_tokens": 64,
+    "think_time_s": 6.0,
+    "seed": 0,
+    "prefix_sharing_ratio": 0.8
+   }
+  },
+  "loads": [
+   1,
+   2,
+   3,
+   4,
+   6,
+   8
+  ],
+  "h1": {
+   "trace": "high_sharing",
+   "policies": [
+    "radix-affinity",
+    "radix-affinity-balanced"
+   ],
+   "versus": "least-loaded",
+   "replicas": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "bootstrap_resamples": 1000,
+   "widen_tolerance": 0.005
+  },
+  "h5": {
+   "policies": [
+    "radix-affinity",
+    "radix-affinity-balanced"
+   ],
+   "versus": "round-robin"
+  }
+ },
+ "runtime_s": 690.0,
+ "policies": [
+  "round-robin",
+  "least-loaded",
+  "power-of-two",
+  "consistent-hash-prefix",
+  "radix-affinity",
+  "radix-affinity-balanced",
+  "session-sticky"
+ ],
+ "profiles": {
+  "t4": {
+   "name": "t4-qwen3-4b-vllm0.30.0",
+   "prefill_base_s": 0.0,
+   "prefill_per_token_s": 0.0007014400878738409,
+   "decode_base_s": 0.05291123879934786,
+   "decode_per_seq_s": 0.001232162611867379,
+   "kv_cache_blocks": 1537,
+   "block_size": 16,
+   "max_num_seqs": 256,
+   "gpu": "Tesla T4",
+   "model": "Qwen/Qwen3-4B",
+   "engine_version": "0.30.0",
+   "calibrated": true,
+   "calibration_error": 0.002901,
+   "WARNING": "calibrated on Tesla T4 / Qwen/Qwen3-4B / 0.30.0"
+  },
+  "faster_2x": {
+   "name": "t4-qwen3-4b-vllm0.30.0+faster_2x",
+   "prefill_base_s": 0.0,
+   "prefill_per_token_s": 0.00035072004393692046,
+   "decode_base_s": 0.02645561939967393,
+   "decode_per_seq_s": 0.0006160813059336895,
+   "kv_cache_blocks": 1537,
+   "block_size": 16,
+   "max_num_seqs": 256,
+   "gpu": "Tesla T4",
+   "model": "Qwen/Qwen3-4B",
+   "engine_version": "0.30.0",
+   "calibrated": false,
+   "calibration_error": null,
+   "WARNING": "UNCALIBRATED \u2014 timings are plausible shapes, not measurements. Policy RANKING may still be informative (H6); absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
+  },
+  "faster_4x": {
+   "name": "t4-qwen3-4b-vllm0.30.0+faster_4x",
+   "prefill_base_s": 0.0,
+   "prefill_per_token_s": 0.00017536002196846023,
+   "decode_base_s": 0.013227809699836965,
+   "decode_per_seq_s": 0.00030804065296684475,
+   "kv_cache_blocks": 1537,
+   "block_size": 16,
+   "max_num_seqs": 256,
+   "gpu": "Tesla T4",
+   "model": "Qwen/Qwen3-4B",
+   "engine_version": "0.30.0",
+   "calibrated": false,
+   "calibration_error": null,
+   "WARNING": "UNCALIBRATED \u2014 timings are plausible shapes, not measurements. Policy RANKING may still be informative (H6); absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
+  },
+  "cheap_prefill": {
+   "name": "t4-qwen3-4b-vllm0.30.0+cheap_prefill",
+   "prefill_base_s": 0.0,
+   "prefill_per_token_s": 0.00035072004393692046,
+   "decode_base_s": 0.05291123879934786,
+   "decode_per_seq_s": 0.001232162611867379,
+   "kv_cache_blocks": 1537,
+   "block_size": 16,
+   "max_num_seqs": 256,
+   "gpu": "Tesla T4",
+   "model": "Qwen/Qwen3-4B",
+   "engine_version": "0.30.0",
+   "calibrated": false,
+   "calibration_error": null,
+   "WARNING": "UNCALIBRATED \u2014 timings are plausible shapes, not measurements. Policy RANKING may still be informative (H6); absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
+  },
+  "dear_prefill": {
+   "name": "t4-qwen3-4b-vllm0.30.0+dear_prefill",
+   "prefill_base_s": 0.0,
+   "prefill_per_token_s": 0.0014028801757476818,
+   "decode_base_s": 0.05291123879934786,
+   "decode_per_seq_s": 0.001232162611867379,
+   "kv_cache_blocks": 1537,
+   "block_size": 16,
+   "max_num_seqs": 256,
+   "gpu": "Tesla T4",
+   "model": "Qwen/Qwen3-4B",
+   "engine_version": "0.30.0",
+   "calibrated": false,
+   "calibration_error": null,
+   "WARNING": "UNCALIBRATED \u2014 timings are plausible shapes, not measurements. Policy RANKING may still be informative (H6); absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
+  }
+ },
+ "cost_model": {
+  "schema_version": 1,
+  "currency": "INR",
+  "fx": {
+   "usd_to_inr": 95.87,
+   "source": "https://www.federalreserve.gov/releases/h10/hist/dat00_in.htm",
+   "date": "2026-09-22"
+  },
+  "compute": {
+   "sku": "g4dn.xlarge",
+   "provider": "AWS EC2",
+   "region": "us-east-1",
+   "gpus_per_instance": 1,
+   "price_per_hour_usd": 0.526,
+   "source": "https://instances.vantage.sh/aws/ec2/g4dn.xlarge",
+   "date": "2026-09-22"
+  },
+  "slo": {
+   "ttft_p95_ms": 2000,
+   "source": "https://github.com/mlcommons/inference_policies/blob/master/inference_rules.adoc (commit ff7edba545, 2026-08-20)",
+   "date": "2026-09-22"
+  },
+  "excluded": [
+   "networking_egress",
+   "control_plane_overhead",
+   "engineering_time",
+   "kv_cache_storage"
+  ]
+ },
+ "required_replicas": {
+  "t4": {
+   "low_sharing": {
+    "1": {
+     "round-robin": 1,
+     "least-loaded": 1,
+     "power-of-two": 1,
+     "consistent-hash-prefix": 1,
+     "radix-affinity": 1,
+     "radix-affinity-balanced": 1,
+     "session-sticky": 1
+    },
+    "2": {
+     "round-robin": 3,
+     "least-loaded": 3,
+     "power-of-two": 3,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 2,
+     "session-sticky": 2
+    },
+    "3": {
+     "round-robin": 4,
+     "least-loaded": 4,
+     "power-of-two": 4,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 3,
+     "session-sticky": 3
+    },
+    "4": {
+     "round-robin": 5,
+     "least-loaded": 5,
+     "power-of-two": 5,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 3,
+     "session-sticky": 3
+    },
+    "6": {
+     "round-robin": 7,
+     "least-loaded": 7,
+     "power-of-two": 7,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 4,
+     "session-sticky": 4
+    },
+    "8": {
+     "round-robin": 8,
+     "least-loaded": 8,
+     "power-of-two": 8,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 5,
+     "session-sticky": 5
+    }
+   },
+   "high_sharing": {
+    "1": {
+     "round-robin": 1,
+     "least-loaded": 1,
+     "power-of-two": 1,
+     "consistent-hash-prefix": 1,
+     "radix-affinity": 1,
+     "radix-affinity-balanced": 1,
+     "session-sticky": 1
+    },
+    "2": {
+     "round-robin": 3,
+     "least-loaded": 3,
+     "power-of-two": 3,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 2
+    },
+    "3": {
+     "round-robin": 4,
+     "least-loaded": 4,
+     "power-of-two": 4,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 3
+    },
+    "4": {
+     "round-robin": 5,
+     "least-loaded": 5,
+     "power-of-two": 5,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 3
+    },
+    "6": {
+     "round-robin": 7,
+     "least-loaded": 7,
+     "power-of-two": 7,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 4
+    },
+    "8": {
+     "round-robin": 9,
+     "least-loaded": 8,
+     "power-of-two": 8,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 5
+    }
+   }
+  },
+  "faster_2x": {
+   "low_sharing": {
+    "1": {
+     "round-robin": 1,
+     "least-loaded": 1,
+     "power-of-two": 1,
+     "consistent-hash-prefix": 1,
+     "radix-affinity": 1,
+     "radix-affinity-balanced": 1,
+     "session-sticky": 1
+    },
+    "2": {
+     "round-robin": 1,
+     "least-loaded": 1,
+     "power-of-two": 1,
+     "consistent-hash-prefix": 1,
+     "radix-affinity": 1,
+     "radix-affinity-balanced": 1,
+     "session-sticky": 1
+    },
+    "3": {
+     "round-robin": 2,
+     "least-loaded": 2,
+     "power-of-two": 2,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 2,
+     "session-sticky": 2
+    },
+    "4": {
+     "round-robin": 3,
+     "least-loaded": 3,
+     "power-of-two": 3,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 2,
+     "session-sticky": 2
+    },
+    "6": {
+     "round-robin": 4,
+     "least-loaded": 4,
+     "power-of-two": 4,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 3,
+     "session-sticky": 3
+    },
+    "8": {
+     "round-robin": 5,
+     "least-loaded": 5,
+     "power-of-two": 5,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 3,
+     "session-sticky": 3
+    }
+   },
+   "high_sharing": {
+    "1": {
+     "round-robin": 1,
+     "least-loaded": 1,
+     "power-of-two": 1,
+     "consistent-hash-prefix": 1,
+     "radix-affinity": 1,
+     "radix-affinity-balanced": 1,
+     "session-sticky": 1
+    },
+    "2": {
+     "round-robin": 1,
+     "least-loaded": 1,
+     "power-of-two": 1,
+     "consistent-hash-prefix": 1,
+     "radix-affinity": 1,
+     "radix-affinity-balanced": 1,
+     "session-sticky": 1
+    },
+    "3": {
+     "round-robin": 2,
+     "least-loaded": 2,
+     "power-of-two": 2,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 2,
+     "session-sticky": 2
+    },
+    "4": {
+     "round-robin": 3,
+     "least-loaded": 3,
+     "power-of-two": 3,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 2,
+     "session-sticky": 2
+    },
+    "6": {
+     "round-robin": 4,
+     "least-loaded": 4,
+     "power-of-two": 4,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 3
+    },
+    "8": {
+     "round-robin": 5,
+     "least-loaded": 5,
+     "power-of-two": 5,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 3
+    }
+   }
+  },
+  "faster_4x": {
+   "low_sharing": {
+    "1": {
+     "round-robin": 1,
+     "least-loaded": 1,
+     "power-of-two": 1,
+     "consistent-hash-prefix": 1,
+     "radix-affinity": 1,
+     "radix-affinity-balanced": 1,
+     "session-sticky": 1
+    },
+    "2": {
+     "round-robin": 1,
+     "least-loaded": 1,
+     "power-of-two": 1,
+     "consistent-hash-prefix": 1,
+     "radix-affinity": 1,
+     "radix-affinity-balanced": 1,
+     "session-sticky": 1
+    },
+    "3": {
+     "round-robin": 2,
+     "least-loaded": 2,
+     "power-of-two": 2,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 2,
+     "session-sticky": 2
+    },
+    "4": {
+     "round-robin": 2,
+     "least-loaded": 2,
+     "power-of-two": 2,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 2,
+     "session-sticky": 2
+    },
+    "6": {
+     "round-robin": 2,
+     "least-loaded": 2,
+     "power-of-two": 2,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 2,
+     "session-sticky": 2
+    },
+    "8": {
+     "round-robin": 3,
+     "least-loaded": 3,
+     "power-of-two": 3,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 3,
+     "session-sticky": 3
+    }
+   },
+   "high_sharing": {
+    "1": {
+     "round-robin": 1,
+     "least-loaded": 1,
+     "power-of-two": 1,
+     "consistent-hash-prefix": 1,
+     "radix-affinity": 1,
+     "radix-affinity-balanced": 1,
+     "session-sticky": 1
+    },
+    "2": {
+     "round-robin": 1,
+     "least-loaded": 1,
+     "power-of-two": 1,
+     "consistent-hash-prefix": 1,
+     "radix-affinity": 1,
+     "radix-affinity-balanced": 1,
+     "session-sticky": 1
+    },
+    "3": {
+     "round-robin": 2,
+     "least-loaded": 2,
+     "power-of-two": 2,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 2,
+     "session-sticky": 2
+    },
+    "4": {
+     "round-robin": 2,
+     "least-loaded": 2,
+     "power-of-two": 2,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 2,
+     "session-sticky": 2
+    },
+    "6": {
+     "round-robin": 2,
+     "least-loaded": 2,
+     "power-of-two": 2,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 2
+    },
+    "8": {
+     "round-robin": 3,
+     "least-loaded": 3,
+     "power-of-two": 3,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 3
+    }
+   }
+  },
+  "cheap_prefill": {
+   "low_sharing": {
+    "1": {
+     "round-robin": 1,
+     "least-loaded": 1,
+     "power-of-two": 1,
+     "consistent-hash-prefix": 1,
+     "radix-affinity": 1,
+     "radix-affinity-balanced": 1,
+     "session-sticky": 1
+    },
+    "2": {
+     "round-robin": 2,
+     "least-loaded": 2,
+     "power-of-two": 2,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 2,
+     "session-sticky": 2
+    },
+    "3": {
+     "round-robin": 3,
+     "least-loaded": 3,
+     "power-of-two": 3,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 2,
+     "session-sticky": 2
+    },
+    "4": {
+     "round-robin": 4,
+     "least-loaded": 4,
+     "power-of-two": 4,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 3,
+     "session-sticky": 3
+    },
+    "6": {
+     "round-robin": 5,
+     "least-loaded": 5,
+     "power-of-two": 5,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 4,
+     "session-sticky": 4
+    },
+    "8": {
+     "round-robin": 6,
+     "least-loaded": 6,
+     "power-of-two": 6,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 4,
+     "session-sticky": 4
+    }
+   },
+   "high_sharing": {
+    "1": {
+     "round-robin": 1,
+     "least-loaded": 1,
+     "power-of-two": 1,
+     "consistent-hash-prefix": 1,
+     "radix-affinity": 1,
+     "radix-affinity-balanced": 1,
+     "session-sticky": 1
+    },
+    "2": {
+     "round-robin": 2,
+     "least-loaded": 2,
+     "power-of-two": 2,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 2,
+     "session-sticky": 2
+    },
+    "3": {
+     "round-robin": 3,
+     "least-loaded": 3,
+     "power-of-two": 3,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 2
+    },
+    "4": {
+     "round-robin": 4,
+     "least-loaded": 4,
+     "power-of-two": 4,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 3
+    },
+    "6": {
+     "round-robin": 5,
+     "least-loaded": 5,
+     "power-of-two": 5,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 4
+    },
+    "8": {
+     "round-robin": 6,
+     "least-loaded": 6,
+     "power-of-two": 6,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 4
+    }
+   }
+  },
+  "dear_prefill": {
+   "low_sharing": {
+    "1": {
+     "round-robin": 2,
+     "least-loaded": 2,
+     "power-of-two": 3,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 2,
+     "session-sticky": 2
+    },
+    "2": {
+     "round-robin": 4,
+     "least-loaded": 9,
+     "power-of-two": 7,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 3,
+     "session-sticky": 3
+    },
+    "3": {
+     "round-robin": 7,
+     "least-loaded": 9,
+     "power-of-two": 9,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 5,
+     "session-sticky": 4
+    },
+    "4": {
+     "round-robin": 9,
+     "least-loaded": 9,
+     "power-of-two": 9,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 6,
+     "session-sticky": 5
+    },
+    "6": {
+     "round-robin": 9,
+     "least-loaded": 9,
+     "power-of-two": 9,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 6,
+     "session-sticky": 6
+    },
+    "8": {
+     "round-robin": 9,
+     "least-loaded": 9,
+     "power-of-two": 9,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 7
+    }
+   },
+   "high_sharing": {
+    "1": {
+     "round-robin": 2,
+     "least-loaded": 3,
+     "power-of-two": 4,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 2
+    },
+    "2": {
+     "round-robin": 4,
+     "least-loaded": 9,
+     "power-of-two": 8,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 3
+    },
+    "3": {
+     "round-robin": 7,
+     "least-loaded": 9,
+     "power-of-two": 9,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 5
+    },
+    "4": {
+     "round-robin": 9,
+     "least-loaded": 9,
+     "power-of-two": 9,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 5
+    },
+    "6": {
+     "round-robin": 9,
+     "least-loaded": 9,
+     "power-of-two": 9,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 6
+    },
+    "8": {
+     "round-robin": 9,
+     "least-loaded": 9,
+     "power-of-two": 9,
+     "consistent-hash-prefix": 9,
+     "radix-affinity": 9,
+     "radix-affinity-balanced": 9,
+     "session-sticky": 7
+    }
+   }
+  }
+ },
+ "recommendations": {
+  "t4": {
+   "low_sharing": {
+    "1": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.74037,
+      "p50_ttft_ms": 309.44,
+      "p95_ttft_ms": 610.149,
+      "inr_per_1k_requests": 4.015,
+      "throughput_rps": 3.4889,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.74037,
+      "p50_ttft_ms": 309.44,
+      "p95_ttft_ms": 610.149,
+      "inr_per_1k_requests": 4.015,
+      "throughput_rps": 3.4889,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 15,
+     "calibrated": true
+    },
+    "2": {
+     "recommended": {
+      "policy": "radix-affinity-balanced",
+      "n_replicas": 2,
+      "hit_rate": 0.738321,
+      "p50_ttft_ms": 294.911,
+      "p95_ttft_ms": 614.999,
+      "inr_per_1k_requests": 4.3994,
+      "throughput_rps": 6.368,
+      "load_imbalance": 1.005,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 3,
+      "hit_rate": 0.49716,
+      "p50_ttft_ms": 312.075,
+      "p95_ttft_ms": 594.204,
+      "inr_per_1k_requests": 6.5866,
+      "throughput_rps": 6.3801,
+      "load_imbalance": 1.0012,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -33.21,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 17,
+     "calibrated": true
+    },
+    "3": {
+     "recommended": {
+      "policy": "radix-affinity-balanced",
+      "n_replicas": 3,
+      "hit_rate": 0.73563,
+      "p50_ttft_ms": 293.542,
+      "p95_ttft_ms": 638.497,
+      "inr_per_1k_requests": 4.7796,
+      "throughput_rps": 8.7921,
+      "load_imbalance": 1.0192,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 4,
+      "hit_rate": 0.448395,
+      "p50_ttft_ms": 357.719,
+      "p95_ttft_ms": 767.711,
+      "inr_per_1k_requests": 6.3893,
+      "throughput_rps": 8.7695,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -25.19,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 8,
+     "calibrated": true
+    },
+    "4": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 3,
+      "hit_rate": 0.73963,
+      "p50_ttft_ms": 390.126,
+      "p95_ttft_ms": 935.33,
+      "inr_per_1k_requests": 3.8898,
+      "throughput_rps": 10.8035,
+      "load_imbalance": 1.02,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 5,
+      "hit_rate": 0.428272,
+      "p50_ttft_ms": 394.625,
+      "p95_ttft_ms": 1058.404,
+      "inr_per_1k_requests": 6.4767,
+      "throughput_rps": 10.8139,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -39.94,
+     "replica_delta_vs_baseline": -2,
+     "frontier_size": 6,
+     "calibrated": true
+    },
+    "6": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 4,
+      "hit_rate": 0.739259,
+      "p50_ttft_ms": 385.789,
+      "p95_ttft_ms": 822.035,
+      "inr_per_1k_requests": 3.9975,
+      "throughput_rps": 14.0167,
+      "load_imbalance": 1.036,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 7,
+      "hit_rate": 0.407284,
+      "p50_ttft_ms": 408.568,
+      "p95_ttft_ms": 747.383,
+      "inr_per_1k_requests": 6.9357,
+      "throughput_rps": 14.1374,
+      "load_imbalance": 1.0062,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -42.36,
+     "replica_delta_vs_baseline": -3,
+     "frontier_size": 6,
+     "calibrated": true
+    },
+    "8": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 5,
+      "hit_rate": 0.738889,
+      "p50_ttft_ms": 354.25,
+      "p95_ttft_ms": 727.038,
+      "inr_per_1k_requests": 4.2447,
+      "throughput_rps": 16.5005,
+      "load_imbalance": 1.045,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 8,
+      "hit_rate": 0.35358,
+      "p50_ttft_ms": 536.41,
+      "p95_ttft_ms": 1567.793,
+      "inr_per_1k_requests": 7.2487,
+      "throughput_rps": 15.9376,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -41.44,
+     "replica_delta_vs_baseline": -3,
+     "frontier_size": 6,
+     "calibrated": true
+    }
+   },
+   "high_sharing": {
+    "1": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.923706,
+      "p50_ttft_ms": 315.919,
+      "p95_ttft_ms": 622.413,
+      "inr_per_1k_requests": 4.0143,
+      "throughput_rps": 3.4894,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.923706,
+      "p50_ttft_ms": 315.919,
+      "p95_ttft_ms": 622.413,
+      "inr_per_1k_requests": 4.0143,
+      "throughput_rps": 3.4894,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 14,
+     "calibrated": true
+    },
+    "2": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 2,
+      "hit_rate": 0.922706,
+      "p50_ttft_ms": 298.078,
+      "p95_ttft_ms": 639.068,
+      "inr_per_1k_requests": 4.3986,
+      "throughput_rps": 6.3692,
+      "load_imbalance": 1.012,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 3,
+      "hit_rate": 0.853106,
+      "p50_ttft_ms": 315.103,
+      "p95_ttft_ms": 596.161,
+      "inr_per_1k_requests": 6.5855,
+      "throughput_rps": 6.3812,
+      "load_imbalance": 1.0012,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -33.21,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 15,
+     "calibrated": true
+    },
+    "3": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 3,
+      "hit_rate": 0.921706,
+      "p50_ttft_ms": 280.966,
+      "p95_ttft_ms": 572.756,
+      "inr_per_1k_requests": 4.7869,
+      "throughput_rps": 8.7788,
+      "load_imbalance": 1.026,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 4,
+      "hit_rate": 0.838576,
+      "p50_ttft_ms": 356.383,
+      "p95_ttft_ms": 754.478,
+      "inr_per_1k_requests": 6.3897,
+      "throughput_rps": 8.7689,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -25.08,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 4,
+     "calibrated": true
+    },
+    "4": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 3,
+      "hit_rate": 0.921706,
+      "p50_ttft_ms": 414.23,
+      "p95_ttft_ms": 1041.195,
+      "inr_per_1k_requests": 3.9013,
+      "throughput_rps": 10.7716,
+      "load_imbalance": 1.02,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 5,
+      "hit_rate": 0.832282,
+      "p50_ttft_ms": 402.854,
+      "p95_ttft_ms": 1085.53,
+      "inr_per_1k_requests": 6.4775,
+      "throughput_rps": 10.8126,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -39.77,
+     "replica_delta_vs_baseline": -2,
+     "frontier_size": 4,
+     "calibrated": true
+    },
+    "6": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 4,
+      "hit_rate": 0.920706,
+      "p50_ttft_ms": 392.347,
+      "p95_ttft_ms": 847.219,
+      "inr_per_1k_requests": 4.0114,
+      "throughput_rps": 13.9759,
+      "load_imbalance": 1.028,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 7,
+      "hit_rate": 0.824671,
+      "p50_ttft_ms": 410.757,
+      "p95_ttft_ms": 766.103,
+      "inr_per_1k_requests": 6.9411,
+      "throughput_rps": 14.1265,
+      "load_imbalance": 1.0062,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -42.21,
+     "replica_delta_vs_baseline": -3,
+     "frontier_size": 6,
+     "calibrated": true
+    },
+    "8": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 5,
+      "hit_rate": 0.919706,
+      "p50_ttft_ms": 361.161,
+      "p95_ttft_ms": 762.758,
+      "inr_per_1k_requests": 4.2322,
+      "throughput_rps": 16.549,
+      "load_imbalance": 1.04,
+      "meets_slo": true,
+      "calibrated": true
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 8,
+      "hit_rate": 0.808588,
+      "p50_ttft_ms": 567.448,
+      "p95_ttft_ms": 2045.55,
+      "inr_per_1k_requests": 7.4124,
+      "throughput_rps": 15.9348,
+      "load_imbalance": 1.0,
+      "meets_slo": false,
+      "calibrated": true
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -42.9,
+     "replica_delta_vs_baseline": -3,
+     "frontier_size": 6,
+     "calibrated": true
+    }
+   }
+  },
+  "faster_2x": {
+   "low_sharing": {
+    "1": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.74037,
+      "p50_ttft_ms": 96.923,
+      "p95_ttft_ms": 170.375,
+      "inr_per_1k_requests": 3.9786,
+      "throughput_rps": 3.5208,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.74037,
+      "p50_ttft_ms": 96.923,
+      "p95_ttft_ms": 170.375,
+      "inr_per_1k_requests": 3.9786,
+      "throughput_rps": 3.5208,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 14,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "2": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.74037,
+      "p50_ttft_ms": 145.572,
+      "p95_ttft_ms": 318.022,
+      "inr_per_1k_requests": 2.1645,
+      "throughput_rps": 6.4715,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.74037,
+      "p50_ttft_ms": 145.572,
+      "p95_ttft_ms": 318.022,
+      "inr_per_1k_requests": 2.1645,
+      "throughput_rps": 6.4715,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 20,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "3": {
+     "recommended": {
+      "policy": "least-loaded",
+      "n_replicas": 2,
+      "hit_rate": 0.573366,
+      "p50_ttft_ms": 176.057,
+      "p95_ttft_ms": 459.718,
+      "inr_per_1k_requests": 3.1185,
+      "throughput_rps": 8.9836,
+      "load_imbalance": 1.006,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.564198,
+      "p50_ttft_ms": 148.986,
+      "p95_ttft_ms": 388.004,
+      "inr_per_1k_requests": 3.12,
+      "throughput_rps": 8.9792,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -0.05,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 10,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "4": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 2,
+      "hit_rate": 0.74,
+      "p50_ttft_ms": 136.088,
+      "p95_ttft_ms": 308.154,
+      "inr_per_1k_requests": 2.515,
+      "throughput_rps": 11.1395,
+      "load_imbalance": 1.008,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 3,
+      "hit_rate": 0.508519,
+      "p50_ttft_ms": 149.219,
+      "p95_ttft_ms": 308.425,
+      "inr_per_1k_requests": 3.7653,
+      "throughput_rps": 11.1605,
+      "load_imbalance": 1.0012,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -33.21,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 7,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "6": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 3,
+      "hit_rate": 0.73963,
+      "p50_ttft_ms": 124.171,
+      "p95_ttft_ms": 251.649,
+      "inr_per_1k_requests": 2.8638,
+      "throughput_rps": 14.6738,
+      "load_imbalance": 1.017,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 4,
+      "hit_rate": 0.435309,
+      "p50_ttft_ms": 170.861,
+      "p95_ttft_ms": 312.257,
+      "inr_per_1k_requests": 3.8222,
+      "throughput_rps": 14.6591,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -25.08,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 6,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "8": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 3,
+      "hit_rate": 0.73963,
+      "p50_ttft_ms": 148.985,
+      "p95_ttft_ms": 368.746,
+      "inr_per_1k_requests": 2.4128,
+      "throughput_rps": 17.4166,
+      "load_imbalance": 1.029,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 5,
+      "hit_rate": 0.416914,
+      "p50_ttft_ms": 168.317,
+      "p95_ttft_ms": 342.275,
+      "inr_per_1k_requests": 4.0204,
+      "throughput_rps": 17.4207,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -39.99,
+     "replica_delta_vs_baseline": -2,
+     "frontier_size": 6,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    }
+   },
+   "high_sharing": {
+    "1": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.923706,
+      "p50_ttft_ms": 98.702,
+      "p95_ttft_ms": 170.973,
+      "inr_per_1k_requests": 3.9787,
+      "throughput_rps": 3.5206,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.923706,
+      "p50_ttft_ms": 98.702,
+      "p95_ttft_ms": 170.973,
+      "inr_per_1k_requests": 3.9787,
+      "throughput_rps": 3.5206,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 14,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "2": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.923706,
+      "p50_ttft_ms": 147.772,
+      "p95_ttft_ms": 355.908,
+      "inr_per_1k_requests": 2.1646,
+      "throughput_rps": 6.4712,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.923706,
+      "p50_ttft_ms": 147.772,
+      "p95_ttft_ms": 355.908,
+      "inr_per_1k_requests": 2.1646,
+      "throughput_rps": 6.4712,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 16,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "3": {
+     "recommended": {
+      "policy": "least-loaded",
+      "n_replicas": 2,
+      "hit_rate": 0.874311,
+      "p50_ttft_ms": 174.95,
+      "p95_ttft_ms": 431.1,
+      "inr_per_1k_requests": 3.1175,
+      "throughput_rps": 8.9866,
+      "load_imbalance": 1.005,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.871412,
+      "p50_ttft_ms": 148.747,
+      "p95_ttft_ms": 394.094,
+      "inr_per_1k_requests": 3.12,
+      "throughput_rps": 8.9792,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -0.08,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 8,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "4": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 2,
+      "hit_rate": 0.922706,
+      "p50_ttft_ms": 137.293,
+      "p95_ttft_ms": 319.87,
+      "inr_per_1k_requests": 2.5133,
+      "throughput_rps": 11.1467,
+      "load_imbalance": 1.012,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 3,
+      "hit_rate": 0.855871,
+      "p50_ttft_ms": 152.691,
+      "p95_ttft_ms": 323.446,
+      "inr_per_1k_requests": 3.7661,
+      "throughput_rps": 11.1582,
+      "load_imbalance": 1.0012,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -33.26,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 5,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "6": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 3,
+      "hit_rate": 0.921706,
+      "p50_ttft_ms": 127.272,
+      "p95_ttft_ms": 278.442,
+      "inr_per_1k_requests": 2.8635,
+      "throughput_rps": 14.6756,
+      "load_imbalance": 1.011,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 4,
+      "hit_rate": 0.833471,
+      "p50_ttft_ms": 173.792,
+      "p95_ttft_ms": 326.062,
+      "inr_per_1k_requests": 3.8221,
+      "throughput_rps": 14.6598,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -25.08,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 4,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "8": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 3,
+      "hit_rate": 0.921652,
+      "p50_ttft_ms": 161.448,
+      "p95_ttft_ms": 727.798,
+      "inr_per_1k_requests": 2.4109,
+      "throughput_rps": 17.4302,
+      "load_imbalance": 1.014,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 5,
+      "hit_rate": 0.827541,
+      "p50_ttft_ms": 176.194,
+      "p95_ttft_ms": 373.905,
+      "inr_per_1k_requests": 4.0214,
+      "throughput_rps": 17.4165,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -40.05,
+     "replica_delta_vs_baseline": -2,
+     "frontier_size": 6,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    }
+   }
+  },
+  "faster_4x": {
+   "low_sharing": {
+    "1": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.74037,
+      "p50_ttft_ms": 43.361,
+      "p95_ttft_ms": 67.701,
+      "inr_per_1k_requests": 3.9622,
+      "throughput_rps": 3.5353,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.74037,
+      "p50_ttft_ms": 43.361,
+      "p95_ttft_ms": 67.701,
+      "inr_per_1k_requests": 3.9622,
+      "throughput_rps": 3.5353,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 11,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "2": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.74037,
+      "p50_ttft_ms": 49.471,
+      "p95_ttft_ms": 96.24,
+      "inr_per_1k_requests": 2.1469,
+      "throughput_rps": 6.5247,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.74037,
+      "p50_ttft_ms": 49.471,
+      "p95_ttft_ms": 96.24,
+      "inr_per_1k_requests": 2.1469,
+      "throughput_rps": 6.5247,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 16,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "3": {
+     "recommended": {
+      "policy": "radix-affinity-balanced",
+      "n_replicas": 2,
+      "hit_rate": 0.74,
+      "p50_ttft_ms": 46.217,
+      "p95_ttft_ms": 76.186,
+      "inr_per_1k_requests": 3.0833,
+      "throughput_rps": 9.086,
+      "load_imbalance": 1.068,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.564198,
+      "p50_ttft_ms": 57.039,
+      "p95_ttft_ms": 112.39,
+      "inr_per_1k_requests": 3.0845,
+      "throughput_rps": 9.0828,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -0.04,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 16,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "4": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.537531,
+      "p50_ttft_ms": 61.77,
+      "p95_ttft_ms": 144.681,
+      "inr_per_1k_requests": 2.4779,
+      "throughput_rps": 11.3061,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.537531,
+      "p50_ttft_ms": 61.77,
+      "p95_ttft_ms": 144.681,
+      "inr_per_1k_requests": 2.4779,
+      "throughput_rps": 11.3061,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 12,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "6": {
+     "recommended": {
+      "policy": "radix-affinity-balanced",
+      "n_replicas": 2,
+      "hit_rate": 0.57949,
+      "p50_ttft_ms": 69.631,
+      "p95_ttft_ms": 403.001,
+      "inr_per_1k_requests": 1.8738,
+      "throughput_rps": 14.9508,
+      "load_imbalance": 1.011,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.465226,
+      "p50_ttft_ms": 92.354,
+      "p95_ttft_ms": 317.102,
+      "inr_per_1k_requests": 1.8756,
+      "throughput_rps": 14.9364,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -0.1,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 11,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "8": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 3,
+      "hit_rate": 0.44823,
+      "p50_ttft_ms": 75.422,
+      "p95_ttft_ms": 155.938,
+      "inr_per_1k_requests": 2.3557,
+      "throughput_rps": 17.8392,
+      "load_imbalance": 1.0012,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 3,
+      "hit_rate": 0.44823,
+      "p50_ttft_ms": 75.422,
+      "p95_ttft_ms": 155.938,
+      "inr_per_1k_requests": 2.3557,
+      "throughput_rps": 17.8392,
+      "load_imbalance": 1.0012,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 8,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    }
+   },
+   "high_sharing": {
+    "1": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.923706,
+      "p50_ttft_ms": 44.457,
+      "p95_ttft_ms": 69.634,
+      "inr_per_1k_requests": 3.9622,
+      "throughput_rps": 3.5353,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.923706,
+      "p50_ttft_ms": 44.457,
+      "p95_ttft_ms": 69.634,
+      "inr_per_1k_requests": 3.9622,
+      "throughput_rps": 3.5353,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 11,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "2": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.923694,
+      "p50_ttft_ms": 50.369,
+      "p95_ttft_ms": 93.192,
+      "inr_per_1k_requests": 2.1471,
+      "throughput_rps": 6.5241,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.923694,
+      "p50_ttft_ms": 50.369,
+      "p95_ttft_ms": 93.192,
+      "inr_per_1k_requests": 2.1471,
+      "throughput_rps": 6.5241,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 14,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "3": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 2,
+      "hit_rate": 0.922706,
+      "p50_ttft_ms": 46.512,
+      "p95_ttft_ms": 81.333,
+      "inr_per_1k_requests": 3.0829,
+      "throughput_rps": 9.0873,
+      "load_imbalance": 1.008,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.871212,
+      "p50_ttft_ms": 57.889,
+      "p95_ttft_ms": 113.953,
+      "inr_per_1k_requests": 3.0843,
+      "throughput_rps": 9.0831,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -0.05,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 14,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "4": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.865141,
+      "p50_ttft_ms": 61.649,
+      "p95_ttft_ms": 143.133,
+      "inr_per_1k_requests": 2.4779,
+      "throughput_rps": 11.3061,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.865141,
+      "p50_ttft_ms": 61.649,
+      "p95_ttft_ms": 143.133,
+      "inr_per_1k_requests": 2.4779,
+      "throughput_rps": 11.3061,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 8,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "6": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 2,
+      "hit_rate": 0.857696,
+      "p50_ttft_ms": 96.339,
+      "p95_ttft_ms": 638.993,
+      "inr_per_1k_requests": 1.8739,
+      "throughput_rps": 14.9501,
+      "load_imbalance": 1.01,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.836765,
+      "p50_ttft_ms": 107.439,
+      "p95_ttft_ms": 695.666,
+      "inr_per_1k_requests": 1.8757,
+      "throughput_rps": 14.9362,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -0.09,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 8,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "8": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 3,
+      "hit_rate": 0.835894,
+      "p50_ttft_ms": 79.358,
+      "p95_ttft_ms": 157.998,
+      "inr_per_1k_requests": 2.3555,
+      "throughput_rps": 17.8403,
+      "load_imbalance": 1.0012,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 3,
+      "hit_rate": 0.835894,
+      "p50_ttft_ms": 79.358,
+      "p95_ttft_ms": 157.998,
+      "inr_per_1k_requests": 2.3555,
+      "throughput_rps": 17.8403,
+      "load_imbalance": 1.0012,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 5,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    }
+   }
+  },
+  "cheap_prefill": {
+   "low_sharing": {
+    "1": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.74037,
+      "p50_ttft_ms": 188.011,
+      "p95_ttft_ms": 298.025,
+      "inr_per_1k_requests": 4.013,
+      "throughput_rps": 3.4906,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.74037,
+      "p50_ttft_ms": 188.011,
+      "p95_ttft_ms": 298.025,
+      "inr_per_1k_requests": 4.013,
+      "throughput_rps": 3.4906,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 17,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "2": {
+     "recommended": {
+      "policy": "radix-affinity-balanced",
+      "n_replicas": 2,
+      "hit_rate": 0.739753,
+      "p50_ttft_ms": 185.859,
+      "p95_ttft_ms": 310.697,
+      "inr_per_1k_requests": 4.3935,
+      "throughput_rps": 6.3766,
+      "load_imbalance": 1.0095,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.590123,
+      "p50_ttft_ms": 215.162,
+      "p95_ttft_ms": 359.807,
+      "inr_per_1k_requests": 4.3938,
+      "throughput_rps": 6.3761,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -0.01,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 18,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "3": {
+     "recommended": {
+      "policy": "radix-affinity-balanced",
+      "n_replicas": 2,
+      "hit_rate": 0.736395,
+      "p50_ttft_ms": 263.587,
+      "p95_ttft_ms": 485.43,
+      "inr_per_1k_requests": 3.1983,
+      "throughput_rps": 8.7594,
+      "load_imbalance": 1.013,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 3,
+      "hit_rate": 0.492963,
+      "p50_ttft_ms": 228.284,
+      "p95_ttft_ms": 409.752,
+      "inr_per_1k_requests": 4.7813,
+      "throughput_rps": 8.7891,
+      "load_imbalance": 1.0012,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -33.11,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 11,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "4": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 3,
+      "hit_rate": 0.73963,
+      "p50_ttft_ms": 216.714,
+      "p95_ttft_ms": 381.185,
+      "inr_per_1k_requests": 3.8711,
+      "throughput_rps": 10.8556,
+      "load_imbalance": 1.017,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 4,
+      "hit_rate": 0.444198,
+      "p50_ttft_ms": 232.572,
+      "p95_ttft_ms": 422.182,
+      "inr_per_1k_requests": 5.1648,
+      "throughput_rps": 10.8486,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -25.05,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 8,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "6": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 4,
+      "hit_rate": 0.739259,
+      "p50_ttft_ms": 216.325,
+      "p95_ttft_ms": 367.035,
+      "inr_per_1k_requests": 3.9562,
+      "throughput_rps": 14.1627,
+      "load_imbalance": 1.02,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 5,
+      "hit_rate": 0.431481,
+      "p50_ttft_ms": 258.687,
+      "p95_ttft_ms": 411.84,
+      "inr_per_1k_requests": 4.959,
+      "throughput_rps": 14.1234,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -20.22,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 6,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "8": {
+     "recommended": {
+      "policy": "radix-affinity-balanced",
+      "n_replicas": 4,
+      "hit_rate": 0.727802,
+      "p50_ttft_ms": 283.104,
+      "p95_ttft_ms": 551.075,
+      "inr_per_1k_requests": 3.3941,
+      "throughput_rps": 16.5208,
+      "load_imbalance": 1.048,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 6,
+      "hit_rate": 0.396543,
+      "p50_ttft_ms": 275.721,
+      "p95_ttft_ms": 515.823,
+      "inr_per_1k_requests": 5.0557,
+      "throughput_rps": 16.624,
+      "load_imbalance": 1.005,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -32.87,
+     "replica_delta_vs_baseline": -2,
+     "frontier_size": 7,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    }
+   },
+   "high_sharing": {
+    "1": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.923706,
+      "p50_ttft_ms": 191.525,
+      "p95_ttft_ms": 301.743,
+      "inr_per_1k_requests": 4.0127,
+      "throughput_rps": 3.4908,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 1,
+      "hit_rate": 0.923706,
+      "p50_ttft_ms": 191.525,
+      "p95_ttft_ms": 301.743,
+      "inr_per_1k_requests": 4.0127,
+      "throughput_rps": 3.4908,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 16,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "2": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.879788,
+      "p50_ttft_ms": 217.786,
+      "p95_ttft_ms": 376.875,
+      "inr_per_1k_requests": 4.3937,
+      "throughput_rps": 6.3763,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.879788,
+      "p50_ttft_ms": 217.786,
+      "p95_ttft_ms": 376.875,
+      "inr_per_1k_requests": 4.3937,
+      "throughput_rps": 6.3763,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 18,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "3": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 2,
+      "hit_rate": 0.922706,
+      "p50_ttft_ms": 273.815,
+      "p95_ttft_ms": 491.932,
+      "inr_per_1k_requests": 3.2025,
+      "throughput_rps": 8.757,
+      "load_imbalance": 1.018,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 3,
+      "hit_rate": 0.851482,
+      "p50_ttft_ms": 232.159,
+      "p95_ttft_ms": 428.538,
+      "inr_per_1k_requests": 4.7827,
+      "throughput_rps": 8.7865,
+      "load_imbalance": 1.0012,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -33.04,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 6,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "4": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 3,
+      "hit_rate": 0.921706,
+      "p50_ttft_ms": 221.611,
+      "p95_ttft_ms": 396.406,
+      "inr_per_1k_requests": 3.8749,
+      "throughput_rps": 10.845,
+      "load_imbalance": 1.023,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 4,
+      "hit_rate": 0.837318,
+      "p50_ttft_ms": 235.415,
+      "p95_ttft_ms": 439.788,
+      "inr_per_1k_requests": 5.1643,
+      "throughput_rps": 10.8497,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -24.97,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 6,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "6": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 4,
+      "hit_rate": 0.920706,
+      "p50_ttft_ms": 219.531,
+      "p95_ttft_ms": 385.592,
+      "inr_per_1k_requests": 3.9566,
+      "throughput_rps": 14.1614,
+      "load_imbalance": 1.02,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 5,
+      "hit_rate": 0.8326,
+      "p50_ttft_ms": 260.698,
+      "p95_ttft_ms": 413.592,
+      "inr_per_1k_requests": 4.9571,
+      "throughput_rps": 14.1288,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -20.18,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 6,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "8": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 4,
+      "hit_rate": 0.920706,
+      "p50_ttft_ms": 273.376,
+      "p95_ttft_ms": 506.527,
+      "inr_per_1k_requests": 3.4013,
+      "throughput_rps": 16.4737,
+      "load_imbalance": 1.04,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 6,
+      "hit_rate": 0.821729,
+      "p50_ttft_ms": 281.681,
+      "p95_ttft_ms": 554.77,
+      "inr_per_1k_requests": 5.0538,
+      "throughput_rps": 16.6302,
+      "load_imbalance": 1.005,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -32.7,
+     "replica_delta_vs_baseline": -2,
+     "frontier_size": 5,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    }
+   }
+  },
+  "dear_prefill": {
+   "low_sharing": {
+    "1": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.584691,
+      "p50_ttft_ms": 509.82,
+      "p95_ttft_ms": 1296.0,
+      "inr_per_1k_requests": 8.0245,
+      "throughput_rps": 3.4912,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.584691,
+      "p50_ttft_ms": 509.82,
+      "p95_ttft_ms": 1296.0,
+      "inr_per_1k_requests": 8.0245,
+      "throughput_rps": 3.4912,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 14,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "2": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 3,
+      "hit_rate": 0.73963,
+      "p50_ttft_ms": 405.598,
+      "p95_ttft_ms": 1081.966,
+      "inr_per_1k_requests": 6.6118,
+      "throughput_rps": 6.3686,
+      "load_imbalance": 1.029,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 4,
+      "hit_rate": 0.468642,
+      "p50_ttft_ms": 645.354,
+      "p95_ttft_ms": 1529.666,
+      "inr_per_1k_requests": 8.9883,
+      "throughput_rps": 6.3367,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -26.44,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 12,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "3": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 4,
+      "hit_rate": 0.739259,
+      "p50_ttft_ms": 472.995,
+      "p95_ttft_ms": 1380.582,
+      "inr_per_1k_requests": 6.4471,
+      "throughput_rps": 8.7635,
+      "load_imbalance": 1.06,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 7,
+      "hit_rate": 0.411975,
+      "p50_ttft_ms": 555.645,
+      "p95_ttft_ms": 1116.013,
+      "inr_per_1k_requests": 11.1992,
+      "throughput_rps": 8.7554,
+      "load_imbalance": 1.0062,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -42.43,
+     "replica_delta_vs_baseline": -3,
+     "frontier_size": 6,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "4": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 5,
+      "hit_rate": 0.738889,
+      "p50_ttft_ms": 482.263,
+      "p95_ttft_ms": 1421.309,
+      "inr_per_1k_requests": 6.5712,
+      "throughput_rps": 10.8032,
+      "load_imbalance": 1.08,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 8,
+      "hit_rate": 0.376543,
+      "p50_ttft_ms": 709.684,
+      "p95_ttft_ms": 2426.433,
+      "inr_per_1k_requests": 11.4848,
+      "throughput_rps": 10.5915,
+      "load_imbalance": 1.0,
+      "meets_slo": false,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -42.78,
+     "replica_delta_vs_baseline": -3,
+     "frontier_size": 6,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "6": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 6,
+      "hit_rate": 0.738519,
+      "p50_ttft_ms": 542.167,
+      "p95_ttft_ms": 1345.004,
+      "inr_per_1k_requests": 6.0417,
+      "throughput_rps": 14.0343,
+      "load_imbalance": 1.068,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 8,
+      "hit_rate": 0.369383,
+      "p50_ttft_ms": 4712.127,
+      "p95_ttft_ms": 15991.564,
+      "inr_per_1k_requests": 30.0127,
+      "throughput_rps": 11.0631,
+      "load_imbalance": 1.0,
+      "meets_slo": false,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -79.87,
+     "replica_delta_vs_baseline": -2,
+     "frontier_size": 6,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "8": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 7,
+      "hit_rate": 0.738148,
+      "p50_ttft_ms": 526.747,
+      "p95_ttft_ms": 1350.63,
+      "inr_per_1k_requests": 5.9946,
+      "throughput_rps": 16.4154,
+      "load_imbalance": 1.064,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 8,
+      "hit_rate": 0.35358,
+      "p50_ttft_ms": 7663.279,
+      "p95_ttft_ms": 22040.206,
+      "inr_per_1k_requests": 32.9088,
+      "throughput_rps": 11.0738,
+      "load_imbalance": 1.0,
+      "meets_slo": false,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -81.78,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 6,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    }
+   },
+   "high_sharing": {
+    "1": {
+     "recommended": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.878635,
+      "p50_ttft_ms": 521.578,
+      "p95_ttft_ms": 1352.025,
+      "inr_per_1k_requests": 8.043,
+      "throughput_rps": 3.4919,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 2,
+      "hit_rate": 0.878635,
+      "p50_ttft_ms": 521.578,
+      "p95_ttft_ms": 1352.025,
+      "inr_per_1k_requests": 8.043,
+      "throughput_rps": 3.4919,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": 0.0,
+     "replica_delta_vs_baseline": 0,
+     "frontier_size": 14,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "2": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 3,
+      "hit_rate": 0.921706,
+      "p50_ttft_ms": 435.779,
+      "p95_ttft_ms": 1264.533,
+      "inr_per_1k_requests": 6.6481,
+      "throughput_rps": 6.3624,
+      "load_imbalance": 1.02,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 4,
+      "hit_rate": 0.844365,
+      "p50_ttft_ms": 657.109,
+      "p95_ttft_ms": 1573.258,
+      "inr_per_1k_requests": 9.0268,
+      "throughput_rps": 6.3338,
+      "load_imbalance": 1.0,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -26.35,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 11,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "3": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 5,
+      "hit_rate": 0.919706,
+      "p50_ttft_ms": 387.997,
+      "p95_ttft_ms": 1034.269,
+      "inr_per_1k_requests": 8.0303,
+      "throughput_rps": 8.7811,
+      "load_imbalance": 1.065,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 7,
+      "hit_rate": 0.825788,
+      "p50_ttft_ms": 568.824,
+      "p95_ttft_ms": 1143.419,
+      "inr_per_1k_requests": 11.2968,
+      "throughput_rps": 8.7564,
+      "load_imbalance": 1.0062,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -28.92,
+     "replica_delta_vs_baseline": -2,
+     "frontier_size": 5,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "4": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 5,
+      "hit_rate": 0.919706,
+      "p50_ttft_ms": 517.33,
+      "p95_ttft_ms": 1566.153,
+      "inr_per_1k_requests": 6.6492,
+      "throughput_rps": 10.7723,
+      "load_imbalance": 1.075,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 8,
+      "hit_rate": 0.815047,
+      "p50_ttft_ms": 732.736,
+      "p95_ttft_ms": 2396.806,
+      "inr_per_1k_requests": 11.6669,
+      "throughput_rps": 10.5696,
+      "load_imbalance": 1.0,
+      "meets_slo": false,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -43.01,
+     "replica_delta_vs_baseline": -3,
+     "frontier_size": 7,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "6": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 6,
+      "hit_rate": 0.918706,
+      "p50_ttft_ms": 581.688,
+      "p95_ttft_ms": 1638.96,
+      "inr_per_1k_requests": 6.1253,
+      "throughput_rps": 14.0629,
+      "load_imbalance": 1.044,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 8,
+      "hit_rate": 0.813012,
+      "p50_ttft_ms": 4677.514,
+      "p95_ttft_ms": 15833.423,
+      "inr_per_1k_requests": 30.5613,
+      "throughput_rps": 11.1962,
+      "load_imbalance": 1.0,
+      "meets_slo": false,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -79.96,
+     "replica_delta_vs_baseline": -2,
+     "frontier_size": 6,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    },
+    "8": {
+     "recommended": {
+      "policy": "session-sticky",
+      "n_replicas": 7,
+      "hit_rate": 0.917706,
+      "p50_ttft_ms": 559.328,
+      "p95_ttft_ms": 1469.765,
+      "inr_per_1k_requests": 6.052,
+      "throughput_rps": 16.4531,
+      "load_imbalance": 1.057,
+      "meets_slo": true,
+      "calibrated": false
+     },
+     "baseline": {
+      "policy": "round-robin",
+      "n_replicas": 8,
+      "hit_rate": 0.808459,
+      "p50_ttft_ms": 7564.792,
+      "p95_ttft_ms": 21757.008,
+      "inr_per_1k_requests": 34.1008,
+      "throughput_rps": 11.1396,
+      "load_imbalance": 1.0,
+      "meets_slo": false,
+      "calibrated": false
+     },
+     "reason": "cheapest configuration meeting the p95 TTFT SLO",
+     "inr_delta_pct_vs_baseline": -82.25,
+     "replica_delta_vs_baseline": -1,
+     "frontier_size": 6,
+     "calibrated": false,
+     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+    }
+   }
+  }
+ },
+ "points": [
+  {
+   "regime": "faster_2x",
+   "trace": "low_sharing",
+   "load": 1,
+   "required_baseline": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "required_regime": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "our_pick": "round-robin",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": null,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_2x",
+   "trace": "low_sharing",
+   "load": 2,
+   "required_baseline": {
+    "round-robin": 3,
+    "least-loaded": 3,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "required_regime": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "our_pick": "radix-affinity-balanced",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": null,
+   "flip": false,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_2x",
+   "trace": "low_sharing",
+   "load": 3,
+   "required_baseline": {
+    "round-robin": 4,
+    "least-loaded": 4,
+    "power-of-two": 4,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 3,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 2,
+    "least-loaded": 2,
+    "power-of-two": 2,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "our_pick": "radix-affinity-balanced",
+   "regime_pick": "least-loaded",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": 0.7906,
+   "flip": false,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_2x",
+   "trace": "low_sharing",
+   "load": 4,
+   "required_baseline": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 5,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 3,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 3,
+    "least-loaded": 3,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "tau_b": 1.0,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_2x",
+   "trace": "low_sharing",
+   "load": 6,
+   "required_baseline": {
+    "round-robin": 7,
+    "least-loaded": 7,
+    "power-of-two": 7,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 4,
+    "session-sticky": 4
+   },
+   "required_regime": {
+    "round-robin": 4,
+    "least-loaded": 4,
+    "power-of-two": 4,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 3,
+    "session-sticky": 3
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "tau_b": 1.0,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_2x",
+   "trace": "low_sharing",
+   "load": 8,
+   "required_baseline": {
+    "round-robin": 8,
+    "least-loaded": 8,
+    "power-of-two": 8,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 5,
+    "session-sticky": 5
+   },
+   "required_regime": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 5,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 3,
+    "session-sticky": 3
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "tau_b": 1.0,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_2x",
+   "trace": "high_sharing",
+   "load": 1,
+   "required_baseline": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "required_regime": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "our_pick": "round-robin",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": null,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_2x",
+   "trace": "high_sharing",
+   "load": 2,
+   "required_baseline": {
+    "round-robin": 3,
+    "least-loaded": 3,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 2
+   },
+   "required_regime": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": null,
+   "flip": false,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_2x",
+   "trace": "high_sharing",
+   "load": 3,
+   "required_baseline": {
+    "round-robin": 4,
+    "least-loaded": 4,
+    "power-of-two": 4,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 2,
+    "least-loaded": 2,
+    "power-of-two": 2,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "least-loaded",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": 0.6532,
+   "flip": false,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_2x",
+   "trace": "high_sharing",
+   "load": 4,
+   "required_baseline": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 5,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 3,
+    "least-loaded": 3,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "tau_b": 0.5164,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_2x",
+   "trace": "high_sharing",
+   "load": 6,
+   "required_baseline": {
+    "round-robin": 7,
+    "least-loaded": 7,
+    "power-of-two": 7,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 4
+   },
+   "required_regime": {
+    "round-robin": 4,
+    "least-loaded": 4,
+    "power-of-two": 4,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 3
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "session-sticky"
+   ],
+   "tau_b": 1.0,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_2x",
+   "trace": "high_sharing",
+   "load": 8,
+   "required_baseline": {
+    "round-robin": 9,
+    "least-loaded": 8,
+    "power-of-two": 8,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 5
+   },
+   "required_regime": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 5,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 3
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "session-sticky"
+   ],
+   "tau_b": 0.8281,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_4x",
+   "trace": "low_sharing",
+   "load": 1,
+   "required_baseline": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "required_regime": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "our_pick": "round-robin",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": null,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_4x",
+   "trace": "low_sharing",
+   "load": 2,
+   "required_baseline": {
+    "round-robin": 3,
+    "least-loaded": 3,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "required_regime": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "our_pick": "radix-affinity-balanced",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": null,
+   "flip": false,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_4x",
+   "trace": "low_sharing",
+   "load": 3,
+   "required_baseline": {
+    "round-robin": 4,
+    "least-loaded": 4,
+    "power-of-two": 4,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 3,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 2,
+    "least-loaded": 2,
+    "power-of-two": 2,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "our_pick": "radix-affinity-balanced",
+   "regime_pick": "radix-affinity-balanced",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": 0.7906,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_4x",
+   "trace": "low_sharing",
+   "load": 4,
+   "required_baseline": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 5,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 3,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 2,
+    "least-loaded": 2,
+    "power-of-two": 2,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": 0.7906,
+   "flip": false,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_4x",
+   "trace": "low_sharing",
+   "load": 6,
+   "required_baseline": {
+    "round-robin": 7,
+    "least-loaded": 7,
+    "power-of-two": 7,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 4,
+    "session-sticky": 4
+   },
+   "required_regime": {
+    "round-robin": 2,
+    "least-loaded": 2,
+    "power-of-two": 2,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "radix-affinity-balanced",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": 0.7906,
+   "flip": false,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_4x",
+   "trace": "low_sharing",
+   "load": 8,
+   "required_baseline": {
+    "round-robin": 8,
+    "least-loaded": 8,
+    "power-of-two": 8,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 5,
+    "session-sticky": 5
+   },
+   "required_regime": {
+    "round-robin": 3,
+    "least-loaded": 3,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 3,
+    "session-sticky": 3
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": 0.7906,
+   "flip": false,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_4x",
+   "trace": "high_sharing",
+   "load": 1,
+   "required_baseline": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "required_regime": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "our_pick": "round-robin",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": null,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_4x",
+   "trace": "high_sharing",
+   "load": 2,
+   "required_baseline": {
+    "round-robin": 3,
+    "least-loaded": 3,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 2
+   },
+   "required_regime": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": null,
+   "flip": false,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_4x",
+   "trace": "high_sharing",
+   "load": 3,
+   "required_baseline": {
+    "round-robin": 4,
+    "least-loaded": 4,
+    "power-of-two": 4,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 2,
+    "least-loaded": 2,
+    "power-of-two": 2,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": 0.6532,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_4x",
+   "trace": "high_sharing",
+   "load": 4,
+   "required_baseline": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 5,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 2,
+    "least-loaded": 2,
+    "power-of-two": 2,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": 0.6532,
+   "flip": false,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_4x",
+   "trace": "high_sharing",
+   "load": 6,
+   "required_baseline": {
+    "round-robin": 7,
+    "least-loaded": 7,
+    "power-of-two": 7,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 4
+   },
+   "required_regime": {
+    "round-robin": 2,
+    "least-loaded": 2,
+    "power-of-two": 2,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 2
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "least-loaded",
+    "power-of-two",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": 0.8944,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "faster_4x",
+   "trace": "high_sharing",
+   "load": 8,
+   "required_baseline": {
+    "round-robin": 9,
+    "least-loaded": 8,
+    "power-of-two": 8,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 5
+   },
+   "required_regime": {
+    "round-robin": 3,
+    "least-loaded": 3,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 3
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "least-loaded",
+    "power-of-two",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": 0.6944,
+   "flip": false,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "cheap_prefill",
+   "trace": "low_sharing",
+   "load": 1,
+   "required_baseline": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "required_regime": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "our_pick": "round-robin",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": null,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "cheap_prefill",
+   "trace": "low_sharing",
+   "load": 2,
+   "required_baseline": {
+    "round-robin": 3,
+    "least-loaded": 3,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "required_regime": {
+    "round-robin": 2,
+    "least-loaded": 2,
+    "power-of-two": 2,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "our_pick": "radix-affinity-balanced",
+   "regime_pick": "radix-affinity-balanced",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": 0.7906,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "cheap_prefill",
+   "trace": "low_sharing",
+   "load": 3,
+   "required_baseline": {
+    "round-robin": 4,
+    "least-loaded": 4,
+    "power-of-two": 4,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 3,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 3,
+    "least-loaded": 3,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "our_pick": "radix-affinity-balanced",
+   "regime_pick": "radix-affinity-balanced",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "tau_b": 1.0,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "cheap_prefill",
+   "trace": "low_sharing",
+   "load": 4,
+   "required_baseline": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 5,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 3,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 4,
+    "least-loaded": 4,
+    "power-of-two": 4,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 3,
+    "session-sticky": 3
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "tau_b": 1.0,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "cheap_prefill",
+   "trace": "low_sharing",
+   "load": 6,
+   "required_baseline": {
+    "round-robin": 7,
+    "least-loaded": 7,
+    "power-of-two": 7,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 4,
+    "session-sticky": 4
+   },
+   "required_regime": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 5,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 4,
+    "session-sticky": 4
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "tau_b": 1.0,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "cheap_prefill",
+   "trace": "low_sharing",
+   "load": 8,
+   "required_baseline": {
+    "round-robin": 8,
+    "least-loaded": 8,
+    "power-of-two": 8,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 5,
+    "session-sticky": 5
+   },
+   "required_regime": {
+    "round-robin": 6,
+    "least-loaded": 6,
+    "power-of-two": 6,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 4,
+    "session-sticky": 4
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "radix-affinity-balanced",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "tau_b": 1.0,
+   "flip": false,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "cheap_prefill",
+   "trace": "high_sharing",
+   "load": 1,
+   "required_baseline": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "required_regime": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "our_pick": "round-robin",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": null,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "cheap_prefill",
+   "trace": "high_sharing",
+   "load": 2,
+   "required_baseline": {
+    "round-robin": 3,
+    "least-loaded": 3,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 2
+   },
+   "required_regime": {
+    "round-robin": 2,
+    "least-loaded": 2,
+    "power-of-two": 2,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": 0.6532,
+   "flip": false,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "cheap_prefill",
+   "trace": "high_sharing",
+   "load": 3,
+   "required_baseline": {
+    "round-robin": 4,
+    "least-loaded": 4,
+    "power-of-two": 4,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 3,
+    "least-loaded": 3,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 2
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "session-sticky"
+   ],
+   "tau_b": 1.0,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "cheap_prefill",
+   "trace": "high_sharing",
+   "load": 4,
+   "required_baseline": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 5,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 4,
+    "least-loaded": 4,
+    "power-of-two": 4,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 3
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "session-sticky"
+   ],
+   "tau_b": 1.0,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "cheap_prefill",
+   "trace": "high_sharing",
+   "load": 6,
+   "required_baseline": {
+    "round-robin": 7,
+    "least-loaded": 7,
+    "power-of-two": 7,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 4
+   },
+   "required_regime": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 5,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 4
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "session-sticky"
+   ],
+   "tau_b": 1.0,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "cheap_prefill",
+   "trace": "high_sharing",
+   "load": 8,
+   "required_baseline": {
+    "round-robin": 9,
+    "least-loaded": 8,
+    "power-of-two": 8,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 5
+   },
+   "required_regime": {
+    "round-robin": 6,
+    "least-loaded": 6,
+    "power-of-two": 6,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 4
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "session-sticky"
+   ],
+   "tau_b": 0.8281,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "dear_prefill",
+   "trace": "low_sharing",
+   "load": 1,
+   "required_baseline": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "required_regime": {
+    "round-robin": 2,
+    "least-loaded": 2,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "our_pick": "round-robin",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "least-loaded",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": null,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "dear_prefill",
+   "trace": "low_sharing",
+   "load": 2,
+   "required_baseline": {
+    "round-robin": 3,
+    "least-loaded": 3,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 2,
+    "session-sticky": 2
+   },
+   "required_regime": {
+    "round-robin": 4,
+    "least-loaded": 9,
+    "power-of-two": 7,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 3,
+    "session-sticky": 3
+   },
+   "our_pick": "radix-affinity-balanced",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "tau_b": 0.8489,
+   "flip": false,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "dear_prefill",
+   "trace": "low_sharing",
+   "load": 3,
+   "required_baseline": {
+    "round-robin": 4,
+    "least-loaded": 4,
+    "power-of-two": 4,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 3,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 7,
+    "least-loaded": 9,
+    "power-of-two": 9,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 5,
+    "session-sticky": 4
+   },
+   "our_pick": "radix-affinity-balanced",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "session-sticky"
+   ],
+   "tau_b": 0.7746,
+   "flip": true,
+   "strict_flip": true,
+   "lenient_flip": false
+  },
+  {
+   "regime": "dear_prefill",
+   "trace": "low_sharing",
+   "load": 4,
+   "required_baseline": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 5,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 3,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 9,
+    "least-loaded": 9,
+    "power-of-two": 9,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 6,
+    "session-sticky": 5
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "session-sticky"
+   ],
+   "tau_b": 0.7538,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "dear_prefill",
+   "trace": "low_sharing",
+   "load": 6,
+   "required_baseline": {
+    "round-robin": 7,
+    "least-loaded": 7,
+    "power-of-two": 7,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 4,
+    "session-sticky": 4
+   },
+   "required_regime": {
+    "round-robin": 9,
+    "least-loaded": 9,
+    "power-of-two": 9,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 6,
+    "session-sticky": 6
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "tau_b": 0.7906,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "dear_prefill",
+   "trace": "low_sharing",
+   "load": 8,
+   "required_baseline": {
+    "round-robin": 8,
+    "least-loaded": 8,
+    "power-of-two": 8,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 5,
+    "session-sticky": 5
+   },
+   "required_regime": {
+    "round-robin": 9,
+    "least-loaded": 9,
+    "power-of-two": 9,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 7
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "radix-affinity-balanced",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "session-sticky"
+   ],
+   "tau_b": 0.5103,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "dear_prefill",
+   "trace": "high_sharing",
+   "load": 1,
+   "required_baseline": {
+    "round-robin": 1,
+    "least-loaded": 1,
+    "power-of-two": 1,
+    "consistent-hash-prefix": 1,
+    "radix-affinity": 1,
+    "radix-affinity-balanced": 1,
+    "session-sticky": 1
+   },
+   "required_regime": {
+    "round-robin": 2,
+    "least-loaded": 3,
+    "power-of-two": 4,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 2
+   },
+   "our_pick": "round-robin",
+   "regime_pick": "round-robin",
+   "best_set_baseline": [
+    "consistent-hash-prefix",
+    "least-loaded",
+    "power-of-two",
+    "radix-affinity",
+    "radix-affinity-balanced",
+    "round-robin",
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "round-robin",
+    "session-sticky"
+   ],
+   "tau_b": null,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "dear_prefill",
+   "trace": "high_sharing",
+   "load": 2,
+   "required_baseline": {
+    "round-robin": 3,
+    "least-loaded": 3,
+    "power-of-two": 3,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 2
+   },
+   "required_regime": {
+    "round-robin": 4,
+    "least-loaded": 9,
+    "power-of-two": 8,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 3
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "session-sticky"
+   ],
+   "tau_b": 0.8,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "dear_prefill",
+   "trace": "high_sharing",
+   "load": 3,
+   "required_baseline": {
+    "round-robin": 4,
+    "least-loaded": 4,
+    "power-of-two": 4,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 7,
+    "least-loaded": 9,
+    "power-of-two": 9,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 5
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "session-sticky"
+   ],
+   "tau_b": 0.7006,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "dear_prefill",
+   "trace": "high_sharing",
+   "load": 4,
+   "required_baseline": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 5,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 3
+   },
+   "required_regime": {
+    "round-robin": 9,
+    "least-loaded": 9,
+    "power-of-two": 9,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 5
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "session-sticky"
+   ],
+   "tau_b": 0.6325,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "dear_prefill",
+   "trace": "high_sharing",
+   "load": 6,
+   "required_baseline": {
+    "round-robin": 7,
+    "least-loaded": 7,
+    "power-of-two": 7,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 4
+   },
+   "required_regime": {
+    "round-robin": 9,
+    "least-loaded": 9,
+    "power-of-two": 9,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 6
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "session-sticky"
+   ],
+   "tau_b": 0.6325,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  },
+  {
+   "regime": "dear_prefill",
+   "trace": "high_sharing",
+   "load": 8,
+   "required_baseline": {
+    "round-robin": 9,
+    "least-loaded": 8,
+    "power-of-two": 8,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 5
+   },
+   "required_regime": {
+    "round-robin": 9,
+    "least-loaded": 9,
+    "power-of-two": 9,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "radix-affinity-balanced": 9,
+    "session-sticky": 7
+   },
+   "our_pick": "session-sticky",
+   "regime_pick": "session-sticky",
+   "best_set_baseline": [
+    "session-sticky"
+   ],
+   "best_set_regime": [
+    "session-sticky"
+   ],
+   "tau_b": 0.6547,
+   "flip": false,
+   "strict_flip": false,
+   "lenient_flip": false
+  }
+ ],
+ "verdicts": {
+  "faster_2x": {
+   "points": 12,
+   "flips": 0,
+   "flips_not_applicable": 0,
+   "strict_flips": 4,
+   "lenient_flips": 0,
+   "points_with_tau": 8,
+   "min_tau_b": 0.5164,
+   "median_tau_b": 0.91405,
+   "holds": false
+  },
+  "faster_4x": {
+   "points": 12,
+   "flips": 0,
+   "flips_not_applicable": 0,
+   "strict_flips": 7,
+   "lenient_flips": 0,
+   "points_with_tau": 8,
+   "min_tau_b": 0.6532,
+   "median_tau_b": 0.7906,
+   "holds": false
+  },
+  "cheap_prefill": {
+   "points": 12,
+   "flips": 0,
+   "flips_not_applicable": 0,
+   "strict_flips": 2,
+   "lenient_flips": 0,
+   "points_with_tau": 10,
+   "min_tau_b": 0.6532,
+   "median_tau_b": 1.0,
+   "holds": false
+  },
+  "dear_prefill": {
+   "points": 12,
+   "flips": 1,
+   "flips_not_applicable": 0,
+   "strict_flips": 2,
+   "lenient_flips": 0,
+   "points_with_tau": 10,
+   "min_tau_b": 0.5103,
+   "median_tau_b": 0.7272000000000001,
+   "holds": false
+  }
+ },
+ "h6_ranking_holds": false
+}

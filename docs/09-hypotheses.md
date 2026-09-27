@@ -200,7 +200,7 @@ calibration cannot cash.
 | **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[x]` ✅ **PASSED 2026-09-22** — **zero** error on 2 sequential shapes under eviction pressure (3 runs each, every counter and all 120 requests' cached tokens); **+0.3%** on the concurrent shape |
 | **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[x]` ✅ **supported, in its second amendment's form (2026-09-22):** plain LRU's residual on a live engine is **capacity** skew (−11.9 pts when requests hold decode blocks, 0.17 without); histogram counts exact, W2 distributions identical |
 | **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[~]` **holds only for balanced affinity at LOW sharing** (1–3 fewer T4s); falsified elsewhere. Session-sticky (untested) needs the fewest everywhere |
-| **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 (CPU-only re-run) | `[~]` ranking half **registered 2026-09-28** — `configs/h6_ranking.yaml`, `scripts/run_h6.py` · crossover half after Phase 5 · **gates ADR-010's tier-1/2 claims** |
+| **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 (CPU-only re-run) | `[x]` ⛔ ranking half **FALSIFIED 2026-09-28** — τ-b down to 0.51, one flip in 48 points; session-sticky in the best set at all 48 (post-hoc) · crossover half after Phase 5 · **ADR-010's tier-1/2 claims withdrawn** |
 
 **Amendments:** *(add dated entries below, never edit above)*
 
@@ -478,3 +478,34 @@ it, so neither can be hidden.
 policy on the same few replicas, so many points will be all ties and the test will be decided at the
 loaded points. And this entry does **not** test H6's crossover half: that needs Phase 5's grid, and
 gets its own entry.
+
+### 2026-09-28 — ⛔ H6's ranking half RAN: FALSIFIED. The full order moves with the hardware; the winner did not.
+Report: [`artifacts/results/h6_ranking/report.md`](../artifacts/results/h6_ranking/report.md) — 16,800
+runs in 690 s, from a clean tree at `ff2ba87`. The baseline reproduced Phase 4's required-replica
+table exactly, so the rescaled regimes are compared with the numbers Phase 4 published.
+
+**As registered: FALSIFIED in all four rescaled regimes.** Every regime has a point with τ-b below
+0.8 — minimums **0.52** (2× faster), **0.65** (4× faster), **0.65** (prefill 2× cheaper) and **0.51**
+(prefill 2× dearer). The dearer-prefill regime also has **one flip**: at low sharing and 3 sessions/s,
+our T4 pick (radix-affinity-balanced, 3 replicas on the T4) needs 5 replicas there, where
+session-sticky needs 4. Strict flips: 4, 7, 2, 2. Lenient flips: 0 in every regime.
+
+**What moved.** Mostly the middle and the bottom of the order. With a faster GPU, whole groups of
+policies tie on the same few replicas, and those ties resolve differently from the T4's order. With
+prefill 2× dearer, least-loaded falls far behind round-robin: at low sharing it cannot hold the SLO at
+2 sessions/s even on 8 replicas, where round-robin needs 4. ⚠️ **Not yet understood** — logged as an
+open question rather than explained after the fact. The full order of seven policies is not a property
+of the workload alone.
+
+**What did not move — noticed after the run, not registered, labelled so.** Session-sticky was in the
+best set (fewest replicas) at **all 48 points** in every regime. The one registered flip sits where the
+T4 baseline itself was tied: radix-affinity-balanced and session-sticky both needed 3 replicas there,
+and the recommender picked the first on a rupee difference of **0.1%** (₹4.7796 vs ₹4.7842 per 1k).
+
+**Decision, as H6's own text says it must be.** Tiers 1 and 2 of ADR-010 do not survive as stated: the
+README no longer says a ranking transfers to other hardware for free (changed the same day). What it
+may say is narrower and measured: on this workload, across these five cost regimes, session-sticky
+needed the fewest replicas at every point. `kvsim calibrate` moves up, because it is now the only
+honest way to give a user a full ranking for their own hardware. And one product change the result
+points at, to be made as its own change and not folded into this entry: when policies tie on replicas,
+the recommender should report the tie rather than break it on rupee noise.

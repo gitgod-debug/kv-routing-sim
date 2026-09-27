@@ -453,12 +453,14 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       ⚠️ **restate it first: only without memory pressure.** Phase 4 measured it failing under load
       (pure affinity 0.815 vs round-robin 0.832 at high sharing, 4/s, 5 replicas), as H1 now explains
 - [ ] Golden-file test on a small sweep; CI green gate
-- [~] ⭐ **Test H6 — re-run the sweep under a rescaled cost function** (a "faster GPU", and a different
+- [x] ⭐ **Test H6 — re-run the sweep under a rescaled cost function** (a "faster GPU", and a different
       prefill/decode ratio) and compute Kendall's τ between the policy orderings. **Pure CPU, no extra GPU
       time, the sweep already exists.** ⛔ Do this *before* the README makes any tier-1 claim: H6 is what
       says whether a user without a GPU can trust the recommendation at all (ADR-010).
-      **Ranking half registered 2026-09-28** (`configs/h6_ranking.yaml`, `scripts/run_h6.py`); the
-      crossover half waits for Phase 5's grid
+      **Ranking half registered, run and ⛔ FALSIFIED 2026-09-28** — τ-b down to 0.51 and one flip in
+      48 points ([`report.md`](artifacts/results/h6_ranking/report.md)); session-sticky stayed in the best
+      set at all 48 (post-hoc). The README's free-ranking claim is withdrawn; the crossover half waits
+      for Phase 5's grid
 
 ---
 
