@@ -38,6 +38,13 @@ vLLM (the credential, below), a 2-second p95 TTFT target, and the test registere
 - **The load weight matters, and it should shrink as prompts multiply** (reported, not tested): the best
   weight was 8–16 with one prompt and 1 with 16 or 64.
 
+**On real traffic it is not yet shown.** Replaying the Mooncake FAST'25 tool-agent and conversation
+traces (token counts scaled 1/32, sessions inferred; R1, falsified): session-sticky and prefix-affinity
+with a load weight came out **within one replica** of each other at every speed, both beat
+round-robin under load (6 T4s against 8 at 4× the tool-agent rate), and pure prefix-affinity failed
+the target at every speed. The many-prompt advantage did not appear there — most likely because the
+shared blocks are spread over an hour rather than hot at once (not yet tested).
+
 ⚠️ **Scope:** generated traffic, one model (Qwen3-4B). The replica counts are T4 figures. The full
 ranking of the seven policies does **not** transfer to other hardware (H6's ranking half,
 falsified) — but the **direction of this flip** did: under a 2× or 4× faster GPU and a 2× cheaper
