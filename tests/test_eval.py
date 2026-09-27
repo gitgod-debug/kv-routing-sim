@@ -165,3 +165,16 @@ def test_kendall_tau_b_is_undefined_when_there_is_nothing_to_order():
 def test_kendall_tau_b_requires_equal_lengths():
     with pytest.raises(ValueError, match="equal lengths"):
         kendall_tau_b([1, 2], [1, 2, 3])
+
+
+def test_recommendation_reports_ties_on_the_same_replica_count():
+    """Between policies that hold the SLO on the same replicas, the rupee gap is noise (H6 found a
+    pick made on 0.1%). The pick is kept; the tie is reported, not hidden."""
+    sticky = _p("session-sticky", 3, 0.9, 500.0, 4.7842)
+    balanced = _p("radix-affinity-balanced", 3, 0.9, 600.0, 4.7796)
+    rr = _p("round-robin", 4, 0.8, 500.0, 6.0)
+    rec = recommend([sticky, balanced, rr])
+    assert rec.chosen is balanced
+    assert rec.tied_with == ("session-sticky",)
+    assert rec.as_dict()["tied_with"] == ["session-sticky"]
+    assert recommend([rr]).tied_with == ()

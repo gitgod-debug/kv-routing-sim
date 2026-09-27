@@ -30,6 +30,10 @@ class Recommendation:
     replica_delta: int | None
     calibrated: bool
     frontier_size: int
+    # Other policies that hold the SLO on the SAME number of replicas. Between those, the rupee gap
+    # is throughput noise (H6 found one choice made on a 0.1% difference), so they are reported as
+    # ties instead of being hidden behind the pick.
+    tied_with: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -42,13 +46,14 @@ class Recommendation:
             "replica_delta_vs_baseline": self.replica_delta,
             "frontier_size": self.frontier_size,
             "calibrated": self.calibrated,
+            "tied_with": list(self.tied_with),
         }
         if not self.calibrated:
             out["WARNING"] = (
-                "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output "
-                "(ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an "
-                "unmeasured cost profile and are NOT predictions for any real fleet. "
-                "Run `kvsim calibrate` against your own engine for tier-3 numbers."
+                "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost "
+                "profile and are NOT predictions for any real fleet. The recommended POLICY and "
+                "REPLICA COUNT depend on the hardware too: H6 found the full ranking moves with it "
+                "(only the direction of the prompt-count flip held). Measure your own profile."
             )
         return out
 
@@ -67,6 +72,7 @@ def recommend(
     # SLO" when no SLO was ever supplied — would be a false statement about the result.
     no_slo_defined = all(p.meets_slo is None for p in points)
     feasible = [p for p in points if p.meets_slo and p.inr_per_1k != float("inf")]
+    ties: tuple[str, ...] = ()
 
     if no_slo_defined:
         chosen = min(points, key=lambda p: (p.p95_ttft_ms, p.n_replicas))
@@ -77,6 +83,8 @@ def recommend(
     elif feasible:
         chosen = min(feasible, key=lambda p: (p.inr_per_1k, p.n_replicas, p.p95_ttft_ms))
         reason = "cheapest configuration meeting the p95 TTFT SLO"
+        ties = tuple(sorted({p.policy for p in feasible
+                             if p.n_replicas == chosen.n_replicas and p.policy != chosen.policy}))
     else:
         # A real failure: an SLO existed and nothing met it. Say so rather than quietly relaxing
         # the constraint and presenting the result as though it had passed.
@@ -109,4 +117,5 @@ def recommend(
         replica_delta=replica_delta,
         calibrated=calibrated,
         frontier_size=len(front),
+        tied_with=ties,
     )

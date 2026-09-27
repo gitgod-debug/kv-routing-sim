@@ -101,6 +101,10 @@ def _markdown(payload: dict[str, Any]) -> str:
             f"**{r['policy']} on {r['n_replicas']} replica(s)** — {rec.get('reason', '')}",
             "",
         ]
+        if rec.get("tied_with"):
+            lines.append(f"tied on replicas with: {', '.join(rec['tied_with'])} "
+                         "(between these the rupee gap is noise)")
+            lines.append("")
         if rec.get("inr_delta_pct_vs_baseline") is not None:
             lines.append(
                 f"vs round-robin: {rec['inr_delta_pct_vs_baseline']:+.1f}% cost, "
