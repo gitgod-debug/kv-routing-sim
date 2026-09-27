@@ -16,7 +16,7 @@ vLLM under eviction pressure to the token, against predictions committed before 
 your tenants' prompts outgrow one GPU's cache; then route by prefix, and keep its load weight small* (H2b
 holds; H2 falsified) · 🔨 **4** — H6's ranking half ⛔ and crossover half ✅, R1 on real traffic ⛔; two
 tests left · 🔨 **6** registered, the Kaggle run is yours · 🔨 **7** — demo page, grid and 10×/100× done;
-PyPI and `kvsim calibrate` left. ▶ **Next:** the README figure, the preprint draft, `kvsim calibrate`.
+PyPI and `kvsim calibrate` left. ▶ **Next:** the preprint draft, `kvsim calibrate`, the two Phase 4 tests.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -84,7 +84,7 @@ PyPI and `kvsim calibrate` left. ▶ **Next:** the README figure, the preprint d
 | **2b** | **Cache model = vLLM's block pool** 🆕 | `[x]` | Every eviction behaviour cites a line of vLLM's source; naive LRU kept as the ablation; both still reproduce v1/v2 exactly |
 | 3 | **Real-Engine Calibration Report** | `[x]` ✅ exact on W1 + W2, +0.3% on W3 | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
 | 4 | **Seven** policies + Pareto sweep | `[~]` H1 ⛔ · H5 1 of 4 · H6 ranking ⛔, crossover ✅ · α swept · R1 (Mooncake) ⛔ — property + golden tests left | Tests **H1 + H5 + H6** |
-| 5 | **The crossover finding** | `[~]` H2 ⛔ · **H2b ✅** — the README headline; its README figure still owed | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
+| 5 | **The crossover finding** | `[x]` H2 ⛔ · **H2b ✅** — the README headline, with its figure | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
 | 6 | Sim-to-real 2-replica validation | `[~]` registered 2026-09-28 on two physical T4s; the Kaggle run is left | Predicted vs measured across two MIG instances, or the documented fallback and why |
 | 7 | Package · CLI · static demo · hardening | `[~]` demo page + grid + 10×/100× ✅ · PyPI, `kvsim calibrate` left | `pip install` + `kvsim replay` + a **static** demo page (ADR-011) + "what breaks at 10×/100×" answered with measured numbers |
 | 8 | Write-up & launch | `[ ]` | README numbers-first, Show HN, **the `guidellm` PR open** |
@@ -498,7 +498,8 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 - [x] Locate the boundary where least-loaded overtakes prefix-affinity on **p95 TTFT** — published as a
       win map with paired session-bootstrap CIs. ⛔ **It is not the boundary H2 predicted:** pure
       affinity loses at every sharing > 0 (the prompt's existence decides, not its length), and the
-      balanced policy shows no monotone boundary. *The plot for the README is still owed*
+      balanced policy shows no monotone boundary. ✅ *The README figure* — `docs/figures/flip-*.svg`,
+      drawn by `scripts/make_figures.py` from the committed grid (2026-09-28)
 - [x] Check H2's three directional sub-predictions — ⛔ **H2 FALSIFIED** for both policies (docs/09)
 - [-] ~~If the effect sits inside the CIs, report that~~ — not needed: the effects were far outside them
 - [x] ⭐ **H2b HOLDS** — the README headline, scoped (2026-09-28): *keep each user on one GPU until your
@@ -570,7 +571,7 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       `.github/workflows/pages.yml` publishes `site/` + the grid on every push to `master` that touches
       them. **Manual step:** push the repo to GitHub, then Settings → Pages → Source: *GitHub
       Actions*; the Static Space needs a Hugging Face account (upload the same two files)
-- [ ] ⭐ **The same curve images and calibration table go IN THE README**, for the reader who never
+- [x] ⭐ **The same curve images and calibration table go IN THE README**, for the reader who never
       leaves GitHub. *(No longer a workaround for cold starts — a static page does not sleep — just
       belt-and-braces.)*
 - [x] ✅ **Render: CUT.** Verified 2026-09-21: free web services **spin down after 15 minutes** idle,
