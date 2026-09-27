@@ -606,3 +606,26 @@ lightly loaded, and keeps sending it more.
 until your tenants' prompts outgrow one GPU's cache; then route by prefix, with a small load weight.*
 It is a T4 result (H6) on generated traffic. Whether the flip survives other hardware is H6's crossover
 half, registered next; Mooncake is the real trace it points at.
+
+### 2026-09-28 — H6's crossover half REGISTERED before it runs: does H2b's flip survive other hardware?
+Design and rules: [`configs/h6_crossover.yaml`](../configs/h6_crossover.yaml). Procedure:
+`scripts/run_h6_crossover.py`. Both are committed before the run; a pipeline check ran first on a
+6-session, 0.5 sessions/s config outside the design.
+
+**The setup.** Phase 5's H2b grid unchanged — K = 1, 4, 16, 64 tenant prompts × 1–8 sessions/s ×
+replicas 1–8 × 3 seeds, radix-affinity-balanced at α\* = 16 against session-sticky, plus round-robin,
+least-loaded and pure radix-affinity for the record — under the five cost regimes of H6's ranking
+half. Guard: the t4 regime must reproduce Phase 5's H2b table exactly.
+
+**How it is decided.** H6's own text: the boundary "may shift, but should not invert". So a rescaled
+regime holds only if (i) at K = 1 affinity beats session-sticky at no load, (ii) at K = 64
+session-sticky beats affinity at no load, and (iii) at no load does sticky win at a larger K than
+affinity. H6's crossover half holds only if all four rescaled regimes hold. Whether the flip is still
+*visible* — an affinity win at K = 64 — is reported, not tested: a regime where everything ties has
+shifted, not inverted.
+
+**What would be uncomfortable, written down now.** Nothing in these regimes changes the cache size,
+and H2b's mechanism is about the cache, so the flip should survive. But a faster GPU makes ties more
+common (H6's ranking half saw whole groups of policies tie), so the flip may stop being visible. And
+dearer prefill makes every cache hit worth more, which could let affinity win already at K = 1 — an
+inversion under rule (i).
