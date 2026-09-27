@@ -141,6 +141,7 @@ def run(
                     "cached_tokens": seq.matched_blocks * profile.block_size,
                     "ttft_ms": (seq.first_token_ts - seq.arrival_ts) * 1000.0,
                     "preemptions": seq.num_preemptions,
+                    "replica": idx,  # which replica served it: a two-replica run compares routing
                 }
 
         if replica.has_work:

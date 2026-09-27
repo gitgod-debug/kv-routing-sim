@@ -1,0 +1,52 @@
+# Phase 6 — sim-to-real on TWO live replicas under cache pressure: H2b's flip on a real vLLM.
+# Registered BEFORE the GPU run, with a dated entry in docs/09-hypotheses.md. scripts/phase6_prepare.py
+# makes the trace fingerprints, the predictions and notebooks/phase6_sim2real.ipynb from this file,
+# so none of the three can drift from the others.
+
+schema_version: 1
+
+engine:                           # Phase 3's flags, one server per physical T4
+  model: Qwen/Qwen3-4B
+  vllm: 0.30.0
+  block_size: 16
+  num_gpu_blocks: 1537            # the calibrated profile's capacity — made a controlled input
+  max_model_len: 2048
+  max_num_seqs: 256
+  max_num_batched_tokens: 8192
+
+profile: configs/profiles/t4-qwen3-4b-vllm0.30.0.json
+replicas: 2
+router_seed: 0                    # the router's tie-breaking stream, the same in simulator and notebook
+policies: [round-robin, session-sticky, radix-affinity]
+
+# H2b's shape (Phase 4's session shape, sharing 0.8), at 1 session/s — where Phase 5 needed 3 replicas
+# to hold the SLO at K = 64, so two replicas run under pressure. 120 sessions keep each run to minutes.
+shape: &shape
+  n_sessions: 120
+  turns_per_session: 4
+  session_context_tokens: 150
+  user_turn_tokens: 40
+  assistant_turn_tokens: 60
+  output_tokens: 64
+  think_time_s: 6.0
+  seed: 0
+  prefix_sharing_ratio: 0.8
+  arrival_rate: 1.0
+workloads:
+  K1:  {<<: *shape}                                             # one shared prompt
+  K64: {<<: *shape, n_shared_prefixes: 64, prefix_zipf_s: 1.0}  # 64 tenant prompts
+
+# ── The decision rules, fixed before the GPU run ─────────────────────────────────────────────
+# A run = (workload, policy). Measured hit rate = Σ vllm:prefix_cache_hits ÷ Σ vllm:prefix_cache_queries
+# over both servers (the counter deltas of the run). Predicted = the simulator's, below.
+# S1 — per run: |measured − predicted| ÷ predicted ≤ 10% (H3's bar).
+# S2 — per workload: every pair of policies whose PREDICTED hit rates differ by >= s2_min_gap
+#      comes out in the same order when measured. (Pairs closer than that are inside the noise:
+#      at K1, session-sticky and radix-affinity are predicted 0.002 apart.) The pair that carries
+#      the flip's mechanism is K64 radix-affinity above session-sticky, predicted 0.022 apart.
+# Phase 6 HOLDS only if S1 holds for all six runs and S2 for both workloads.
+# Reported, not tested: preemptions, each replica's share of requests, p50/p95 TTFT (T4 figures),
+# per-request cached tokens, and — post-hoc, labelled so — the simulator re-run on the ACTUAL
+# routing and send times, which separates routing noise from cache-model error.
+s1_max_relative_error: 0.10
+s2_min_gap: 0.02
