@@ -130,8 +130,8 @@ so the honest answer comes in three tiers, and they must not be blended (ADR-010
 
 | | What you get | What it costs you |
 |---|---|---|
-| **Policy ranking** | *Which* policy wins on your workload shape, and roughly by how much | **Nothing.** No GPU, no calibration. Depends on workload shape, not hardware — *pending* **H6**, which tests exactly that rather than assuming it |
-| **The crossover boundary** | Whether prefix-affinity is worth implementing at *your* sharing ratio and utilization | **Nothing** (same caveat) |
+| **Policy ranking** | *Which* policy wins on your workload shape, and roughly by how much | ⛔ **Not free.** **H6 was tested and FALSIFIED (2026-09-28):** under a 2× faster GPU, or prefill 2× cheaper or dearer, the full order of the seven policies changed (Kendall's τ-b as low as 0.51). What held — noticed after the run, not registered: session-sticky needed the fewest replicas at all 48 points. So read a ranking as a result for *our* T4 unless you calibrate |
+| **The crossover boundary** | Whether prefix-affinity is worth implementing at *your* sharing ratio and utilization | The same caveat as the ranking — pending Phase 5, and H6's crossover half |
 | **Absolute ms and ₹** | p95 TTFT and ₹/1k requests for your fleet | **`kvsim calibrate` on your own hardware** *(not built yet)*. ⛔ Our error bar was measured on our GPU and our model. It does **not** transfer, and this README will never imply that it does |
 
 > **So: why trust our numbers on your hardware?** You shouldn't. Once `kvsim calibrate` is built, run it and use your own.
