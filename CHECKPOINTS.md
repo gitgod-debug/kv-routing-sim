@@ -507,13 +507,24 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 
 ## Phase 6 — Sim-to-real, two replicas
 
-- [ ] **One vLLM server per physical T4** (`CUDA_VISIBLE_DEVICES=0` / `=1`) — no MIG needed; two real
-      GPUs are complete isolation. Notebook v2 already detects this and does it
-- [ ] Two vLLM servers, one arrival stream, the top recommended policy actually deployed
-- [ ] Predicted vs measured hit rate across the pair *(v2's round-robin arm is the first data point —
-      predicted 1,088 tokens computed, hit rate 0.966862, committed before it ran)*
-- [ ] ⛔ **TTFT percentiles only from separate GPUs** — never from the memory-split fallback (ADR-005).
-      And they are **T4** percentiles
+> ### 🔨 2026-09-28 — built, dry-run and REGISTERED. ⏳ Waiting for one Kaggle run.
+> [`notebooks/phase6_sim2real.ipynb`](notebooks/phase6_sim2real.ipynb) — self-contained (vLLM + the
+> standard library): two vLLM 0.30.0 servers, Qwen3-4B, **one per physical T4**, 1,537 blocks each; H2b's
+> traffic with one shared prompt (K1) and 64 tenant prompts (K64); routed by round-robin, session-sticky
+> and radix-affinity through ports of the simulator's own policies. Predictions committed first
+> ([`predictions.json`](artifacts/results/phase6_prereg/predictions.json), from a clean tree at `8951a1e`);
+> decided by **S1** (each run's hit rate within 10%) and **S2** (policies predicted ≥ 0.02 apart keep
+> their order — the headline pair is K64 radix-affinity 0.8436 above session-sticky 0.8214).
+> `scripts/phase6_dryrun.py` runs the whole notebook against two mock engines and passes.
+> **To run:** Kaggle → GPU T4 ×2, Internet on → Run All (~40 min) → bring back `phase6_results.zip`.
+
+- [x] **One vLLM server per physical T4** (`CUDA_VISIBLE_DEVICES=0` / `=1`) — no MIG needed; two real
+      GPUs are complete isolation
+- [~] Two vLLM servers, one arrival stream, routed by three policies — built and registered; not yet run
+- [~] Predicted vs measured hit rate across the pair — six runs registered *(v2's round-robin arm was
+      the first data point — predicted 1,088 tokens computed, hit rate 0.966862, committed before it ran)*
+- [x] ⛔ **TTFT percentiles only from separate GPUs** — the notebook runs one server per physical GPU.
+      They are **T4** percentiles, and reported, not tested
 - [ ] **Fallback, decided in advance:** if 2 replicas prove infeasible, ship a **single-replica calibration
       plus a documented, reproducible account of why**. That beats no calibration, and the failure write-up
       is itself an OSS-PR premise

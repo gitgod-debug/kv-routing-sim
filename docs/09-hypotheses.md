@@ -718,3 +718,37 @@ set is the natural next test, not this entry's claim.
 must now say what real traffic showed: on the Mooncake traces, session-sticky and prefix-affinity with a
 load weight tie within a replica, both beat round-robin, and pure prefix-affinity fails. *"Route by
 prefix once prompts outgrow the cache"* is not yet shown on real traffic.
+
+### 2026-09-28 — Phase 6 REGISTERED before the GPU run: H2b's mechanism on two live replicas
+Design and rules: [`configs/phase6_sim2real.yaml`](../configs/phase6_sim2real.yaml). Predictions:
+[`artifacts/results/phase6_prereg/predictions.json`](../artifacts/results/phase6_prereg/predictions.json),
+generated from a clean tree at `8951a1e` together with
+[`notebooks/phase6_sim2real.ipynb`](../notebooks/phase6_sim2real.ipynb), which embeds their hash and the
+traces' fingerprints.
+
+**The setup.** Two vLLM 0.30.0 servers, Qwen3-4B, one per physical T4 (1,537 blocks each, fixed by
+override — the calibrated profile's capacity). H2b's traffic at 1 session/s, 120 sessions: one shared
+prompt (K1) and 64 tenant prompts (K64). Three routers — round-robin, session-sticky, radix-affinity —
+run in the notebook as ports of the simulator's own policies, with the same tie-breaking stream. The
+notebook regenerates the traffic with a port of the generator and stops unless the fingerprints match;
+the prepare script checked that port against the real generator and hashing before writing it.
+
+**The predictions (simulator, calibrated T4 profile, 2 replicas).**
+
+| | round-robin | session-sticky | radix-affinity |
+|---|---:|---:|---:|
+| K1 hit rate | 0.8795 | 0.9214 | 0.9230 (all 480 requests on one replica) |
+| K64 hit rate | 0.6944 (34 preemptions) | 0.8214 | **0.8436** |
+
+**How it is decided.** S1 — each run's measured hit rate (Σ prefix_cache_hits ÷ Σ prefix_cache_queries
+over both servers) within 10% of its prediction. S2 — every pair of policies whose predicted hit rates
+differ by at least 0.02 comes out in the same order when measured; that includes the pair the headline
+rests on, K64 radix-affinity above session-sticky (0.022 apart). K1's session-sticky vs radix-affinity
+(0.002 apart) is inside the noise and not tested. Phase 6 holds only if S1 holds for all six runs and S2
+for both workloads.
+
+**What would be uncomfortable, written down now.** The routers decide on in-flight counts, and a real
+engine's timing differs from the simulator's, so load-aware routing can place sessions differently than
+predicted (the dry-run already shows this in the request splits); S1 and S2 are on hit rates for that
+reason. And async scheduling, on by default in vLLM 0.30.0, is not modelled — Phase 3 found it cost
+nothing sequentially and 0.3% concurrently.
