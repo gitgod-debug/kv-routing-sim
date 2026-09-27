@@ -19,7 +19,7 @@ is published**.
 ## The finding
 
 > **Keep each user on one GPU — until your tenants' system prompts outgrow one GPU's KV cache. Then
-> route by prefix, with a small load weight.**
+> route by prefix, and keep its load weight small.**
 
 Measured on simulated agentic traffic, with the cache model and the T4 timings calibrated against a live
 vLLM (the credential, below), a 2-second p95 TTFT target, and the test registered before it ran (H2b in
@@ -28,15 +28,17 @@ vLLM (the credential, below), a 2-second p95 TTFT target, and the test registere
 | Distinct system prompts (85 blocks each) | Working set ÷ one T4's cache | Fewest T4s that hold the target at 2 sessions/s |
 |---|---:|---|
 | 1 | 0.06 | session-sticky **2** · balanced prefix-affinity 3 · round-robin 3 |
-| 64 | 2.66 | balanced prefix-affinity **5** · session-sticky, round-robin, least-loaded: **not held on 8** |
+| 64 | 2.66 | balanced prefix-affinity **5** (**4** with a load weight of 1 or none — found after the test) · session-sticky, round-robin, least-loaded: **not held on 8** |
 
 - **One shared prompt:** session-sticky needed the fewest GPUs at every load — 25–42% fewer than
   round-robin — and *pure* prefix-affinity collapsed: it sends every session to the one replica holding
   the prompt, and lost 60–260 s of p95 TTFT from 2 sessions/s (H2, falsified).
 - **Many prompts:** the order flips. Round-robin's hit rate fell from 0.84 to 0.53 and session-sticky's
   from 0.92 to 0.82; prefix-affinity kept 0.87–0.92.
-- **The load weight matters, and it should shrink as prompts multiply** (reported, not tested): the best
-  weight was 8–16 with one prompt and 1 with 16 or 64.
+- **The load weight matters, and it should shrink as prompts multiply** (reported, not tested): 8–16 was
+  best with one prompt. With 16 or 64 prompts, a weight of 1 and no weight at all needed the same number
+  of GPUs at every load, while the registered weight of 16 needed up to 4 more, or could not hold the
+  target on 8.
 
 **On real traffic it is not yet shown.** Replaying the Mooncake FAST'25 tool-agent and conversation
 traces (token counts scaled 1/32, sessions inferred; R1, falsified): session-sticky and prefix-affinity
