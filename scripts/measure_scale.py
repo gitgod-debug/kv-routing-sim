@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """What breaks at 10× and 100×? Measured, for the README's named section.
 
-    python scripts/measure_scale.py        # -> artifacts/results/scale/scale.json + report.md
+    python scripts/measure_scale.py                # -> artifacts/results/scale/
+    python scripts/measure_scale.py --report-only  # re-render report.md from scale.json, no runs
 
 Each case runs in a FRESH process, so its peak RSS is its own. Base = Phase 4's session shape
 (200 sessions × 4 turns, sharing 0.8) on the calibrated T4 profile. Scaling the trace keeps the
@@ -11,10 +12,12 @@ it, so each replica sees the same load.
 
 from __future__ import annotations
 
+import argparse
 import json
 import pathlib
 import subprocess
 import sys
+from typing import Any
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 OUT = REPO / "artifacts" / "results" / "scale"
@@ -55,7 +58,30 @@ CASES = [
 POLICIES = ("round-robin", "radix-affinity-balanced")
 
 
+def _report(payload: dict[str, Any]) -> str:
+    cpus = payload["hardware"].get("usable_cpus", "?")
+    where = (f"`scripts/measure_scale.py` at `{payload['git_sha']}`"
+             f"{' (dirty tree)' if payload['git_dirty'] else ''}; each case is one "
+             f"single-threaded process on a machine with {cpus} usable CPUs.")
+    lines = ["# What breaks at 10× and 100× — measured", "", where, "",
+             "| case | policy | requests | block hashes | generate | simulate | peak RSS |",
+             "|---|---|---:|---:|---:|---:|---:|"]
+    for r in payload["cases"]:
+        lines.append(f"| {r['case']} | {r['policy']} | {r['requests']:,} | {r['block_hashes']:,} | "
+                     f"{r['generate_s']:.1f} s | {r['simulate_s']:.1f} s | "
+                     f"{r['peak_rss_mib']:,.0f} MiB |")
+    return "\n".join(lines) + "\n"
+
+
 def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--report-only", action="store_true",
+                    help="re-render report.md from the existing scale.json; run nothing")
+    args = ap.parse_args()
+    if args.report_only:
+        (OUT / "report.md").write_text(_report(json.loads((OUT / "scale.json").read_text())))
+        return 0
+
     sys.path.insert(0, str(REPO / "scripts"))
     from _spike_common import results_header
 
@@ -75,17 +101,7 @@ def main() -> int:
     payload["cases"] = rows
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "scale.json").write_text(json.dumps(payload, indent=1) + "\n")
-    where = (f"`scripts/measure_scale.py` at `{payload['git_sha']}`"
-             f"{' (dirty tree)' if payload['git_dirty'] else ''}, "
-             f"{payload['hardware'].get('cpu_count', '?')} CPUs, one process per case.")
-    lines = ["# What breaks at 10× and 100× — measured", "", where, "",
-             "| case | policy | requests | block hashes | generate | simulate | peak RSS |",
-             "|---|---|---:|---:|---:|---:|---:|"]
-    for r in rows:
-        lines.append(f"| {r['case']} | {r['policy']} | {r['requests']:,} | {r['block_hashes']:,} | "
-                     f"{r['generate_s']:.1f} s | {r['simulate_s']:.1f} s | "
-                     f"{r['peak_rss_mib']:,.0f} MiB |")
-    (OUT / "report.md").write_text("\n".join(lines) + "\n")
+    (OUT / "report.md").write_text(_report(payload))
     return 0
 
 
