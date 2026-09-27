@@ -480,10 +480,15 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 
 ## Phase 5 — The crossover finding *(tests H2 · ⛔ never cut)*
 
-- [ ] Sweep **prefix-sharing ratio as its own axis**, crossed with offered load
-      *(`kvsim crossover` and `eval/sweep.py:crossover_sweep` are built; awaiting a calibrated profile)*
-- [ ] ⭐ **Add turns-per-session as a third axis** — the first sweep suggests it decides whether
-      stickiness or affinity wins, and it was not previously in the plan
+- [~] ⭐ **Registered 2026-09-28** ([`configs/phase5_crossover.yaml`](configs/phase5_crossover.yaml),
+      `scripts/run_phase5.py`, dated entry in `docs/09`): **A1** — sweep radix-affinity-balanced's α on
+      Phase 4's traces and fix α\* by a written rule; **H2**'s procedure — sharing × load at 4 and 8
+      replicas, paired session-bootstrap CIs; **H2b** (new) — K tenant prompts (the generator's new
+      `n_shared_prefixes`), affinity at α\* vs session-sticky on replicas needed
+- [~] Sweep **prefix-sharing ratio as its own axis**, crossed with offered load — in the registered H2 grid
+- [-] ~~Add turns-per-session as a third axis~~ — **deferred** (2026-09-28): the reason sticky won in
+      Phase 4 is more likely that ONE small shared prompt fits in every replica's cache. H2b tests that
+      mechanism directly (the number of tenant prompts); turns per session comes back if H2b fails
 - [ ] Locate the boundary where least-loaded overtakes prefix-affinity on **p95 TTFT**; publish it as a
       **curve with CIs**
 - [ ] Check H2's three directional sub-predictions (monotonicity in each axis; power-of-two in between)

@@ -196,7 +196,8 @@ calibration cannot cash.
 | | Hypothesis | Tested in | Status |
 |---|---|---|---|
 | **H1** | Prefix-affinity dominates hit rate under high sharing | Phase 4 | `[x]` ⛔ **FALSIFIED 2026-09-22 — by load.** Holds exactly at 1–2 sessions/s; gone or reversed from 3/s, where concentration forces preemption |
-| **H2** | ⭐ The crossover boundary exists and is monotonic | Phase 5 | `[ ]` untested |
+| **H2** | ⭐ The crossover boundary exists and is monotonic | Phase 5 | `[~]` procedure **registered 2026-09-28** — `configs/phase5_crossover.yaml` |
+| **H2b** | ⭐ Prefix-affinity pays once the tenants' prompts outgrow one replica's cache | Phase 5 | `[~]` **registered 2026-09-28** (new) |
 | **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[x]` ✅ **PASSED 2026-09-22** — **zero** error on 2 sequential shapes under eviction pressure (3 runs each, every counter and all 120 requests' cached tokens); **+0.3%** on the concurrent shape |
 | **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[x]` ✅ **supported, in its second amendment's form (2026-09-22):** plain LRU's residual on a live engine is **capacity** skew (−11.9 pts when requests hold decode blocks, 0.17 without); histogram counts exact, W2 distributions identical |
 | **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[~]` **holds only for balanced affinity at LOW sharing** (1–3 fewer T4s); falsified elsewhere. Session-sticky (untested) needs the fewest everywhere |
@@ -509,3 +510,53 @@ needed the fewest replicas at every point. `kvsim calibrate` moves up, because i
 honest way to give a user a full ranking for their own hardware. And one product change the result
 points at, to be made as its own change and not folded into this entry: when policies tie on replicas,
 the recommender should report the tie rather than break it on rupee noise.
+
+### 2026-09-28 — Phase 5 REGISTERED before it runs: A1 (the alpha sweep), H2's procedure, and a new H2b
+Design and every rule: [`configs/phase5_crossover.yaml`](../configs/phase5_crossover.yaml). Procedure:
+`scripts/run_phase5.py`. Both are committed before the run. As for H6, a pipeline check ran first on a
+6-session, 0.5 sessions/s config outside the design, where every policy fits on one replica.
+
+**Why a new hypothesis — from the traffic generator, not from any result.** Every trace so far had ONE
+system prompt for the whole fleet: 85 blocks at high sharing, against 1,536 usable blocks per T4
+replica. A prompt that small fits in every replica's cache many times over, so any policy ends up with a
+copy everywhere, and prefix-aware routing has nothing left to win by choosing where it lives. That is
+the most likely reason session-sticky beat every prefix-aware policy in Phase 4 — and it means H2, run on
+one prompt, may not test prefix-aware routing where it can pay at all. Real fleets serve many tenants
+and agents, each with its own long prompt. The generator now takes K distinct prompts with Zipf
+popularity (`n_shared_prefixes`, `prefix_zipf_s`); K = 1 reproduces every earlier trace byte for byte,
+and the Phase 3 fingerprint test still passes.
+
+**A1 — alpha.** radix-affinity-balanced scores `matched blocks − α × queued requests`; Phase 4 used
+α = 1 and never swept it. A1 sweeps α ∈ {1, 2, 4, 8, 16, 32, 64} on Phase 4's two traces, unchanged.
+**α\*** = the value with the fewest required replicas summed over both traces and all six loads (9 for
+"not met at 8"); ties go to the smaller α. α\* is then **fixed** for H2 and H2b. Guard: α = 1 must
+reproduce Phase 4's row exactly. Choosing α on Phase 4's traces and testing it on new ones keeps the
+choice out of the test.
+
+**H2 — the procedure for the hypothesis registered on 2026-09-20.** One shared prompt; sharing 0.0–0.8
+× 1–8 sessions/s; p95 TTFT at a fixed 4 and 8 replicas; paired session-bootstrap 95% CIs on p95(X) −
+p95(P), for X = least-loaded and X = power-of-two. The four checks — a crossover exists, monotone along
+sharing, monotone along load, power-of-two in between — are written out in the config. H2 holds for a
+policy only if all four hold at both replica counts. It is tested on radix-affinity (H2's
+"prefix-affinity", as in H1) and, reported separately under the same rules, on radix-affinity-balanced
+at α\*.
+
+**What would be uncomfortable, written down now.** Pure radix-affinity sends every new session to the
+replica that already holds block 0 of the shared prompt. With ANY shared prompt (sharing > 0) that is
+one replica, so its collapse should not depend on how long the prompt is — and sub-prediction 1 ("more
+sharing moves the boundary toward prefix-affinity") may fail for it for exactly that reason. At sharing
+0.0 there is no shared block 0, and pure affinity should behave like session-sticky.
+
+**H2b (new) — the shared-prefix working set.**
+*Prediction.* With K tenant prompts of 85 blocks each (sharing 0.8, Zipf exponent 1), balanced affinity
+at α\* needs **fewer** replicas than session-sticky once the prompts no longer fit in one replica's cache
+— and not before. *Concretely:* (a) at K = 1 affinity wins at no load; (b) at K = 64 (a 4,080-block
+working set, 2.7× one replica) it wins at one load or more; (c) at every load, no sticky win at a larger
+K than an affinity win. *Falsified if* any of the three fails.
+*Mechanism.* Session-sticky spreads each tenant's sessions over every replica, so every replica has to
+cache every popular prompt. Affinity keeps a tenant's sessions together, so the fleet caches each prompt
+about once.
+*Decision it changes.* Whether the headline can be "use prefix-aware routing when your tenants' prompts
+outgrow one GPU's cache; otherwise keep each user on one GPU" rather than "session-sticky wins". It also
+decides which real trace matters most: Mooncake (many prompts, global hashes) is where H2b can show up;
+AgentX (hashes scoped to one session) cannot show it.
