@@ -9,12 +9,14 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-09-28 (stale lines refreshed; **H6's ranking half registered**; 124 tests green.
-Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live vLLM under eviction pressure to the
-token, against predictions committed before the run)
-**Current phase:** ✅ **Phase 0** · ✅ **Phase 2b** · ✅ **Phase 3** · 🔨 **Phase 4 in progress** — the first calibrated
-sweep ran: **H1 falsified by load**, **H5 holds in one case of four**, and **session-sticky** holds the SLO with
-the fewest T4s — 25–42% cheaper than round-robin. ▶ **Next: H6**, then the alpha sweep and a real trace.
+**Last updated:** 2026-09-28 (the finding, H6, R1 on Mooncake, Phase 6 registered, the demo page and the
+10×/100× numbers; 135 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
+vLLM under eviction pressure to the token, against predictions committed before the run)
+**Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding** — *keep each user on one GPU until
+your tenants' prompts outgrow one GPU's cache; then route by prefix, and keep its load weight small* (H2b
+holds; H2 falsified) · 🔨 **4** — H6's ranking half ⛔ and crossover half ✅, R1 on real traffic ⛔; two
+tests left · 🔨 **6** registered, the Kaggle run is yours · 🔨 **7** — demo page, grid and 10×/100× done;
+PyPI and `kvsim calibrate` left. ▶ **Next:** the README figure, the preprint draft, `kvsim calibrate`.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -81,10 +83,10 @@ the fewest T4s — 25–42% cheaper than round-robin. ▶ **Next: H6**, then the
 | 2 | Block-level KV cache model | `[x]` | Known prefix sequence → known hit/miss pattern, in tests; partial-block rule holds; memory ceiling measured |
 | **2b** | **Cache model = vLLM's block pool** 🆕 | `[x]` | Every eviction behaviour cites a line of vLLM's source; naive LRU kept as the ablation; both still reproduce v1/v2 exactly |
 | 3 | **Real-Engine Calibration Report** | `[x]` ✅ exact on W1 + W2, +0.3% on W3 | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
-| 4 | **Seven** policies + Pareto sweep | `[~]` first calibrated sweep done — H1 ⛔ · H5 1 of 4 · H6 next | Tests **H1 + H5 + H6** |
-| 5 | **The crossover finding** | `[ ]` | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
-| 6 | Sim-to-real 2-replica validation | `[ ]` | Predicted vs measured across two MIG instances, or the documented fallback and why |
-| 7 | Package · CLI · static demo · hardening | `[~]` | `pip install` + `kvsim replay` + a **static** demo page (ADR-011) + "what breaks at 10×/100×" answered with measured numbers |
+| 4 | **Seven** policies + Pareto sweep | `[~]` H1 ⛔ · H5 1 of 4 · H6 ranking ⛔, crossover ✅ · α swept · R1 (Mooncake) ⛔ — property + golden tests left | Tests **H1 + H5 + H6** |
+| 5 | **The crossover finding** | `[~]` H2 ⛔ · **H2b ✅** — the README headline; its README figure still owed | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
+| 6 | Sim-to-real 2-replica validation | `[~]` registered 2026-09-28 on two physical T4s; the Kaggle run is left | Predicted vs measured across two MIG instances, or the documented fallback and why |
+| 7 | Package · CLI · static demo · hardening | `[~]` demo page + grid + 10×/100× ✅ · PyPI, `kvsim calibrate` left | `pip install` + `kvsim replay` + a **static** demo page (ADR-011) + "what breaks at 10×/100×" answered with measured numbers |
 | 8 | Write-up & launch | `[ ]` | README numbers-first, Show HN, **the `guidellm` PR open** |
 
 ### ⛔ Two ordering rules, written down now so a compressed week does not decide them under pressure
@@ -449,8 +451,9 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       $0.526/h, ₹95.87/$, SLO p95 TTFT ≤ 2,000 ms (MLPerf). **₹ per 1k successful requests**
 - [x] ✅ `eval/pareto.py` + `eval/recommend.py` → one policy, one replica count, a ₹ delta vs
       round-robin — at every (shape, load)
-- [ ] ⭐ **Sweep alpha** for radix-affinity-balanced (its load weight), registered as a NEW experiment
-      before it runs — the one open question in H5's balanced result
+- [x] ⭐ **Sweep alpha** for radix-affinity-balanced (its load weight), registered as a NEW experiment
+      before it runs — the one open question in H5's balanced result. ✅ Done as Phase 5's **A1**
+      (2026-09-28): α\* = 16 on Phase 4's traces (45 replicas in total against 64 at α = 1)
 - [ ] Property test: prefix-affinity never scores below round-robin on perfectly-shared prefixes —
       ⚠️ **restate it first: only without memory pressure.** Phase 4 measured it failing under load
       (pure affinity 0.815 vs round-robin 0.832 at high sharing, 4/s, 5 replicas), as H1 now explains
@@ -543,18 +546,30 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
       from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no
       measured basis
-- [ ] ⭐ **`scripts/build_grid.py`** — sweep sharing × load × replicas × policy and emit ONE JSON file.
+- [x] ⭐ **`scripts/build_grid.py`** — sweep sharing × load × replicas × policy and emit ONE JSON file.
       This is the demo's whole backend (ADR-011). Parallel via `joblib` (`[sweep]` extra); commit the
       grid plus its wall-clock and byte size, since both are currently estimates
-- [ ] **The static demo page** — the one-screen design in
+      ✅ **Built 2026-09-28** on the finding's axes instead of sharing: K tenant prompts (1, 4, 16, 64)
+      × loads 1–8 × replicas 1–8 × 6 policies × 3 seeds = **3,456 runs in 149 s**, stdlib
+      `ProcessPoolExecutor` like the other scripts (no joblib). **34 KiB raw, 12 KiB gzipped.** A guard
+      stops the build unless it reproduces Phase 5's H2b table exactly — it does
+- [x] **The static demo page** — [`site/index.html`](site/index.html), 2026-09-28 — the one-screen design in
       the deployment notes: finding + crossover curve +
       calibration table above the fold, then three sliders that **look up** the grid (no server, no
       wait) and whose payoff is watching the recommendation **flip**.
       ⛔ **Bundled + generated traces only, no upload box** — a serving log is someone's users' prompts
-- [ ] ⚠️ **Rebuild `demo_grid.json` from the CALIBRATED T4 profile.** The committed grid was built on an
+      ✅ Finding + calibration table on top; three selectors (prompts, load, replicas) that look the
+      answer up; the flip happens on the prompts selector (H2b), not on sharing (H2 was falsified).
+      One HTML file, no libraries, light and dark, checked in Chrome at 1280 px and at a true 390 px
+      (no sideways scroll), and the K = 1 → 64 flip checked by clicking
+- [x] ⚠️ **Rebuild `demo_grid.json` from the CALIBRATED T4 profile.** The committed grid was built on an
       A100-shaped guess (2026-09-21) that no longer describes any hardware in the plan. It is a
-      placeholder that proved the pipeline, nothing more
-- [ ] Publish that page to **GitHub Pages** AND to a **free Static Space** — same build, two URLs
+      placeholder that proved the pipeline, nothing more — ✅ **rebuilt 2026-09-28** from the calibrated
+      profile, from a clean tree (`6bdee6c`)
+- [~] Publish that page to **GitHub Pages** AND to a **free Static Space** — same build, two URLs.
+      `.github/workflows/pages.yml` publishes `site/` + the grid on every push to `master` that touches
+      them. **Manual step:** push the repo to GitHub, then Settings → Pages → Source: *GitHub
+      Actions*; the Static Space needs a Hugging Face account (upload the same two files)
 - [ ] ⭐ **The same curve images and calibration table go IN THE README**, for the reader who never
       leaves GitHub. *(No longer a workaround for cold starts — a static page does not sleep — just
       belt-and-braces.)*
@@ -567,10 +582,14 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       **ZeroGPU** — rationed GPU, absurd for a CPU-only simulator. Static is also *better*: it never
       sleeps, and a precomputed grid is reproducible from a committed script where a live app is not
 - [ ] Docs published to GitHub Pages
-- [ ] ⭐ **"What breaks at 10× and 100×"** as a named README section, answered with **measured** numbers:
+- [x] ⭐ **"What breaks at 10× and 100×"** as a named README section, answered with **measured** numbers:
       RSS ceiling and sweep wall-clock at 10× trace length; at 100×, which gives out first — block-hash
       memory, the policy inner loop, or the report renderer; at 10× replicas, does cache-model fidelity
       hold or does eviction skew compound? *(These are the questions a design review asks.)*
+      ✅ **Measured 2026-09-28** ([`scale/report.md`](artifacts/results/scale/report.md)): 10× is 81 MiB
+      and seconds; at 100× **block-hash memory** gives out first (537 MiB of trace before the simulation
+      starts; the policy loop stays linear); at 80 replicas affinity routing costs 2.4× per request.
+      Fidelity at 80 replicas is not answerable on a CPU, and the README says so
 - [ ] 👥 `CONTRIBUTING.md` + **three genuinely good first issues** (a new trace adapter, a new policy class —
       both are single-file by design), then **review the PRs properly**: real comments, changes requested,
       then merged.

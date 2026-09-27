@@ -40,6 +40,11 @@ vLLM (the credential, below), a 2-second p95 TTFT target, and the test registere
   of GPUs at every load, while the registered weight of 16 needed up to 4 more, or could not hold the
   target on 8.
 
+**See it flip yourself:** the demo page ([`site/`](site/index.html)) looks up every point of this grid —
+prompts × load × replicas × six policies, 3,456 simulator runs, rebuilt by
+[`scripts/build_grid.py`](scripts/build_grid.py) only if it reproduces the experiment's table exactly. To
+open it from a clone: `python -m http.server` in the repo root, then `http://localhost:8000/site/`.
+
 **On real traffic it is not yet shown.** Replaying the Mooncake FAST'25 tool-agent and conversation
 traces (token counts scaled 1/32, sessions inferred; R1, falsified): session-sticky and prefix-affinity
 with a load weight came out **within one replica** of each other at every speed, both beat

@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kv-routing-sim</title>
+<meta name="description" content="Which KV-cache routing policy should you run, and on how many GPUs? A simulator calibrated against a live vLLM.">
+<style>
+  :root {
+    --bg: #fbfaf7; --fg: #1d1d1b; --muted: #5f5d57; --line: #dedad2; --card: #ffffff;
+    --accent: #1f5fbf; --good: #1d7a3e; --bad: #b3261e; --warn-bg: #fff6e0; --warn-fg: #6b4a00;
+    --chip: #eef2f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --fg: #ecebe6; --muted: #a8a59c; --line: #34332f; --card: #1d1d1b;
+      --accent: #7fb0ff; --good: #6fd08f; --bad: #ff8a80; --warn-bg: #2d2610; --warn-fg: #f3d68a;
+      --chip: #22293a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.75rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 1.2rem; margin: 40px 0 8px; }
+  p { margin: 8px 0; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .finding { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+             border-radius: 8px; padding: 14px 16px; font-size: 1.1rem; }
+  .note { background: var(--warn-bg); color: var(--warn-fg); border-radius: 8px; padding: 10px 14px;
+          font-size: 0.93rem; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; margin: 8px 0; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.num { white-space: nowrap; }
+  #tbl td:first-child { min-width: 8.5em; }
+  @media (max-width: 560px) {
+    table { font-size: 0.85rem; }
+    th, td { padding: 6px 5px; }
+    .opt { display: none; }  /* p50 TTFT: the table's least-needed column, dropped on phones */
+    #tbl td:first-child { min-width: 7em; }
+  }
+  .controls { display: grid; gap: 14px; background: var(--card); border: 1px solid var(--line);
+              border-radius: 8px; padding: 16px; }
+  .control label { display: block; font-weight: 600; margin-bottom: 6px; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button { font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+                border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .answer { font-size: 1.05rem; background: var(--chip); border-radius: 8px; padding: 12px 14px; margin-top: 14px; }
+  .answer strong { color: var(--accent); }
+  .ok { color: var(--good); font-weight: 600; }
+  .no { color: var(--bad); }
+  .muted { color: var(--muted); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+  pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow-x: auto; }
+  svg text { fill: var(--muted); font-size: 12px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.9rem; margin: 4px 0; }
+  .legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px;
+                         vertical-align: middle; background: var(--c); }
+  a { color: var(--accent); }
+  footer { margin-top: 48px; color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>kv-routing-sim</h1>
+  <p class="sub">Which KV-cache routing policy should you run — and on how many GPUs? A simulator whose
+    cache model was checked against a live vLLM, and whose tests were written down before they ran.</p>
+
+  <div class="finding"><strong>Keep each user on one GPU — until your tenants' system prompts outgrow one
+    GPU's KV cache. Then route by prefix, and keep its load weight small.</strong></div>
+
+  <div class="scroll">
+    <table aria-label="The finding in numbers">
+      <thead><tr><th>Distinct system prompts</th><th class="num">Working set ÷ one T4's cache</th>
+        <th>Fewest T4s that hold a 2 s p95 time-to-first-token at 2 sessions/s</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td class="num">0.06</td><td>session-sticky <strong>2</strong> · balanced prefix-affinity 3 · round-robin 3</td></tr>
+        <tr><td>64</td><td class="num">2.66</td><td>balanced prefix-affinity <strong>5</strong> (4 with a load weight of 1 or none — found after the test) · session-sticky, round-robin, least-loaded: not held on 8</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note"><strong>Scope, before you trust it.</strong> Generated agentic traffic, Qwen3-4B, T4 timings.
+    The direction of this flip survived a 2× and 4× faster GPU and a 2× cheaper or dearer prefill; the
+    replica counts did not. On two real traces (Mooncake FAST'25, scaled) session-sticky and
+    prefix-affinity with a load weight came out within one replica of each other — the many-prompt
+    advantage is not yet shown on real traffic.</p>
+
+  <h2>The credential — checked against a live vLLM</h2>
+  <p>vLLM 0.30.0, Qwen3-4B (fp16), a deliberately small 512-block cache that overflows, three runs of each
+    workload, predictions committed before the run.</p>
+  <div class="scroll">
+    <table aria-label="Calibration">
+      <thead><tr><th>Workload</th><th class="num">Engine</th><th class="num">Block-pool model</th><th class="num">Plain LRU</th></tr></thead>
+      <tbody>
+        <tr><td>One at a time, 1-token outputs</td><td class="num">0.6090</td><td class="num">0.6090 · exact</td><td class="num">0.6073</td></tr>
+        <tr><td>One at a time, 64-token outputs</td><td class="num">0.4883</td><td class="num">0.4883 · exact</td><td class="num">0.6073</td></tr>
+        <tr><td>Concurrent, under preemption</td><td class="num">0.5076</td><td class="num">0.509 (+0.3%)</td><td class="num">0.6073 (+19.7%)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Hit rate = <code>vllm:prefix_cache_hits ÷ vllm:prefix_cache_queries</code>, two counters.
+    Every request's cached-token count matched too.</p>
+
+  <h2>Try it — every answer below is precomputed, nothing runs</h2>
+  <div class="controls">
+    <div class="control"><label id="lk">Distinct system prompts (tenants)</label>
+      <div class="seg" role="group" aria-labelledby="lk" id="ks"></div></div>
+    <div class="control"><label id="ll">Offered load (sessions per second)</label>
+      <div class="seg" role="group" aria-labelledby="ll" id="loads"></div></div>
+    <div class="control"><label id="lr">Replicas (T4 GPUs) for the table</label>
+      <div class="seg" role="group" aria-labelledby="lr" id="reps"></div></div>
+  </div>
+  <div class="answer" id="answer" aria-live="polite">Loading the grid…</div>
+  <p class="muted" id="ws"></p>
+  <div class="scroll"><table id="tbl" aria-label="Every policy at the chosen point"></table></div>
+  <div class="scroll"><svg id="chart" width="100%" height="220" role="img" aria-label="T4s needed as prompts multiply"></svg></div>
+  <div class="legend" id="legend"></div>
+  <p class="muted" id="chartcap"></p>
+
+  <h2>Run it on your own traffic</h2>
+  <pre><code>pip install kv-routing-sim
+kvsim replay your-trace.jsonl --policies all --replicas 1-8 \
+  --profile configs/profiles/t4-qwen3-4b-vllm0.30.0.json --cost-model configs/cost_model.yaml</code></pre>
+  <p class="muted">No upload box on purpose: a serving log holds your users' prompts. It stays on your
+    machine, and prompts are hashed before they enter the simulator.</p>
+
+  <footer id="foot">Every number on this page comes from committed scripts with pinned seeds.</footer>
+</main>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const state = { k: 0, load: 1, rep: 3 };  // indices into the axes: K = 1, 2 sessions/s, 4 T4s
+  let G = null;
+
+  // Readable names for the grid's policy labels ("radix-affinity-balanced@16" -> a load weight).
+  function nice(name) {
+    const m = /^radix-affinity-balanced@(.+)$/.exec(name);
+    if (m) return `prefix-affinity, load weight ${m[1]}`;
+    return name === "radix-affinity" ? "prefix-affinity, pure" : name;
+  }
+  function seg(el, values, fmt, key) {
+    el.innerHTML = "";
+    values.forEach((v, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = fmt(v);
+      b.setAttribute("aria-pressed", String(state[key] === i));
+      b.addEventListener("click", () => { state[key] = i; render(); });
+      el.appendChild(b);
+    });
+  }
+  function cell(k, l, p, r) { return G.cells[k][l][p][r]; }  // [hit, p50, p95, inr, meets]
+  function needed(k, l, p) {  // index of the fewest replicas that hold the SLO, or -1
+    for (let r = 0; r < G.axes.replicas.length; r++) if (cell(k, l, p, r)[4] === 1) return r;
+    return -1;
+  }
+  function t4s(n) { return `${n} T4${n > 1 ? "s" : ""}`; }
+  function ms(x) {
+    return x >= 10000 ? (x / 1000).toFixed(0) + " s" : x >= 1000 ? (x / 1000).toFixed(1) + " s" : x + " ms";
+  }
+  function render() {
+    const A = G.axes;
+    seg($("ks"), A.prompts, (v) => String(v), "k");
+    seg($("loads"), A.loads, (v) => v + "/s", "load");
+    seg($("reps"), A.replicas, (v) => String(v), "rep");
+    const k = state.k, l = state.load, r = state.rep;
+    // The recommendation: fewest T4s that hold the target, then the cheaper of those.
+    let best = null;
+    A.policies.forEach((name, p) => {
+      const ri = needed(k, l, p);
+      if (ri < 0) return;
+      const inr = cell(k, l, p, ri)[3];
+      if (!best || ri < best.ri || (ri === best.ri && inr < best.inr)) best = { name, ri, inr, p };
+    });
+    let msg;
+    if (!best) {
+      msg = "Nothing holds the 2 s target on 8 T4s at this point.";
+    } else {
+      const ties = A.policies.filter((n, p) => p !== best.p && needed(k, l, p) === best.ri);
+      const rrNeed = needed(k, l, A.policies.indexOf("round-robin"));
+      msg = `Use <strong>${nice(best.name)}</strong> on <strong>${t4s(A.replicas[best.ri])}</strong>` +
+            ` — ₹${best.inr.toFixed(2)} per 1,000 requests.`;
+      msg += rrNeed < 0 ? " Round-robin does not hold the target on 8." :
+             ` Round-robin needs ${A.replicas[rrNeed]}.`;
+      if (ties.length) {
+        msg += ` <span class="muted">Same T4 count: ${ties.map(nice).join(", ")} — the rupee gap between them is noise.</span>`;
+      }
+    }
+    $("answer").innerHTML = msg;
+    const ws = G.working_set_blocks[String(A.prompts[k])], cap = G.usable_blocks_per_replica;
+    $("ws").textContent = `${A.prompts[k]} prompt${A.prompts[k] > 1 ? "s" : ""} in use: a working set of ` +
+      `${ws.toLocaleString()} blocks = ${(ws / cap).toFixed(2)}× one T4's usable KV cache (${cap.toLocaleString()} blocks).`;
+    let rows = `<thead><tr><th>Policy</th><th class="num">T4s needed</th><th class="num">Hit rate</th>` +
+               `<th class="num opt">p50 TTFT</th><th class="num">p95 TTFT</th><th class="num">₹ / 1k</th>` +
+               `<th>On ${t4s(A.replicas[r])}</th></tr></thead><tbody>`;
+    A.policies.forEach((name, p) => {
+      const c = cell(k, l, p, r), ri = needed(k, l, p);
+      rows += `<tr><td>${nice(name)}</td><td class="num">${ri < 0 ? "✗" : A.replicas[ri]}</td>` +
+              `<td class="num">${c[0].toFixed(3)}</td><td class="num opt">${ms(c[1])}</td><td class="num">${ms(c[2])}</td>` +
+              `<td class="num">${c[3] === null ? "—" : c[3].toFixed(2)}</td>` +
+              `<td>${c[4] ? '<span class="ok">holds</span>' : '<span class="no">misses</span>'}</td></tr>`;
+    });
+    $("tbl").innerHTML = rows + "</tbody>";
+    $("tbl").setAttribute("aria-label", `Every policy at ${A.prompts[k]} prompt(s), ${A.loads[l]} sessions/s; ` +
+      `the last column says whether ${t4s(A.replicas[r])} hold the 2 s p95 target`);
+    chart(l);
+  }
+  function chart(l) {
+    const A = G.axes, svg = $("chart");
+    const show = ["round-robin", "session-sticky", `radix-affinity-balanced@${G.alpha_star}`,
+                  "radix-affinity-balanced@1"].filter((n) => A.policies.includes(n));
+    const colors = ["#8d8a82", "#1f9d6a", "#3a78d8", "#c2542d"];
+    const W = svg.clientWidth || 600, H = 220, L = 44, R = 24, T = 12, B = 34;
+    const x = (i) => L + (W - L - R) * (i / (A.prompts.length - 1));
+    const y = (v) => T + (H - T - B) * (1 - (v - 1) / 8);  // 1..9, where 9 = not held on 8
+    let s = "";
+    for (let v = 1; v <= 9; v += 2) {
+      s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="currentColor" opacity="0.12"/>` +
+           `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v === 9 ? "✗" : v}</text>`;
+    }
+    A.prompts.forEach((k, i) => { s += `<text x="${x(i)}" y="${H - 12}" text-anchor="middle">K = ${k}</text>`; });
+    show.forEach((name, j) => {
+      const p = A.policies.indexOf(name);
+      const off = (j - (show.length - 1) / 2) * 2.5;  // nudge so equal counts do not hide each other
+      const pts = A.prompts.map((_, i) => {
+        const ri = needed(i, l, p);
+        return [x(i), y(ri < 0 ? 9 : A.replicas[ri]) + off];
+      });
+      s += `<polyline fill="none" stroke="${colors[j]}" stroke-width="2.5" points="${pts.map((q) => q.join(",")).join(" ")}"/>`;
+      pts.forEach((q) => { s += `<circle cx="${q[0]}" cy="${q[1]}" r="3.5" fill="${colors[j]}"/>`; });
+    });
+    svg.innerHTML = s;
+    $("legend").innerHTML = show.map((n, j) => `<span style="--c:${colors[j]}">${nice(n)}</span>`).join("");
+    $("chartcap").textContent = `T4s needed to hold the 2 s p95 target at ${A.loads[l]} sessions/s as the ` +
+      `number of distinct system prompts (K) grows; ✗ = not held on 8. T4 figures, generated traffic.`;
+  }
+  // Published: the grid sits next to the page. Previewed from a clone (`python -m http.server` in
+  // the repo root, then open /site/): it is read from where build_grid.py wrote it.
+  function load(urls) {
+    return fetch(urls[0]).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .catch((e) => (urls.length > 1 ? load(urls.slice(1)) : Promise.reject(e)));
+  }
+  load(["demo_grid.json", "../artifacts/results/demo_grid.json"]).then((g) => {
+    G = g;
+    $("foot").textContent = `Grid: ${g.n_simulator_runs.toLocaleString()} simulator runs ` +
+      `(${g.seeds.length} seeds each point), built ${g.date_utc.slice(0, 10)} (UTC) at commit ${g.git_sha} by ` +
+      `scripts/build_grid.py${g.git_dirty ? " (with uncommitted changes)" : ""}, and checked to reproduce ` +
+      `the Phase 5 experiment's table exactly.`;
+    render();
+    window.addEventListener("resize", () => chart(state.load));
+  }).catch(() => { $("answer").textContent = "Could not load demo_grid.json."; });
+})();
+</script>
+</body>
+</html>
