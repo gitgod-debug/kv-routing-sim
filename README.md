@@ -30,6 +30,15 @@ vLLM (the credential, below), a 2-second p95 TTFT target, and the test registere
 | 1 | 0.06 | session-sticky **2** · balanced prefix-affinity 3 · round-robin 3 |
 | 64 | 2.66 | balanced prefix-affinity **5** (**4** with a load weight of 1 or none — found after the test) · session-sticky, round-robin, least-loaded: **not held on 8** |
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/figures/flip-dark.svg">
+  <img src="docs/figures/flip-light.svg" width="100%" alt="Left: T4s needed at 2 sessions/s as distinct system prompts grow from 1 to 64. Session-sticky needs 2 with one prompt but cannot hold the target on 8 with 64; prefix-affinity with load weight 1 needs 4 there. Right: hit rate on 4 T4s. Round-robin falls from 0.84 to 0.53, session-sticky to 0.82, prefix-affinity with load weight 1 stays at 0.87 or above.">
+</picture>
+
+*Drawn by [`scripts/make_figures.py`](scripts/make_figures.py) from
+[`demo_grid.json`](artifacts/results/demo_grid.json), which reproduces Phase 5's table; 3 seeds per point,
+a point counts only if every seed holds the target. Replica counts are T4 figures (H6).*
+
 - **One shared prompt:** session-sticky needed the fewest GPUs at every load — 25–42% fewer than
   round-robin — and *pure* prefix-affinity collapsed: it sends every session to the one replica holding
   the prompt, and lost 60–260 s of p95 TTFT from 2 sessions/s (H2, falsified).
