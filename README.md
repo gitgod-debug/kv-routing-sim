@@ -38,9 +38,10 @@ vLLM (the credential, below), a 2-second p95 TTFT target, and the test registere
 - **The load weight matters, and it should shrink as prompts multiply** (reported, not tested): the best
   weight was 8–16 with one prompt and 1 with 16 or 64.
 
-⚠️ **Scope:** generated traffic, one model (Qwen3-4B), T4 timings. The full ranking of policies does
-**not** transfer to other hardware for free (H6, falsified); whether this flip does is the next
-registered test. `azrabano23/disagg-sim` published that locality can lose to load balancing, and llm-d
+⚠️ **Scope:** generated traffic, one model (Qwen3-4B). The replica counts are T4 figures. The full
+ranking of the seven policies does **not** transfer to other hardware (H6's ranking half,
+falsified) — but the **direction of this flip** did: under a 2× or 4× faster GPU and a 2× cheaper
+or dearer prefill it shifted and never inverted (H6's crossover half, holds). `azrabano23/disagg-sim` published that locality can lose to load balancing, and llm-d
 weighs prefix and load scores by hand-set weights; this is the measured condition that decided between
 them, on this setup.
 

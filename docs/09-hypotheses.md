@@ -201,7 +201,7 @@ calibration cannot cash.
 | **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[x]` ✅ **PASSED 2026-09-22** — **zero** error on 2 sequential shapes under eviction pressure (3 runs each, every counter and all 120 requests' cached tokens); **+0.3%** on the concurrent shape |
 | **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[x]` ✅ **supported, in its second amendment's form (2026-09-22):** plain LRU's residual on a live engine is **capacity** skew (−11.9 pts when requests hold decode blocks, 0.17 without); histogram counts exact, W2 distributions identical |
 | **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[~]` **holds only for balanced affinity at LOW sharing** (1–3 fewer T4s); falsified elsewhere. Session-sticky (untested) needs the fewest everywhere |
-| **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 (CPU-only re-run) | `[x]` ⛔ ranking half **FALSIFIED 2026-09-28** — τ-b down to 0.51, one flip in 48 points; session-sticky in the best set at all 48 (post-hoc) · crossover half after Phase 5 · **ADR-010's tier-1/2 claims withdrawn** |
+| **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 + 5 (CPU-only re-runs) | `[x]` ⛔ ranking half **FALSIFIED** — τ-b down to 0.51 · ✅ crossover half **HOLDS** — H2b's flip shifts but never inverts in all four regimes (both 2026-09-28) |
 
 **Amendments:** *(add dated entries below, never edit above)*
 
@@ -629,3 +629,24 @@ and H2b's mechanism is about the cache, so the flip should survive. But a faster
 common (H6's ranking half saw whole groups of policies tie), so the flip may stop being visible. And
 dearer prefill makes every cache hit worth more, which could let affinity win already at K = 1 — an
 inversion under rule (i).
+
+### 2026-09-28 — ✅ H6's crossover half RAN: HOLDS. The flip shifts with the hardware; it never inverts.
+Report: [`artifacts/results/h6_crossover/report.md`](../artifacts/results/h6_crossover/report.md) —
+14,400 runs in 570 s, from a clean tree at `16fcc53`. The t4 regime reproduced Phase 5's H2b table
+exactly.
+
+**As registered: HOLDS in all four rescaled regimes.** In none of them does balanced affinity (α\* =
+16) beat session-sticky at K = 1, does session-sticky beat it at K = 64, or does the order reverse
+along K.
+
+**How it shifted.** With a GPU 2× or 4× faster, or prefill 2× cheaper, the flip is still visible at
+K = 64 and now appears already at K = 16 — for example, 2× faster: 4 vs 5 replicas at 4 sessions/s at
+K = 16. With prefill 2× dearer, no policy holds the SLO at K = 64 on 8 replicas (every cell ties at
+"not met"), and the flip shows at K = 16 instead: 5 replicas against not held at 1 session/s. At
+K = 1, session-sticky still needs fewer replicas than balanced affinity at every load in that regime.
+
+**Decision.** H6's two halves now say different things, and both belong in the README: the full order
+of seven policies moves with the hardware (ranking half, falsified), but the one decision the headline
+makes — session-sticky with one shared prompt, prefix-affinity once many prompts outgrow the cache —
+survived every rescale (crossover half, holds). So the headline may drop "T4 only" for the *direction*
+of the flip; the replica counts and rupees stay T4 figures. Real traffic is next (R1, Mooncake).
