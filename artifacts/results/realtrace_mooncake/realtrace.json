@@ -1,0 +1,284 @@
+{
+ "script": "scripts/run_realtrace.py",
+ "date_utc": "2026-09-27T19:47:36+00:00",
+ "git_sha": "3f61f9e",
+ "git_dirty": false,
+ "seed": 0,
+ "hardware_path": "cpu-only",
+ "hardware": {
+  "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+  "python": "3.13.12",
+  "usable_cpus": 12,
+  "gpus": [
+   "NVIDIA GeForce GTX 1650, 4096 MiB, 7.5, 595.71.05"
+  ],
+  "gpu_name": "NVIDIA GeForce GTX 1650",
+  "gpu_memory_total": "4096 MiB",
+  "compute_capability": "7.5",
+  "driver_version": "595.71.05",
+  "mig_enabled": false,
+  "mig_mode_current": [
+   "[N/A]"
+  ]
+ },
+ "packages": {
+  "vllm": "not installed",
+  "torch": "not installed",
+  "numpy": "2.5.3",
+  "pydantic": "2.13.5",
+  "httpx": "not installed",
+  "prometheus-client": "not installed",
+  "matplotlib": "3.11.2"
+ },
+ "config": {
+  "schema_version": 1,
+  "source": "https://github.com/kvcache-ai/Mooncake/tree/main/FAST25-release",
+  "traces": {
+   "toolagent": "artifacts/traces/mooncake/toolagent_trace.jsonl",
+   "conversation": "artifacts/traces/mooncake/conversation_trace.jsonl"
+  },
+  "adapter": {
+   "token_scale": 0.03125,
+   "infer_sessions": true,
+   "hot_fanout": 100
+  },
+  "window_s": 3600,
+  "warmup_s": 300,
+  "profile": "configs/profiles/t4-qwen3-4b-vllm0.30.0.json",
+  "cost_model": "configs/cost_model.yaml",
+  "cache_model": "vllm",
+  "replicas": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8
+  ],
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "probe_speeds": [
+   0.25,
+   0.5,
+   1,
+   2,
+   4
+  ],
+  "speeds": [
+   1,
+   2,
+   4
+  ],
+  "policies": [
+   "round-robin",
+   "least-loaded",
+   "power-of-two",
+   "consistent-hash-prefix",
+   "radix-affinity",
+   "session-sticky"
+  ],
+  "alphas": [
+   16,
+   1
+  ],
+  "alpha_star": 16,
+  "rules": {
+   "toolagent": "affinity_wins",
+   "conversation": "affinity_never_wins"
+  }
+ },
+ "trace_sha256": {
+  "toolagent": "48a2db1a13d3bc05e6330140c64f604ba366df20d3c9e128b5c35a01c1fa5f71",
+  "conversation": "b8cbb061a85206d729d91cdc2981f43c9e0d99209dce588d3af5f7934408b9df"
+ },
+ "runtime_s": 235.0,
+ "n_runs": 1152,
+ "profile": {
+  "name": "t4-qwen3-4b-vllm0.30.0",
+  "prefill_base_s": 0.0,
+  "prefill_per_token_s": 0.0007014400878738409,
+  "decode_base_s": 0.05291123879934786,
+  "decode_per_seq_s": 0.001232162611867379,
+  "kv_cache_blocks": 1537,
+  "block_size": 16,
+  "max_num_seqs": 256,
+  "gpu": "Tesla T4",
+  "model": "Qwen/Qwen3-4B",
+  "engine_version": "0.30.0",
+  "calibrated": true,
+  "calibration_error": 0.002901,
+  "WARNING": "calibrated on Tesla T4 / Qwen/Qwen3-4B / 0.30.0"
+ },
+ "required_replicas": {
+  "toolagent": {
+   "1": {
+    "round-robin": 4,
+    "least-loaded": 4,
+    "power-of-two": 4,
+    "consistent-hash-prefix": 5,
+    "radix-affinity": 9,
+    "session-sticky": 4,
+    "radix-affinity-balanced@16": 4,
+    "radix-affinity-balanced@1": 4
+   },
+   "2": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 5,
+    "consistent-hash-prefix": 6,
+    "radix-affinity": 9,
+    "session-sticky": 4,
+    "radix-affinity-balanced@16": 5,
+    "radix-affinity-balanced@1": 5
+   },
+   "4": {
+    "round-robin": 8,
+    "least-loaded": 7,
+    "power-of-two": 7,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "session-sticky": 6,
+    "radix-affinity-balanced@16": 6,
+    "radix-affinity-balanced@1": 6
+   }
+  },
+  "conversation": {
+   "1": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 5,
+    "consistent-hash-prefix": 6,
+    "radix-affinity": 9,
+    "session-sticky": 5,
+    "radix-affinity-balanced@16": 4,
+    "radix-affinity-balanced@1": 5
+   },
+   "2": {
+    "round-robin": 5,
+    "least-loaded": 5,
+    "power-of-two": 6,
+    "consistent-hash-prefix": 7,
+    "radix-affinity": 9,
+    "session-sticky": 5,
+    "radix-affinity-balanced@16": 5,
+    "radix-affinity-balanced@1": 5
+   },
+   "4": {
+    "round-robin": 8,
+    "least-loaded": 8,
+    "power-of-two": 8,
+    "consistent-hash-prefix": 9,
+    "radix-affinity": 9,
+    "session-sticky": 7,
+    "radix-affinity-balanced@16": 7,
+    "radix-affinity-balanced@1": 7
+   }
+  }
+ },
+ "hit_rate_at_4": {
+  "toolagent": {
+   "1": {
+    "round-robin": 0.3708,
+    "least-loaded": 0.3714,
+    "power-of-two": 0.3697,
+    "consistent-hash-prefix": 0.4302,
+    "radix-affinity": 0.3568,
+    "session-sticky": 0.424,
+    "radix-affinity-balanced@16": 0.4205,
+    "radix-affinity-balanced@1": 0.4238
+   },
+   "2": {
+    "round-robin": 0.371,
+    "least-loaded": 0.3706,
+    "power-of-two": 0.3704,
+    "consistent-hash-prefix": 0.4297,
+    "radix-affinity": 0.3558,
+    "session-sticky": 0.4235,
+    "radix-affinity-balanced@16": 0.4166,
+    "radix-affinity-balanced@1": 0.4247
+   },
+   "4": {
+    "round-robin": 0.3651,
+    "least-loaded": 0.3699,
+    "power-of-two": 0.3695,
+    "consistent-hash-prefix": 0.4247,
+    "radix-affinity": 0.3558,
+    "session-sticky": 0.4215,
+    "radix-affinity-balanced@16": 0.4051,
+    "radix-affinity-balanced@1": 0.4252
+   }
+  },
+  "conversation": {
+   "1": {
+    "round-robin": 0.0711,
+    "least-loaded": 0.0712,
+    "power-of-two": 0.0698,
+    "consistent-hash-prefix": 0.1423,
+    "radix-affinity": 0.0502,
+    "session-sticky": 0.1372,
+    "radix-affinity-balanced@16": 0.1342,
+    "radix-affinity-balanced@1": 0.1454
+   },
+   "2": {
+    "round-robin": 0.0713,
+    "least-loaded": 0.0695,
+    "power-of-two": 0.0706,
+    "consistent-hash-prefix": 0.1432,
+    "radix-affinity": 0.0491,
+    "session-sticky": 0.1378,
+    "radix-affinity-balanced@16": 0.1284,
+    "radix-affinity-balanced@1": 0.1432
+   },
+   "4": {
+    "round-robin": 0.0693,
+    "least-loaded": 0.0689,
+    "power-of-two": 0.0689,
+    "consistent-hash-prefix": 0.1414,
+    "radix-affinity": 0.0491,
+    "session-sticky": 0.1363,
+    "radix-affinity-balanced@16": 0.1092,
+    "radix-affinity-balanced@1": 0.1407
+   }
+  }
+ },
+ "verdicts": {
+  "toolagent": {
+   "rule": "affinity_wins",
+   "winner_by_speed": {
+    "1": "tie",
+    "2": "sticky",
+    "4": "tie"
+   },
+   "holds": false
+  },
+  "conversation": {
+   "rule": "affinity_never_wins",
+   "winner_by_speed": {
+    "1": "affinity",
+    "2": "tie",
+    "4": "tie"
+   },
+   "holds": false
+  }
+ },
+ "structure": {
+  "toolagent": {
+   "requests_in_window": 23608,
+   "sessions": 19544,
+   "cross_session_sharing": 0.3974,
+   "total_block_reuse": 0.5856
+  },
+  "conversation": {
+   "requests_in_window": 12031,
+   "sessions": 8057,
+   "cross_session_sharing": 0.1002,
+   "total_block_reuse": 0.3819
+  }
+ },
+ "r1_holds": false
+}

@@ -439,8 +439,10 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 - [x] `sim/` — replica with memory-based admission and preemption, fitted cost, fleet event loop
 - [~] Sweep policy × replicas 1–8 on ≥2 traces — ✅ two generated shapes × six loads. **Real traces found
       2026-09-23** (`FLAGSHIP_PROJECTS.md`): SemiAnalysis **AgentX** (64-token block hashes, scoped to the
-      session) and **Mooncake** FAST'25 (512-token block hashes, global). ⛔ Not started: an adapter for
-      pre-hashed block traces, a license check on each dataset card, and whether each has session ids
+      session) and **Mooncake** FAST'25 (512-token block hashes, global). ✅ **Mooncake done 2026-09-28**:
+      the `mooncake` adapter (sessions inferred; Apache-2.0), R1 registered and run — ⛔ FALSIFIED: on
+      real traffic sticky and balanced affinity tie within a replica, both beat round-robin, pure
+      affinity fails ([`report.md`](artifacts/results/realtrace_mooncake/report.md)). AgentX: not yet
 - [~] **Multi-seed (5) + bootstrap CIs by session** — ✅ used for every H1 decision; per-cell p95 CIs
       for the README tables are still to add
 - [x] ✅ `eval/cost.py` from `configs/cost_model.yaml` — every constant **cited and dated**: g4dn.xlarge

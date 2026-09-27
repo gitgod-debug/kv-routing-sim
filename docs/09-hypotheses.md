@@ -201,6 +201,7 @@ calibration cannot cash.
 | **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[x]` ✅ **PASSED 2026-09-22** — **zero** error on 2 sequential shapes under eviction pressure (3 runs each, every counter and all 120 requests' cached tokens); **+0.3%** on the concurrent shape |
 | **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[x]` ✅ **supported, in its second amendment's form (2026-09-22):** plain LRU's residual on a live engine is **capacity** skew (−11.9 pts when requests hold decode blocks, 0.17 without); histogram counts exact, W2 distributions identical |
 | **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[~]` **holds only for balanced affinity at LOW sharing** (1–3 fewer T4s); falsified elsewhere. Session-sticky (untested) needs the fewest everywhere |
+| **R1** | Real traffic (Mooncake): affinity beats sticky on tool-agent, never on conversation | R1 | `[x]` ⛔ **FALSIFIED 2026-09-28** — both directions wrong; sticky and balanced affinity within one replica; pure affinity fails everywhere |
 | **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 + 5 (CPU-only re-runs) | `[x]` ⛔ ranking half **FALSIFIED** — τ-b down to 0.51 · ✅ crossover half **HOLDS** — H2b's flip shifts but never inverts in all four regimes (both 2026-09-28) |
 
 **Amendments:** *(add dated entries below, never edit above)*
@@ -685,3 +686,35 @@ between users"* question.
 **What would be uncomfortable, written down now.** The shared blocks are spread over an hour; if few
 are hot at the same time, the working set that matters is far smaller than 2.4×, and sticky may tie or
 win on tool-agent too. And every session-sticky number rests on inferred sessions.
+
+### 2026-09-28 — ⛔ R1 RAN: FALSIFIED on both traces. On real traffic the two winners are within one replica.
+Report: [`artifacts/results/realtrace_mooncake/report.md`](../artifacts/results/realtrace_mooncake/report.md)
+— 1,152 runs in 235 s, from a clean tree at `3f61f9e`; trace sha256s recorded in the results file.
+
+**As registered: FALSIFIED — and in both directions.** *Tool-agent:* balanced affinity at α\* = 16 never
+needed fewer replicas than session-sticky (tie at 1× and 4×; one more at 2×: 5 vs 4). *Conversation:*
+it did, once — 4 against 5 replicas at 1× — and tied at 2× and 4×. Both predictions came from H2b's
+mechanism plus the measured size of the cross-session shared blocks (2.4× and 2.7× one cache), and both
+were wrong.
+
+**What the real traces show instead.**
+- Session-sticky and balanced affinity (either α) are **within one replica** of each other at every
+  speed on both traces; their hit rates at 4 replicas are within about one point (tool-agent 0.42 vs
+  0.42; conversation 0.14 vs 0.13–0.15).
+- Both beat the load balancers under load: on tool-agent at 4×, session-sticky holds the SLO on 6 T4s
+  where round-robin needs 8; the hit rate is 0.42 against 0.37.
+- **Pure radix-affinity fails the SLO at every speed on both traces**, as expected: a handful of shared
+  system prompts start almost every request, so it piles them onto a few replicas.
+- Consistent-hash on the prefix gets the best tool-agent hit rate (0.43) and still needs more replicas
+  (5, 6, not met) — locality without load feedback.
+
+**Why H2b's many-prompt advantage did not appear — the "uncomfortable" outcome written down before the
+run, not yet tested.** The shared blocks are counted over a whole hour; few of them are in use at the
+same time, so the working set a cache must hold at once is probably far smaller than 2.4×. H2b's
+generated tenants, by contrast, were all active together. A measure of the *concurrently* shared working
+set is the natural next test, not this entry's claim.
+
+**Decision.** The README headline keeps its mechanism (generated traffic, H2b; hardware-robust, H6) but
+must now say what real traffic showed: on the Mooncake traces, session-sticky and prefix-affinity with a
+load weight tie within a replica, both beat round-robin, and pure prefix-affinity fails. *"Route by
+prefix once prompts outgrow the cache"* is not yet shown on real traffic.
