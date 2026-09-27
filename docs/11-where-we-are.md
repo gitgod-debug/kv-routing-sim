@@ -1,6 +1,6 @@
 # 11 — Where we are, in plain words
 
-**Written 2026-09-22.** Everything this project has done so far, what it found, what was decided and
+**Written 2026-09-22; brought up to date 2026-09-28.** Everything this project has done so far, what it found, what was decided and
 why, what went wrong along the way, and what is left — in plain words, for someone who has forgotten
 all of it. The other docs have the detail; this one has the story.
 
@@ -64,6 +64,23 @@ vLLM.
 cited prices, and the first full calibrated sweep was designed, registered and run. Its headline:
 the simple "keep each user on one GPU" policy beat the clever cache-seeking ones (§6).
 
+**28 Sep — the finding, and the tests around it** (§6b).
+- **H6:** we re-ran the whole Phase 4 sweep as if on four other GPUs (2× and 4× faster; prefill 2×
+  cheaper or dearer). The *order* of the policies moved more than we had allowed: **the ranking half
+  failed.** A GPU count measured on our T4 is not a GPU count for your GPU.
+- **Phase 5, the finding:** we gave the traffic many tenants, each with its own system prompt. With one
+  shared prompt, keeping each user on one GPU wins. With 64 prompts — more than one GPU's cache can
+  hold — routing by prefix wins, and keep-on-one-GPU cannot hold the target even on 8 GPUs. This flip
+  survived all four "other GPUs": **H6's second half held.**
+- **A real trace (Mooncake):** on real tool-agent and chat traffic, keep-on-one-GPU and balanced
+  prefix routing came out within one GPU of each other. Our prediction was wrong, and is recorded so.
+- **guidellm:** while using the tool we plan to contribute to, we found that its trace replay drops
+  one token per block with common tokenizers, and wrote the fix with a test.
+- **Phase 6 prepared:** the two-GPU notebook is written, tested against fake engines, and its
+  predictions are committed. It waits for a Kaggle run.
+- **The public side:** the package installs with one dependency; we measured what breaks at 10× and
+  100×; the demo page and the README figure are built.
+
 ## 4. What we found
 
 1. **The simulator reproduces a real vLLM's cache exactly — even when the cache is overflowing.**
@@ -95,6 +112,25 @@ the simple "keep each user on one GPU" policy beat the clever cache-seeking ones
    change one-at-a-time results, and flagged it for concurrent ones.
 8. **Cache-seeking routing backfires under load, and the simple policy wins** — see §6. The early
    hint from the uncalibrated simulator survived calibration.
+9. ⭐ **The finding: keep each user on one GPU — until your tenants' system prompts outgrow one GPU's
+   cache; then route by prefix, and keep its load weight small.** With one prompt, session-sticky needs
+   2 T4s where round-robin needs 3. With 64 prompts, prefix routing needs 4–5, and session-sticky
+   cannot hold the target with 8. *Why it matters:* the choice follows from one number an operator can
+   compute — the size of their prompts compared with one GPU's cache.
+10. **"Send it to the GPU that has the prompt" fails whenever one prompt is popular:** it piles every
+    user onto one GPU (H2, falsified). A load weight fixes that, but the right weight shrinks as prompts
+    multiply: 8–16 with one prompt, 1 or none with 16 or more.
+11. **The order of the policies depends on the hardware; the direction of the flip does not** (H6). So
+    a user must measure their own GPU before trusting a GPU count — which is why `kvsim calibrate` moved
+    up the list.
+12. **On real traffic the difference is small.** On the Mooncake traces, keep-on-one-GPU and balanced
+    prefix routing were within one GPU of each other, and both beat round-robin under load (6 T4s
+    against 8 on the tool-agent trace at 4× speed). The many-prompt effect is not yet shown on real
+    traffic.
+13. **guidellm's trace replay drops one token per block** with tokenizers that add a start token — an
+    upstream bug with a ready fix (the upstream log #7).
+14. **At 100× the trace size, memory for the block hashes runs out first:** 537 MiB for 80,000 requests
+    before the simulation starts. The simulation itself stays linear.
 
 ## 5. What we decided, and why
 
@@ -146,6 +182,35 @@ But the traffic is generated, not real; the speeds are one T4 and one model; and
 would hold on other hardware (H6) is not yet tested. So this is a result about this setup, and not yet
 a claim about anyone else's fleet.
 
+## 6b. Phase 5, H6 and the real trace — the finding
+
+**What we did.** The same simulated T4 fleet, but now the traffic has **tenants**: 1, 4, 16 or 64
+companies, each with its own long system prompt. One prompt fits easily in one GPU's cache; 64 prompts
+need 2.66 GPUs' worth of cache. Six traffic levels, 1 to 8 GPUs, three repeats each — with the tests
+committed before the run.
+
+**What came out** (2 sessions per second, a 2-second first-token target):
+
+| Prompts | Fewest T4s that hold the target |
+|---|---|
+| 1 | session-sticky **2** · balanced prefix routing 3 · round-robin 3 |
+| 64 | balanced prefix routing **5** (4 with a smaller load weight) · session-sticky, round-robin, least-loaded: not with 8 |
+
+**Why.** As prompts multiply, round-robin's hit rate falls from 0.84 to 0.53, because every GPU must
+hold every prompt; session-sticky's falls to 0.82. Prefix routing keeps 0.87–0.92, because each prompt
+lives on one GPU.
+
+**Then we tried to break it.**
+- *Other hardware (H6):* the flip held on all four imaginary GPUs; the GPU counts did not.
+- *Real traffic (R1):* on the Mooncake traces the two good policies tied within one GPU. Our best
+  guess, written down before the run and not yet tested: the real traces' shared prompts are mostly
+  not in use at the same time, so a cache has far less to hold at once than with our 64 tenants.
+- *The demo page* lets anyone click from 1 to 64 prompts and watch the answer change.
+
+**How much to trust it.** A T4 result on generated traffic, from a cache model that matched the real
+engine exactly. The direction survives other hardware; the GPU counts do not. Real traffic has not
+shown the flip yet. Phase 6, on two real GPUs, is the next check.
+
 ## 7. Mistakes we made — and caught
 
 Kept here on purpose. Each one was caught by a check we had built for exactly that purpose.
@@ -166,6 +231,16 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
   ₹95.87. We use the table.
 - **Earlier, smaller ones:** a router that fought itself for ownership, a timestamp of zero treated as
   missing, a trace written out of order, and a few over-claims corrected once measured.
+- **Our headline said "with a small load weight"** — but where the headline applies, a weight of 1 did
+  no better than no weight at all. Caught when the demo grid put them side by side; reworded, with a
+  dated note in `09-hypotheses.md`.
+- **Our first way of finding sessions in the Mooncake trace glued 9,202 requests into one "session"**,
+  because they all began with the same system prompt. Fixed: a block that 100 or more requests continue
+  from is a shared prompt, not a conversation.
+- **Results were marked "dirty" because of an unrelated file** in the folder. The check now looks only
+  at code, configs and notebooks.
+- **Our first scale for the real trace was too big for a T4** — every policy failed. We changed it
+  before the real run and wrote down why.
 
 ## 8. Where we are right now
 
@@ -175,37 +250,36 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 | 1–2 | Traffic, cache model, policies, simulator | ✅ done |
 | 2b | Cache model rebuilt to follow vLLM's real rules | ✅ done |
 | 3 | **The calibration** — model vs real engine, pre-registered | ✅ **done: exact** |
-| 4 | Calibrated sweep of policies × GPU counts; the recommendation; H1, H5, H6 | 🔨 **first sweep done**; H6 next |
-| 5 | **The finding** — where prefix-aware routing stops paying off | ⬜ next after 4 |
-| 6 | Two-GPU real-engine check under pressure | ⬜ |
-| 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | ⬜ |
-| 8 | Write-up, launch, the upstream pull request | ⬜ |
+| 4 | Calibrated sweep; H1, H5, H6; the load weight; a real trace | ✅ mostly — H6's ranking half ⛔, its crossover half ✅; the real trace (R1) ⛔; AgentX left |
+| 5 | **The finding** — where prefix-aware routing starts paying off | ✅ **done** — H2 ⛔, **H2b ✅** |
+| 6 | Two-GPU real-engine check under pressure | 🔨 notebook ready, predictions committed — **your Kaggle run** |
+| 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | 🔨 demo, figure, 10×/100× done; PyPI and `kvsim calibrate` left |
+| 8 | Write-up, launch, the upstream pull request | 🔨 the guidellm fix is ready; the preprint is next |
 
 ## 9. What is left
 
-**Phase 4 (in progress):**
-- **H6** — re-run the sweep as if on a faster GPU and check the *ranking* of policies does not change
-  (if it holds, people can trust the recommendation without calibrating their own GPU);
-- tune the balanced policy's weight (its "alpha"), as a new, separately registered experiment;
-- a real-world trace, if a public one with prompt-sharing information can be obtained;
-- the remaining tests the plan asks for (a small "golden" sweep, and a property test that prefix-aware
-  routing never loses on perfectly shared prompts).
+**Manual steps (they need an account):**
+- Run [`notebooks/phase6_sim2real.ipynb`](../notebooks/phase6_sim2real.ipynb) on Kaggle (GPU T4 ×2,
+  Internet on, Run All, about 40 minutes) and bring back `phase6_results.zip`.
+- File the vLLM issue (the draft is the upstream log #1).
+- Open the guidellm issue, then the pull request (the patch is in `docs/upstream/`, the text in
+  the upstream log #7–8).
+- Ask someone for an arXiv endorsement, by mid-October.
+- Create the GitHub repository, push, and turn on Pages (Settings → Pages → Source: *GitHub Actions*).
 
-**Phase 5 — the headline:** find the boundary — how much prompt sharing, at what load — where sending
-requests to the GPU that has them cached stops beating simply sending them to the least busy GPU. It
-gets published as a curve with error bars, and it becomes the README's first sentence.
-
-**Phases 6–8:** a two-GPU check on the real engine under pressure; the installable package, the static
-demo page (its grid rebuilt from the calibrated profile), and measured answers to "what breaks at 10×
-and 100×"; then the write-up, the launch, and an upstream pull request to `vllm-project/guidellm`,
-seeded by the friction log (the upstream log, six entries so far).
+**Next on the build side:**
+- the preprint draft — the finding, the calibration, H6 and the real trace;
+- `kvsim calibrate`, so a user can measure their own GPU (H6 says they must);
+- Phase 6's write-up, whatever it shows;
+- later: the AgentX trace, the PyPI release, and a contributor guide with three good first issues.
 
 **Known limits, owned rather than hidden:**
 - the timing model is the weak part: it cannot express the slow single-sequence decode, and it charges
   a little too much (~20 ms) for a request arriving at an idle GPU;
 - every replay is *open-loop* — real agents wait for an answer before sending the next turn, and would
   then reuse the answer's cache blocks, which we cannot measure this way;
-- one GPU type (T4) and one model (Qwen3-4B) so far.
+- one GPU type (T4) and one model (Qwen3-4B) so far;
+- one real trace family (Mooncake), scaled down 32× to fit a T4, with sessions inferred.
 
 ## 10. Where to find things
 
@@ -218,3 +292,7 @@ seeded by the friction log (the upstream log, six entries so far).
 | How to run the GPU notebooks | [`../notebooks/README.md`](../notebooks/README.md) |
 | The measured T4 profile and the cost numbers | [`../configs/profiles/`](../configs/profiles/), [`../configs/cost_model.yaml`](../configs/cost_model.yaml) |
 | Upstream bugs and friction we hit | the upstream log |
+| The finding, its figure and the demo | The README's first section; [`../site/index.html`](../site/index.html); [`figures/`](figures/) |
+| Every experiment's report | `../artifacts/results/*/report.md` — `phase5_crossover`, `h6_ranking`, `h6_crossover`, `realtrace_mooncake`, `scale` |
+| The two-GPU notebook | [`../notebooks/phase6_sim2real.ipynb`](../notebooks/phase6_sim2real.ipynb) |
+| The guidellm fix | [`upstream/guidellm-add-special-tokens.patch`](upstream/guidellm-add-special-tokens.patch) |
