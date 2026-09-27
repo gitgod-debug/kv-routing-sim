@@ -9,8 +9,9 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-09-22 (**Phase 3 RAN and PASSED** — the block-pool model reproduced a live vLLM
-under eviction pressure to the token, against predictions committed before the run; 117 tests green)
+**Last updated:** 2026-09-28 (stale lines refreshed; **H6's ranking half registered**; 124 tests green.
+Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live vLLM under eviction pressure to the
+token, against predictions committed before the run)
 **Current phase:** ✅ **Phase 0** · ✅ **Phase 2b** · ✅ **Phase 3** · 🔨 **Phase 4 in progress** — the first calibrated
 sweep ran: **H1 falsified by load**, **H5 holds in one case of four**, and **session-sticky** holds the SLO with
 the fewest T4s — 25–42% cheaper than round-robin. ▶ **Next: H6**, then the alpha sweep and a real trace.
@@ -125,6 +126,9 @@ Phase-0 equivalent until now.
 - [x] Record the two owed decisions with a date, here and in the project plan
 
 ### The spike itself — on the Kaggle 2x T4 box (see the runbook in `docs/07-environment.md`)
+
+> ✅ **Done — see the PASSED record below.** The spike ran as the notebook (v1 2026-09-21, v2
+> 2026-09-22), not as the shell scripts. The boxes below are that original plan, kept as written.
 
 - [ ] Create the local `.venv`, `pip install -e ".[dev]"`, and **record what actually installed** in
       `docs/07-environment.md` (pins are intentions; only an install produces facts)
@@ -250,10 +254,10 @@ and a corrupted line is survived and counted.
 
 ## Phase 2 — The block-level KV cache model
 
-- [x] `block_trie.py` — trie of resident block hashes on plain dicts (ADR-002)
-- [x] `eviction.py` — LRU order + optional TTL + a hard capacity bound derived from a GPU memory config
-- [x] `replica_cache.py` — counters **named to mirror vLLM's own**, so predicted and measured are literally
-      the same quantity
+- [x] `block_trie.py` (`BlockCache`) — resident block hashes on plain dicts (ADR-002), LRU order, a hard
+      capacity bound derived from a GPU memory config, and counters **named to mirror vLLM's own** (in
+      tokens), so predicted and measured are literally the same quantity. *(Planned as three files;
+      `eviction.py` and `replica_cache.py` were never separate modules. No TTL was built.)*
 - [x] **Tests that matter most:** known prefix sequence → known hit/miss pattern ✅; the
       **partial-block rule** ✅; **stop-at-first-miss** with stranded blocks still occupying capacity ✅
 - [ ] Measure and state the **memory ceiling** at 1M requests on the 14 GB dev box
@@ -433,8 +437,10 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       a new pre-registered GPU run, never a re-fit to W3
 - [x] Seven policies, one file each, behind one interface (ADR-003), every tie from a seeded RNG
 - [x] `sim/` — replica with memory-based admission and preemption, fitted cost, fleet event loop
-- [~] Sweep policy × replicas 1–8 on ≥2 traces — ✅ two generated shapes × six loads; a **real trace**
-      is still to find (one with prefix-sharing information, e.g. block-hash ids)
+- [~] Sweep policy × replicas 1–8 on ≥2 traces — ✅ two generated shapes × six loads. **Real traces found
+      2026-09-23** (`FLAGSHIP_PROJECTS.md`): SemiAnalysis **AgentX** (64-token block hashes, scoped to the
+      session) and **Mooncake** FAST'25 (512-token block hashes, global). ⛔ Not started: an adapter for
+      pre-hashed block traces, a license check on each dataset card, and whether each has session ids
 - [~] **Multi-seed (5) + bootstrap CIs by session** — ✅ used for every H1 decision; per-cell p95 CIs
       for the README tables are still to add
 - [x] ✅ `eval/cost.py` from `configs/cost_model.yaml` — every constant **cited and dated**: g4dn.xlarge
@@ -447,10 +453,12 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       ⚠️ **restate it first: only without memory pressure.** Phase 4 measured it failing under load
       (pure affinity 0.815 vs round-robin 0.832 at high sharing, 4/s, 5 replicas), as H1 now explains
 - [ ] Golden-file test on a small sweep; CI green gate
-- [ ] ⭐ **Test H6 — re-run the sweep under a rescaled cost function** (a "faster GPU", and a different
+- [~] ⭐ **Test H6 — re-run the sweep under a rescaled cost function** (a "faster GPU", and a different
       prefill/decode ratio) and compute Kendall's τ between the policy orderings. **Pure CPU, no extra GPU
       time, the sweep already exists.** ⛔ Do this *before* the README makes any tier-1 claim: H6 is what
-      says whether a user without a GPU can trust the recommendation at all (ADR-010)
+      says whether a user without a GPU can trust the recommendation at all (ADR-010).
+      **Ranking half registered 2026-09-28** (`configs/h6_ranking.yaml`, `scripts/run_h6.py`); the
+      crossover half waits for Phase 5's grid
 
 ---
 

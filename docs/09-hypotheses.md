@@ -1,4 +1,4 @@
-# 09 — Pre-registered hypotheses (H1–H5)
+# 09 — Pre-registered hypotheses (H1–H6)
 
 > ## ⭐ Why this file exists, and why it is dated
 >
@@ -197,9 +197,10 @@ calibration cannot cash.
 |---|---|---|---|
 | **H1** | Prefix-affinity dominates hit rate under high sharing | Phase 4 | `[x]` ⛔ **FALSIFIED 2026-09-22 — by load.** Holds exactly at 1–2 sessions/s; gone or reversed from 3/s, where concentration forces preemption |
 | **H2** | ⭐ The crossover boundary exists and is monotonic | Phase 5 | `[ ]` untested |
-| **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[x]` ✅ **PASSED 2026-09-22** — **zero** error on 2 sequential shapes under eviction pressure (3 runs each, every| **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[x]` ✅ **supported, in its second amendment's form (2026-09-22):** plain LRU's residual on a live engine is **capacity** skew (−11.9 pts when requests hold decode blocks, 0.17 without); histogram counts exact, W2 distributions identical |-predicts — but the cause is **capacity** accounting, not order |
+| **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[x]` ✅ **PASSED 2026-09-22** — **zero** error on 2 sequential shapes under eviction pressure (3 runs each, every counter and all 120 requests' cached tokens); **+0.3%** on the concurrent shape |
+| **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[x]` ✅ **supported, in its second amendment's form (2026-09-22):** plain LRU's residual on a live engine is **capacity** skew (−11.9 pts when requests hold decode blocks, 0.17 without); histogram counts exact, W2 distributions identical |
 | **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[~]` **holds only for balanced affinity at LOW sharing** (1–3 fewer T4s); falsified elsewhere. Session-sticky (untested) needs the fewest everywhere |
-| **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 (CPU-only re-run) | `[ ]` untested · **gates ADR-010's tier-1/2 claims** |
+| **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 (CPU-only re-run) | `[~]` ranking half **registered 2026-09-28** — `configs/h6_ranking.yaml`, `scripts/run_h6.py` · crossover half after Phase 5 · **gates ADR-010's tier-1/2 claims** |
 
 **Amendments:** *(add dated entries below, never edit above)*
 
@@ -446,3 +447,34 @@ sessions, open-loop replay — Phase 3's T4 timings, one model. Whether the rank
 hardware is **H6**, not yet tested; until it is, none of this goes in the README as a claim about
 anyone else's fleet.
 
+### 2026-09-28 — H6's ranking half, REGISTERED before it runs
+Design and rules: [`configs/h6_ranking.yaml`](../configs/h6_ranking.yaml). Procedure:
+`scripts/run_h6.py`. Both are committed before the run.
+
+**The setup.** Phase 4's design, unchanged — 2 traces × 6 loads × 7 policies × replicas 1–8 × 5
+seeds, the vllm cache model, the SLO and the price — re-run under five regimes. One is the measured
+T4 profile. The other four multiply its timing coefficients: **2× and 4× faster** (prefill and decode
+together), and **prefill alone 2× cheaper or 2× dearer**. KV capacity, `max_num_seqs`, the SLO and
+the price do not change. Those fixed limits are exactly why H6's own text says it might fail. The
+baseline must reproduce Phase 4's required-replica table exactly, or the script stops.
+
+**How it is decided,** at every (trace, load) point, for each rescaled regime against the baseline.
+R(policy) is the fewest replicas that hold the SLO on every seed (9 if none).
+- **Flip:** the baseline's recommendation is not among the regime's lowest-R policies — following our
+  advice on that hardware would cost at least one more replica. *n/a* where no policy holds the SLO.
+- **Kendall's τ-b** between the two R vectors (`eval/rank.py`). *n/a* where either one is all ties.
+
+The ranking half **holds** only if every rescaled regime has **zero flips** and **every defined τ-b ≥
+0.8**. A regime with no defined τ-b anywhere is *untestable*, and does not count as holding.
+
+**Why "flip" is defined this way — written before the result.** H6's text says the recommended
+policy "should not change". Read literally, that is decided by rupee differences of a few percent
+between policies that need the same number of replicas: noise, not ranking. The rule above asks what
+a user needs to know instead: does our pick cost them a GPU on their hardware? The literal reading
+(*strict*) and a kinder one (the two best sets share no policy, *lenient*) are both reported beside
+it, so neither can be hidden.
+
+**What would be uncomfortable, written down now.** At 1–2 sessions/s a faster GPU fits almost every
+policy on the same few replicas, so many points will be all ties and the test will be decided at the
+loaded points. And this entry does **not** test H6's crossover half: that needs Phase 5's grid, and
+gets its own entry.
