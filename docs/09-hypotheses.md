@@ -650,3 +650,38 @@ of seven policies moves with the hardware (ranking half, falsified), but the one
 makes — session-sticky with one shared prompt, prefix-affinity once many prompts outgrow the cache —
 survived every rescale (crossover half, holds). So the headline may drop "T4 only" for the *direction*
 of the flip; the replica counts and rupees stay T4 figures. Real traffic is next (R1, Mooncake).
+
+### 2026-09-28 — R1 REGISTERED before the comparison runs: real traffic, the Mooncake FAST'25 traces
+Design and rules: [`configs/realtrace_mooncake.yaml`](../configs/realtrace_mooncake.yaml). Procedure:
+`scripts/run_realtrace.py`, reading the traces through the new `mooncake` adapter. Both are committed
+before the comparison runs. The traces (Apache-2.0) are not committed; the results record each file's
+sha256.
+
+**What was measured before registering — trace structure, and round-robin alone.** The tool-agent
+trace (23,608 requests in one hour) and the conversation trace (12,031) carry no session ids; the
+adapter infers them from prompts that extend an earlier request's full blocks, never through a prefix
+that 100 or more different blocks follow (three shared system prompts have fan-outs of 3,335–8,894;
+no other block exceeds 15). Inferred: 26% of tool-agent and 50% of conversation requests belong to
+multi-turn sessions; 39% and 10% of block uses are shared across sessions. A round-robin-only probe at
+token scale 1/16 could not hold the SLO at any speed — the longest prompts' prefill alone passed 2 s —
+so the scale is **1/32**, the coarsest that keeps one of our blocks per trace block. At 1/32 the
+blocks shared across sessions come to **2.4×** (tool-agent) and **2.7×** (conversation) one T4's
+cache, and round-robin needs 4, 5, 8 (tool-agent) and 5, 5, 8 (conversation) replicas at 1×, 2×, 4×
+the recorded arrival rate — the three speeds, fixed now.
+
+**Prediction.** From H2b's mechanism and the structure above:
+- *Tool-agent:* balanced affinity at α\* = 16 needs **fewer** replicas than session-sticky at one speed
+  or more, and more at none — its shared prompts outgrow one cache, and 39% of its reuse is between
+  users, which only a prefix-aware router can place.
+- *Conversation:* balanced affinity needs fewer replicas than session-sticky at **no** speed — only
+  10% of its reuse is between users; the rest is a user's own history, which session-sticky already
+  keeps together.
+
+*Falsified if* either fails. *Reported, not tested:* every policy's replicas and hit rates, α = 1, pure
+radix-affinity and consistent-hash (expected to pile the few system-prompt families onto a few
+replicas), and the within/cross-session reuse split — the plan's *"how much real agentic reuse is
+between users"* question.
+
+**What would be uncomfortable, written down now.** The shared blocks are spread over an hour; if few
+are hot at the same time, the working set that matters is far smaller than 2.4×, and sticky may tie or
+win on tool-agent too. And every session-sticky number rests on inferred sessions.
