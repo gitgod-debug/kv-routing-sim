@@ -1,0 +1,42 @@
+# H6's ranking half — does the ORDER of the policies survive a change of hardware?
+# Registered 2026-09-28, BEFORE it runs, with a dated entry in docs/09-hypotheses.md.
+# `scripts/run_h6.py` is the procedure below, and nothing in it is chosen after a result.
+
+schema_version: 1
+
+# Re-run EXACTLY Phase 4's design: its traces, loads, policies, replicas 1-8, seeds, cache model,
+# profile and cost model. Read from that file rather than copied, so the two cannot drift apart.
+base_sweep: configs/phase4_sweep.yaml
+# Guard: the baseline regime must reproduce Phase 4's required-replica table exactly, or the
+# script stops. Same code, same seeds: any difference means the code changed since Phase 4.
+phase4_results: artifacts/results/phase4_sweep_t4/sweep.json
+
+baseline: t4
+# A regime multiplies the profile's four timing coefficients. Everything else stays fixed — KV
+# capacity (1,537 blocks), max_num_seqs, the SLO and the price: the absolute limits that H6's own
+# text names as the reason it might fail.
+regimes:
+  t4:            {prefill_x: 1.0,  decode_x: 1.0}   # the measured profile, unchanged
+  faster_2x:     {prefill_x: 0.5,  decode_x: 0.5}   # a GPU twice as fast, same memory
+  faster_4x:     {prefill_x: 0.25, decode_x: 0.25}  # four times as fast, same memory
+  cheap_prefill: {prefill_x: 0.5,  decode_x: 1.0}   # prefill 2x cheaper, decode unchanged
+  dear_prefill:  {prefill_x: 2.0,  decode_x: 1.0}   # prefill 2x dearer, decode unchanged
+
+# ── The decision rules, fixed before the run ─────────────────────────────────────────────────
+# A point = (trace, load). R(policy) = the fewest replicas (1-8) whose cell meets the SLO on every
+# seed; 9 if none. Our pick = the baseline's recommendation (recommend(): the cheapest
+# configuration that meets the SLO). A regime's best set = the policies with the smallest R there.
+#
+# FLIP at a point: our pick is NOT in the regime's best set, so following the baseline's advice on
+# that hardware costs at least one more replica. n/a if no policy meets the SLO in that regime.
+# TAU at a point: Kendall's tau-b (eval/rank.py) between the baseline's R vector and the regime's,
+# over the 7 policies. n/a if either vector is all ties.
+#
+# H6's ranking half HOLDS only if EVERY rescaled regime has zero flips and every defined tau-b is
+# >= tau_threshold. A regime with no defined tau-b anywhere is UNTESTABLE and does not count as
+# holding. The crossover half of H6 is tested after Phase 5, on its grid.
+tau_threshold: 0.8
+
+# Reported, not tested: the STRICT flip (the regime's own recommendation names another policy —
+# fragile, because rupee near-ties between equal replica counts decide it) and the LENIENT flip
+# (the two best sets share no policy). Both are reported, so neither reading can be hidden.

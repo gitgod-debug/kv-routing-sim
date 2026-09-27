@@ -81,11 +81,13 @@ charges a full decode step on top of every prefill, over-estimating an idle repl
 1. **Trace ingestion** — reads real serving logs (vLLM/SGLang JSONL, OpenAI-style request logs) into one
    normalized, versioned request schema. Prompts are hashed at the adapter boundary and **never enter the
    simulator**, so a trace's user content stays out of memory and out of artifacts.
-2. **A block-level KV cache model** — hash-block trie with LRU/TTL eviction, per replica, at
-   vLLM-APC/RadixAttention granularity. *This is table stakes, not the contribution — the contribution is
-   its measured fidelity.*
-3. **Six routing policies** — round-robin · least-loaded · power-of-two-choices ·
-   consistent-hashing-on-prefix · radix-prefix-affinity · session-sticky. One file each; a new policy is a
+2. **A block-level KV cache model**, per replica. The default follows vLLM 0.30.0's block pool line by
+   line — reference counts, tail-first freeing, cached decode blocks, admission by free memory, and
+   preemption. A plain LRU model is kept beside it as the ablation. *This is table stakes, not the
+   contribution — the contribution is its measured fidelity.*
+3. **Seven routing policies** — round-robin · least-loaded · power-of-two-choices ·
+   consistent-hashing-on-prefix · radix-prefix-affinity · radix-prefix-affinity-balanced (affinity with
+   a load term, the way production routers do it) · session-sticky. One file each; a new policy is a
    new file.
 4. **The sweep + recommendation** — policy × replica count (1–8) → Pareto curves over
    hit-rate / p95 TTFT / **₹ per 1k successful requests**, and one recommended configuration with a
@@ -110,12 +112,16 @@ kvsim replay trace.jsonl --policies all --replicas 1-8 --format md
 Runs on your laptop. **Your trace never leaves your machine**, and prompts are hashed at the adapter
 boundary, so prompt text never enters the simulator at all.
 
-The inference engine is an optional extra (`pip install "kv-routing-sim[calib]"`), needed only to
-**calibrate against your own hardware**:
+To use measured timings instead of the built-in guess, pass a profile. The one measured so far is
+ours — Tesla T4, Qwen3-4B, vLLM 0.30.0:
 
 ```bash
-kvsim calibrate --engine http://localhost:8000 --out configs/profiles/my-fleet.yaml   # ~30 min, your GPU
+kvsim replay trace.jsonl --policies all --replicas 1-8 \
+  --profile configs/profiles/t4-qwen3-4b-vllm0.30.0.json --cost-model configs/cost_model.yaml
 ```
+
+⚠️ **Not built yet:** `kvsim calibrate`, which will fit a profile to *your* GPU and model (the
+`[calib]` extra). Until it exists, every millisecond and rupee figure here is a T4 figure.
 
 ## ⭐ What transfers to your fleet, and what doesn't
 
@@ -126,9 +132,9 @@ so the honest answer comes in three tiers, and they must not be blended (ADR-010
 |---|---|---|
 | **Policy ranking** | *Which* policy wins on your workload shape, and roughly by how much | **Nothing.** No GPU, no calibration. Depends on workload shape, not hardware — *pending* **H6**, which tests exactly that rather than assuming it |
 | **The crossover boundary** | Whether prefix-affinity is worth implementing at *your* sharing ratio and utilization | **Nothing** (same caveat) |
-| **Absolute ms and ₹** | p95 TTFT and ₹/1k requests for your fleet | **`kvsim calibrate` on your own hardware.** ⛔ Our error bar was measured on our GPU and our model. It does **not** transfer, and this README will never imply that it does |
+| **Absolute ms and ₹** | p95 TTFT and ₹/1k requests for your fleet | **`kvsim calibrate` on your own hardware** *(not built yet)*. ⛔ Our error bar was measured on our GPU and our model. It does **not** transfer, and this README will never imply that it does |
 
-> **So: why trust our numbers on your hardware?** You shouldn't. Run `kvsim calibrate` and use your own.
+> **So: why trust our numbers on your hardware?** You shouldn't. Once `kvsim calibrate` is built, run it and use your own.
 > That is the same posture as the cost model, which ships every constant in a config with a source and a
 > date so you can disagree with it and re-run. **Handing the skeptic the means to disagree, twice.**
 
@@ -203,10 +209,11 @@ delete it and get it back, it doesn't ship.**
 | | |
 |---|---|
 | [`docs/00-START-HERE.md`](docs/00-START-HERE.md) | Start here — what this is, and the read order |
-| [`docs/02-architecture-decisions.md`](docs/02-architecture-decisions.md) | ADR-001…009: why this shape, this fidelity, this hardware |
+| [`docs/02-architecture-decisions.md`](docs/02-architecture-decisions.md) | ADR-001…012: why this shape, this fidelity, this hardware |
 | [`docs/04-prior-art.md`](docs/04-prior-art.md) | What exists, what to cite, **and the sentences that must never be written** |
 | [`docs/06-methodology.md`](docs/06-methodology.md) | The statistics protocol and the cost model |
-| [`docs/09-hypotheses.md`](docs/09-hypotheses.md) | **H1–H5, pre-registered before any code existed** |
+| [`docs/09-hypotheses.md`](docs/09-hypotheses.md) | **H1–H6, pre-registered before any code existed** — with dated results |
+| [`docs/11-where-we-are.md`](docs/11-where-we-are.md) | The whole story so far, in plain words |
 | [`CHECKPOINTS.md`](CHECKPOINTS.md) | Where the build actually is |
 
 **Sibling project:** [`colpali-lite`](../colpali-economics) — the same method (cost and tail latency under a

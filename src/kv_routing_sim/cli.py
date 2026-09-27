@@ -33,7 +33,7 @@ UNCALIBRATED_BANNER = (
     "\n  ⚠️  UNCALIBRATED COST PROFILE — no live engine has been measured.\n"
     "      Usable:     the policy RANKING and the replica count (ADR-010 tier 1, pending H6).\n"
     "      NOT usable: the millisecond and rupee figures. They are shapes, not predictions.\n"
-    "      Fix:        kvsim calibrate --engine http://<your-vllm>:8000\n"
+    "      Fix:        --profile <a measured profile .json>   (kvsim calibrate: not built yet)\n"
 )
 
 
@@ -217,8 +217,9 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
         "It is the ADR-010 mechanism: point it at your own running vLLM and it fits a cost\n"
         "profile to YOUR hardware and model, so the millisecond and rupee figures become yours\n"
         "rather than ours. It needs the [calib] extra and a live engine.\n\n"
-        "Blocked on the Phase-0 spike — no calibration code is written until the two prefix-cache\n"
-        "counters have been seen moving on a real engine. See CHECKPOINTS.md.\n",
+        "Phase 0 passed and Phase 3 fitted a T4 profile with the notebook harness; turning that\n"
+        "harness into this command is Phase 7. Until then, pass a measured profile:\n"
+        "  --profile configs/profiles/t4-qwen3-4b-vllm0.30.0.json\n",
         file=sys.stderr,
     )
     return 2

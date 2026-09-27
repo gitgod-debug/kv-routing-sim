@@ -14,6 +14,7 @@ from kv_routing_sim.eval.bootstrap import (
 )
 from kv_routing_sim.eval.cost import CostModel, UnfilledCostModel, successful_requests
 from kv_routing_sim.eval.pareto import Point, frontier
+from kv_routing_sim.eval.rank import kendall_tau_b
 from kv_routing_sim.eval.recommend import recommend
 
 
@@ -142,3 +143,25 @@ def test_recommendation_prefers_fewer_replicas_at_equal_cost():
     cheap_small = _p("radix-affinity-balanced", 2, 0.8, 50.0, 5.0)
     cheap_big = _p("round-robin", 8, 0.7, 50.0, 5.0)
     assert recommend([cheap_big, cheap_small]).chosen is cheap_small
+
+
+def test_kendall_tau_b_matches_worked_examples():
+    """H6 is decided on this statistic, and its tie handling is the part that matters: rankings by
+    replica count are full of ties."""
+    assert kendall_tau_b([1, 2, 3, 4], [1, 2, 3, 4]) == pytest.approx(1.0)
+    assert kendall_tau_b([1, 2, 3, 4], [4, 3, 2, 1]) == pytest.approx(-1.0)
+    # one pair tied only in x, one tied only in y, one concordant: 1 / sqrt(2 x 2)
+    assert kendall_tau_b([1, 1, 2], [1, 2, 2]) == pytest.approx(0.5)
+    # ties shared by both orderings are not disagreement
+    assert kendall_tau_b([3, 3, 3, 1, 2], [5, 5, 5, 1, 2]) == pytest.approx(1.0)
+
+
+def test_kendall_tau_b_is_undefined_when_there_is_nothing_to_order():
+    """A constant ranking has no order to agree with: None, never a made-up 0 or 1."""
+    assert kendall_tau_b([1, 1, 1], [1, 2, 3]) is None
+    assert kendall_tau_b([2, 2], [2, 2]) is None
+
+
+def test_kendall_tau_b_requires_equal_lengths():
+    with pytest.raises(ValueError, match="equal lengths"):
+        kendall_tau_b([1, 2], [1, 2, 3])

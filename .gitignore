@@ -36,3 +36,6 @@ artifacts/sweeps/
 *.bin
 .cache/
 hf_cache/
+
+# Test-coverage database, written by pytest-cov
+.coverage

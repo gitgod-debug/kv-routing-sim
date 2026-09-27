@@ -48,6 +48,12 @@ TRACKED_PACKAGES = (
 # The valid values for `hardware_path`. See ADR-005 for what each one permits reporting.
 HARDWARE_PATHS = ("single-replica", "multi-gpu", "mig", "memory-split", "cpu-only")
 
+# What can change a number: the package, the scripts, the configs, the notebooks and the pins. A
+# change anywhere else — docs, or the untracked personal notes kept beside the build — cannot, so it
+# does not make a result "dirty". Counting those would mark every header dirty, and a flag that is
+# always on tells a reader nothing.
+PROVENANCE_PATHS = ("src", "scripts", "configs", "notebooks", "pyproject.toml")
+
 
 def _git(*args: str) -> str:
     try:
@@ -161,7 +167,9 @@ def results_header(
     """The header every results file starts with (docs/06-methodology.md §3).
 
     `git_dirty` is recorded because a number produced from an uncommitted tree is not
-    re-derivable, and the file should say so rather than imply otherwise.
+    re-derivable, and the file should say so rather than imply otherwise. It looks only at
+    `PROVENANCE_PATHS` — tracked changes AND untracked files there — because those are the only
+    paths whose state can change a number.
 
     `hardware_path` is required by ADR-005: it decides which numbers in the file may be reported.
     An unrecognised value raises, because silently accepting a typo here would let a contaminated
@@ -174,7 +182,7 @@ def results_header(
         "script": script,
         "date_utc": datetime.now(UTC).isoformat(timespec="seconds"),
         "git_sha": _git("rev-parse", "--short", "HEAD") or "unknown",
-        "git_dirty": bool(_git("status", "--porcelain")),
+        "git_dirty": bool(_git("status", "--porcelain", "--", *PROVENANCE_PATHS)),
         "seed": seed,
         "hardware_path": hardware_path,
         "hardware": _hardware(),
