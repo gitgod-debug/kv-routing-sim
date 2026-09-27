@@ -210,14 +210,16 @@ published calibration error and honest error bars — not the idea.**
 
 ## What breaks at 10× and 100×
 
-*(Answered with measured numbers in Phase 7 — not with prose. Named here now so it cannot be quietly
-skipped.)*
+Measured 2026-09-28 by [`scripts/measure_scale.py`](scripts/measure_scale.py) — one fresh process per
+case, one CPU core each, results in [`artifacts/results/scale/`](artifacts/results/scale/report.md). The
+base is Phase 4's traffic (200 sessions × 4 turns = 800 requests) on 8 replicas with the calibrated T4
+profile; each case was run with round-robin and with balanced prefix-affinity.
 
 | Scale | Question | Answer |
 |---|---|---|
-| **10× trace length** | RSS ceiling and sweep wall-clock? | TBD — not yet measured |
-| **100× trace length** | What gives out first — block-hash memory, the policy inner loop, or the report renderer? | TBD — not yet measured |
-| **10× replicas** | Does the cache model's fidelity hold, or does eviction-order skew compound? | TBD — not yet measured |
+| **10× trace length** (8,000 requests) | RSS ceiling and sweep wall-clock? | **81 MiB** peak per process. One run: 1.3 s (round-robin) to 2.0 s (balanced affinity), after 8 s to generate the trace. Nothing breaks: a default `kvsim replay` sweep (280 runs, one core) is minutes. |
+| **100× trace length** (80,000 requests, 8.5 M block hashes) | What gives out first — block-hash memory, the policy inner loop, or the report renderer? | **Block-hash memory.** The trace alone holds **537 MiB** (about 64 bytes per hash, as Python ints) before the simulation starts; the simulation adds 11–35 MiB. The policy loop stays linear: 13.5 s and 21 s, about 10× the 10× case. The renderer does not grow with the trace. Two walls follow by arithmetic, not measured: the parallel experiment scripts copy the trace into every worker (11 workers ≈ 6 GiB), and a default one-core sweep is 280 × 13–21 s ≈ 1–1.6 hours. |
+| **10× replicas** (80 replicas at 10× load) | Does the cache model's fidelity hold, or does eviction-order skew compound? | **Not answerable on a CPU.** In the model each replica is its own block pool, so errors cannot compound inside the simulator; whether real replicas stay matched is what Phase 6 checks, on 2 GPUs. 80 is untested. What *was* measured: affinity routing scores every replica on every request, so its run time grew 2.4× (2.0 → 4.8 s for the same 8,000 requests) while round-robin stayed flat (1.3 → 1.4 s). |
 
 ---
 
