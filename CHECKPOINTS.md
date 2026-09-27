@@ -499,7 +499,8 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 - [x] Check H2's three directional sub-predictions — ⛔ **H2 FALSIFIED** for both policies (docs/09)
 - [-] ~~If the effect sits inside the CIs, report that~~ — not needed: the effects were far outside them
 - [x] ⭐ **H2b HOLDS** — the README headline, scoped (2026-09-28): *keep each user on one GPU until your
-      tenants' prompts outgrow one GPU's cache; then route by prefix, with a small load weight.* ✅ The
+      tenants' prompts outgrow one GPU's cache; then route by prefix, and keep its load weight small.*
+      (Reworded 2026-09-28 from "with a small load weight": see docs/09's amendment.) ✅ The
       flip's direction survived all four hardware rescales — **H6's crossover half HOLDS**
       ([`report.md`](artifacts/results/h6_crossover/report.md)); replica counts stay T4 figures
 

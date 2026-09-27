@@ -752,3 +752,23 @@ engine's timing differs from the simulator's, so load-aware routing can place se
 predicted (the dry-run already shows this in the request splits); S1 and S2 are on hit rates for that
 reason. And async scheduling, on by default in vLLM 0.30.0, is not modelled — Phase 3 found it cost
 nothing sequentially and 0.3% concurrently.
+
+### 2026-09-28 — Amendment: the headline's load-weight clause, reworded after the demo grid
+The demo grid ([`scripts/build_grid.py`](../scripts/build_grid.py)) reproduces Phase 5's H2b table
+exactly and puts load weight 1 beside α\* = 16 and pure radix-affinity (no load weight), so the
+post-hoc numbers of the Phase 5 entry can be read side by side. All three were already in Phase 5's
+committed table (`h2b.required_replicas` in `phase5.json`); only α\* was written up. At K = 16 and
+K = 64, weight 1 and no weight need the **same** number of replicas at every load (K = 16: 2, 3, 3, 4 at
+1–4 sessions/s; K = 64: 3, 4, 5, 5). At K = 4, 3 sessions/s, no weight needs one fewer (3 against 4).
+Nowhere in the grid does weight 1 need fewer replicas than no weight. α\* = 16 needs up to 4 more
+(K = 16 at 4/s: 8 against 4), or cannot hold the SLO on 8 at all (K = 64 at 4/s).
+
+So "then route by prefix, **with** a small load weight" credited the weight with a benefit the data does
+not show. The headline now reads "then route by prefix, **and keep its load weight small**". That is
+what the numbers support where that half of the headline applies — 16 and 64 prompts, working sets of
+0.89× and 2.66× one replica's cache: there, small (1 or none) beats large (16). Below that the weight
+cuts the other way: at K = 4 and 4 sessions/s only α = 16 holds the SLO among the affinity policies (on
+6), and with one prompt, weight 1 and no weight both fail from 2 sessions/s (H2's collapse). But there
+the headline's first half applies: session-sticky needs the fewest replicas, or ties for them, at every
+load at K = 1 and K = 4. Nothing registered changes: H2b holds as written, at α\* = 16, and everything
+in this entry stays *reported, not tested*. The Phase 5 entry above is left as written.
