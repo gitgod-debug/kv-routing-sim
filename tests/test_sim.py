@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-import pytest
+import dataclasses
+import pathlib
+import random
 
-from kv_routing_sim.sim.cost_model import UNCALIBRATED_DEFAULT, CostProfile
+import pytest
+import yaml
+
+from kv_routing_sim.sim.cost_model import UNCALIBRATED_DEFAULT, CostProfile, load_profile
 from kv_routing_sim.sim.engine import run
 from kv_routing_sim.sim.replica import Replica
 from kv_routing_sim.traces.generator import AgenticWorkload
@@ -56,6 +61,63 @@ def test_prefix_affinity_never_loses_to_round_robin_on_perfectly_shared_prefixes
     rr = run(trace, policy="round-robin", n_replicas=4, seed=0, profile=SMALL)
     aff = run(trace, policy="radix-affinity", n_replicas=4, seed=0, profile=SMALL)
     assert aff.hit_rate >= rr.hit_rate
+
+
+# A cache the traces below can never fill: the precondition the property needs (next two tests).
+ROOMY = dataclasses.replace(SMALL, name="test-roomy", kv_cache_blocks=20_000, max_num_seqs=256)
+
+
+@pytest.mark.parametrize("case", range(24))
+def test_prefix_affinity_never_loses_to_round_robin_without_memory_pressure(case):
+    """The spec's property, restated after Phase 4: it holds WITHOUT memory pressure, on any trace.
+
+    With a cache that never fills and sessions arriving far apart, routing each request to the
+    replica holding its longest cached prefix gets it every hit an earlier request made possible,
+    so it cannot fall below round-robin — not only on identical prompts. Checked on 24 generated
+    workloads: sharing 0 to 0.95, one to sixteen tenant prompts, one to five turns, 2-6 replicas.
+    """
+    rng = random.Random(case)
+    trace, _ = AgenticWorkload(
+        n_sessions=rng.randint(4, 30),
+        turns_per_session=rng.randint(1, 5),
+        prefix_sharing_ratio=rng.choice((0.0, 0.2, 0.5, 0.8, 0.95)),
+        n_shared_prefixes=rng.choice((1, 1, 4, 16)),
+        arrival_rate=0.2,
+        seed=case,
+    ).generate()
+    # Every distinct block the trace can ever put in a cache — its prompt blocks, plus each
+    # request's own output blocks — fits on one replica at once, so nothing is ever evicted.
+    ever = len({h for q in trace for h in q.block_hashes})
+    ever += sum(q.output_tokens // ROOMY.block_size + 1 for q in trace)
+    assert ever < ROOMY.kv_cache_blocks
+    n = rng.randint(2, 6)
+    rr = run(trace, policy="round-robin", n_replicas=n, seed=case, profile=ROOMY)
+    aff = run(trace, policy="radix-affinity", n_replicas=n, seed=case, profile=ROOMY)
+    assert rr.preemptions == aff.preemptions == 0  # the precondition really held
+    assert aff.hit_rate >= rr.hit_rate
+
+
+def test_the_property_needs_its_precondition():
+    """Under memory pressure the property FAILS, as Phase 4 measured — pinned so it stays visible.
+
+    Phase 4's high-sharing trace at 4 sessions/s on 5 calibrated T4s: pure prefix-affinity sends
+    every session to the replica holding the shared prompt, that replica runs out of blocks and
+    preempts, and its hit rate ends below round-robin's (0.815 against 0.832 over five seeds). If a
+    change ever makes this pass the other way, the cache model's pressure behaviour has changed.
+    """
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    p4 = yaml.safe_load((repo / "configs" / "phase4_sweep.yaml").read_text())
+    trace, _ = AgenticWorkload(**p4["traces"]["high_sharing"], arrival_rate=4.0).generate()
+    t4 = load_profile(repo / p4["profile"])
+
+    def mean_hit(policy: str) -> float:
+        runs = [run(trace, policy=policy, n_replicas=5, seed=s, profile=t4) for s in p4["seeds"]]
+        return sum(r.hit_rate for r in runs) / len(runs)
+
+    aff, rr = mean_hit("radix-affinity"), mean_hit("round-robin")
+    assert aff == pytest.approx(0.815, abs=5e-4)
+    assert rr == pytest.approx(0.832, abs=5e-4)
+    assert aff < rr
 
 
 def test_more_replicas_dilute_the_cache_under_round_robin():

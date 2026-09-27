@@ -10,13 +10,13 @@
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
 **Last updated:** 2026-09-28 (the finding, H6, R1 on Mooncake, Phase 6 registered, the demo page and the
-10×/100× numbers; 135 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
+10×/100× numbers; 161 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
 vLLM under eviction pressure to the token, against predictions committed before the run)
 **Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding** — *keep each user on one GPU until
 your tenants' prompts outgrow one GPU's cache; then route by prefix, and keep its load weight small* (H2b
-holds; H2 falsified) · 🔨 **4** — H6's ranking half ⛔ and crossover half ✅, R1 on real traffic ⛔; two
-tests left · 🔨 **6** registered, the Kaggle run is yours · 🔨 **7** — demo page, grid and 10×/100× done;
-PyPI and `kvsim calibrate` left. ▶ **Next:** the preprint draft, `kvsim calibrate`, the two Phase 4 tests.
+holds; H2 falsified) · 🔨 **4** — H6's ranking half ⛔ and crossover half ✅, R1 on real traffic ⛔;
+AgentX left · 🔨 **6** registered, the Kaggle run is yours · 🔨 **7** — demo page, grid, figure and
+10×/100× done; PyPI and `kvsim calibrate` left. ▶ **Next:** the preprint draft, `kvsim calibrate`.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -83,7 +83,7 @@ PyPI and `kvsim calibrate` left. ▶ **Next:** the preprint draft, `kvsim calibr
 | 2 | Block-level KV cache model | `[x]` | Known prefix sequence → known hit/miss pattern, in tests; partial-block rule holds; memory ceiling measured |
 | **2b** | **Cache model = vLLM's block pool** 🆕 | `[x]` | Every eviction behaviour cites a line of vLLM's source; naive LRU kept as the ablation; both still reproduce v1/v2 exactly |
 | 3 | **Real-Engine Calibration Report** | `[x]` ✅ exact on W1 + W2, +0.3% on W3 | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
-| 4 | **Seven** policies + Pareto sweep | `[~]` H1 ⛔ · H5 1 of 4 · H6 ranking ⛔, crossover ✅ · α swept · R1 (Mooncake) ⛔ — property + golden tests left | Tests **H1 + H5 + H6** |
+| 4 | **Seven** policies + Pareto sweep | `[~]` H1 ⛔ · H5 1 of 4 · H6 ranking ⛔, crossover ✅ · α swept · R1 (Mooncake) ⛔ · property + golden tests ✅ — AgentX and per-cell CIs left | Tests **H1 + H5 + H6** |
 | 5 | **The crossover finding** | `[x]` H2 ⛔ · **H2b ✅** — the README headline, with its figure | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
 | 6 | Sim-to-real 2-replica validation | `[~]` registered 2026-09-28 on two physical T4s; the Kaggle run is left | Predicted vs measured across two MIG instances, or the documented fallback and why |
 | 7 | Package · CLI · static demo · hardening | `[~]` demo page + grid + 10×/100× ✅ · PyPI, `kvsim calibrate` left | `pip install` + `kvsim replay` + a **static** demo page (ADR-011) + "what breaks at 10×/100×" answered with measured numbers |
@@ -454,10 +454,16 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 - [x] ⭐ **Sweep alpha** for radix-affinity-balanced (its load weight), registered as a NEW experiment
       before it runs — the one open question in H5's balanced result. ✅ Done as Phase 5's **A1**
       (2026-09-28): α\* = 16 on Phase 4's traces (45 replicas in total against 64 at α = 1)
-- [ ] Property test: prefix-affinity never scores below round-robin on perfectly-shared prefixes —
+- [x] Property test: prefix-affinity never scores below round-robin on perfectly-shared prefixes —
       ⚠️ **restate it first: only without memory pressure.** Phase 4 measured it failing under load
-      (pure affinity 0.815 vs round-robin 0.832 at high sharing, 4/s, 5 replicas), as H1 now explains
-- [ ] Golden-file test on a small sweep; CI green gate
+      (pure affinity 0.815 vs round-robin 0.832 at high sharing, 4/s, 5 replicas), as H1 now explains.
+      ✅ 2026-09-28, `tests/test_sim.py`: restated and checked on **24 generated workloads** (sharing
+      0–0.95, 1–16 tenant prompts, 1–5 turns, 2–6 replicas) with a cache the test proves cannot fill;
+      and the Phase 4 counterexample is **pinned** (0.815 < 0.832), so the precondition stays visible
+- [x] Golden-file test on a small sweep; CI green gate — ✅ 2026-09-28, `tests/test_golden.py` +
+      `tests/golden/small_sweep.json`: 4 policies × 1–3 replicas × 2 seeds on the calibrated profile,
+      every number and the recommendation pinned; regenerate with `KVSIM_UPDATE_GOLDEN=1`. CI runs it
+      on Python 3.11–3.13 (checked locally on 3.13 only, under three hash seeds)
 - [x] ⭐ **Test H6 — re-run the sweep under a rescaled cost function** (a "faster GPU", and a different
       prefill/decode ratio) and compute Kendall's τ between the policy orderings. **Pure CPU, no extra GPU
       time, the sweep already exists.** ⛔ Do this *before* the README makes any tier-1 claim: H6 is what
