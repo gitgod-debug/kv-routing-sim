@@ -1,0 +1,44 @@
+# R1 — real traffic: the Mooncake FAST'25 traces, replayed through every policy on the T4 profile.
+# Registered 2026-09-28, BEFORE the comparison runs, with a dated entry in docs/09-hypotheses.md.
+# `scripts/run_realtrace.py` is the procedure. Its `--probe` mode runs round-robin ALONE, to choose
+# the speeds; no comparison between policies is looked at before the entry.
+
+schema_version: 1
+
+# The traces are other people's data: never committed (.gitignore: artifacts/traces/). Fetch them
+# from the source; the results file records each file's sha256.
+source: https://github.com/kvcache-ai/Mooncake/tree/main/FAST25-release   # Apache-2.0, fetched 2026-09-28
+traces:
+  toolagent: artifacts/traces/mooncake/toolagent_trace.jsonl         # 23,608 requests, one hour
+  conversation: artifacts/traces/mooncake/conversation_trace.jsonl   # 12,031 requests, one hour
+
+# What the adapter changes — see traces/adapters/mooncake.py. Every token count × 1/32: one of our
+# 16-token blocks per 512-token trace block, the coarsest scale that keeps the block structure.
+# Prompts go from p50 ~6.5K / max 126K tokens to p50 ~200 / p95 ~0.8-1.2K / max 3.9K. On one T4's cache
+# this stands for the whole trace on a cache 32× larger. (A round-robin probe at 1/16 could not hold
+# the SLO at any speed: the longest prompts' prefill alone exceeded 2 s. Recorded in docs/09.)
+adapter: {token_scale: 0.03125, infer_sessions: true, hot_fanout: 100}
+window_s: 3600      # the whole released hour
+warmup_s: 300       # the first 5 minutes' requests warm the caches; their TTFTs are not counted
+
+profile: configs/profiles/t4-qwen3-4b-vllm0.30.0.json
+cost_model: configs/cost_model.yaml
+cache_model: vllm
+replicas: [1, 2, 3, 4, 5, 6, 7, 8]
+seeds: [0, 1, 2]
+probe_speeds: [0.25, 0.5, 1, 2, 4]   # arrival-rate multipliers tried by the round-robin probe
+speeds: [1, 2, 4]   # from the round-robin probe at 1/32: toolagent needs 4, 5, 8; conversation 5, 5, 8
+
+policies: [round-robin, least-loaded, power-of-two, consistent-hash-prefix, radix-affinity, session-sticky]
+alphas: [16, 1]     # radix-affinity-balanced: alpha* (tested), and alpha = 1 (Phase 5's many-prompt best)
+alpha_star: 16
+
+# ── The decision rules, fixed before the comparison runs ─────────────────────────────────────
+# At each speed: R = the fewest replicas (1-8) meeting the SLO on every seed, 9 if none. Affinity
+# wins if R(radix-affinity-balanced @ 16) < R(session-sticky); sticky wins if the reverse.
+#   affinity_wins       — holds if affinity wins at >= 1 speed and sticky wins at none
+#   affinity_never_wins — holds if affinity wins at no speed
+# R1 HOLDS only if both traces' rules hold.
+rules:
+  toolagent: affinity_wins          # 39% of block uses shared across users; shared set 2.4x a cache
+  conversation: affinity_never_wins # 10% shared across users (2.7x a cache); reuse is mostly history

@@ -179,3 +179,65 @@ def test_generator_rejects_impossible_prefix_counts():
         AgenticWorkload(n_shared_prefixes=101)
     with pytest.raises(ValueError, match="prefix_zipf_s"):
         AgenticWorkload(n_shared_prefixes=4, prefix_zipf_s=-1.0)
+
+
+def _mooncake(tmp_path, rows):
+    p = tmp_path / "m.jsonl"
+    p.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return p
+
+
+def test_mooncake_blocks_share_exactly_at_the_traces_granularity(tmp_path):
+    """A 512-token trace block becomes whole 16-token blocks; equal trace ids hash equal, and a
+    partial trace block contributes only its full 16-token blocks."""
+    p = _mooncake(tmp_path, [
+        {"timestamp": 0, "input_length": 1024, "output_length": 8, "hash_ids": [7, 8]},
+        {"timestamp": 500, "input_length": 1100, "output_length": 8, "hash_ids": [7, 9, 10]},
+    ])
+    a, b = adapters.get("mooncake").read(p, infer_sessions=False)
+    assert len(a.block_hashes) == 64  # 2 trace blocks x 32
+    assert len(b.block_hashes) == 64 + 76 // 16  # 2 full blocks + the 76-token tail's 4 blocks
+    assert a.block_hashes[:32] == b.block_hashes[:32]  # trace block 7, shared
+    assert a.block_hashes[32:64] != b.block_hashes[32:64]  # 8 vs 9: not shared
+    assert b.arrival_ts == 0.5 and b.session_id is None
+
+
+def test_mooncake_token_scale_keeps_structure_and_shrinks_sizes(tmp_path):
+    p = _mooncake(tmp_path, [
+        {"timestamp": 0, "input_length": 1024, "output_length": 160, "hash_ids": [1, 2]},
+    ])
+    (r,) = adapters.get("mooncake").read(p, token_scale=1 / 16, infer_sessions=False)
+    assert r.prompt_tokens == 64 and r.output_tokens == 10
+    assert len(r.block_hashes) == 4  # 2 trace blocks x (512 / 16 / 16)
+    with pytest.raises(ValueError, match="whole number"):
+        list(adapters.get("mooncake").read(p, token_scale=1 / 3))
+
+
+def test_mooncake_sessions_follow_histories_but_never_a_shared_prompt(tmp_path):
+    """A turn that re-sends a request's full blocks joins its session. Requests that only share a
+    hot system prompt — one many different blocks follow — stay separate."""
+    # five users behind shared prompt 0: its fan-out is 5
+    rows = [{"timestamp": i, "input_length": 1536, "output_length": 1,
+             "hash_ids": [0, 100 + i, 200 + i]} for i in range(5)]
+    rows.append({"timestamp": 9, "input_length": 2048, "output_length": 1,
+                 "hash_ids": [0, 100, 200, 300]})  # user 0's next turn
+    st = TraceStats()
+    out = list(adapters.get("mooncake").read(_mooncake(tmp_path, rows), hot_fanout=3, stats=st))
+    assert len({r.session_id for r in out[:5]}) == 5  # the shared prompt merged no one
+    assert out[5].session_id == out[0].session_id  # the continuation joined user 0
+    assert st.requests == 6
+
+
+def test_mooncake_bad_lines_are_skipped_and_counted(tmp_path):
+    p = tmp_path / "m.jsonl"
+    p.write_text(
+        '{"timestamp": 0, "input_length": 1024, "output_length": 1, "hash_ids": [1, 2]}\n'
+        "not json\n"
+        '{"timestamp": 1, "input_length": 1024, "output_length": 1, "hash_ids": [1]}\n'
+        '{"timestamp": 2, "input_length": 1024, "output_length": 1}\n'
+    )
+    st = TraceStats()
+    out = list(adapters.get("mooncake").read(p, stats=st))
+    assert len(out) == 1 and st.skipped_lines == 3
+    assert st.skip_reasons == {"json_decode_error": 1, "block_count_mismatch": 1,
+                               "missing_or_bad_fields": 1}
