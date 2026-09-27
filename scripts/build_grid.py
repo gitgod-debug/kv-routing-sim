@@ -1,151 +1,173 @@
 #!/usr/bin/env python3
-"""Precompute the demo grid: sharing x load x replicas x policy -> one JSON file.
+"""Precompute the demo grid: tenant prompts × load × replicas × policy -> one JSON file.
 
-⭐ THIS IS THE DEMO'S ENTIRE BACKEND (ADR-011). The static page ships this file and the sliders look
-answers up in it. No server, nothing to wake, and — the part that matters for this project — every
-number on the page comes from a committed script with a pinned seed, so it is auditable exactly like
-anything in `artifacts/results/`. A live app computing on demand would be LESS checkable, because
-nobody can verify what it computed.
+    python scripts/build_grid.py        # -> artifacts/results/demo_grid.json
 
-⚠️ The grid inherits the cost profile's status. While that profile is uncalibrated, the page may show
-the policy RANKING and the cache numbers but NOT the millisecond or rupee figures as predictions
-(ADR-010 tier 1). The emitted JSON carries `calibrated: false` so the page cannot forget.
+⭐ THIS IS THE DEMO'S ENTIRE BACKEND (ADR-011). The static page (`site/`) ships this file and its
+selectors look answers up in it: no server, nothing to wake, and every number comes from this
+committed script with pinned seeds — auditable exactly like anything else in `artifacts/results/`.
 
-    python scripts/build_grid.py --sharing-steps 11 --rates 4,8,16,32 --replicas 1-8 --seeds 3
+The axes are the finding's (H2b): K distinct tenant prompts × offered load × replicas × policy, on
+the calibrated T4 profile and the cited cost model, so each cell says whether it holds the 2 s p95
+TTFT target and what it costs. Traffic, prompt counts, loads, replicas, seeds and alpha* are read
+from Phase 5's config and results, and a guard stops the build unless the grid reproduces Phase 5's
+H2b required-replica table exactly: the demo cannot drift from the experiment it illustrates.
+
+⚠️ T4 figures, generated traffic, one model. The direction of the K flip survived H6's hardware
+rescales; the replica counts and rupees did not transfer (H6's ranking half). The page says so.
 """
 
 from __future__ import annotations
 
-import argparse
+import gzip
 import json
+import os
+import pathlib
 import sys
 import time
-from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor
+from functools import cache, lru_cache
+from typing import Any
 
-from joblib import Parallel, delayed
+import yaml
 
-from kv_routing_sim import policies as policy_pkg
-from kv_routing_sim.sim.cost_model import UNCALIBRATED_DEFAULT
+from kv_routing_sim.eval.cost import CostModel
+from kv_routing_sim.eval.pareto import Point, to_point
+from kv_routing_sim.eval.sweep import average_points
+from kv_routing_sim.sim.cost_model import load_profile
 from kv_routing_sim.sim.engine import run
 from kv_routing_sim.traces.generator import AgenticWorkload
 
-# The metrics each cell carries. Kept short and fixed-order: the page indexes by position, which is
-# what keeps the file small enough to ship.
-FIELDS = ("hit_rate", "p50_ms", "p95_ms", "p99_ms", "imbalance")
+REPO = pathlib.Path(__file__).resolve().parents[1]
+P5 = REPO / "configs" / "phase5_crossover.yaml"
+P5_RESULTS = REPO / "artifacts" / "results" / "phase5_crossover" / "phase5.json"
+NOT_MET = 9  # no replica count from 1 to 8 holds the SLO (Phase 5's convention)
+FIELDS = ("hit_rate", "p50_ms", "p95_ms", "inr_per_1k", "meets_slo")
 
 
-def _scenario(sharing: float, rate: float, replicas: list[int], names: list[str],
-              seeds: tuple[int, ...], n_sessions: int, turns: int) -> dict[str, object]:
-    """One (sharing, rate) point: generate the trace once, sweep replicas x policies over it.
+def label(policy: str, alpha: float | None) -> str:
+    return policy if alpha is None else f"{policy}@{alpha:g}"
 
-    The trace is generated ONCE per scenario rather than per policy — otherwise each policy would be
-    measured on a different trace and the comparison would not be paired.
-    """
-    trace, report = AgenticWorkload(
-        n_sessions=n_sessions,
-        turns_per_session=turns,
-        prefix_sharing_ratio=sharing,
-        arrival_rate=rate,
-        seed=0,
-    ).generate()
-    cells: list[list[float]] = []
-    for rep in replicas:
-        for name in names:
-            runs = [
-                run(trace, policy=name, n_replicas=rep, seed=s, profile=UNCALIBRATED_DEFAULT)
-                for s in seeds
-            ]
-            n = len(runs)
-            pct = [r.ttft_percentiles() for r in runs]
-            cells.append([
-                round(sum(r.hit_rate for r in runs) / n, 5),
-                round(sum(p["p50_ms"] for p in pct) / n, 2),
-                round(sum(p["p95_ms"] for p in pct) / n, 2),
-                round(sum(p["p99_ms"] for p in pct) / n, 2),
-                round(sum(r.load_imbalance() for r in runs) / n, 4),
-            ])
-    return {
-        # The MEASURED axis value, not the requested knob — the page must plot what happened.
-        "cross_session_sharing": report["achieved_cross_session_sharing"],
-        "requested_sharing": sharing,
-        "arrival_rate": rate,
-        "requests": report["requests"],
-        "mean_prompt_tokens": report["mean_prompt_tokens"],
-        "cells": cells,  # ordered replicas-major, then policies
-    }
+
+@lru_cache(maxsize=1)
+def _p5() -> dict[str, Any]:
+    return yaml.safe_load(P5.read_text())
+
+
+@lru_cache(maxsize=1)
+def _p5_results() -> dict[str, Any]:
+    return json.loads(P5_RESULTS.read_text())
+
+
+def _policies() -> list[tuple[str, float | None]]:
+    alpha_star = float(_p5_results()["a1"]["alpha_star"])
+    return [
+        ("round-robin", None),
+        ("least-loaded", None),
+        ("session-sticky", None),
+        ("radix-affinity", None),
+        ("radix-affinity-balanced", alpha_star),  # Phase 5's A1 choice
+        ("radix-affinity-balanced", 1.0),  # the best weight once prompts multiply (post-hoc)
+    ]
+
+
+@cache
+def _trace(k: int, load: float):
+    p5 = _p5()
+    spec = {**p5["session_shape"], "prefix_sharing_ratio": p5["h2b"]["sharing"],
+            "n_shared_prefixes": k, "prefix_zipf_s": p5["h2b"]["prefix_zipf_s"]}
+    return AgenticWorkload(**spec, arrival_rate=float(load)).generate()
+
+
+@lru_cache(maxsize=1)
+def _profile():
+    return load_profile(REPO / _p5()["profile"])
+
+
+@lru_cache(maxsize=1)
+def _cost() -> CostModel:
+    return CostModel.from_yaml(REPO / _p5()["cost_model"])
+
+
+def _job(key: tuple) -> tuple[tuple, Point]:
+    k, load, policy, alpha, n, seed = key
+    trace, _ = _trace(k, load)
+    kwargs = None if alpha is None else {"load_penalty": alpha}
+    r = run(trace, policy=policy, n_replicas=n, seed=seed, profile=_profile(),
+            cache_model=_p5()["cache_model"], policy_kwargs=kwargs)
+    return key, to_point(r, _cost())
 
 
 def main() -> int:
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    sys.path.insert(0, str(REPO / "scripts"))
     from _spike_common import results_header
 
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--sharing-steps", type=int, default=11, help="values from 0.0 to 0.9")
-    ap.add_argument("--rates", default="4,8,16,32")
-    ap.add_argument("--replicas", default="1-8")
-    ap.add_argument("--seeds", type=int, default=3)
-    ap.add_argument("--sessions", type=int, default=120)
-    ap.add_argument("--turns", type=int, default=6)
-    ap.add_argument("--jobs", type=int, default=-1, help="-1 = all cores")
-    ap.add_argument("--out", default="artifacts/results/demo_grid.json")
-    args = ap.parse_args()
-
-    lo, hi = args.replicas.split("-") if "-" in args.replicas else (args.replicas, args.replicas)
-    replicas = list(range(int(lo), int(hi) + 1))
-    rates = [float(x) for x in args.rates.split(",")]
-    steps = max(1, args.sharing_steps - 1)
-    sharings = [round(i * 0.9 / steps, 4) for i in range(args.sharing_steps)]
-    names = list(policy_pkg.ALL)
-    seeds = tuple(range(args.seeds))
-
-    scenarios = [(s, r) for s in sharings for r in rates]
-    n_runs = len(scenarios) * len(replicas) * len(names) * len(seeds)
-    print(f"grid: {len(sharings)} sharing x {len(rates)} rates x {len(replicas)} replicas "
-          f"x {len(names)} policies x {len(seeds)} seeds")
-    print(f"  = {len(scenarios)} traces, {n_runs:,} simulator runs")
-
+    p5 = _p5()
+    ks, seeds = p5["h2b"]["n_shared_prefixes"], p5["h2b"]["seeds"]
+    loads, replicas, policies = p5["loads"], p5["replicas"], _policies()
+    payload = results_header("scripts/build_grid.py", seed=0, hardware_path="cpu-only")
+    jobs = [(k, ld, p, al, n, s) for k in ks for ld in loads for p, al in policies
+            for n in replicas for s in seeds]
     t0 = time.monotonic()
-    results = Parallel(n_jobs=args.jobs, verbose=5)(
-        delayed(_scenario)(s, r, replicas, names, seeds, args.sessions, args.turns)
-        for s, r in scenarios
-    )
+    with ProcessPoolExecutor(max(1, (os.cpu_count() or 2) - 1)) as ex:
+        results = list(ex.map(_job, jobs, chunksize=4))
     wall = time.monotonic() - t0
+    runs: dict[tuple, list[Point]] = {}
+    for (k, ld, p, al, n, _s), point in results:
+        runs.setdefault((k, ld, p, al, n), []).append(point)
+    agg = {key: average_points(pts) for key, pts in runs.items()}
 
-    payload = results_header(
-        "scripts/build_grid.py",
-        seed=0,
-        hardware_path="cpu-only",
-        extra={
-            "axes": {
-                "sharing_requested": sharings,
-                "arrival_rates": rates,
-                "replicas": replicas,
-                "policies": names,
-                "seeds": list(seeds),
-            },
-            "cell_fields": list(FIELDS),
-            "cell_order": "replicas-major, then policies",
-            "n_simulator_runs": n_runs,
-            "build_wall_clock_s": round(wall, 1),
-            "profile": UNCALIBRATED_DEFAULT.provenance(),
+    # Guard: every cell here is also in Phase 5's H2b grid — same traces, seeds, profile, cost
+    # model and code path. If the fewest replicas holding the SLO differ anywhere, the page would
+    # show numbers the experiment did not produce: stop instead of writing the file.
+    want = _p5_results()["h2b"]["required_replicas"]
+    for k in ks:
+        for ld in loads:
+            for p, al in policies:
+                got = next((n for n in replicas if agg[(k, ld, p, al, n)].meets_slo), NOT_MET)
+                exp = want[str(k)][str(ld)][label(p, al)]
+                if got != exp:
+                    raise SystemExit(
+                        f"error: K={k} at {ld}/s, {label(p, al)} needs {got} replicas here but "
+                        f"{exp} in Phase 5. The code or the config drifted; not writing the grid."
+                    )
+    print("the grid reproduces Phase 5's H2b required-replica table exactly")
+
+    def cell(k: int, ld: float, p: str, al: float | None, n: int) -> list:
+        a = agg[(k, ld, p, al, n)]
+        inr = None if a.inr_per_1k == float("inf") else round(a.inr_per_1k, 3)
+        return [round(a.hit_rate, 4), round(a.p50_ttft_ms), round(a.p95_ttft_ms), inr,
+                1 if a.meets_slo else 0]
+
+    first = {k: _trace(k, loads[0])[1] for k in ks}
+    payload.update({
+        "axes": {"prompts": ks, "loads": loads, "replicas": replicas,
+                 "policies": [label(p, al) for p, al in policies]},
+        "cell_fields": list(FIELDS),
+        "cell_order": "prompts, load, policy, replicas — nested lists in that order",
+        "cells": [[[[cell(k, ld, p, al, n) for n in replicas] for p, al in policies]
+                   for ld in loads] for k in ks],
+        "alpha_star": _p5_results()["a1"]["alpha_star"],
+        "seeds": seeds,
+        "working_set_blocks": {
+            str(k): first[k].get("shared_working_set_blocks",
+                                 first[k]["shared_prefix_tokens"] // _profile().block_size)
+            for k in ks
         },
-    )
-    payload["scenarios"] = results
-
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(payload, separators=(",", ":")) + "\n", encoding="utf-8")
-    size = out.stat().st_size
-
-    import gzip
-    gz = len(gzip.compress(out.read_bytes()))
-    print(f"\nwrote {out}")
-    print(f"  wall clock : {wall:.1f}s on {args.jobs} jobs")
-    print(f"  raw size   : {size / 1024:.0f} KiB")
-    print(f"  gzipped    : {gz / 1024:.0f} KiB   <- what a visitor actually downloads")
-    print(f"  per cell   : {size / max(1, n_runs // max(1, len(seeds))):.0f} B")
-    print("\n⚠️  UNCALIBRATED: the page may show the ranking and the cache numbers. "
-          "The millisecond figures are not predictions.")
+        "usable_blocks_per_replica": _profile().kv_cache_blocks - 1,
+        "slo_p95_ttft_ms": _cost().ttft_p95_slo_ms,
+        "profile": _profile().provenance(),
+        "cost_model": _cost().provenance,
+        "reproduces": "artifacts/results/phase5_crossover/phase5.json (h2b.required_replicas)",
+        "n_simulator_runs": len(jobs),
+        "build_wall_clock_s": round(wall, 1),
+    })
+    out = REPO / "artifacts" / "results" / "demo_grid.json"
+    out.write_text(json.dumps(payload, separators=(",", ":"), default=str) + "\n",
+                   encoding="utf-8")
+    raw = out.stat().st_size
+    print(f"{len(jobs):,} runs in {wall:.0f}s · wrote {out.relative_to(REPO)} — {raw / 1024:.0f} "
+          f"KiB raw, {len(gzip.compress(out.read_bytes())) / 1024:.0f} KiB gzipped")
     return 0
 
 
