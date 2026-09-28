@@ -10,8 +10,8 @@
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
 **Last updated:** 2026-09-28 (the finding, H6, R1 on Mooncake, Phase 6 registered, the demo page and the
-10×/100× numbers, the preprint draft, `kvsim calibrate`, a wheel that works outside a clone; 172 tests
-green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
+10×/100× numbers, the preprint draft, `kvsim calibrate` and C1, a wheel that works outside a clone;
+175 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
 vLLM under eviction pressure to the token, against predictions committed before the run)
 **Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding** — *keep each user on one GPU until
 your tenants' prompts outgrow one GPU's cache; then route by prefix, and keep its load weight small* (H2b
@@ -617,7 +617,7 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       and seconds; at 100× **block-hash memory** gives out first (537 MiB of trace before the simulation
       starts; the policy loop stays linear); at 80 replicas affinity routing costs 2.4× per request.
       Fidelity at 80 replicas is not answerable on a CPU, and the README says so
-- [ ] 👥 `CONTRIBUTING.md` + **three genuinely good first issues** (a new trace adapter, a new policy class —
+- [~] 👥 `CONTRIBUTING.md` + **three genuinely good first issues** (a new trace adapter, a new policy class —
       both are single-file by design), then **review the PRs properly**: real comments, changes requested,
       then merged.
 
@@ -625,6 +625,11 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 
 ## Phase 8 — Write-up and launch
 
+      ✅ 2026-09-28: [`CONTRIBUTING.md`](CONTRIBUTING.md) (setup, the six habits, how to add a policy,
+      an adapter or a profile) and [`docs/good-first-issues.md`](docs/good-first-issues.md) — a
+      `least-tokens` policy that tests the open least-loaded question, `--format html`, and per-cell
+      bootstrap CIs by session. The adapter issue waits until AgentX's format is checked. Open them
+      once the repo is public; then review the PRs properly
 - [ ] README **numbers-first**, with **the credential and the finding in separate sections**
 - [ ] Write the README against the **three readers** in
       the deployment notes: the 30-second reader (needs the
