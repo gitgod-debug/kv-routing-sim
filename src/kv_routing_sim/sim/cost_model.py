@@ -15,12 +15,21 @@ ever checked. This flag is where that difference is enforced in code rather than
 
 THE MODEL (ADR-001, iteration granularity):
 
-    prefill(uncached_tokens) = prefill_base_s + prefill_per_token_s * uncached_tokens
-    decode(batch_size)       = decode_base_s  + decode_per_seq_s   * batch_size
+    prefill(n, c) = prefill_base_s + prefill_per_token_s * n + prefill_attn_s * n * (c + n / 2)
+    decode(b, S)  = decode_base_s  + decode_per_seq_s    * b + decode_per_ctx_token_s * S
+
+n = uncached tokens computed, c = cached tokens before them, b = sequences in the step, S = the
+sum of their context lengths (prompt + tokens generated so far).
 
 Prefill is compute-bound and scales with the tokens actually computed — which is exactly the
 quantity prefix caching reduces, and therefore exactly the quantity routing controls. Decode is
 memory-bandwidth-bound and scales with how many sequences share the step.
+
+⚠️ THE TWO CONTEXT TERMS (added 2026-09-28, after Phase 6): attention reads every earlier token, so
+both costs also grow with context. Phase 6 found the context-free model optimistic by 2.7–4.0× per
+decode step on ~1,700-token prompts, and C1 found prefill per token rising from 0.71 ms (≤ 1,024
+tokens) to 1.12 ms (2,040). Both terms default to 0.0, which reproduces the old model exactly —
+every profile fitted before C2 keeps its results to the bit. C2 (configs/c2_timing.yaml) fits them.
 """
 
 from __future__ import annotations
@@ -57,11 +66,26 @@ class CostProfile:
     calibrated: bool = False
     calibration_error: float | None = None  # relative hit-rate error vs the live engine
 
-    def prefill_s(self, uncached_tokens: int) -> float:
-        return self.prefill_base_s + self.prefill_per_token_s * max(0, uncached_tokens)
+    # ── The context terms (C2). 0.0 = the context-free model, exactly as before. ──
+    prefill_attn_s: float = 0.0  # per computed token, per token it attends to
+    decode_per_ctx_token_s: float = 0.0  # per context token summed over the batch
 
-    def decode_s(self, batch_size: int) -> float:
-        return self.decode_base_s + self.decode_per_seq_s * max(0, batch_size)
+    def prefill_s(self, uncached_tokens: int, cached_tokens: int = 0) -> float:
+        n = max(0, uncached_tokens)
+        cost = self.prefill_base_s + self.prefill_per_token_s * n
+        if self.prefill_attn_s:
+            cost += self.prefill_attn_s * n * (max(0, cached_tokens) + n / 2.0)
+        return cost
+
+    def decode_s(self, batch_size: int, context_tokens: int = 0) -> float:
+        cost = self.decode_base_s + self.decode_per_seq_s * max(0, batch_size)
+        if self.decode_per_ctx_token_s:
+            cost += self.decode_per_ctx_token_s * max(0, context_tokens)
+        return cost
+
+    @property
+    def context_aware(self) -> bool:
+        return bool(self.prefill_attn_s or self.decode_per_ctx_token_s)
 
     def provenance(self) -> dict[str, object]:
         """What every results file records about where its timing came from."""

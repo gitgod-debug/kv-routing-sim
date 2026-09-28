@@ -270,3 +270,32 @@ def test_both_models_complete_every_request_on_agentic_traffic(cache_model):
     r = run(trace, policy="radix-affinity-balanced", n_replicas=4, profile=SMALL,
             cache_model=cache_model)
     assert r.completed == len(trace)
+
+
+def test_context_terms_follow_the_stated_formulas():
+    """prefill(n, c) = base + per_token·n + attn·n·(c + n/2); decode(b, S) = base + per_seq·b +
+    per_ctx·S. And with both context terms at zero, exactly the old context-free model."""
+    p = dataclasses.replace(SMALL, prefill_attn_s=1e-8, decode_per_ctx_token_s=2e-6)
+    assert p.prefill_s(100, 400) == pytest.approx(0.001 + 0.00001 * 100 + 1e-8 * 100 * 450)
+    assert p.decode_s(4, 2_000) == pytest.approx(0.002 + 0.0001 * 4 + 2e-6 * 2_000)
+    assert p.context_aware and not SMALL.context_aware
+    assert SMALL.prefill_s(100, 400) == SMALL.prefill_s(100)  # no context term: ignored
+    assert SMALL.decode_s(4, 2_000) == SMALL.decode_s(4)
+
+
+def test_long_contexts_cost_more_only_with_the_context_term():
+    """The same requests with long prompts run slower than with short ones when the profile has a
+    context term — and cost exactly the same per step without one (the decode side)."""
+    def trace(prompt_tokens):
+        blocks = prompt_tokens // 16
+        return [NormalizedRequest(f"r{i}", 0.0, tuple(range(i * 10_000, i * 10_000 + blocks)),
+                                  prompt_tokens, 32, f"s{i}") for i in range(8)]
+
+    aware = dataclasses.replace(SMALL, decode_per_ctx_token_s=2e-6)
+    short, long_ = trace(160), trace(1_600)
+    flat = [run(t, policy="round-robin", n_replicas=1, profile=SMALL).makespan_s
+            for t in (short, long_)]
+    ctx = [run(t, policy="round-robin", n_replicas=1, profile=aware).makespan_s
+           for t in (short, long_)]
+    assert ctx[1] - ctx[0] > flat[1] - flat[0] + 0.01  # the context term adds real time
+    assert ctx[0] > flat[0]

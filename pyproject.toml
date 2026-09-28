@@ -91,6 +91,7 @@ extend-select = ["E501"]
 "scripts/_phase3_notebook.py" = ["E501"]
 "scripts/_phase6_notebook.py" = ["E501"]
 "scripts/_c1_notebook.py" = ["E501"]
+"scripts/_c2_notebook.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

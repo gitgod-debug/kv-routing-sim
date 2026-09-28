@@ -114,7 +114,7 @@ class Replica:
             matched = self.cache.query(req.block_hashes, req.prompt_tokens)
             cached_tokens = matched * p.block_size
             uncached = max(0, req.prompt_tokens - cached_tokens)
-            prefill_s += p.prefill_s(uncached)
+            prefill_s += p.prefill_s(uncached, cached_tokens)
             self.running.append(
                 InFlight(
                     request=req,
@@ -127,7 +127,7 @@ class Replica:
                 )
             )
 
-        duration = prefill_s + p.decode_s(len(self.running))
+        duration = prefill_s + p.decode_s(len(self.running), self._context_tokens())
         return duration, self._emit(now + duration)
 
     # ── the vLLM model ────────────────────────────────────────────────────────────────────────
@@ -181,7 +181,7 @@ class Replica:
                 self.queue.popleft()
                 pool.record_lookup(num_tokens, len(hit), preempted=seq is not None)
                 uncached = max(0, num_tokens - len(hit) * p.block_size)
-                prefill_s += p.prefill_s(uncached)
+                prefill_s += p.prefill_s(uncached, num_tokens - uncached)
                 if seq is None:
                     seq = InFlight(
                         request=req,
@@ -195,13 +195,22 @@ class Replica:
                 self.running.append(seq)
 
         # A step in which everything was preempted computes nothing, and costs nothing.
-        duration = prefill_s + (p.decode_s(len(self.running)) if self.running else 0.0)
+        duration = prefill_s + (
+            p.decode_s(len(self.running), self._context_tokens()) if self.running else 0.0
+        )
         end = now + duration
         finished = self._emit(end)
         for seq in finished:
             pool.free(seq.request.request_id)
             pool.forget(seq.request.request_id)
         return duration, finished
+
+    def _context_tokens(self) -> int:
+        """Σ context over the batch — prompt plus tokens generated so far, per sequence — for the
+        decode step's context term. Computed only when the profile has one: 0 otherwise."""
+        if not self.profile.decode_per_ctx_token_s:
+            return 0
+        return sum(s.request.prompt_tokens + s.tokens_emitted for s in self.running)
 
     def _preempt(self, seq: InFlight) -> None:
         """scheduler.py `_preempt_request`: free the blocks (their hashes survive), keep the
