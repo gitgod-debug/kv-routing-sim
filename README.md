@@ -39,7 +39,7 @@ vLLM (the credential, below), a 2-second p95 TTFT target, and the test registere
 [`demo_grid.json`](artifacts/results/demo_grid.json), which reproduces Phase 5's table; 3 seeds per point,
 a point counts only if every seed holds the target. Replica counts are T4 figures (H6).*
 
-- **One shared prompt:** session-sticky needed the fewest GPUs at every load — 25–42% fewer than
+- **One shared prompt:** session-sticky needed the fewest GPUs at every load — 25–43% fewer than
   round-robin — and *pure* prefix-affinity collapsed: it sends every session to the one replica holding
   the prompt, and lost 60–260 s of p95 TTFT from 2 sessions/s (H2, falsified).
 - **Many prompts:** the order flips. Round-robin's hit rate fell from 0.84 to 0.53 and session-sticky's
