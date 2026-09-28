@@ -1,0 +1,63 @@
+# R2 — real traffic: SemiAnalysis's AgentX traces (real coding-agent sessions).
+# Registered with a dated entry in docs/09-hypotheses.md BEFORE the comparison runs. The procedure is
+# scripts/run_realtrace.py (R1's), with this config; its `--probe` runs round-robin ALONE.
+
+schema_version: 1
+name: R2
+title: "R2 — real traffic: SemiAnalysis's AgentX traces (coding-agent sessions)"
+sessions_note: real sessions (one per trace), hashes session-local
+results_dir: artifacts/results/realtrace_agentx
+source: https://huggingface.co/datasets/semianalysisai/cc-traces-weka-042026   # Apache-2.0, fetched 2026-09-28
+adapter_name: agentx
+traces:
+  agentx: artifacts/traces/agentx/traces.jsonl   # 739 sessions, 59,274 requests; not committed
+
+# The replay (see the adapter's docstring): CONCURRENCY sessions run at once, each at its recorded
+# pace, three hours in all. SCALE 1/64: sixteen 64-token trace blocks (1,024 tokens) become one
+# 16-token block. Both were set by round-robin-only probes, before any comparison ran (2026-09-28):
+#   1. At R1's 1/32 and 32 sessions, round-robin held the SLO on 8 replicas at NO probe speed,
+#      0.25x included: a median prompt is ~3,100 tokens there, and one whose context was evicted
+#      takes over 2 s to prefill. So, by the rule below, 1/64.
+#   2. At 1/64 and 32 sessions, round-robin needed 1, 1, 1, 2, 3 replicas at 0.25x-4x: a load too
+#      light to tell policies apart. At 128 and at 64 sessions it held the SLO at NO speed, even on
+#      8 replicas — a cliff, not a slope: under round-robin every replica ends up caching every
+#      session, so adding replicas does not shrink the working set. The first rule had not foreseen
+#      either. So, fixed before the next probes: the concurrency is the LARGEST of 32, 40, 48, 56 at
+#      which round-robin holds the SLO on 8 or fewer replicas at the recorded pace (1x). Only
+#      round-robin has been run, so nothing about session-sticky against affinity informs this.
+#      Round-robin needed, at 0.25x 0.5x 1x 2x 4x: 40 sessions 1 1 2 3 —; 48 sessions 1 2 2 5 —;
+#      56 sessions — everywhere. So 48 sessions, and by the speed rule below 0.5x 1x 2x.
+adapter: {token_scale: 0.015625, concurrency: 48, window_s: 10800, stagger_s: 600, seed: 0, models: main}
+window_s: 10800     # three hours
+warmup_s: 1800      # think times average 199 s, so the caches take longer to fill than in R1
+
+profile: configs/profiles/t4-qwen3-4b-vllm0.30.0.json
+cost_model: configs/cost_model.yaml
+cache_model: vllm
+replicas: [1, 2, 3, 4, 5, 6, 7, 8]
+seeds: [0, 1, 2]
+
+# ── How the scale and the speeds are chosen, fixed BEFORE the probe runs ─────────────────────
+# The probe runs round-robin alone, which says nothing about session-sticky against affinity.
+#   * Scale: 1/32, as in R1. Only if round-robin holds the SLO on 8 replicas at NO probe speed does
+#     the scale become 1/64 (and the probe runs again).
+#   * Speeds (multiples of the recorded pace): the highest probe speed at which round-robin still
+#     holds the SLO on 8 or fewer replicas, and the two probe speeds below it.
+probe_speeds: [0.25, 0.5, 1, 2, 4]
+speeds: [0.5, 1, 2] # by the rule: round-robin holds on 8 at 2x (5 replicas), not at 4x
+
+policies: [round-robin, least-loaded, power-of-two, consistent-hash-prefix, radix-affinity, session-sticky]
+alphas: [16, 1]     # radix-affinity-balanced: alpha* (tested), and alpha = 1 (reported)
+alpha_star: 16
+
+# ── The decision rules ────────────────────────────────────────────────────────────────────────
+# Hash scope is local, so NO block is shared across sessions: prefix-affinity can exploit only
+# the reuse session-sticky already keeps together. From H2b's mechanism:
+#   tie_within_one            — balanced affinity (alpha*) and session-sticky need replicas within
+#                               one of each other at every testable speed;
+#   pure_affinity_ties_sticky — so does PURE affinity: with no prompt shared across sessions there
+#                               is nothing to pile every session onto, so the collapse that sank it
+#                               on Mooncake (and in H2) must not happen here.
+# R2 holds only if both hold. A speed where neither policy holds the SLO on 8 is untestable.
+rules:
+  agentx: [tie_within_one, pure_affinity_ties_sticky]
