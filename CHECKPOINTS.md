@@ -15,8 +15,8 @@
 vLLM under eviction pressure to the token, against predictions committed before the run)
 **Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding** — *keep each user on one GPU until
 your tenants' prompts outgrow one GPU's cache; then route by prefix, and keep its load weight small* (H2b
-holds; H2 falsified) · 🔨 **4** — H6's ranking half ⛔ and crossover half ✅, R1 on real traffic ⛔;
-AgentX left · 🔨 **6** registered, the Kaggle run is yours · 🔨 **7** — demo page, grid, figure and
+holds; H2 falsified) · 🔨 **4** — H6's ranking half ⛔ and crossover half ✅; real traffic: R1
+(Mooncake) ⛔, R2 (AgentX) ✅ · 🔨 **6** registered, the Kaggle run is yours · 🔨 **7** — demo page, grid, figure and
 10×/100× done; `kvsim calibrate` built (first GPU run left); PyPI left · 🔨 **8** — the preprint is
 drafted. ▶ **Next:** your Kaggle run of Phase 6; `kvsim calibrate`'s first GPU run once the repo is
 public (a Kaggle notebook can then `pip install` it — the registered Phase 6 notebook stays as it is).
@@ -86,7 +86,7 @@ public (a Kaggle notebook can then `pip install` it — the registered Phase 6 n
 | 2 | Block-level KV cache model | `[x]` | Known prefix sequence → known hit/miss pattern, in tests; partial-block rule holds; memory ceiling measured |
 | **2b** | **Cache model = vLLM's block pool** 🆕 | `[x]` | Every eviction behaviour cites a line of vLLM's source; naive LRU kept as the ablation; both still reproduce v1/v2 exactly |
 | 3 | **Real-Engine Calibration Report** | `[x]` ✅ exact on W1 + W2, +0.3% on W3 | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
-| 4 | **Seven** policies + Pareto sweep | `[~]` H1 ⛔ · H5 1 of 4 · H6 ranking ⛔, crossover ✅ · α swept · R1 (Mooncake) ⛔ · property + golden tests ✅ — AgentX and per-cell CIs left | Tests **H1 + H5 + H6** |
+| 4 | **Seven** policies + Pareto sweep | `[~]` H1 ⛔ · H5 1 of 4 · H6 ranking ⛔, crossover ✅ · α swept · R1 (Mooncake) ⛔ · R2 (AgentX) ✅ · property + golden tests ✅ — per-cell CIs left | Tests **H1 + H5 + H6** |
 | 5 | **The crossover finding** | `[x]` H2 ⛔ · **H2b ✅** — the README headline, with its figure | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
 | 6 | Sim-to-real 2-replica validation | `[~]` registered 2026-09-28 on two physical T4s; the Kaggle run is left | Predicted vs measured across two MIG instances, or the documented fallback and why |
 | 7 | Package · CLI · static demo · hardening | `[~]` demo page + grid + 10×/100× ✅ · `kvsim calibrate` built, not yet run on a GPU · PyPI left | `pip install` + `kvsim replay` + a **static** demo page (ADR-011) + "what breaks at 10×/100×" answered with measured numbers |
@@ -449,9 +449,11 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       the `mooncake` adapter (sessions inferred; Apache-2.0), R1 registered and run — ⛔ FALSIFIED: on
       real traffic sticky and balanced affinity tie within a replica, both beat round-robin, pure
       affinity fails ([`report.md`](artifacts/results/realtrace_mooncake/report.md)). **AgentX:
-      R2 registered 2026-09-28** — the `agentx` adapter (sessions real, hashes session-local),
-      48 sessions at a time at 1/64, speeds 0.5×/1×/2× set by round-robin-only probes; predicted: no
-      cross-user sharing, so balanced AND pure affinity tie session-sticky within one replica
+      R2 registered and ✅ HOLDS 2026-09-28** — the `agentx` adapter (sessions real, hashes
+      session-local), 48 sessions at a time at 1/64, speeds set by round-robin-only probes. As
+      predicted, sticky, balanced AND pure affinity all need 2 T4s at every speed; round-robin needs
+      5 at 2× ([`report.md`](artifacts/results/realtrace_agentx/report.md)). Pure affinity's collapse
+      on Mooncake is caused by shared prompts
 - [~] **Multi-seed (5) + bootstrap CIs by session** — ✅ used for every H1 decision; per-cell p95 CIs
       for the README tables are still to add
 - [x] ✅ `eval/cost.py` from `configs/cost_model.yaml` — every constant **cited and dated**: g4dn.xlarge

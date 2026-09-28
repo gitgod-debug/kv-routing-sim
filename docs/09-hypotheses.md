@@ -851,3 +851,28 @@ unevenly, sticky may pile large sessions onto one replica, and affinity with a l
 then win outright; that would falsify tie_within_one and would be the first real-traffic case where
 re-deciding per turn pays. The scale (1/64) and the replay (48 sessions at a time, open-loop) are
 choices, not facts about the traffic, and every number carries them.
+
+### 2026-09-28 — R2 RAN: HOLDS. With nothing shared across users, sticky and affinity tie — and pure affinity does not collapse.
+Report: [`artifacts/results/realtrace_agentx/report.md`](../artifacts/results/realtrace_agentx/report.md)
+— 576 runs in 177 s, from a clean tree at `cf74aec`; the trace file's sha256 is recorded.
+
+**As registered: HOLDS, on both rules.** Session-sticky, balanced affinity (α\* = 16) and pure
+affinity each need **2 T4s at 0.5×, 1× and 2×** — equal at every speed, not merely within one; so
+does α = 1. Their hit rates at 4 replicas are 0.933–0.937.
+
+**What else it shows (reported).**
+- Round-robin needs 2, 2, **5**: at 2× it takes two and a half times the GPUs the locality-keeping
+  policies take. Least-loaded and power-of-two need 3 at 2×. All three hit 0.59 at 4 replicas,
+  against 0.93: a session's next turn lands on a replica that never saw its context, or holds an
+  older, partly evicted copy. The probes before registering had already shown the extreme: above 48
+  sessions, round-robin held the SLO on no number of replicas.
+- Consistent-hash on the prompt's first blocks does as well (2, 2, 3; hit rate 0.933): with every
+  session's prefix private, hashing it *is* session affinity, and there is no hot prompt to pile onto.
+
+**What it means for the finding.** The two real traces now bracket H2b's mechanism. On Mooncake,
+where prompts are shared across users, pure affinity failed at every speed; on AgentX, where nothing
+is, it tied session-sticky everywhere. So its collapse comes from shared prompts — as H2 found on
+generated traffic — not from routing by prefix as such. On neither trace did affinity beat
+session-sticky by more than a replica: the many-prompt advantage (H2b) is still shown only on
+generated traffic. For agent traffic like this, the practical rule is simple: keep each session on
+one replica, by any policy that does, and never scatter it.

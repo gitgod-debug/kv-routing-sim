@@ -54,12 +54,18 @@ prompts × load × replicas × six policies, 3,456 simulator runs, rebuilt by
 [`scripts/build_grid.py`](scripts/build_grid.py) only if it reproduces the experiment's table exactly. To
 open it from a clone: `python -m http.server` in the repo root, then `http://localhost:8000/site/`.
 
-**On real traffic it is not yet shown.** Replaying the Mooncake FAST'25 tool-agent and conversation
-traces (token counts scaled 1/32, sessions inferred; R1, falsified): session-sticky and prefix-affinity
-with a load weight came out **within one replica** of each other at every speed, both beat
-round-robin under load (6 T4s against 8 at 4× the tool-agent rate), and pure prefix-affinity failed
-the target at every speed. The many-prompt advantage did not appear there — most likely because the
-shared blocks are spread over an hour rather than hot at once (not yet tested).
+**On real traffic, the many-prompt advantage is not yet shown — but the mechanism is.** Two real
+trace families, each test registered before it ran:
+
+| Real trace | What is shared | Session-sticky vs prefix-affinity | Pure prefix-affinity | Round-robin |
+|---|---|---|---|---|
+| **Mooncake** FAST'25 (R1, scale 1/32, sessions inferred) | prompts across users | within one replica (predicted a win on tool-agent: **falsified**) | fails at every speed | 8 T4s vs 6 at 4× tool-agent |
+| **AgentX**, coding-agent sessions (R2, scale 1/64, real sessions) | nothing across users | **identical**: 2 T4s at every speed (**as predicted**) | 2 T4s at every speed — **no collapse** | 5 T4s vs 2 at 2×; hit rate 0.59 vs 0.93 |
+
+So pure prefix-affinity collapses because of prompts shared across users, not because it routes by
+prefix; and on agent traffic like AgentX the rule is simply *keep each session on one replica, by any
+policy that does*. Why affinity did not beat session-sticky on Mooncake is not yet tested — most
+likely its shared blocks are spread over an hour rather than hot at once.
 
 ⚠️ **Scope:** generated traffic, one model (Qwen3-4B). The replica counts are T4 figures. The full
 ranking of the seven policies does **not** transfer to other hardware (H6's ranking half,

@@ -131,6 +131,10 @@ the simple "keep each user on one GPU" policy beat the clever cache-seeking ones
     upstream bug with a ready fix (the upstream log #7).
 14. **At 100× the trace size, memory for the block hashes runs out first:** 537 MiB for 80,000 requests
     before the simulation starts. The simulation itself stays linear.
+15. **On real coding-agent sessions (AgentX), keep-on-one-GPU and prefix routing tie exactly** — 2 T4s
+    at every speed — and even pure prefix routing does not collapse, because nothing is shared across
+    users there (R2, predicted and confirmed). Round-robin needs 5 T4s at 2× where they need 2. So
+    pure prefix routing fails *because of shared prompts* (Mooncake), not because it routes by prefix.
 
 ## 5. What we decided, and why
 
@@ -205,6 +209,9 @@ lives on one GPU.
 - *Real traffic (R1):* on the Mooncake traces the two good policies tied within one GPU. Our best
   guess, written down before the run and not yet tested: the real traces' shared prompts are mostly
   not in use at the same time, so a cache has far less to hold at once than with our 64 tenants.
+- *Real traffic (R2):* on AgentX's coding-agent sessions, where nothing is shared across users, the two
+  tied exactly, as predicted — and pure prefix routing did not collapse, which shows its collapse on
+  Mooncake came from the shared prompts.
 - *The demo page* lets anyone click from 1 to 64 prompts and watch the answer change.
 
 **How much to trust it.** A T4 result on generated traffic, from a cache model that matched the real
@@ -250,7 +257,7 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 | 1–2 | Traffic, cache model, policies, simulator | ✅ done |
 | 2b | Cache model rebuilt to follow vLLM's real rules | ✅ done |
 | 3 | **The calibration** — model vs real engine, pre-registered | ✅ **done: exact** |
-| 4 | Calibrated sweep; H1, H5, H6; the load weight; a real trace | ✅ mostly — H6's ranking half ⛔, its crossover half ✅; the real trace (R1) ⛔; AgentX left |
+| 4 | Calibrated sweep; H1, H5, H6; the load weight; real traces | ✅ mostly — H6's ranking half ⛔, its crossover half ✅; Mooncake (R1) ⛔; AgentX (R2) ✅ |
 | 5 | **The finding** — where prefix-aware routing starts paying off | ✅ **done** — H2 ⛔, **H2b ✅** |
 | 6 | Two-GPU real-engine check under pressure | 🔨 notebook ready, predictions committed — **your Kaggle run** |
 | 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | 🔨 demo, figure, 10×/100× done; `kvsim calibrate` built (not yet run on a GPU); PyPI left |
@@ -271,7 +278,8 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 - ✅ done 28 Sep: the preprint draft (`paper/`), and `kvsim calibrate` — so a user can measure their
   own GPU, as H6 says they must. It still needs its first run on a real GPU;
 - Phase 6's write-up, whatever it shows;
-- later: the AgentX trace, the PyPI release, and a contributor guide with three good first issues.
+- ✅ done 28 Sep: the AgentX trace (R2 holds), and a contributor guide with three good first issues;
+- later: the PyPI release.
 
 **Known limits, owned rather than hidden:**
 - the timing model is the weak part: it cannot express the slow single-sequence decode, and it charges
