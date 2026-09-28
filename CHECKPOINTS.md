@@ -566,7 +566,9 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       it recovers the known timings (decode 2.53 ms/seq against 2.5; prefill 0.022 ms/token against
       0.020), its check is exact (48 of 48 requests), and a wrong block size is caught — which the
       first version of the check missed. ⬜ **Not yet run against a real GPU** — the box stays open
-      until it is
+      until it is. **C1 registered 2026-09-28:** [`c1_calibrate_t4.ipynb`](notebooks/c1_calibrate_t4.ipynb)
+      carries the wheel of the clean commit `5a34c6d`; predicted exact (48 of 48; hit rate 0.714286);
+      dry-run against the mock PASSES. Run it on Kaggle with Phase 6
 - [ ] **`configs/profiles/`** — committed calibration profiles keyed by
       `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
       from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no

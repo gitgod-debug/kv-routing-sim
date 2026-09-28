@@ -1,0 +1,46 @@
+"""C1's registration must stay reproducible; the notebook must carry exactly what was registered.
+
+The notebook embeds the package's wheel; if its bytes or the prediction drift from
+artifacts/results/c1_prereg/prediction.json, the GPU run would test something other than what was
+registered. A deliberate change means re-running scripts/c1_prepare.py on a clean tree, and a dated
+entry in docs/09-hypotheses.md saying why — before the run, never after.
+"""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import json
+import pathlib
+import random
+import re
+
+from kv_routing_sim.calib.calibrate import check_workload, predict_check
+from kv_routing_sim.sim.cost_model import load_profile
+
+REPO = pathlib.Path(__file__).resolve().parents[1]
+PREREG = json.loads((REPO / "artifacts/results/c1_prereg/prediction.json").read_text())
+NOTEBOOK = json.loads((REPO / "notebooks/c1_calibrate_t4.ipynb").read_text())
+SRC = "".join("".join(c["source"]) for c in NOTEBOOK["cells"] if c["cell_type"] == "code")
+
+
+def test_the_notebook_carries_the_registered_wheel_and_prediction():
+    wheel = base64.b64decode(re.search(r'b64decode\("""([A-Za-z0-9+/=]+)"""\)', SRC).group(1))
+    assert hashlib.sha256(wheel).hexdigest() == PREREG["wheel"]["sha256"]
+    assert f'!= "{PREREG["wheel"]["sha256"]}"' in SRC  # and the notebook checks that hash itself
+    pred = json.loads(re.search(r'PRED = json.loads\(r"""(.+?)"""\)', SRC).group(1))
+    assert pred == PREREG["prediction"]
+    assert PREREG["git_dirty"] is False  # registered from committed code only
+
+
+def test_the_registered_prediction_reproduces_from_the_committed_code():
+    cfg = PREREG["config"]
+    c = cfg["calibrate"]
+    work = check_workload(random.Random(f"check-{c['seed']}"), c["check_sessions"],
+                          c["check_turns"], tuple(c["token_range"]))
+    sim = predict_check(work, load_profile(REPO / cfg["phase3_profile"]))
+    p = PREREG["prediction"]
+    assert (sim.cache_hits, sim.cache_queries, len(work)) == (p["hits"], p["queries"],
+                                                              p["requests"])
+    assert [sim.per_request[f"c{i}"]["cached_tokens"] for i in range(len(work))] == \
+        p["cached_tokens"]

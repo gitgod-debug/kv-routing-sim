@@ -772,3 +772,35 @@ cuts the other way: at K = 4 and 4 sessions/s only α = 16 holds the SLO among t
 the headline's first half applies: session-sticky needs the fewest replicas, or ties for them, at every
 load at K = 1 and K = 4. Nothing registered changes: H2b holds as written, at α\* = 16, and everything
 in this entry stays *reported, not tested*. The Phase 5 entry above is left as written.
+
+### 2026-09-28 — C1 REGISTERED before it runs: `kvsim calibrate` on a real GPU
+Design and rules: [`configs/c1_calibrate.yaml`](../configs/c1_calibrate.yaml). Notebook:
+[`notebooks/c1_calibrate_t4.ipynb`](../notebooks/c1_calibrate_t4.ipynb), built by
+`scripts/c1_prepare.py` with the package's wheel **embedded** — built from the clean commit
+`5a34c6d`, sha256 `ac5209ef2899b896…` — so the GPU box runs exactly the committed code. Prediction:
+[`artifacts/results/c1_prereg/prediction.json`](../artifacts/results/c1_prereg/prediction.json).
+`scripts/c1_dryrun.py` ran the whole notebook against the mock engine first: C1 held there, as it
+must, since the mock is the model.
+
+**Why.** H6's ranking half was falsified, so a replica count from our T4 does not transfer; users
+must measure their own GPU, and `kvsim calibrate` is how. It has only met the mock so far.
+
+**The setup.** One vLLM 0.30.0 server, Qwen3-4B in fp16, one T4 — Phase 3's flags without the block
+override, so the engine allocates its natural capacity. `kvsim calibrate` with its defaults.
+
+**How it is decided.** C1 holds only if both hold:
+- **C1a** — the command exits 0: its check's hit-rate error is at most 5% **and** every one of the
+  48 check requests' cached-token counts equals the model's. **Predicted: exact** — hit rate
+  **0.714286**, 9,840 of 13,776 tokens, as the block-pool model was exact on sequential workloads in
+  Phase 3.
+- **C1b** — the KV capacity it reads from the engine equals the engine log's
+  `GPU KV cache size` ÷ 16.
+
+*Reported, not tested:* the fitted timings against Phase 3's (0.70 ms per uncached token; 52.9 ms +
+1.23 ms × batch), the capacity against the Phase 4 profile's 1,537 blocks, and the wall-clock time.
+
+**What would be uncomfortable, written down now.** The timing fit may not match Phase 3's: the
+prompt lengths and batch sizes differ, and one sequence decodes slower than the line predicts.
+That is reported, not a failure. A failure of C1a would mean a rule in this engine that the check
+exposes and Phase 3's workloads did not — the check's lengths are chosen so that even a wrong block
+size shows, which the first version of the check missed.

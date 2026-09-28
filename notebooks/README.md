@@ -16,8 +16,27 @@ shell.
 ✅ **Phase 3 ran on 2026-09-22 and passed** — the block-pool model matched every pre-registered count on
 both sequential workloads, request by request, and predicted the concurrent one within 0.3% on hit
 rate. Results: [`phase3_kaggle_t4/`](../artifacts/results/phase3_kaggle_t4/) ·
-[`calibration_report.md`](../artifacts/results/phase3_kaggle_t4/calibration_report.md). **Nothing here
-needs running now**; the section below is kept as the record of how it was run.
+[`calibration_report.md`](../artifacts/results/phase3_kaggle_t4/calibration_report.md). Its section
+below is kept as the record of how it was run.
+
+---
+
+## ▶ Run next — two notebooks, one Kaggle session
+
+Both are registered: their rules and predictions were committed before any GPU run. Both are
+self-contained — they need no copy of this repo on the GPU box.
+
+**On Kaggle, for each notebook:** *File → Import notebook* → pick the `.ipynb` → *Settings:
+Accelerator **GPU T4 ×2**, Internet **on*** → *Run All* → when it finishes, download the results zip
+from the output panel and put it in this repo (under `artifacts/results/`), then ask for the write-up.
+
+| Notebook | What it tests | Time | Bring back |
+|---|---|---|---|
+| [`phase6_sim2real.ipynb`](phase6_sim2real.ipynb) | **Phase 6:** the finding's mechanism on **two live replicas** — three routers, one shared prompt and 64 tenant prompts; hit rates against predictions | ~40 min | `phase6_results.zip` |
+| [`c1_calibrate_t4.ipynb`](c1_calibrate_t4.ipynb) | **C1:** the first run of `kvsim calibrate` on a real GPU — its cache check must be exact (48 of 48 requests) and the capacity it reads must equal the engine's log | ~20 min | `c1_results.zip` |
+
+If a cell stops with ⛔, still download the zip if it was written — a stop is a result too, and the
+reason is in the output.
 
 ---
 
