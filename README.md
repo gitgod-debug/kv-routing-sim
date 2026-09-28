@@ -158,12 +158,15 @@ Runs on your laptop. **Your trace never leaves your machine**, and prompts are h
 boundary, so prompt text never enters the simulator at all.
 
 To use measured timings instead of the built-in guess, pass a profile. The one measured so far is
-ours — Tesla T4, Qwen3-4B, vLLM 0.30.0:
+ours — Tesla T4, Qwen3-4B, vLLM 0.30.0 — and it ships with the package, as does the cited cost model:
 
 ```bash
 kvsim replay trace.jsonl --policies all --replicas 1-8 \
-  --profile configs/profiles/t4-qwen3-4b-vllm0.30.0.json --cost-model configs/cost_model.yaml
+  --profile t4-qwen3-4b-vllm0.30.0 --cost-model default
 ```
+
+(`--profile` also takes a path to any profile file, and `--cost-model` a path to your own YAML — the
+shipped ones are byte-for-byte `configs/profiles/` and `configs/cost_model.yaml`.)
 
 To get **your** numbers, point `kvsim calibrate` at your own running vLLM (prefix caching on). It
 fits the timings to your GPU and model, reads the KV capacity from the engine, and checks the cache
@@ -172,7 +175,7 @@ install:
 
 ```bash
 kvsim calibrate --engine http://localhost:8000 --out mine.json
-kvsim replay trace.jsonl --policies all --replicas 1-8 --profile mine.json --cost-model configs/cost_model.yaml
+kvsim replay trace.jsonl --policies all --replicas 1-8 --profile mine.json --cost-model default
 ```
 
 If the cache check misses (by more than 5%, or on any single request's cached tokens), the profile is

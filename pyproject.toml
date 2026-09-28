@@ -63,6 +63,11 @@ kvsim = "kv_routing_sim.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# The measured T4 profile and the cited cost model travel with the package, so `pip install` users
+# can run `--profile t4-qwen3-4b-vllm0.30.0 --cost-model default` without a clone.
+[tool.setuptools.package-data]
+kv_routing_sim = ["data/*.yaml", "data/profiles/*.json"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
