@@ -21,6 +21,18 @@ below is kept as the record of how it was run.
 
 ---
 
+## ▶ Run next — `c2_timing_t4.ipynb` (about an hour)
+
+**What it tests:** why Phase 6's latency was 5–222× the prediction. It measures decode and prefill
+speed against context length on one T4 (parts A, B), checks whether a busy second engine slows the
+first (part C), and replays two held-out traffic runs the new timing model must predict (part D).
+Registered before the run: `configs/c2_timing.yaml` and `docs/09-hypotheses.md`.
+
+**On Kaggle:** *File → Import notebook* → `c2_timing_t4.ipynb` → *Settings: Accelerator **GPU T4 ×2**,
+Internet **on*** → *Run All*. When it ends, download **`c2_results.zip`** from the Output panel and
+put it in this repo's `notebooks/` folder. Results are saved after every part: if a cell stops with ⛔,
+download the zip anyway. ⚠️ Run it **once**; if you must run it again, bring back both zips.
+
 ## ✅ Phase 6 and C1 — ran on 2026-09-28, both HOLD
 
 - **Phase 6** ran twice: every hit rate within 1.4% of its prediction and every tested pair of policies

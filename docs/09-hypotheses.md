@@ -930,3 +930,52 @@ intercept (−212 ms), which the command clamps to 0, and then over-predicts a 5
 Decode repeats Phase 3's oddity (one sequence alone is slower than two to sixteen) and, measured on
 32-token prompts, describes short contexts only. So the command's *cache* check is proven on a real
 engine; its *timing* fit is not yet fit for sizing a fleet — the same limit Phase 6 exposed.
+
+### 2026-09-28 — C2 REGISTERED before it runs: a context-aware timing model, and what would break it
+Design and rules: [`configs/c2_timing.yaml`](../configs/c2_timing.yaml). Notebook:
+[`notebooks/c2_timing_t4.ipynb`](../notebooks/c2_timing_t4.ipynb). The whole analysis:
+`scripts/c2_analyze.py`, committed with the design at `adfada5`, before any GPU run. Part D's traffic
+and the context-free profile's predictions for it:
+[`artifacts/results/c2_prereg/predictions.json`](../artifacts/results/c2_prereg/predictions.json),
+generated from that clean commit. `scripts/c2_dryrun.py` ran the whole notebook against two mock
+engines with known context terms, then the analysis: it recovered them (decode 3.98e-6 s per
+context token against the mock's 4e-6, R² 1.000) and C2c held within 1.05×.
+
+**Why.** Phase 6 found the timing model optimistic by 5–222× on ~1,700-token prompts. Two suspects:
+no context-length term, or CPU contention on a 4-vCPU box running two engines and a client.
+
+**The model** (`sim/cost_model.py`, both new terms default to zero, which reproduces every earlier
+result to the bit): prefill(n, c) = p0 + p1·n + p2·n·(c + n/2); decode(b, S) = d0 + d1·b + d2·S,
+with S the batch's summed context.
+
+**The setup.** One Kaggle box, two T4s, Phase 6's engine flags. Replica 0 is measured.
+- **A** — decode step for 28 cells of context length L (128–1,984) × batch b (1–64), two reps, all
+  within 1,300 blocks so nothing is preempted; the step is the mean gap from the 8th token to the
+  64th, median over the batch. Replica 1 idle.
+- **B** — prefill time for 15 cells of cached prefix c (0–1,280) × new tokens n (64–1,984), three reps.
+- **C** — three of A's cells measured alone and with replica 1 kept busy by a separate streaming
+  client (48 at a time), alternating, two reps; measured **engine-side** with
+  `vllm:inter_token_latency_seconds`.
+- **D** — held out: Phase 6's generator on replica 0 alone — K1 at 0.5 sessions/s (Phase 6
+  K1-sticky's per-replica load) and K64 at 0.25. The context-free profile predicts p95 TTFT 0.33 s
+  and 1.20 s (reported, not tested).
+
+**The fit**, fixed now: least squares with every coefficient ≥ 0, decode on A, then prefill on B with
+one fitted decode step taken out of each TTFT (the simulator's own TTFT). The context-free fit on
+the same data is reported beside it.
+
+**How it is decided.**
+- **C2a** — the context term is real: at batch 8, the step at L = 1,536 is ≥ 1.5× the step at
+  L = 128. *Predicted: holds* (~3×, from Phase 3's sweep and C1).
+- **C2b** — CPU contention is real: contended ÷ alone engine-side inter-token latency, median over
+  C's cells, ≥ 1.2. *Predicted: fails* — context alone roughly accounts for Phase 6's steps.
+- **C2c** — the model fitted on A and B, replaying D at the times its requests were really sent,
+  gives p50 **and** p95 TTFT within 2× of the measured ones, for **both** workloads. *Predicted:
+  holds.* A rule whose data is missing is undecided, and does not hold.
+
+**What would be uncomfortable, written down now.** If C2b holds, Phase 6's latencies were partly an
+artefact of the box — and every multi-engine timing on a small CPU carries that caveat. If C2c fails
+with C2a holding, the context term is real but not enough: chunked prefill (which the simulator does
+not model) or the single-sequence decode oddity may matter under load. And D is one engine: a model
+that predicts it still has to be re-checked on two replicas before the README's replica counts
+change.

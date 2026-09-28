@@ -276,6 +276,9 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 ## 9. What is left
 
 **Manual steps (they need an account):**
+- Run [`notebooks/c2_timing_t4.ipynb`](../notebooks/c2_timing_t4.ipynb) on Kaggle (GPU T4 ×2,
+  Internet on, Run All, about an hour) and bring back `c2_results.zip` — the test of the new,
+  context-aware timing model.
 - File the vLLM issue (the draft is the upstream log #1).
 - Open the guidellm issue, then the pull request (the patch is in `docs/upstream/`, the text in
   the upstream log #7–8).

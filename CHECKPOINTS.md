@@ -19,8 +19,8 @@ holds; H2 falsified) · 🔨 **4** — H6's ranking half ⛔ and crossover half 
 (Mooncake) ⛔, R2 (AgentX) ✅ · ✅ **6** — hit rates on two live T4s within 1.4%, policy order held
 (run twice); ⚠️ latency 5–222× the prediction — the timing model is the weak part · 🔨 **7** — demo
 page, grid, figure and 10×/100× done; `kvsim calibrate` proven on a real T4 (C1); PyPI left · 🔨 **8** —
-the preprint is drafted. ▶ **Next:** a context-aware timing model, registered and tested on held-out
-GPU data (see Phase 6's section).
+the preprint is drafted. ▶ **Next:** run C2 on Kaggle (`notebooks/c2_timing_t4.ipynb`, ~1 h) —
+the context-aware timing model, registered, with a held-out test.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -554,11 +554,16 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 - [x] Predicted vs measured hit rate across the pair — ✅ all 12 runs within 1.4%; S2 in order *(v2's
       round-robin arm was the first data point — predicted 1,088 tokens computed, hit rate 0.966862,
       committed before it ran)*
-- [ ] ⭐ **A context-aware timing model**, fitted on data Phase 6 did not produce and registered before
+- [~] ⭐ **A context-aware timing model**, fitted on data Phase 6 did not produce and registered before
       it is checked: a single-engine decode sweep across context lengths (~100 to ~2,000 tokens) ×
       batch sizes, which also tells context cost from CPU contention. Phase 6's measured latencies
       are then the held-out test — seen already, so labelled post hoc — and a fresh two-replica run
-      the real one
+      the real one. 🔨 **C2 registered 2026-09-28** ([`configs/c2_timing.yaml`](configs/c2_timing.yaml),
+      [`c2_timing_t4.ipynb`](notebooks/c2_timing_t4.ipynb), from the clean commit `adfada5`): the
+      model has two context terms (zero by default — every earlier result unchanged); parts A–C
+      measure decode, prefill and contention, part D is held-out traffic the fit never sees. C2a
+      (context real) / C2b (contention real) / C2c (D within 2×) — predicted holds / fails / holds.
+      Dry-run against mocks with known terms: recovered, C2c within 1.05×. **Run it on Kaggle**
 - [x] ⛔ **TTFT percentiles only from separate GPUs** — the notebook runs one server per physical GPU.
       They are **T4** percentiles, and reported, not tested
 - [-] **Fallback, decided in advance** — not needed: two replicas ran. (It was: if 2 replicas prove
