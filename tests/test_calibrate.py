@@ -117,3 +117,24 @@ def test_a_line_needs_two_distinct_points():
     assert ols([1.0, 2.0, 4.0], [3.0, 5.0, 9.0])["slope"] == pytest.approx(2.0)
     with pytest.raises(CalibrationError, match="two distinct points"):
         ols([4.0, 4.0], [1.0, 2.0])
+
+
+PHASE3 = REPO / "artifacts" / "results" / "phase3_kaggle_t4"
+
+
+def _real(metrics: str) -> dict:
+    return {**_answers(metrics),
+            ("GET", "/server_info"): (200, (PHASE3 / "server_info.json").read_text())}
+
+
+def test_probe_reads_what_a_real_vllm_0_30_served():
+    """Parsed from what vLLM 0.30.0 actually served on the T4 in Phase 3 — not from the mock."""
+    metrics = (PHASE3 / "metrics_W2_short_r1_before.txt").read_text()
+    info = probe(_Canned(_real(metrics)))
+    assert (info.kv_cache_blocks, info.block_size, info.max_num_seqs) == (512, 16, 256)
+    assert any("from vllm:cache_config_info" in n for n in info.notes)
+    # Without that gauge, the same number comes from /server_info.
+    stripped = "\n".join(ln for ln in metrics.splitlines() if "cache_config_info" not in ln)
+    info = probe(_Canned(_real(stripped)))
+    assert info.kv_cache_blocks == 512
+    assert any("from GET /server_info" in n for n in info.notes)

@@ -391,8 +391,8 @@ def fit(prefill: list[dict[str, float]], decode: list[dict[str, Any]]) -> dict[s
 # ── step 3: does the cache model predict this engine? ─────────────────────────────────────────
 
 
-def _check_workload(rng: random.Random, sessions: int, turns: int,
-                    token_range: tuple[int, int]) -> list[tuple[str, list[int]]]:
+def check_workload(rng: random.Random, sessions: int, turns: int,
+                   token_range: tuple[int, int]) -> list[tuple[str, list[int]]]:
     """Sessions that share one system prompt, each re-sending its own growing history.
 
     ⚠️ The lengths are chosen, not arbitrary. None is a multiple of 16, so the partial-block rule
@@ -410,11 +410,20 @@ def _check_workload(rng: random.Random, sessions: int, turns: int,
     return out
 
 
+def predict_check(work: list[tuple[str, list[int]]], profile: CostProfile):
+    """The simulator's prediction for the check: one request at a time, 1,000 simulated seconds
+    apart — far longer than any request takes — on one replica with the block-pool model."""
+    trace = [NormalizedRequest(f"c{i}", i * 1000.0, chain_hashes(ids, profile.block_size), len(ids),
+                               1, sid) for i, (sid, ids) in enumerate(work)]
+    return run(trace, policy="round-robin", n_replicas=1, profile=profile, cache_model="vllm",
+               record_per_request=True)
+
+
 def check_cache_model(engine: Engine, info: EngineInfo, profile: CostProfile,
                       rng: random.Random, *, sessions: int, turns: int,
                       token_range: tuple[int, int]) -> dict[str, Any]:
     """The engine's prefix-cache counters over a sequential workload, against the simulator."""
-    work = _check_workload(rng, sessions, turns, token_range)
+    work = check_workload(rng, sessions, turns, token_range)
     blocks = len({h for _, ids in work for h in chain_hashes(ids, info.block_size)}) + len(work)
     if blocks > info.kv_cache_blocks // 2:
         raise CalibrationError(
@@ -442,11 +451,7 @@ def check_cache_model(engine: Engine, info: EngineInfo, profile: CostProfile,
     if queries <= 0:
         raise CalibrationError("the check moved no prefix-cache query counter")
 
-    # One request at a time: 1,000 simulated seconds apart, far longer than any request takes.
-    trace = [NormalizedRequest(f"c{i}", i * 1000.0, chain_hashes(ids, info.block_size), len(ids),
-                               1, sid) for i, (sid, ids) in enumerate(work)]
-    sim = run(trace, policy="round-robin", n_replicas=1, profile=profile, cache_model="vllm",
-              record_per_request=True)
+    sim = predict_check(work, profile)
     measured, predicted = hits / queries, sim.hit_rate
     compared = {k: v for k, v in measured_cached.items() if v is not None}
     differ = sorted((k for k, v in compared.items() if sim.per_request[k]["cached_tokens"] != v),
@@ -535,8 +540,10 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
         engine_version=info.version,
         calibrated=False,
     )
-    check = check_cache_model(engine, info, profile, rng, sessions=check_sessions,
-                              turns=check_turns, token_range=token_range)
+    # Its own random stream: the check's prompts depend only on the seed, not on how many timing
+    # requests came first — so its expected hit rate can be computed, and registered, in advance.
+    check = check_cache_model(engine, info, profile, random.Random(f"check-{seed}"),
+                              sessions=check_sessions, turns=check_turns, token_range=token_range)
     err = check["relative_error"]
     n_cmp, n_eq = check["cached_tokens_compared"], check["cached_tokens_equal"]
     # Both must hold. On a sequential workload that fits in the cache the model was exact on a real
