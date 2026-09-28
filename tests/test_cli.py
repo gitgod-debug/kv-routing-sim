@@ -107,9 +107,11 @@ def test_replay_fails_loudly_on_an_empty_trace(tmp_path):
         main(["replay", str(empty)])
 
 
-def test_calibrate_is_honest_about_being_unimplemented(capsys):
-    assert main(["calibrate"]) == 2
-    assert "not implemented" in capsys.readouterr().err
+def test_calibrate_stops_cleanly_when_the_engine_is_unreachable(tmp_path, capsys):
+    out = tmp_path / "mine.json"
+    assert main(["calibrate", "--engine", "http://127.0.0.1:9", "--out", str(out)]) == 2
+    assert "cannot reach the engine" in capsys.readouterr().err
+    assert not out.exists()  # nothing is written when nothing was measured
 
 
 def test_sweep_produces_one_point_per_cell():

@@ -1,17 +1,19 @@
 """kv-routing-sim — which KV-cache routing policy should you actually run, and on how many replicas?
 
-⚠️ Phase 0: this package is a SCAFFOLD. Each subpackage carries its designed contract as a
-docstring and no implementation. That ordering is deliberate — the layout is a set of decisions
-(ADR-001…ADR-004), and writing the contracts down before the code exists is what stops them
-drifting into whatever the first implementation happened to do.
+A trace-driven simulator of a multi-replica vLLM fleet, and a recommender on top of it. The cache
+model follows vLLM 0.30.0's block pool and was checked against a live engine before anything was
+built on it (Phase 3: exact on two sequential workloads under eviction pressure, +0.3% concurrent).
 
-⛔ No module here may be implemented before the Phase-0 spike passes on a live engine. See
-`CHECKPOINTS.md`. The reason is specific rather than procedural: the cache model's block-hashing
-rule and the prefill cost function are both meant to MIRROR a real engine, and a mirror built from
-documentation is how a competitor ended up shipping a README that cites a metric which does not
-exist (`docs/04-prior-art.md`).
+  traces/    adapters and the generator → requests as chains of block hashes (no text, ever)
+  cache/     the block pool (vLLM's rules) and the plain-LRU ablation
+  policies/  seven routers, one file each
+  sim/       replicas, the event loop, the timing profile
+  eval/      cost, Pareto, bootstrap, rank agreement, the recommendation
+  calib/     `kvsim calibrate`: fit a profile to YOUR engine, and check the cache model on it
+  cli.py     `kvsim replay | generate | crossover | calibrate`
 
+The layout was written down as contracts before the code (ADR-001…004); the code implements them.
 Read `docs/05-codebase-map.md` for the module-by-module contract.
 """
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"  # keep in step with pyproject.toml
