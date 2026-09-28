@@ -39,3 +39,6 @@ hf_cache/
 
 # Test-coverage database, written by pytest-cov
 .coverage
+
+# The preprint's build output (the source and its figure are committed)
+paper/main.pdf

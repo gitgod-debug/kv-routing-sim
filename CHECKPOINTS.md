@@ -16,7 +16,7 @@ vLLM under eviction pressure to the token, against predictions committed before 
 your tenants' prompts outgrow one GPU's cache; then route by prefix, and keep its load weight small* (H2b
 holds; H2 falsified) · 🔨 **4** — H6's ranking half ⛔ and crossover half ✅, R1 on real traffic ⛔;
 AgentX left · 🔨 **6** registered, the Kaggle run is yours · 🔨 **7** — demo page, grid, figure and
-10×/100× done; PyPI and `kvsim calibrate` left. ▶ **Next:** the preprint draft, `kvsim calibrate`.
+10×/100× done; PyPI and `kvsim calibrate` left · 🔨 **8** — the preprint is drafted. ▶ **Next:** `kvsim calibrate`.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -617,6 +617,11 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 - [ ] Show HN + X thread, with the engine and version
       **in** the title
 - [ ] ⭐ **The `guidellm` PR merged** — see the upstream log
+- [~] 📄 **The preprint** (due ~Nov 9, cs.DC) — [`paper/main.tex`](paper/main.tex), drafted 2026-09-28:
+      five pages that compile; every number mapped to its results file in
+      [`paper/README.md`](paper/README.md); 17 references, each checked on arXiv or at its source; no
+      "first" claims. Left: author details and the repository URL, Phase 6's result, the October
+      prior-art re-audit, and the arXiv endorsement
 - [ ] Cross-link with `colpali-lite`: two instantiations of one method
 
 ---
@@ -637,7 +642,8 @@ Check every one before anything is published.
 - [ ] **Every cost constant is cited and dated** in a committed config
 - [ ] **No TTFT percentile from the memory-split hardware path**
 - [ ] ⛔ **No sentence blends a calibrated error bar with an uncalibrated recommendation.** Our error bar
-      belongs to our GPU and our model; the ranking is what transfers (ADR-010, pending H6). *"Validated
+      belongs to our GPU and our model. H6 (2026-09-28) found that even the full ranking does not
+      transfer across hardware — only the direction of the flip does (ADR-010). *"Validated
       within X%"* and *"your serving log in, a recommendation out"* are true separately and false together
 - [ ] **Bootstrap CIs resample sessions/segments, not requests** — and every caption says which
 - [ ] **A hypothesis that failed is reported as a finding**, not deleted
