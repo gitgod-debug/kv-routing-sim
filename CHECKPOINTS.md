@@ -9,17 +9,18 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-09-28 (the finding, H6, R1 on Mooncake and R2 on AgentX, Phase 6 and C1
-registered, the demo page and the 10×/100× numbers, the preprint draft, `kvsim calibrate`, a wheel that
-works outside a clone; 179 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
+**Last updated:** 2026-09-28 (the finding, H6, R1 on Mooncake and R2 on AgentX, **Phase 6 and C1 run
+on Kaggle — both hold**, the demo page and the 10×/100× numbers, the preprint draft, `kvsim calibrate`,
+a wheel that works outside a clone; 179 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
 vLLM under eviction pressure to the token, against predictions committed before the run)
 **Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding** — *keep each user on one GPU until
 your tenants' prompts outgrow one GPU's cache; then route by prefix, and keep its load weight small* (H2b
 holds; H2 falsified) · 🔨 **4** — H6's ranking half ⛔ and crossover half ✅; real traffic: R1
-(Mooncake) ⛔, R2 (AgentX) ✅ · 🔨 **6** registered, the Kaggle run is yours · 🔨 **7** — demo page, grid, figure and
-10×/100× done; `kvsim calibrate` built (first GPU run left); PyPI left · 🔨 **8** — the preprint is
-drafted. ▶ **Next:** your Kaggle run of Phase 6; `kvsim calibrate`'s first GPU run once the repo is
-public (a Kaggle notebook can then `pip install` it — the registered Phase 6 notebook stays as it is).
+(Mooncake) ⛔, R2 (AgentX) ✅ · ✅ **6** — hit rates on two live T4s within 1.4%, policy order held
+(run twice); ⚠️ latency 5–222× the prediction — the timing model is the weak part · 🔨 **7** — demo
+page, grid, figure and 10×/100× done; `kvsim calibrate` proven on a real T4 (C1); PyPI left · 🔨 **8** —
+the preprint is drafted. ▶ **Next:** a context-aware timing model, registered and tested on held-out
+GPU data (see Phase 6's section).
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -88,8 +89,8 @@ public (a Kaggle notebook can then `pip install` it — the registered Phase 6 n
 | 3 | **Real-Engine Calibration Report** | `[x]` ✅ exact on W1 + W2, +0.3% on W3 | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
 | 4 | **Seven** policies + Pareto sweep | `[~]` H1 ⛔ · H5 1 of 4 · H6 ranking ⛔, crossover ✅ · α swept · R1 (Mooncake) ⛔ · R2 (AgentX) ✅ · property + golden tests ✅ — per-cell CIs left | Tests **H1 + H5 + H6** |
 | 5 | **The crossover finding** | `[x]` H2 ⛔ · **H2b ✅** — the README headline, with its figure | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
-| 6 | Sim-to-real 2-replica validation | `[~]` registered 2026-09-28 on two physical T4s; the Kaggle run is left | Predicted vs measured across two MIG instances, or the documented fallback and why |
-| 7 | Package · CLI · static demo · hardening | `[~]` demo page + grid + 10×/100× ✅ · `kvsim calibrate` built, not yet run on a GPU · PyPI left | `pip install` + `kvsim replay` + a **static** demo page (ADR-011) + "what breaks at 10×/100×" answered with measured numbers |
+| 6 | Sim-to-real 2-replica validation | `[x]` ✅ HOLDS, run twice (2026-09-28): hit rates within 1.4%, S2 in order · ⚠️ timing 5–222× optimistic | Predicted vs measured across two MIG instances, or the documented fallback and why |
+| 7 | Package · CLI · static demo · hardening | `[~]` demo page + grid + 10×/100× ✅ · `kvsim calibrate` ✅ on a real T4 (C1) · PyPI left | `pip install` + `kvsim replay` + a **static** demo page (ADR-011) + "what breaks at 10×/100×" answered with measured numbers |
 | 8 | Write-up & launch | `[ ]` | README numbers-first, Show HN, **the `guidellm` PR open** |
 
 ### ⛔ Two ordering rules, written down now so a compressed week does not decide them under pressure
@@ -527,7 +528,16 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 
 ## Phase 6 — Sim-to-real, two replicas
 
-> ### 🔨 2026-09-28 — built, dry-run and REGISTERED. ⏳ Waiting for one Kaggle run.
+> ### ✅ 2026-09-28 — RAN TWICE: HOLDS. The cache model predicts two live replicas; the timing model does not.
+> [`report.md`](artifacts/results/phase6_kaggle_t4/report.md) (`scripts/phase6_analyze.py`; S1/S2
+> recomputed from the raw counters). **S1:** largest hit-rate error 1.40% (run 1) and 0.22% (run 2);
+> K1 exact to four decimals. **S2:** all five tested pairs in order in both runs, including K64
+> affinity above sticky. **Reported, not tested:** p95 TTFT 5–222× the prediction, and 15–83
+> preemptions in four of the five runs predicted to have none — decode steps ran 2.7–4.0× the profile, and the engines
+> overloaded. The latency *order* still matched the prediction (post hoc). Cause — context length or
+> CPU contention — not yet tested. Every replica count is now marked a simulator figure.
+>
+> ### (was) 🔨 2026-09-28 — built, dry-run and REGISTERED. ⏳ Waiting for one Kaggle run.
 > [`notebooks/phase6_sim2real.ipynb`](notebooks/phase6_sim2real.ipynb) — self-contained (vLLM + the
 > standard library): two vLLM 0.30.0 servers, Qwen3-4B, **one per physical T4**, 1,537 blocks each; H2b's
 > traffic with one shared prompt (K1) and 64 tenant prompts (K64); routed by round-robin, session-sticky
@@ -540,14 +550,19 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 
 - [x] **One vLLM server per physical T4** (`CUDA_VISIBLE_DEVICES=0` / `=1`) — no MIG needed; two real
       GPUs are complete isolation
-- [~] Two vLLM servers, one arrival stream, routed by three policies — built and registered; not yet run
-- [~] Predicted vs measured hit rate across the pair — six runs registered *(v2's round-robin arm was
-      the first data point — predicted 1,088 tokens computed, hit rate 0.966862, committed before it ran)*
+- [x] Two vLLM servers, one arrival stream, routed by three policies — ✅ ran twice on Kaggle 2× T4
+- [x] Predicted vs measured hit rate across the pair — ✅ all 12 runs within 1.4%; S2 in order *(v2's
+      round-robin arm was the first data point — predicted 1,088 tokens computed, hit rate 0.966862,
+      committed before it ran)*
+- [ ] ⭐ **A context-aware timing model**, fitted on data Phase 6 did not produce and registered before
+      it is checked: a single-engine decode sweep across context lengths (~100 to ~2,000 tokens) ×
+      batch sizes, which also tells context cost from CPU contention. Phase 6's measured latencies
+      are then the held-out test — seen already, so labelled post hoc — and a fresh two-replica run
+      the real one
 - [x] ⛔ **TTFT percentiles only from separate GPUs** — the notebook runs one server per physical GPU.
       They are **T4** percentiles, and reported, not tested
-- [ ] **Fallback, decided in advance:** if 2 replicas prove infeasible, ship a **single-replica calibration
-      plus a documented, reproducible account of why**. That beats no calibration, and the failure write-up
-      is itself an OSS-PR premise
+- [-] **Fallback, decided in advance** — not needed: two replicas ran. (It was: if 2 replicas prove
+      infeasible, ship a single-replica calibration plus a documented, reproducible account of why.)
 
 ---
 
@@ -570,10 +585,13 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       the cache model against the engine's counters **request by request**. Against the mock engine
       it recovers the known timings (decode 2.53 ms/seq against 2.5; prefill 0.022 ms/token against
       0.020), its check is exact (48 of 48 requests), and a wrong block size is caught — which the
-      first version of the check missed. ⬜ **Not yet run against a real GPU** — the box stays open
-      until it is. **C1 registered 2026-09-28:** [`c1_calibrate_t4.ipynb`](notebooks/c1_calibrate_t4.ipynb)
-      carries the wheel of the clean commit `5a34c6d`; predicted exact (48 of 48; hit rate 0.714286);
-      dry-run against the mock PASSES. Run it on Kaggle with Phase 6
+      first version of the check missed. **C1 registered 2026-09-28:** [`c1_calibrate_t4.ipynb`](notebooks/c1_calibrate_t4.ipynb)
+      carries the wheel of the clean commit `5a34c6d`; predicted exact (48 of 48; hit rate 0.714286).
+      ✅ **C1 RAN on a real T4 and HOLDS** ([`report.md`](artifacts/results/c1_kaggle_t4/report.md)):
+      the check exact (48 of 48; 9,840 of 13,776 tokens), 1,537 blocks read = the engine log, 48 s.
+      ⚠️ Its straight-line timing fit is not good enough to size a fleet: T4 prefill is 0.71 ms/token
+      to 1,024 tokens (Phase 3's value) and 1.12 ms at 2,040; the line clamps a −212 ms intercept.
+      Still `[~]`: the timing fit needs the context-aware model (Phase 6)
 - [ ] **`configs/profiles/`** — committed calibration profiles keyed by
       `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
       from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no

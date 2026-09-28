@@ -39,10 +39,13 @@ replica, and what the choice costs in GPUs. We build a trace-driven multi-replic
 cache model follows vLLM~0.30.0's block pool, and check it against a live engine before using it:
 with predictions committed in advance, it reproduces every prefix-cache counter exactly on two
 sequential workloads under eviction pressure, and predicts the hit rate within 0.3\% on a concurrent
-one, where a plain LRU model is off by 19.7\%. With timings fitted on a Tesla~T4 and each hypothesis
-registered before it ran, we find that one ratio decides the policy: the working set of the tenants'
-system prompts over one replica's cache. With one shared prompt (0.06 of a cache), session-sticky
-routing holds a 2\,s p95 time-to-first-token on 2~T4s where round-robin needs~3. With 64 prompts
+one, where a plain LRU model is off by 19.7\%. On two live replicas under the traffic of our finding
+it predicts every hit rate within 1.4\% and the order of the policies; its timing model, however,
+under-predicts latency there by 5--222$\times$, so the replica counts below are simulator figures and
+optimistic. With timings fitted on a Tesla~T4 and each hypothesis registered before it ran, we find
+that one ratio decides the policy: the working set of the tenants' system prompts over one replica's
+cache. With one shared prompt (0.06 of a cache), session-sticky routing holds a 2\,s p95
+time-to-first-token on 2~simulated T4s where round-robin needs~3. With 64 prompts
 (2.66 caches), prefix-affinity with a load weight holds it on~5 (4 with a smaller weight, found
 after the test) and session-sticky cannot hold it on~8. Prefix-affinity without a load weight
 collapses whenever one prompt dominates. The direction of this flip survives four rescalings of the
@@ -78,8 +81,9 @@ hypotheses committed to a public log before each experiment ran. Our contributio
 \begin{itemize}
 \item A trace-driven multi-replica simulator whose cache model follows vLLM~0.30.0's block pool. With
   predictions committed before the run, it reproduces a live engine's prefix-cache counters exactly
-  on two sequential workloads under eviction pressure, and within 0.3\% on a concurrent one
-  (\S\ref{sec:calibration}).
+  on two sequential workloads under eviction pressure, and within 0.3\% on a concurrent one; on two
+  live replicas it predicts every hit rate within 1.4\%, though latency is far worse than its timing
+  model predicts (\S\ref{sec:calibration}).
 \item A finding from a registered test: the policy is decided by the ratio of the tenants' prompt
   working set to one replica's cache. Below it, session affinity needs the fewest replicas; above it,
   prefix affinity with a load weight does, and session affinity fails. Prefix affinity without a load
@@ -206,7 +210,52 @@ replica has the capacity vLLM itself allocated on a T4 for this model, 1{,}537 b
 from memory arithmetic had been 56\% too high. An earlier check with round-robin across two physical
 T4s predicted the recomputed prefill tokens exactly (1{,}088).
 
+\paragraph{Two live replicas.} We then registered a test of the finding's mechanism on two vLLM
+servers, one per physical T4, each with its natural 1{,}537 blocks: the traffic of \S\ref{sec:finding}
+at 1 session per second (120 sessions of 4 turns), with one shared prompt (K1) and with 64 (K64),
+routed by round-robin, session-sticky and prefix-affinity, ported from the simulator. It held only if
+every run's hit rate came within 10\% of its prediction (S1) and every pair of policies predicted at
+least 0.02 apart came out in the same order (S2). The notebook ran twice, and both runs held
+(Table~\ref{tab:twolive}): every hit rate within 1.4\% (the K1 runs to four decimals), and all five
+tested pairs in order, including prefix-affinity above session-sticky at K64. Latency was predicted
+but not tested, and there the timing model failed: p95 TTFT came out 5--222$\times$ the prediction,
+and four of the five runs predicted to preempt nothing preempted 15--83 times. The client sent every request on time; the
+engines were overloaded. From vLLM's own statistics, decode steps took 2.7--4.0$\times$ what the
+fitted profile says at every batch size, which at two requests per second per engine is enough to
+start the spiral of queueing, a full cache, preemption and recomputation. The order of the policies
+by p95 TTFT still matched the prediction in both workloads and both runs --- an observation, not a
+test. Two causes are possible and neither is tested: the profile has no context-length term, and
+these prompts are about 1{,}700 tokens; or CPU contention between two engines and a client on four
+vCPUs. A packaged calibration command run on a fresh T4 engine is consistent with the first. It reproduced
+that engine's counters exactly on a separate check (48 of 48 requests), and its prefill measurements
+cost 0.71\,ms per token up to 1{,}024 tokens --- the value above --- but 1.12\,ms at 2{,}040, a curve no
+straight line fits.
+
+\begin{table}[t]
+\centering\small
+\caption{Two live T4 replicas at 1 session/s: prediction against two runs. Hit rate was the
+registered test; p95 TTFT (seconds) was predicted but not tested.}
+\label{tab:twolive}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+ & \multicolumn{2}{c}{Hit rate} & \multicolumn{2}{c}{p95 TTFT (s)} \\
+Run & predicted & live & predicted & live \\
+\midrule
+K1 round-robin     & 0.880 & 0.880 & 0.44 & 11--15 \\
+K1 session-sticky  & 0.921 & 0.921 & 0.35 & 1.8--1.9 \\
+K1 prefix-affinity & 0.923 & 0.923 & 0.48 & 106--107 \\
+K64 round-robin    & 0.694 & 0.695 & 5.8  & 108--111 \\
+K64 session-sticky & 0.821 & 0.810--0.822 & 1.55 & 57--72 \\
+K64 prefix-affinity & 0.844 & 0.844--0.846 & 1.26 & 32--39 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \section{Results}
+
+Every replica count in this section is the simulator's, on the T4 profile of
+\S\ref{sec:calibration}; for prompts of this length that profile proved optimistic on live engines,
+so the counts are best read as relative, not absolute.
 
 \subsection{One shared prompt: session affinity wins}\label{sec:one}
 
@@ -379,16 +428,19 @@ replica's cache. Well below one cache, keep sessions on one replica. Well above 
 with a small load weight. Do not route by prefix alone when one prompt dominates the traffic. When
 reuse is almost all within sessions, as in AgentX, any policy that keeps a session on one replica
 will do, and scattering sessions is what costs GPUs. Then measure replica counts on your own GPU:
-ours are T4 counts, and the ranking itself moves with speed.
+ours come from a T4 timing model that proved optimistic under load, and the ranking itself moves
+with speed.
 
 \paragraph{Limitations.} The finding comes from generated traffic; on the real traces we replayed, it
 did not appear. We measured one GPU (T4) and one model (Qwen3-4B, fp16); the hardware test rescales
 timings and does not measure other GPUs. Replays are open-loop: a real agent waits for each response,
 and its next turn could reuse the response's cached decode blocks, which our traces cannot express.
-The timing model has the two errors given above. The Mooncake traces were scaled by 1/32 and their
+The timing model is the weakest part: besides the two errors given above, it has no context-length
+term, and on two live replicas with ${\sim}$1{,}700-token prompts latency came out 5--222$\times$ its
+prediction. A context-aware timing model, fitted on data it is not then tested on, is the next step.
+The Mooncake traces were scaled by 1/32 and their
 sessions inferred; the AgentX sessions were scaled by 1/64 and replayed at a chosen concurrency, and
-their session-local hashes hide any prompt their users really share. A live two-replica test of the finding's mechanism is registered, with its
-predictions committed, but has not yet run \todo{Phase 6 result, or remove}. At scale, an
+their session-local hashes hide any prompt their users really share. At scale, an
 80{,}000-request trace simulates in 13.5--21\,s on one core; memory for its block hashes (537\,MiB) is
 the first limit.
 
@@ -398,8 +450,10 @@ Whether prefix-aware routing pays is not a property of the policy alone but of t
 prompts in flight and a replica's cache. Below one cache, keeping each session on one replica wins and
 routing by prefix alone collapses; above it, routing by prefix with a small load weight holds a latency
 target that session affinity cannot. The direction of this result survived every hardware rescaling we
-tried; its replica counts did not. On two real trace families the two good policies tied, and prefix
-routing without a load weight failed only where prompts were shared across users. We release the
+tried; its replica counts did not. On two live replicas the cache model and the order of the
+policies held, and the timing model did not: the replica counts are optimistic. On two real trace
+families the two good policies tied, and prefix routing without a load weight failed only where
+prompts were shared across users. We release the
 simulator, its calibration against a live vLLM and the full registration log, so that each claim can
 be checked and re-measured on other hardware.
 

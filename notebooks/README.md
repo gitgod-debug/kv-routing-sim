@@ -21,7 +21,16 @@ below is kept as the record of how it was run.
 
 ---
 
-## ▶ Run next — two notebooks, one Kaggle session
+## ✅ Phase 6 and C1 — ran on 2026-09-28, both HOLD
+
+- **Phase 6** ran twice: every hit rate within 1.4% of its prediction and every tested pair of policies
+  in order — but latency 5–222× the prediction. [Report](../artifacts/results/phase6_kaggle_t4/report.md).
+- **C1:** `kvsim calibrate`'s cache check was exact on a real T4 (48 of 48 requests) and it read the
+  capacity correctly; its straight-line timing fit is rough. [Report](../artifacts/results/c1_kaggle_t4/report.md).
+
+The instructions below are kept as the record of how they were run.
+
+## How they were run — two notebooks, one Kaggle session
 
 Both are registered: their rules and predictions were committed before any GPU run. Both are
 self-contained — they need no copy of this repo on the GPU box.

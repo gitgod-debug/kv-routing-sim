@@ -135,6 +135,16 @@ the simple "keep each user on one GPU" policy beat the clever cache-seeking ones
     at every speed — and even pure prefix routing does not collapse, because nothing is shared across
     users there (R2, predicted and confirmed). Round-robin needs 5 T4s at 2× where they need 2. So
     pure prefix routing fails *because of shared prompts* (Mooncake), not because it routes by prefix.
+16. **On two real GPUs, the cache model is right and the timing model is not** (Phase 6, run twice).
+    Every hit rate matched the prediction within 1.4% — three of them to four decimals — and the
+    policies came out in the predicted order, including prefix routing above keep-on-one-GPU with 64
+    prompts. But the answers came 5–222× slower than predicted: each decode step took 3–4× what our
+    T4 profile says, and at 2 requests per second per GPU that was enough to overload both engines.
+    So every GPU count in this project is a simulator figure, and an optimistic one. *Why it matters:*
+    it is the most important known weakness, and now it is measured.
+17. **`kvsim calibrate` works on a real GPU** (C1): its cache check was exact on a T4 and it read the
+    engine's capacity correctly. Its prefill measurements also show why a straight line is not
+    enough: 0.71 ms per token up to 1,024 tokens, 1.12 ms at 2,040.
 
 ## 5. What we decided, and why
 
@@ -259,15 +269,13 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 | 3 | **The calibration** — model vs real engine, pre-registered | ✅ **done: exact** |
 | 4 | Calibrated sweep; H1, H5, H6; the load weight; real traces | ✅ mostly — H6's ranking half ⛔, its crossover half ✅; Mooncake (R1) ⛔; AgentX (R2) ✅ |
 | 5 | **The finding** — where prefix-aware routing starts paying off | ✅ **done** — H2 ⛔, **H2b ✅** |
-| 6 | Two-GPU real-engine check under pressure | 🔨 notebook ready, predictions committed — **your Kaggle run** |
-| 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | 🔨 demo, figure, 10×/100× done; `kvsim calibrate` built (not yet run on a GPU); PyPI left |
+| 6 | Two-GPU real-engine check under pressure | ✅ **holds**, run twice — hit rates within 1.4%; ⚠️ latency 5–222× the prediction |
+| 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | 🔨 demo, figure, 10×/100× done; `kvsim calibrate` works on a real T4 (C1); PyPI left |
 | 8 | Write-up, launch, the upstream pull request | 🔨 the guidellm fix is ready; the preprint is drafted (`paper/`) |
 
 ## 9. What is left
 
 **Manual steps (they need an account):**
-- Run [`notebooks/phase6_sim2real.ipynb`](../notebooks/phase6_sim2real.ipynb) on Kaggle (GPU T4 ×2,
-  Internet on, Run All, about 40 minutes) and bring back `phase6_results.zip`.
 - File the vLLM issue (the draft is the upstream log #1).
 - Open the guidellm issue, then the pull request (the patch is in `docs/upstream/`, the text in
   the upstream log #7–8).
@@ -276,14 +284,18 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 
 **Next on the build side:**
 - ✅ done 28 Sep: the preprint draft (`paper/`), and `kvsim calibrate` — so a user can measure their
-  own GPU, as H6 says they must. It still needs its first run on a real GPU;
-- Phase 6's write-up, whatever it shows;
+  own GPU, as H6 says they must — which worked on a real T4 (C1);
+- ✅ done 28 Sep: Phase 6's write-up — it held on hit rates and exposed the timing model;
+- ⭐ **next: a timing model that knows about context length** — a one-GPU Kaggle run that measures
+  decode speed at several context lengths and batch sizes, then a model fitted on it and tested on
+  data it was not fitted on. Until then, every GPU count stays marked as optimistic;
 - ✅ done 28 Sep: the AgentX trace (R2 holds), and a contributor guide with three good first issues;
 - later: the PyPI release.
 
 **Known limits, owned rather than hidden:**
-- the timing model is the weak part: it cannot express the slow single-sequence decode, and it charges
-  a little too much (~20 ms) for a request arriving at an idle GPU;
+- the timing model is the weak part: it cannot express the slow single-sequence decode, it charges
+  a little too much (~20 ms) for a request arriving at an idle GPU, it has no term for context
+  length — and on two live GPUs with ~1,700-token prompts it was 5–222× optimistic (Phase 6);
 - every replay is *open-loop* — real agents wait for an answer before sending the next turn, and would
   then reuse the answer's cache blocks, which we cannot measure this way;
 - one GPU type (T4) and one model (Qwen3-4B) so far;
