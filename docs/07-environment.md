@@ -235,9 +235,9 @@ prompt text ever entering the simulator.
 
 ### What a user gets without a GPU — and what they don't
 
-See **ADR-010** for the full decision. In short: the **policy ranking** and the **crossover boundary**
-transfer (pending **H6**); **absolute ms and ₹** do not, and need `kvsim calibrate` on the user's own
-hardware. ⛔ Never blend a calibrated error bar with an uncalibrated recommendation.
+See **ADR-010** for the full decision. In short, after **H6** (2026-09-28): the **direction** of the
+crossover transfers across hardware; the full **policy ranking**, the replica counts and **absolute ms
+and ₹** do not, and need `kvsim calibrate` on the user's own hardware. ⛔ Never blend a calibrated error bar with an uncalibrated recommendation.
 
 ### ✅ ANSWERED 2026-09-20 — see the deployment notes
 

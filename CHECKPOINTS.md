@@ -10,13 +10,15 @@
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
 **Last updated:** 2026-09-28 (the finding, H6, R1 on Mooncake, Phase 6 registered, the demo page and the
-10×/100× numbers; 161 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
+10×/100× numbers, the preprint draft, `kvsim calibrate`; 167 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
 vLLM under eviction pressure to the token, against predictions committed before the run)
 **Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding** — *keep each user on one GPU until
 your tenants' prompts outgrow one GPU's cache; then route by prefix, and keep its load weight small* (H2b
 holds; H2 falsified) · 🔨 **4** — H6's ranking half ⛔ and crossover half ✅, R1 on real traffic ⛔;
 AgentX left · 🔨 **6** registered, the Kaggle run is yours · 🔨 **7** — demo page, grid, figure and
-10×/100× done; PyPI and `kvsim calibrate` left · 🔨 **8** — the preprint is drafted. ▶ **Next:** `kvsim calibrate`.
+10×/100× done; `kvsim calibrate` built (first GPU run left); PyPI left · 🔨 **8** — the preprint is
+drafted. ▶ **Next:** your Kaggle run of Phase 6; `kvsim calibrate`'s first GPU run once the repo is
+public (a Kaggle notebook can then `pip install` it — the registered Phase 6 notebook stays as it is).
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -86,7 +88,7 @@ AgentX left · 🔨 **6** registered, the Kaggle run is yours · 🔨 **7** — 
 | 4 | **Seven** policies + Pareto sweep | `[~]` H1 ⛔ · H5 1 of 4 · H6 ranking ⛔, crossover ✅ · α swept · R1 (Mooncake) ⛔ · property + golden tests ✅ — AgentX and per-cell CIs left | Tests **H1 + H5 + H6** |
 | 5 | **The crossover finding** | `[x]` H2 ⛔ · **H2b ✅** — the README headline, with its figure | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
 | 6 | Sim-to-real 2-replica validation | `[~]` registered 2026-09-28 on two physical T4s; the Kaggle run is left | Predicted vs measured across two MIG instances, or the documented fallback and why |
-| 7 | Package · CLI · static demo · hardening | `[~]` demo page + grid + 10×/100× ✅ · PyPI, `kvsim calibrate` left | `pip install` + `kvsim replay` + a **static** demo page (ADR-011) + "what breaks at 10×/100×" answered with measured numbers |
+| 7 | Package · CLI · static demo · hardening | `[~]` demo page + grid + 10×/100× ✅ · `kvsim calibrate` built, not yet run on a GPU · PyPI left | `pip install` + `kvsim replay` + a **static** demo page (ADR-011) + "what breaks at 10×/100×" answered with measured numbers |
 | 8 | Write-up & launch | `[ ]` | README numbers-first, Show HN, **the `guidellm` PR open** |
 
 ### ⛔ Two ordering rules, written down now so a compressed week does not decide them under pressure
@@ -389,7 +391,8 @@ to be wrong wastes GPU time and produces a residual nobody can interpret.
       counter by counter, with `prefix_cache_queries`, `_hits`, `num_preemptions` and the histogram counts
 - [x] `/metrics` parsing — in the notebook (stdlib only: it runs where the repo is not) and in
       `phase3_analyze.py` (histogram buckets). The hit rate is **derived from two counters** everywhere.
-      A `calib/metrics_scrape.py` package module waits for `kvsim calibrate`
+      A `calib/metrics_scrape.py` package module waits for `kvsim calibrate` — ✅ built 2026-09-28 as
+      `calib/calibrate.py`, the same stdlib parsing
 - [x] **≥2 shapes, ≥3 live runs each, one overflowing the cache** — W1 + W2 × 3, plus W3 × 3; the trace
       needs ~1,000 blocks against 511
 - [x] Traces generated **locally by our generator**, embedded in the notebook and fingerprinted — never
@@ -546,9 +549,17 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 
 - [ ] `pip install kv-routing-sim`; `kvsim replay trace.jsonl --policies all --replicas 1-8
       --format json|md|html`; semver + changelog
-- [ ] ⭐ **`kvsim calibrate`** — expose the Phase-3 harness so a USER can fit a profile to their own GPU
+- [~] ⭐ **`kvsim calibrate`** — expose the Phase-3 harness so a USER can fit a profile to their own GPU
       and model (~30 min). The ADR-010 mechanism, and the answer to *"why trust your numbers on my
-      hardware?"* — *"you shouldn't; run this."* Needs the `[calib]` extra
+      hardware?"* — *"you shouldn't; run this."* Needs the `[calib]` extra.
+      🔨 **Built 2026-09-28** ([`calib/calibrate.py`](src/kv_routing_sim/calib/calibrate.py)) — and
+      lighter than planned: stdlib only, no extra, the engine reached over HTTP; minutes, not 30. It
+      reads the KV capacity (never estimates it), fits prefill and decode as Phase 3 did, and checks
+      the cache model against the engine's counters **request by request**. Against the mock engine
+      it recovers the known timings (decode 2.53 ms/seq against 2.5; prefill 0.022 ms/token against
+      0.020), its check is exact (48 of 48 requests), and a wrong block size is caught — which the
+      first version of the check missed. ⬜ **Not yet run against a real GPU** — the box stays open
+      until it is
 - [ ] **`configs/profiles/`** — committed calibration profiles keyed by
       `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
       from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no

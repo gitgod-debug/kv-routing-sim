@@ -165,8 +165,20 @@ kvsim replay trace.jsonl --policies all --replicas 1-8 \
   --profile configs/profiles/t4-qwen3-4b-vllm0.30.0.json --cost-model configs/cost_model.yaml
 ```
 
-⚠️ **Not built yet:** `kvsim calibrate`, which will fit a profile to *your* GPU and model (the
-`[calib]` extra). Until it exists, every millisecond and rupee figure here is a T4 figure.
+To get **your** numbers, point `kvsim calibrate` at your own running vLLM (prefix caching on). It
+fits the timings to your GPU and model, reads the KV capacity from the engine, and checks the cache
+model against the engine's own counters. That takes a few minutes and needs nothing beyond the core
+install:
+
+```bash
+kvsim calibrate --engine http://localhost:8000 --out mine.json
+kvsim replay trace.jsonl --policies all --replicas 1-8 --profile mine.json --cost-model configs/cost_model.yaml
+```
+
+If the cache check misses (by more than 5%, or on any single request's cached tokens), the profile is
+written but **not** marked calibrated, and the command exits 1. ⚠️ So far it has been tested against
+the repo's mock engine — whose true timings it recovers, and whose wrong block size it catches — but
+not yet against a real GPU.
 
 ## ⭐ What transfers to your fleet, and what doesn't
 
@@ -176,10 +188,10 @@ so the honest answer comes in three tiers, and they must not be blended (ADR-010
 | | What you get | What it costs you |
 |---|---|---|
 | **Policy ranking** | *Which* policy wins on your workload shape, and roughly by how much | ⛔ **Not free.** **H6 was tested and FALSIFIED (2026-09-28):** under a 2× faster GPU, or prefill 2× cheaper or dearer, the full order of the seven policies changed (Kendall's τ-b as low as 0.51). What held — noticed after the run, not registered: session-sticky needed the fewest replicas at all 48 points. So read a ranking as a result for *our* T4 unless you calibrate |
-| **The crossover boundary** | Whether prefix-affinity is worth implementing at *your* sharing ratio and utilization | The same caveat as the ranking — pending Phase 5, and H6's crossover half |
-| **Absolute ms and ₹** | p95 TTFT and ₹/1k requests for your fleet | **`kvsim calibrate` on your own hardware** *(not built yet)*. ⛔ Our error bar was measured on our GPU and our model. It does **not** transfer, and this README will never imply that it does |
+| **The crossover boundary** | Whether prefix-affinity is worth implementing for *your* prompts and load | ✅ **Its direction transfers:** H6's crossover half held (2026-09-28) — the flip from session-sticky to prefix-affinity as prompts outgrow one GPU's cache survived all four hardware rescalings. *Where* it happens, in replicas, is still a T4 figure |
+| **Absolute ms and ₹** | p95 TTFT and ₹/1k requests for your fleet | **`kvsim calibrate` on your own hardware**, a few minutes. ⛔ Our error bar was measured on our GPU and our model. It does **not** transfer, and this README will never imply that it does |
 
-> **So: why trust our numbers on your hardware?** You shouldn't. Once `kvsim calibrate` is built, run it and use your own.
+> **So: why trust our numbers on your hardware?** You shouldn't. Run `kvsim calibrate` and use your own.
 > That is the same posture as the cost model, which ships every constant in a config with a source and a
 > date so you can disagree with it and re-run. **Handing the skeptic the means to disagree, twice.**
 

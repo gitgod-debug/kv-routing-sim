@@ -17,7 +17,7 @@ license = { text = "MIT" }
 # "no GPU dependency for users; GPU only for your own calibration runs" — a simulator that
 # drags in vLLM (and therefore torch, and therefore CUDA wheels) to answer a CPU question has
 # broken its own pitch. The engine lives in the `[calib]` extra, installed only on the
-# calibration box.
+# calibration box. `kvsim calibrate` needs none of it: it reaches a running engine over HTTP.
 #
 # Versions carry the date they were checked. Confirm no newer release at install time and
 # record what ACTUALLY installed — into docs/07-environment.md and into every results header.

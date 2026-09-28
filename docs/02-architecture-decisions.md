@@ -633,6 +633,13 @@ cost constants: **hand the skeptic the means to disagree.** Consistent posture, 
 ⚠️ `vllm` stays in the `[calib]` extra (ADR-009), so `kvsim calibrate` is available only to users who
 opt into the heavier install. The CPU-only core is unaffected.
 
+> **Built 2026-09-28 — lighter than planned.** `kvsim calibrate` needs no extra at all: it talks to the
+> user's running vLLM over HTTP with the standard library, so vLLM is needed only where the engine
+> runs. It fits the timings, **reads** the KV capacity, and checks the cache model against the engine's
+> counters request by request; a profile that fails the check is written but not marked calibrated.
+> And H6's ranking half was falsified the same day, so this command is no longer optional polish:
+> it is how a user gets a replica count that means anything on their hardware.
+
 ### Rejected alternatives
 
 | Rejected | Why |

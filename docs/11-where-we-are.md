@@ -253,8 +253,8 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 | 4 | Calibrated sweep; H1, H5, H6; the load weight; a real trace | ✅ mostly — H6's ranking half ⛔, its crossover half ✅; the real trace (R1) ⛔; AgentX left |
 | 5 | **The finding** — where prefix-aware routing starts paying off | ✅ **done** — H2 ⛔, **H2b ✅** |
 | 6 | Two-GPU real-engine check under pressure | 🔨 notebook ready, predictions committed — **your Kaggle run** |
-| 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | 🔨 demo, figure, 10×/100× done; PyPI and `kvsim calibrate` left |
-| 8 | Write-up, launch, the upstream pull request | 🔨 the guidellm fix is ready; the preprint is next |
+| 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | 🔨 demo, figure, 10×/100× done; `kvsim calibrate` built (not yet run on a GPU); PyPI left |
+| 8 | Write-up, launch, the upstream pull request | 🔨 the guidellm fix is ready; the preprint is drafted (`paper/`) |
 
 ## 9. What is left
 
@@ -268,8 +268,8 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 - Create the GitHub repository, push, and turn on Pages (Settings → Pages → Source: *GitHub Actions*).
 
 **Next on the build side:**
-- the preprint draft — the finding, the calibration, H6 and the real trace;
-- `kvsim calibrate`, so a user can measure their own GPU (H6 says they must);
+- ✅ done 28 Sep: the preprint draft (`paper/`), and `kvsim calibrate` — so a user can measure their
+  own GPU, as H6 says they must. It still needs its first run on a real GPU;
 - Phase 6's write-up, whatever it shows;
 - later: the AgentX trace, the PyPI release, and a contributor guide with three good first issues.
 

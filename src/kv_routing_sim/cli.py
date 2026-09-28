@@ -5,7 +5,7 @@
                     --cost-model configs/cost_model.yaml
     kvsim generate  --sharing 0.6 --out trace.jsonl
     kvsim crossover --sharing 0.1,0.3,0.5,0.7,0.9 --rates 4,8,16 --profile <profile.json>
-    kvsim calibrate --engine http://localhost:8000 --out configs/profiles/mine.yaml
+    kvsim calibrate --engine http://localhost:8000 --out configs/profiles/mine.json
 
 Error semantics (ADR-004): a bad config or an unknown policy FAILS LOUDLY AT STARTUP, before any
 work begins. A sweep that dies at hour three having written half a Pareto curve is worse than one
@@ -33,7 +33,8 @@ UNCALIBRATED_BANNER = (
     "\n  ⚠️  UNCALIBRATED COST PROFILE — no live engine has been measured.\n"
     "      Usable:     the policy RANKING and the replica count (ADR-010 tier 1, pending H6).\n"
     "      NOT usable: the millisecond and rupee figures. They are shapes, not predictions.\n"
-    "      Fix:        --profile <a measured profile .json>   (kvsim calibrate: not built yet)\n"
+    "      Fix:        kvsim calibrate --engine <your vLLM URL> --out mine.json, then\n"
+    "                  --profile mine.json\n"
 )
 
 
@@ -215,18 +216,55 @@ def cmd_crossover(args: argparse.Namespace) -> int:
     return 0
 
 
+def _ints(spec: str, flag: str) -> tuple[int, ...]:
+    try:
+        out = tuple(int(x) for x in spec.split(",") if x.strip())
+    except ValueError:
+        raise SystemExit(f"error: could not parse {flag} {spec!r}; use e.g. '1,2,4,8'") from None
+    if not out:
+        raise SystemExit(f"error: {flag} is empty")
+    return out
+
+
 def cmd_calibrate(args: argparse.Namespace) -> int:
+    """Fit a profile to a running vLLM, check the cache model against it, write the profile."""
+    from .calib.calibrate import CalibrationError, Engine, calibrate
+
+    lo_hi = _ints(args.token_range, "--token-range")
+    if len(lo_hi) != 2 or not 0 <= lo_hi[0] < lo_hi[1]:
+        raise SystemExit("error: --token-range must be two integers LO,HI with LO < HI")
+    if args.decode_tokens < 2:
+        raise SystemExit("error: --decode-tokens must be at least 2 (it measures between tokens)")
+    try:
+        profile, ok = calibrate(
+            Engine(args.engine, timeout_s=args.timeout),
+            model=args.model, gpu=args.gpu, name=args.name, kv_blocks=args.kv_blocks,
+            block_size=args.block_size, max_num_seqs=args.max_num_seqs,
+            prefill_lengths=_ints(args.prefill_lengths, "--prefill-lengths"), reps=args.reps,
+            decode_batches=_ints(args.decode_batches, "--decode-batches"),
+            decode_tokens=args.decode_tokens, check_sessions=args.check_sessions,
+            check_turns=args.check_turns, max_error=args.max_error, seed=args.seed,
+            token_range=(lo_hi[0], lo_hi[1]),
+        )
+    except CalibrationError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    Path(args.out).write_text(json.dumps(profile, indent=1) + "\n", encoding="utf-8")
+    if ok:
+        print(f"wrote {args.out} — calibrated. Use it: kvsim replay <trace> --profile {args.out}")
+        return 0
+    chk = profile["_source"]["check"]
+    why = (f"it missed this engine's hit rate by {profile['calibration_error']:.2%} (limit "
+           f"{args.max_error:.0%})" if profile["calibration_error"] > args.max_error else
+           f"{chk['cached_tokens_compared'] - chk['cached_tokens_equal']} of "
+           f"{chk['cached_tokens_compared']} requests' cached-token counts differ")
     print(
-        "kvsim calibrate is not implemented yet.\n\n"
-        "It is the ADR-010 mechanism: point it at your own running vLLM and it fits a cost\n"
-        "profile to YOUR hardware and model, so the millisecond and rupee figures become yours\n"
-        "rather than ours. It needs the [calib] extra and a live engine.\n\n"
-        "Phase 0 passed and Phase 3 fitted a T4 profile with the notebook harness; turning that\n"
-        "harness into this command is Phase 7. Until then, pass a measured profile:\n"
-        "  --profile configs/profiles/t4-qwen3-4b-vllm0.30.0.json\n",
+        f"wrote {args.out} — NOT calibrated: the cache model does not predict this engine; {why}. "
+        "Its timings are measured, but its hit rates would not be. Check --block-size and the "
+        "engine version; details in _source.check.",
         file=sys.stderr,
     )
-    return 2
+    return 1
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -266,9 +304,31 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--out", default=None)
     c.set_defaults(func=cmd_crossover)
 
-    cal = sub.add_parser("calibrate", help="fit a cost profile to YOUR engine (needs [calib])")
-    cal.add_argument("--engine", default="http://localhost:8000")
-    cal.add_argument("--out", default=None)
+    cal = sub.add_parser(
+        "calibrate", help="fit a timing profile to YOUR running vLLM; check the cache model on it"
+    )
+    cal.add_argument("--engine", default="http://localhost:8000", help="the vLLM server's URL")
+    cal.add_argument("--out", required=True, help="where to write the profile (.json)")
+    cal.add_argument("--model", default=None, help="served model name (default: /v1/models)")
+    cal.add_argument("--gpu", default=None, help="GPU name for the profile (default: nvidia-smi "
+                     "when the engine is local)")
+    cal.add_argument("--name", default=None, help="profile name (default: gpu-model-vllmVERSION)")
+    cal.add_argument("--kv-blocks", type=int, default=None,
+                     help="KV capacity in blocks, if the engine does not report it")
+    cal.add_argument("--block-size", type=int, default=None)
+    cal.add_argument("--max-num-seqs", type=int, default=None)
+    cal.add_argument("--prefill-lengths", default="64,128,256,512,768,1024,1536,2048")
+    cal.add_argument("--reps", type=int, default=3, help="repeats of each prefill length")
+    cal.add_argument("--decode-batches", default="1,2,4,8,16")
+    cal.add_argument("--decode-tokens", type=int, default=64)
+    cal.add_argument("--check-sessions", type=int, default=16)
+    cal.add_argument("--check-turns", type=int, default=3)
+    cal.add_argument("--max-error", type=float, default=0.05,
+                     help="largest relative hit-rate error that still counts as calibrated")
+    cal.add_argument("--token-range", default="1000,30000",
+                     help="token ids for the random prompts, LO,HI (must be valid for the model)")
+    cal.add_argument("--seed", type=int, default=0)
+    cal.add_argument("--timeout", type=float, default=600.0, help="per-request timeout, seconds")
     cal.set_defaults(func=cmd_calibrate)
     return ap
 

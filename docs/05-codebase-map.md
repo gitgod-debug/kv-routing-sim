@@ -1,12 +1,13 @@
 # 05 — Codebase map
 
-**Status: 2026-09-20 — built, except the three numbers that need an engine.** The contracts below were
-written before the code (ADRs 001–004), and the code now implements them. 73 tests, `ruff` clean.
+**Status: 2026-09-28 — built.** The contracts below were written before the code (ADRs 001–004), and
+the code implements them. 167 tests, `ruff` clean.
 
-⛔ **What is deliberately NOT built: `calib/`, and the four cost coefficients in `sim/cost_model.py`.**
-Those are claims about how a real GPU behaves, and no GPU has been run. They sit behind
-`CostProfile.calibrated = False`, and `eval/` refuses in code to present an uncalibrated run as a
-prediction.
+*(2026-09-20 read: "built, except the three numbers that need an engine". Those numbers were measured
+on a T4 on 2026-09-22 — `configs/profiles/t4-qwen3-4b-vllm0.30.0.json` — and `calib/` was built on
+2026-09-28 so a user can measure their own. A profile without a measurement still carries
+`CostProfile.calibrated = False`, and `eval/` still refuses in code to present such a run as a
+prediction.)*
 
 Each section marks status: `📐 designed` (contract written, no code) · `🔨 building` · `✅ done + tested`.
 
@@ -83,7 +84,7 @@ strawman. So pure affinity stays as the honest extreme, and the balanced variant
 and fabricates locality the real engine does not have — that is a correctness bug that looks like a
 result (ADR-003).
 
-## `src/kv_routing_sim/sim/` — ✅ built + tested (timings uncalibrated)
+## `src/kv_routing_sim/sim/` — ✅ built + tested (timings from a profile; the T4 one is measured)
 
 **Contract:** the fleet, the clock, and the numbers that come out.
 
@@ -102,23 +103,25 @@ result (ADR-003).
 | `cost.py` | Reads `configs/cost_model.yaml`. **No constant is defined in Python** (ADR-006). |
 | `pareto.py` | The non-dominated frontier over (hit rate, p95 TTFT, ₹/1k requests) + the plots. |
 | `recommend.py` | Frontier + an SLO → *one* policy, *one* replica count, and the ₹ delta vs round-robin. **This is the output nobody else produces** — see `04-prior-art.md`. |
-| `crossover.py` | The H2 finding: sweep the sharing ratio as its own axis, locate the flip boundary, publish it with CIs. |
+| `rank.py` | Kendall's tau-b with ties handled — the statistic H6 is decided on. |
+| `sweep.py` | policy × replicas × seeds → points, and `crossover_sweep`, the H2 grid with the sharing ratio as its own axis. |
 
-## `src/kv_routing_sim/calib/` — 📐 designed, NOT built · ⚠️ the only GPU-touching module
+## `src/kv_routing_sim/calib/` — ✅ built + tested (2026-09-28)
 
 | Piece | Responsibility |
 |---|---|
-| `metrics_scrape.py` | Scrape vLLM `/metrics`, parse the exposition format, **derive** the hit rate from two counters (ADR-008). |
-| `compare.py` | Predicted vs measured per workload shape → the residual, with error bars. |
-| `report.py` | Renders the Real-Engine Calibration Report section: engine, version, flags, hardware, fields consumed by name. |
+| `calibrate.py` | `kvsim calibrate`: probe a running vLLM (health, model, version, and the KV capacity — **read, never estimated**), fit prefill per uncached token and the decode step per batch size, then check the cache model against the engine's own prefix-cache counters, request by request. Writes a profile that `--profile` accepts; one that fails the check is written but not marked calibrated. |
 
-⚠️ **Imports `vllm`/`httpx` lazily, inside functions** (ADR-009), and raises a message naming the
-`[calib]` extra. Core install must never need a GPU wheel.
+**Standard library only, and no `vllm` import:** it talks to the engine over HTTP, so the core
+install never needs a GPU wheel (ADR-009). The *designed* split — `metrics_scrape.py`, `compare.py`,
+`report.py` — became one module; the Phase 3 report itself is rendered by `scripts/phase3_analyze.py`.
+Tested against the repo's mock engine (`scripts/phase3_dryrun.py`): it recovers the mock's known
+timings, its check is exact, and a wrong block size is caught.
 
 ## `src/kv_routing_sim/cli.py` — ✅ built + tested
 
-`kvsim replay trace.jsonl --policies all --replicas 1-8 --format json|md|html`. Fails **loudly at startup**
-on a bad config; never silently mid-sweep (ADR-004).
+`kvsim replay` (a trace in, a recommendation out), `kvsim generate`, `kvsim crossover`, and
+`kvsim calibrate`. Fails **loudly at startup** on a bad config; never silently mid-sweep (ADR-004).
 
 ---
 
