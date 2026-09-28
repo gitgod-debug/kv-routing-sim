@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The README's figure — the flip — drawn from the committed demo grid.
 
-    python scripts/make_figures.py      # -> docs/figures/flip-{light,dark}.svg
+    python scripts/make_figures.py  # -> docs/figures/flip-*.svg and paper/figures/flip.pdf
 
 Needs the [analysis] extra (matplotlib). It reads `artifacts/results/demo_grid.json`, which
 `scripts/build_grid.py` writes only when it reproduces Phase 5's H2b table exactly, so the figure
@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt
 REPO = pathlib.Path(__file__).resolve().parents[1]
 GRID = REPO / "artifacts" / "results" / "demo_grid.json"
 OUT = REPO / "docs" / "figures"
+PAPER = REPO / "paper" / "figures" / "flip.pdf"  # the preprint's copy: pdfLaTeX does not read SVG
 LOAD = 2  # sessions/s: the README table's column
 REPLICAS = 4  # the fleet the hit rates are read on, as in Phase 5's write-up
 NOT_MET = 9  # drawn above 8: no replica count from 1 to 8 holds the target
@@ -104,6 +105,7 @@ def draw(grid: dict[str, Any], theme: str) -> plt.Figure:
 def main() -> int:
     plt.rcParams["svg.hashsalt"] = "kv-routing-sim"  # stable ids: same grid, same bytes
     plt.rcParams["svg.fonttype"] = "none"  # text stays text: smaller, and in the reader's font
+    plt.rcParams["pdf.fonttype"] = 42  # TrueType in the PDF, not Type 3, as arXiv prefers
     grid = json.loads(GRID.read_text())
     OUT.mkdir(parents=True, exist_ok=True)
     for theme in THEMES:
@@ -112,6 +114,11 @@ def main() -> int:
         fig.savefig(path, format="svg", metadata={"Date": None})
         plt.close(fig)
         print(f"wrote {path.relative_to(REPO)} ({path.stat().st_size / 1024:.0f} KiB)")
+    PAPER.parent.mkdir(parents=True, exist_ok=True)
+    fig = draw(grid, "light")
+    fig.savefig(PAPER, format="pdf", metadata={"CreationDate": None})
+    plt.close(fig)
+    print(f"wrote {PAPER.relative_to(REPO)} ({PAPER.stat().st_size / 1024:.0f} KiB)")
     return 0
 
 
