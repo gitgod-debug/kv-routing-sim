@@ -5,10 +5,11 @@ that separates this simulator from Vidur and Frontier: both replay their own tra
 adapter is a single file, which is what makes "add a trace adapter" an honest good-first-issue.
 """
 
-from . import mooncake, openai_log, vllm_jsonl
+from . import agentx, mooncake, openai_log, vllm_jsonl
 
 # name -> module, so the CLI has ONE source of truth for "which formats do we read?"
-REGISTRY = {"vllm-jsonl": vllm_jsonl, "openai-log": openai_log, "mooncake": mooncake}
+REGISTRY = {"vllm-jsonl": vllm_jsonl, "openai-log": openai_log, "mooncake": mooncake,
+            "agentx": agentx}
 
 
 def get(name: str):

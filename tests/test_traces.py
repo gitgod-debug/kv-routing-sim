@@ -241,3 +241,72 @@ def test_mooncake_bad_lines_are_skipped_and_counted(tmp_path):
     assert len(out) == 1 and st.skipped_lines == 3
     assert st.skip_reasons == {"json_decode_error": 1, "block_count_mismatch": 1,
                                "missing_or_bad_fields": 1}
+
+
+def _agentx(tmp_path, bad_count=False):
+    """Two tiny AgentX sessions; the second reuses the first's LOCAL ids on purpose."""
+    s1 = {"id": "t1", "models": ["main-model"], "block_size": 64, "hash_id_scope": "local",
+          "requests": [
+              {"t": 0.0, "type": "n", "model": "main-model", "in": 1024, "out": 64,
+               "hash_ids": list(range(1, 17)), "api_time": 5.0},
+              {"t": 10.0, "type": "n", "model": "main-model", "in": 2100, "out": 64,
+               "hash_ids": list(range(1, 33 - int(bad_count))), "api_time": 5.0},
+              {"t": 12.0, "type": "s", "model": "side-model", "in": 640, "out": 8,
+               "hash_ids": list(range(100, 110)), "api_time": 1.0},
+              {"t": 20.0, "type": "subagent", "agent_id": "a1", "requests": [
+                  {"t": 1.0, "type": "n", "model": "main-model", "in": 1024, "out": 8,
+                   "hash_ids": list(range(500, 516)), "api_time": 2.0}]},
+          ]}
+    s2 = {"id": "t2", "models": ["main-model"], "block_size": 64, "hash_id_scope": "local",
+          "requests": [{"t": 0.0, "type": "n", "model": "main-model", "in": 1024, "out": 64,
+                        "hash_ids": list(range(1, 17)), "api_time": 3.0}]}
+    p = tmp_path / "agentx.jsonl"
+    p.write_text(json.dumps(s1) + "\n" + json.dumps(s2) + "\n")
+    return p
+
+
+def test_agentx_hash_scope_is_local_and_blocks_group_at_the_scale(tmp_path):
+    """At 1/64, sixteen 64-token trace blocks make one 16-token block. Equal ids share within a
+    session; the same ids in ANOTHER session must not — the dataset's ids are session-local."""
+    reqs = list(adapters.get("agentx").read(_agentx(tmp_path), token_scale=1 / 64,
+                                            concurrency=2, stagger_s=0.0))
+    t1 = [r for r in reqs if r.session_id == "t1"]
+    (t2,) = [r for r in reqs if r.session_id == "t2"]
+    assert [len(r.block_hashes) for r in t1] == [1, 2]
+    assert t1[0].block_hashes[0] == t1[1].block_hashes[0]  # shared within the session
+    assert t2.block_hashes[0] != t1[0].block_hashes[0]  # the same local ids: NOT shared
+    assert (t1[0].prompt_tokens, t1[0].output_tokens) == (16, 1)
+
+
+def test_agentx_keeps_one_model_and_subagents_as_their_own_sessions(tmp_path):
+    stats = TraceStats()
+    reqs = list(adapters.get("agentx").read(_agentx(tmp_path), token_scale=1 / 64,
+                                            concurrency=2, stagger_s=0.0, stats=stats))
+    assert stats.skip_reasons == {"other_model": 1}  # the side-model request
+    (sub,) = [r for r in reqs if r.session_id == "t1/a1"]
+    assert sub.arrival_ts == 21.0  # the sub-agent's start (20) + its request's own t (1)
+    assert [r.arrival_ts for r in reqs] == sorted(r.arrival_ts for r in reqs)
+    kept = list(adapters.get("agentx").read(_agentx(tmp_path), token_scale=1 / 64,
+                                            concurrency=2, stagger_s=0.0, models="all"))
+    assert len(kept) == len(reqs) + 1
+
+
+def test_agentx_one_slot_plays_sessions_back_to_back(tmp_path):
+    """With one slot, the second session starts when the first would have finished (its last
+    request's t + api_time; session t1's is its sub-agent's, 20 + 1 + 2 = 23)."""
+    reqs = list(adapters.get("agentx").read(_agentx(tmp_path), token_scale=1 / 64,
+                                            concurrency=1, stagger_s=0.0))
+    first = reqs[0].session_id.split("/")[0]
+    later = [r for r in reqs if not r.session_id.startswith(first)]
+    assert min(r.arrival_ts for r in later) == {"t1": 23.0, "t2": 3.0}[first]
+
+
+def test_agentx_window_and_malformed_requests(tmp_path):
+    stats = TraceStats()
+    reqs = list(adapters.get("agentx").read(_agentx(tmp_path, bad_count=True), token_scale=1 / 64,
+                                            concurrency=2, stagger_s=0.0, window_s=11.0,
+                                            stats=stats))
+    assert all(r.arrival_ts < 11.0 for r in reqs)  # the sub-agent, at 21, is outside the window
+    assert stats.skip_reasons == {"block_count_mismatch": 1}  # 2100 tokens need 32 ids, not 31
+    with pytest.raises(ValueError, match="does not divide"):
+        list(adapters.get("agentx").read(_agentx(tmp_path), token_scale=1 / 3))

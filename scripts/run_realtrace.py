@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""R1 — real traffic: the Mooncake FAST'25 traces, replayed through every policy on the T4 profile.
+"""Real traffic, replayed through every policy on the T4 profile: R1 (Mooncake) and R2 (AgentX).
 
-    python scripts/run_realtrace.py            # configs/realtrace_mooncake.yaml
+    python scripts/run_realtrace.py            # configs/realtrace_mooncake.yaml (R1)
+    python scripts/run_realtrace.py --config configs/realtrace_agentx.yaml          # R2
     python scripts/run_realtrace.py --probe    # round-robin only: how many replicas at each speed
 
 The design and every decision rule were committed before the run (the config, plus a dated entry in
@@ -59,7 +60,8 @@ def _cfg() -> dict[str, Any]:
 def _base_trace(name: str) -> tuple:
     """The adapted trace, cut to the window. Read once per worker."""
     cfg = _cfg()
-    reqs = adapters.get("mooncake").read(REPO / cfg["traces"][name], **cfg["adapter"])
+    reader = adapters.get(cfg.get("adapter_name", "mooncake"))
+    reqs = reader.read(REPO / cfg["traces"][name], **cfg["adapter"])
     return tuple(r for r in reqs if r.arrival_ts < cfg["window_s"])
 
 
@@ -116,8 +118,8 @@ def main() -> int:
     global _CONFIG_PATH
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--config", type=pathlib.Path, default=_CONFIG_PATH)
-    ap.add_argument("--out", type=pathlib.Path,
-                    default=REPO / "artifacts" / "results" / "realtrace_mooncake")
+    ap.add_argument("--out", type=pathlib.Path, default=None,
+                    help="default: the config's results_dir (R1's: realtrace_mooncake)")
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     ap.add_argument("--probe", action="store_true",
                     help="round-robin alone, one seed, at the probe speeds: to choose the speeds")
@@ -126,6 +128,7 @@ def main() -> int:
     _cfg.cache_clear()
     cfg = _cfg()
     names, replicas = list(cfg["traces"]), cfg["replicas"]
+    out_dir = args.out or REPO / cfg.get("results_dir", "artifacts/results/realtrace_mooncake")
 
     if args.probe:
         jobs = [(nm, sp, "round-robin", None, n, 0) for nm in names for sp in cfg["probe_speeds"]
@@ -163,14 +166,14 @@ def main() -> int:
                            for p, al in pols} for sp in cfg["speeds"]} for nm in names}
     star = label(BAL, cfg["alpha_star"])
     verdicts = {}
-    for nm, rule in cfg["rules"].items():
+    for nm, rules in cfg["rules"].items():
         wins = {str(sp): ("affinity" if req[nm][str(sp)][star] < req[nm][str(sp)][STICKY] else
                           "sticky" if req[nm][str(sp)][STICKY] < req[nm][str(sp)][star] else "tie")
                 for sp in cfg["speeds"]}
-        aff = [sp for sp, w in wins.items() if w == "affinity"]
-        stk = [sp for sp, w in wins.items() if w == "sticky"]
-        holds = (bool(aff) and not stk) if rule == "affinity_wins" else not aff
-        verdicts[nm] = {"rule": rule, "winner_by_speed": wins, "holds": holds}
+        results = {rule: _rule(rule, req[nm], wins, star)
+                   for rule in ([rules] if isinstance(rules, str) else rules)}
+        verdicts[nm] = {"rule": " + ".join(results), "winner_by_speed": wins,
+                        "rules": results, "holds": all(results.values())}
 
     structure = {}
     for nm in names:
@@ -186,11 +189,32 @@ def main() -> int:
                     _profile().provenance(), "required_replicas": req, "hit_rate_at_4": hit4,
                     "verdicts": verdicts, "structure": structure,
                     "r1_holds": all(v["holds"] for v in verdicts.values())})
-    args.out.mkdir(parents=True, exist_ok=True)
-    (args.out / "realtrace.json").write_text(json.dumps(payload, indent=1, default=str) + "\n")
-    (args.out / "report.md").write_text(_markdown(payload, pols))
-    print((args.out / "report.md").read_text())
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "realtrace.json").write_text(json.dumps(payload, indent=1, default=str) + "\n")
+    (out_dir / "report.md").write_text(_markdown(payload, pols))
+    print((out_dir / "report.md").read_text())
     return 0
+
+
+def _rule(rule: str, req: dict[str, dict[str, int]], wins: dict[str, str], star: str) -> bool:
+    """One registered rule on one trace. `req[speed][policy]` = replicas needed (NOT_MET if none).
+
+    affinity_wins / affinity_never_wins (R1): balanced affinity at alpha* against session-sticky.
+    tie_within_one / pure_affinity_ties_sticky (R2): at every speed where either policy holds the
+    SLO on 8, the two need replicas within one of each other — and at least one speed must be
+    testable, or the rule does not hold (an untestable rule is not a confirmed one).
+    """
+    aff = [sp for sp, w in wins.items() if w == "affinity"]
+    stk = [sp for sp, w in wins.items() if w == "sticky"]
+    if rule == "affinity_wins":
+        return bool(aff) and not stk
+    if rule == "affinity_never_wins":
+        return not aff
+    other = {"tie_within_one": star, "pure_affinity_ties_sticky": "radix-affinity"}.get(rule)
+    if other is None:
+        raise SystemExit(f"error: unknown rule {rule!r}")
+    pairs = [(r[other], r[STICKY]) for r in req.values() if min(r[other], r[STICKY]) < NOT_MET]
+    return bool(pairs) and all(abs(a - b) <= 1 for a, b in pairs)
 
 
 def _row(values: list[int]) -> str:
@@ -200,18 +224,22 @@ def _row(values: list[int]) -> str:
 def _markdown(pl: dict[str, Any], pols: list[tuple]) -> str:
     cfg = pl["config"]
     speeds = cfg["speeds"]
+    name = cfg.get("name", "R1")
+    title = cfg.get("title", "R1 — real traffic: the Mooncake FAST'25 traces")
+    sessions = cfg.get("sessions_note", "sessions inferred (adapter)")
     lines = [
-        "# R1 — real traffic: the Mooncake FAST'25 traces",
+        f"# {title}",
         "",
         (
             f"T4 profile · token counts × {cfg['adapter']['token_scale']} · first "
             f"{cfg['window_s'] // 60} min, the first {cfg['warmup_s'] // 60} min warm-up · "
-            f"sessions inferred (adapter) · SLO p95 TTFT ≤ 2,000 ms · {pl['n_runs']:,} runs in "
+            f"{sessions} · SLO p95 TTFT ≤ 2,000 ms · "
+            f"{pl['n_runs']:,} runs in "
             f"{pl['runtime_s']:.0f} s · generated `{pl['date_utc']}` at `{pl['git_sha']}`"
             f"{' (dirty tree)' if pl['git_dirty'] else ''}."
         ),
         "",
-        f"**R1: {'HOLDS' if pl['r1_holds'] else 'FALSIFIED'}**",
+        f"**{name}: {'HOLDS' if pl['r1_holds'] else 'FALSIFIED'}**",
         "",
         "| trace | prediction | winner at each speed | verdict |",
         "|---|---|---|---|",

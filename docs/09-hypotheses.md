@@ -804,3 +804,50 @@ prompt lengths and batch sizes differ, and one sequence decodes slower than the 
 That is reported, not a failure. A failure of C1a would mean a rule in this engine that the check
 exposes and Phase 3's workloads did not — the check's lengths are chosen so that even a wrong block
 size shows, which the first version of the check missed.
+
+### 2026-09-28 — R2 REGISTERED before the comparison runs: real traffic, SemiAnalysis's AgentX traces
+Design and rules: [`configs/realtrace_agentx.yaml`](../configs/realtrace_agentx.yaml). Procedure: R1's
+`scripts/run_realtrace.py` with that config, reading the traces through the new `agentx` adapter.
+The traces (Apache-2.0, `huggingface.co/datasets/semianalysisai/cc-traces-weka-042026`, sha256
+`d9e30ba2…`) are not committed; the results record the file's hash.
+
+**Why this trace.** Real coding-agent sessions — 739 of them, 59,274 requests — with each request's
+prompt as 64-token block hashes that are **local to the session**. So it shows reuse *within* a
+session and nothing *across* users: the complement of Mooncake. It tests the other half of H2b's
+mechanism — what happens when there is no shared prompt at all.
+
+**What was measured before registering — structure, and round-robin alone.** Sessions are real
+here (one per trace; a sub-agent is its own); requests to a model other than the session's main
+one are dropped and counted (390 in the window). The sessions were recorded separately, so they are
+replayed a fixed number at a time, each at its recorded pace, for three hours with 30 minutes of
+warm-up. The scale, the number of sessions and the speeds were then set by **round-robin-only**
+probes, by rules written into the config before each probe:
+- At R1's scale (1/32) and 32 sessions, round-robin could not hold the SLO on 8 replicas at any
+  speed, 0.25× included — so, by the rule, **1/64**.
+- At 1/64, round-robin needed 1–3 replicas with 32 sessions, and held the SLO at no speed with 56,
+  64 or 128: a cliff, not a slope, because under round-robin every replica ends up caching every
+  session. By the next rule — the most sessions at which round-robin still holds at the recorded
+  pace — **48 sessions**, and speeds **0.5×, 1×, 2×**, where round-robin needs **2, 2 and 5**.
+- The window: 6,063 requests from 136 sessions; median prompt 1,591 tokens (95th percentile 4,824);
+  95.9% of block uses are reuse, **0.0% across sessions** (by construction). The live sessions'
+  contexts come to roughly five T4 caches.
+
+**Prediction.** With no block shared across sessions, prefix-affinity can only use the reuse that
+session-sticky already keeps together. So:
+- **tie_within_one** — balanced affinity (α\* = 16) and session-sticky need replicas within one of
+  each other at every testable speed;
+- **pure_affinity_ties_sticky** — so does **pure** affinity. Its collapse on Mooncake and in H2 came
+  from piling every session onto the replica holding a shared prompt; with nothing shared, there is
+  nothing to pile onto.
+
+R2 holds only if both hold. A speed where neither policy holds the SLO on 8 is untestable; a rule
+with no testable speed does not hold. *Reported, not tested:* every policy's replicas and hit rates,
+and α = 1.
+
+**What would be uncomfortable, written down now.** Round-robin's cliff says the working set, not
+the request rate, decides who holds the SLO here — and session-sticky places a new session by load
+at its first request only, while prefix-affinity re-decides every turn. If sessions' contexts grow
+unevenly, sticky may pile large sessions onto one replica, and affinity with a load weight could
+then win outright; that would falsify tie_within_one and would be the first real-traffic case where
+re-deciding per turn pays. The scale (1/64) and the replay (48 sessions at a time, open-loop) are
+choices, not facts about the traffic, and every number carries them.

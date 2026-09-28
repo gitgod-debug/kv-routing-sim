@@ -448,7 +448,10 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       session) and **Mooncake** FAST'25 (512-token block hashes, global). ✅ **Mooncake done 2026-09-28**:
       the `mooncake` adapter (sessions inferred; Apache-2.0), R1 registered and run — ⛔ FALSIFIED: on
       real traffic sticky and balanced affinity tie within a replica, both beat round-robin, pure
-      affinity fails ([`report.md`](artifacts/results/realtrace_mooncake/report.md)). AgentX: not yet
+      affinity fails ([`report.md`](artifacts/results/realtrace_mooncake/report.md)). **AgentX:
+      R2 registered 2026-09-28** — the `agentx` adapter (sessions real, hashes session-local),
+      48 sessions at a time at 1/64, speeds 0.5×/1×/2× set by round-robin-only probes; predicted: no
+      cross-user sharing, so balanced AND pure affinity tie session-sticky within one replica
 - [~] **Multi-seed (5) + bootstrap CIs by session** — ✅ used for every H1 decision; per-cell p95 CIs
       for the README tables are still to add
 - [x] ✅ `eval/cost.py` from `configs/cost_model.yaml` — every constant **cited and dated**: g4dn.xlarge
