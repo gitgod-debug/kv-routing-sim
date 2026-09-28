@@ -1,0 +1,144 @@
+# C2 — the timing model: does decode and prefill cost grow with context length, is CPU contention a
+# cause, and does a context-aware model predict held-out traffic?
+# Registered 2026-09-28, BEFORE it runs, with a dated entry in docs/09-hypotheses.md.
+#
+# Why: Phase 6 matched every hit rate on two live T4s but found latency 5–222× the prediction —
+# decode steps ran 2.7–4.0× the fitted profile. Two suspects: the profile has no context-length term
+# (Phase 6's prompts are ~1,700 tokens), or CPU contention (two engines and a client on 4 vCPUs).
+# C2 separates them on one Kaggle box, fits a context-aware model on data measured here, and tests it
+# on traffic the fit never saw. `scripts/c2_prepare.py` builds the notebook; `scripts/c2_analyze.py`
+# is the whole analysis, committed before the run: nothing below is chosen after a result.
+
+schema_version: 1
+engine:                           # Phase 6's flags exactly, one server per physical T4
+  model: Qwen/Qwen3-4B
+  vllm: 0.30.0
+  block_size: 16
+  num_gpu_blocks: 1537
+  max_model_len: 2048
+  max_num_seqs: 256
+  max_num_batched_tokens: 8192
+profile: configs/profiles/t4-qwen3-4b-vllm0.30.0.json   # the context-free profile every result used
+replicas: 2                       # replica 0 is measured; replica 1 is idle except in part C
+measure_replica: 0
+
+# ── Part A: decode step against context length L × batch size b, replica 1 idle ────────────────
+# b requests, unique random prompts of L tokens, sent together; each streams `output_tokens` tokens,
+# one chunk per token (checked in Phase 3's data: 64 of 64). A request's decode step = the mean gap
+# from token `skip_tokens` to its last token — past every prefill in the batch. The cell's step =
+# the median over its requests. A cell counts only if every request is valid and nothing was
+# preempted: `b × ceil((L + 64) / 16)` is kept under 1,300 of the 1,536 usable blocks.
+decode:
+  output_tokens: 64
+  skip_tokens: 8
+  reps: 2
+  grid:                           # [L, b]
+    - [128, 1]
+    - [128, 2]
+    - [128, 4]
+    - [128, 8]
+    - [128, 16]
+    - [128, 32]
+    - [128, 64]
+    - [512, 1]
+    - [512, 2]
+    - [512, 4]
+    - [512, 8]
+    - [512, 16]
+    - [512, 32]
+    - [1024, 1]
+    - [1024, 2]
+    - [1024, 4]
+    - [1024, 8]
+    - [1024, 16]
+    - [1536, 1]
+    - [1536, 2]
+    - [1536, 4]
+    - [1536, 8]
+    - [1536, 12]
+    - [1984, 1]
+    - [1984, 2]
+    - [1984, 4]
+    - [1984, 8]
+    - [1984, 10]
+
+# ── Part B: prefill of n new tokens after c cached ones, replica 1 idle ─────────────────────────
+# A warm request of c tokens first (max_tokens 1), then c + n tokens with the same first c. TTFT of
+# the second; its cached tokens as the engine reports them. c = 0 is a cold prompt of n tokens.
+prefill:
+  reps: 3
+  grid:                           # [c, n]
+    - [0, 64]
+    - [0, 256]
+    - [0, 512]
+    - [0, 1024]
+    - [0, 1536]
+    - [0, 1984]
+    - [256, 64]
+    - [256, 256]
+    - [256, 704]
+    - [768, 64]
+    - [768, 256]
+    - [768, 704]
+    - [1280, 64]
+    - [1280, 256]
+    - [1280, 704]
+
+# ── Part C: CPU contention. The same decode cells, with replica 1 idle ("alone") and with replica 1
+# kept busy by a separate client process streaming `concurrency` requests at once ("contended") —
+# Phase 6's situation: two engines and a streaming client on one box. Measured ENGINE-SIDE, by
+# vllm:inter_token_latency_seconds on replica 0 (Δsum ÷ Δcount), so the notebook's own client
+# cannot colour it. Alone and contended alternate within each rep, so drift cannot pose as either.
+cpu:
+  cells: [[512, 8], [1024, 16], [1536, 8]]
+  reps: 2
+  settle_s: 20                    # the background load runs this long before a contended cell
+  background: {replica: 1, concurrency: 48, shared_prefix_tokens: 1344, private_tokens: 192,
+               output_tokens: 64}
+
+# ── Part D: held out. Phase 6's traffic generator, on replica 0 alone, at two loads. The fit
+# never sees it. Predicted by the context-free profile now (reported below), and by the fitted
+# context-aware model after the run, from the committed procedure, at the times requests were sent.
+holdout:
+  shape: &shape
+    n_sessions: 120
+    turns_per_session: 4
+    session_context_tokens: 150
+    user_turn_tokens: 40
+    assistant_turn_tokens: 60
+    output_tokens: 64
+    think_time_s: 6.0
+    seed: 0
+    prefix_sharing_ratio: 0.8
+  workloads:
+    K1_half:    {<<: *shape, arrival_rate: 0.5}                                          # Phase 6 K1-sticky's per-replica load
+    K64_quarter: {<<: *shape, arrival_rate: 0.25, n_shared_prefixes: 64, prefix_zipf_s: 1.0}  # 64 tenant prompts, half that load
+
+# ── The fit — fixed now (scripts/c2_analyze.py) ─────────────────────────────────────────────────
+#   decode(b, S)  = d0 + d1·b + d2·S,          S = b·(L + (skip + output)/2), on every valid part-A rep
+#   prefill(n, c) = p0 + p1·n + p2·n·(c + n/2), on every part-B rep, the target being
+#                   TTFT − decode(1, c + n) — the simulator's own TTFT: prefill plus one step
+# Least squares with every coefficient ≥ 0: all subsets of free coefficients are solved and the
+# feasible one with the least squared error wins. Capacity, block size and max_num_seqs are the
+# engine's (1,537 · 16 · 256). The context-free fit (d2 = p2 = 0) on the same data is reported.
+
+# ── The decision rules, fixed before the run ────────────────────────────────────────────────────
+rules:
+  # C2a — the context term is real: at b = 8, the decode step at L = 1536 is at least this many
+  # times the step at L = 128 (medians over reps).
+  c2a_min_ratio: 1.5
+  # C2b — CPU contention is real: the median over part C's cells of contended ÷ alone engine-side
+  # inter-token latency is at least this.
+  c2b_min_ratio: 1.2
+  # C2c — the context-aware model predicts held-out traffic: for BOTH workloads, its p50 AND p95
+  # TTFT within this factor of the measured ones (either direction).
+  c2c_max_factor: 2.0
+  # Reported beside C2c, not part of it: each workload's hit rate within this of the prediction
+  # (the cache model's claim, now on one replica).
+  hit_rate_max_relative_error: 0.10
+
+# ── The predictions, written before the run ────────────────────────────────────────────────────
+predictions:
+  c2a: holds      # ~3×: Phase 3's decode sweep (L 448) cost ~2 ms per sequence, C1's (L ~100) ~0.2 ms
+  c2b: fails      # contention adds under 20%: context alone roughly accounts for Phase 6's steps
+  c2c: holds

@@ -59,12 +59,16 @@ class MockEngine:
         from kv_routing_sim.sim.cost_model import CostProfile
 
         self.bs = block_size
-        # Fast, but with a real per-sequence cost so a concurrent run queues and preempts.
+        # Fast, but with a real per-sequence cost so a concurrent run queues and preempts. The two
+        # context terms are off unless set (C2's dry-run sets them, to check its fit recovers them).
         self.profile = CostProfile(
             name="mock", prefill_base_s=1e-3, prefill_per_token_s=2e-5, decode_base_s=5e-4,
             decode_per_seq_s=2.5e-3, kv_cache_blocks=num_blocks, block_size=block_size,
             max_num_seqs=max_num_seqs,
+            prefill_attn_s=float(os.environ.get("MOCK_PREFILL_ATTN_S", "0")),
+            decode_per_ctx_token_s=float(os.environ.get("MOCK_DECODE_PER_CTX_TOKEN_S", "0")),
         )
+        self.itl = [0.0, 0]  # vllm:inter_token_latency_seconds — sum, count
         self.cv = threading.Condition()
         self.replica = self._new_replica()
         self.folded: dict[str, float] = {}  # counters of replicas retired by a reset
@@ -107,6 +111,9 @@ class MockEngine:
                 for seq in [*self.replica.running, *finished]:
                     rid, n = seq.request.request_id, seq.tokens_emitted
                     if n > self.emitted[rid]:
+                        if self.emitted[rid] > 0:  # a token after the first: one step's gap
+                            self.itl[0] += dur * (n - self.emitted[rid])
+                            self.itl[1] += n - self.emitted[rid]
                         if self.emitted[rid] == 0:  # first token: vLLM books the prompt here
                             cached = seq.matched_blocks * self.bs
                             self.tokens["prompt"] += seq.request.prompt_tokens
@@ -165,6 +172,7 @@ class MockEngine:
             }
             running, waiting = len(self.replica.running), len(self.replica.queue)
             tk = dict(self.tokens)
+            itl_sum, itl_count = self.itl
         lab = 'engine="0",model_name="mock"'
         rows = [
             "# HELP vllm:prefix_cache_queries Prefix cache queries, in terms of number of tokens.",
@@ -186,6 +194,8 @@ class MockEngine:
             f"vllm:generation_tokens_total{{{lab}}} {float(tk['generation'])}",
             f"vllm:num_requests_running{{{lab}}} {float(running)}",
             f"vllm:num_requests_waiting{{{lab}}} {float(waiting)}",
+            f"vllm:inter_token_latency_seconds_sum{{{lab}}} {float(itl_sum)}",
+            f"vllm:inter_token_latency_seconds_count{{{lab}}} {float(itl_count)}",
         ]
         for fam, key in (
             ("vllm:kv_block_lifetime_seconds", "lifetime"),
