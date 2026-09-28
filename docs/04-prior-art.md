@@ -114,6 +114,12 @@ caching, **single-node**) · `zxuhan/llm-router` (per-worker radix trees, Go) ·
 `AmanPandey28/stateful-cache-router` · `syedazeez337/mesh-lab` · `jahnavi-yelamanchi/cachetrace` (0★, a
 **single-path prompt-construction linter**) · `EeroEternal/kvbridge` (0★, a **production routing proxy**).
 
+**Single-engine work on the same traffic** *(found 2026-09-23)*: **CacheWise** (arXiv 2606.16824,
+Jun 2026) — prefix-aware scheduling plus reuse-aware eviction for coding-agent workloads, single-node
+inside vLLM · **`gauravapiscean/agentic-kv-cache`** (23★) — single-node eviction policies replayed on
+the AgentX and Mooncake traces; finds LRU hard to beat. Neither routes across replicas; cite both
+wherever those traces are used.
+
 **Gateways that implement rather than compare:** `smg` 473★ · `AMD-AGI/Infera` ·
 `llm-d/llm-d-inference-sim` 188★ — a mock vLLM built *specifically* so people can test routing and
 KV-cache-locality logic. Different product: it helps you test routing **code**; we help you choose a
@@ -178,6 +184,7 @@ funded, arXiv-backed, and gaining ~3★/day.
 |---|---|---|---|---|---|
 | 2026-08-25 | `kv routing`, `prefix cache simulator`, `llm router simulator`, `cache aware routing`, + PyPI + HF Hub | 666 / no | 86 / **no** | `disagg-sim` (Aug 16), `Mike-Ew` (Apr) | Open as an intersection |
 | 2026-09-12 | re-check of the four + branch lists + README prose | 676 / **no**, untouched since 2025-06-25 | **139** / **no** (registry re-read) | none | Differentiator survives; star velocity noted |
+| 2026-09-23 | capability searches (recorded in `FLAGSHIP_PROJECTS.md`; ported here 2026-09-28) | — | — | CacheWise (single-node, inside vLLM); `gauravapiscean/agentic-kv-cache` (single-node eviction on AgentX + Mooncake, no routing); llm-d's scheduler write-ups (hand-set prefix + load weights, no boundary published) | None occupies the intersection; all three cited in the README |
 | *(next)* | *due 2026-10-20* | | | | |
 
 **What to check on every pass, minimum:** Vidur's `canary` merge status · Frontier's
