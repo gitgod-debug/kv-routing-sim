@@ -9,9 +9,9 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-09-28 (the finding, H6, R1 on Mooncake, Phase 6 registered, the demo page and the
-10×/100× numbers, the preprint draft, `kvsim calibrate` and C1, a wheel that works outside a clone;
-175 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
+**Last updated:** 2026-09-28 (the finding, H6, R1 on Mooncake and R2 on AgentX, Phase 6 and C1
+registered, the demo page and the 10×/100× numbers, the preprint draft, `kvsim calibrate`, a wheel that
+works outside a clone; 179 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
 vLLM under eviction pressure to the token, against predictions committed before the run)
 **Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding** — *keep each user on one GPU until
 your tenants' prompts outgrow one GPU's cache; then route by prefix, and keep its load weight small* (H2b
