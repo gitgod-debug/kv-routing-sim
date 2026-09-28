@@ -121,6 +121,8 @@ def main() -> int:
     ap.add_argument("--out", type=pathlib.Path, default=None,
                     help="default: the config's results_dir (R1's: realtrace_mooncake)")
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
+    ap.add_argument("--report-only", action="store_true",
+                    help="re-render report.md from the results_dir's realtrace.json; run nothing")
     ap.add_argument("--probe", action="store_true",
                     help="round-robin alone, one seed, at the probe speeds: to choose the speeds")
     args = ap.parse_args()
@@ -129,6 +131,13 @@ def main() -> int:
     cfg = _cfg()
     names, replicas = list(cfg["traces"]), cfg["replicas"]
     out_dir = args.out or REPO / cfg.get("results_dir", "artifacts/results/realtrace_mooncake")
+    if args.report_only:
+        pl = json.loads((out_dir / "realtrace.json").read_text())
+        run_cfg = pl["config"]
+        pols = ([(p, None) for p in run_cfg["policies"]]
+                + [(BAL, al) for al in run_cfg["alphas"]])
+        (out_dir / "report.md").write_text(_markdown(pl, pols))
+        return 0
 
     if args.probe:
         jobs = [(nm, sp, "round-robin", None, n, 0) for nm in names for sp in cfg["probe_speeds"]
@@ -247,8 +256,9 @@ def _markdown(pl: dict[str, Any], pols: list[tuple]) -> str:
     for nm, v in pl["verdicts"].items():
         w = " · ".join(f"{sp}×: {x}" for sp, x in v["winner_by_speed"].items())
         lines.append(f"| {nm} | {v['rule']} | {w} | {'HOLDS' if v['holds'] else 'FALSIFIED'} |")
+    column = "sessions (inferred)" if "inferred" in sessions else "sessions"
     lines += ["", "## Structure of the window (reported)", "",
-              "| trace | requests | sessions (inferred) | cross-session sharing | total reuse |",
+              f"| trace | requests | {column} | cross-session sharing | total reuse |",
               "|---|---:|---:|---:|---:|"]
     for nm, s in pl["structure"].items():
         lines.append(f"| {nm} | {s['requests_in_window']:,} | {s['sessions']:,} | "
