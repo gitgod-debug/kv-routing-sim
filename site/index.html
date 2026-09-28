@@ -87,9 +87,10 @@
   </div>
   <p class="note"><strong>Scope, before you trust it.</strong> Generated agentic traffic, Qwen3-4B, T4 timings.
     The direction of this flip survived a 2× and 4× faster GPU and a 2× cheaper or dearer prefill; the
-    replica counts did not. On two real traces (Mooncake FAST'25, scaled) session-sticky and
-    prefix-affinity with a load weight came out within one replica of each other — the many-prompt
-    advantage is not yet shown on real traffic.</p>
+    replica counts did not. On real traces — Mooncake, whose prompts are shared across users, and
+    AgentX's coding-agent sessions, where nothing is — session-sticky and prefix-affinity came out
+    within one replica of each other: the many-prompt advantage is not yet shown on real traffic.
+    Prefix-affinity without a load weight failed only where prompts were shared.</p>
 
   <h2>The credential — checked against a live vLLM</h2>
   <p>vLLM 0.30.0, Qwen3-4B (fp16), a deliberately small 512-block cache that overflows, three runs of each
