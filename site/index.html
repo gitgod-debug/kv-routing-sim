@@ -90,7 +90,10 @@
     replica counts did not. On real traces — Mooncake, whose prompts are shared across users, and
     AgentX's coding-agent sessions, where nothing is — session-sticky and prefix-affinity came out
     within one replica of each other: the many-prompt advantage is not yet shown on real traffic.
-    Prefix-affinity without a load weight failed only where prompts were shared.</p>
+    Prefix-affinity without a load weight failed only where prompts were shared. On <strong>two live
+    T4s</strong> the hit rates matched the simulator within 1.4% and the policies kept their order,
+    but latency was 5–222× worse than predicted: <strong>the T4 counts below are simulator figures,
+    and optimistic.</strong></p>
 
   <h2>The credential — checked against a live vLLM</h2>
   <p>vLLM 0.30.0, Qwen3-4B (fp16), a deliberately small 512-block cache that overflows, three runs of each

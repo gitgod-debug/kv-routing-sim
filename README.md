@@ -6,15 +6,15 @@ Give it your serving log. It returns a routing policy, a replica count, and a co
 prefix-cache model is calibrated against a live vLLM's own Prometheus counters, and **the calibration error
 is published**.
 
-> ## 🚧 Status (2026-09-28): the calibration and the finding are measured — T4 only; the two-GPU check is next.
+> ## 🚧 Status (2026-09-28): the cache model is proven on one and two live T4s; the timing model is not.
 > The Real-Engine Calibration Report below is filled in from a live vLLM, against predictions committed
 > before the run; the finding comes from a test registered before it ran, on generated traffic, and two
-> real trace families have tested it since (one falsified a prediction, one confirmed one). Still to
-> come: the two-GPU check on a live engine (registered), `kvsim calibrate`'s first run on a real GPU
-> (registered), and other hardware. Every number still written as `TBD — not yet measured` **is
-> exactly that**, and stays so until it is measured — no placeholder here is ever quietly replaced by a
-> plausible figure; see the honesty gates in [`CHECKPOINTS.md`](CHECKPOINTS.md). Start at
-> [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
+> real trace families have tested it since (one falsified a prediction, one confirmed one). On **two
+> live T4s** (Phase 6, run twice) the hit rates matched within 1.4% and the policies came out in the
+> predicted order — but latency was **5–222× worse** than the simulator predicted, so every **replica
+> count** here is a simulator figure, likely optimistic, until a better timing model is tested. Every
+> number still written as `TBD — not yet measured` **is exactly that**; see the honesty gates in
+> [`CHECKPOINTS.md`](CHECKPOINTS.md). Start at [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
 
 ---
 
@@ -39,7 +39,8 @@ vLLM (the credential, below), a 2-second p95 TTFT target, and the test registere
 
 *Drawn by [`scripts/make_figures.py`](scripts/make_figures.py) from
 [`demo_grid.json`](artifacts/results/demo_grid.json), which reproduces Phase 5's table; 3 seeds per point,
-a point counts only if every seed holds the target. Replica counts are T4 figures (H6).*
+a point counts only if every seed holds the target. Replica counts are simulator figures for a T4 —
+and, the live check below shows, optimistic ones.*
 
 - **One shared prompt:** session-sticky needed the fewest GPUs at every load — 25–43% fewer than
   round-robin — and *pure* prefix-affinity collapsed: it sends every session to the one replica holding
@@ -50,6 +51,24 @@ a point counts only if every seed holds the target. Replica counts are T4 figure
   best with one prompt. With 16 or 64 prompts, a weight of 1 and no weight at all needed the same number
   of GPUs at every load, while the registered weight of 16 needed up to 4 more, or could not hold the
   target on 8.
+
+**The live check (Phase 6, registered; run twice on two T4s).** The finding's traffic at 1 session/s,
+one prompt (K1) and 64 (K64), three routers on two live vLLM replicas:
+
+| | K1: sticky · round-robin · affinity | K64: sticky · round-robin · affinity |
+|---|---|---|
+| **Hit rate**, predicted | 0.921 · 0.880 · 0.923 | 0.821 · 0.694 · **0.844** |
+| **Hit rate**, live (two runs) | 0.921 · 0.880 · 0.923 — to four decimals | 0.810–0.822 · 0.695 · **0.844–0.846** |
+| **p95 TTFT**, predicted | 0.35 s · 0.44 s · 0.48 s | 1.55 s · 5.8 s · 1.26 s |
+| **p95 TTFT**, live (two runs) | **1.8–1.9 s** · 11–15 s · ~106 s | 57–72 s · ~110 s · **32–39 s** |
+
+The **mechanism held live**: every hit rate within 1.4% of its prediction, and prefix-affinity above
+session-sticky at 64 prompts (the registered test). The latency *order* matched the prediction too —
+sticky best at K1, affinity best at K64 — though that was observed, not registered. But the engines
+were **overloaded** where the simulator saw headroom: decode steps took 2.7–4.0× what the fitted
+profile says, which at this load became waits 5–222× longer. So the replica counts above are
+simulator figures and likely optimistic for long agentic prompts on a T4; the cause (context length
+or CPU contention) is not yet tested. [Report](artifacts/results/phase6_kaggle_t4/report.md).
 
 **See it flip yourself:** the demo page ([`site/`](site/index.html)) looks up every point of this grid —
 prompts × load × replicas × six policies, 3,456 simulator runs, rebuilt by
@@ -90,7 +109,8 @@ A README needs both, and needs them apart.
 | **Hardware** | **Kaggle 2x Tesla T4** (compute 7.5, driver 580.159.04, CUDA 12.8). vLLM runs TRITON_ATTN in fp16 here — so hit rates and routing results are hardware-independent, and every latency/cost figure is a **T4 figure** |
 | **Hit-rate error vs live engine** | ⭐ **Zero** on 2 sequential shapes × 3 runs — every counter, and every one of 120 requests' cached tokens, to the token. **+0.3%** (relative) on the concurrent shape, predicted by a timing profile fitted without it. Plain LRU on the same runs **over-predicts** by **11.9 points** (W1) and **19.7%** (W3) |
 | **The residual, explained** | Sequential: none to explain. The engine's `kv_block_*` histograms: counts exact (963 and 1,880 events); distributions identical bucket for bucket on W2; W1's small residual (max CDF distance 0.042) traced — post-hoc, labelled so — to the **timing** fit, not the cache model |
-| **2-replica validation** | Round-robin across **two physical T4s**: 1,088 prefill tokens computed, **1,088 predicted** (Phase 0 v2). Under pressure: Phase 6 |
+| **2-replica validation** | Round-robin across **two physical T4s**: 1,088 prefill tokens computed, **1,088 predicted** (Phase 0 v2). **Under pressure (Phase 6, run twice): all 12 runs' hit rates within 1.4%** (K1 to four decimals), 1,537 blocks per replica, three routers, preemptions included |
+| **Timing under load** | ⚠️ **Not validated — optimistic.** On Phase 6's ~1,700-token prompts the engines' decode steps took 2.7–4.0× the fitted profile and p95 TTFT came out 5–222× the prediction ([report](artifacts/results/phase6_kaggle_t4/report.md)). On Phase 3's shorter, cache-bound W3 it was within 6.7% |
 
 **`/metrics` fields consumed, by name:** `vllm:prefix_cache_queries` · `vllm:prefix_cache_hits` ·
 `vllm:prompt_tokens_by_source{source="local_compute"|"local_cache_hit"}` · `vllm:num_preemptions` ·
@@ -187,9 +207,12 @@ kvsim replay trace.jsonl --policies all --replicas 1-8 --profile mine.json --cos
 ```
 
 If the cache check misses (by more than 5%, or on any single request's cached tokens), the profile is
-written but **not** marked calibrated, and the command exits 1. ⚠️ So far it has been tested against
-the repo's mock engine — whose true timings it recovers, and whose wrong block size it catches — but
-not yet against a real GPU.
+written but **not** marked calibrated, and the command exits 1. **On a real T4 (C1, registered):** its
+cache check came out exact — all 48 requests' cached tokens, 9,840 of 13,776 tokens — and it read the
+engine's 1,537 blocks correctly, in 48 seconds. ⚠️ Its **timing** fit is a straight line, and T4
+prefill is not one: 0.71 ms per token up to 1,024 tokens, 1.12 ms at 2,040. So trust the profile's
+hit rates and capacity; treat its timings — and any replica count built on them — as rough
+([report](artifacts/results/c1_kaggle_t4/report.md)).
 
 ## ⭐ What transfers to your fleet, and what doesn't
 
@@ -200,7 +223,7 @@ so the honest answer comes in three tiers, and they must not be blended (ADR-010
 |---|---|---|
 | **Policy ranking** | *Which* policy wins on your workload shape, and roughly by how much | ⛔ **Not free.** **H6 was tested and FALSIFIED (2026-09-28):** under a 2× faster GPU, or prefill 2× cheaper or dearer, the full order of the seven policies changed (Kendall's τ-b as low as 0.51). What held — noticed after the run, not registered: session-sticky needed the fewest replicas at all 48 points. So read a ranking as a result for *our* T4 unless you calibrate |
 | **The crossover boundary** | Whether prefix-affinity is worth implementing for *your* prompts and load | ✅ **Its direction transfers:** H6's crossover half held (2026-09-28) — the flip from session-sticky to prefix-affinity as prompts outgrow one GPU's cache survived all four hardware rescalings. *Where* it happens, in replicas, is still a T4 figure |
-| **Absolute ms and ₹** | p95 TTFT and ₹/1k requests for your fleet | **`kvsim calibrate` on your own hardware**, a few minutes. ⛔ Our error bar was measured on our GPU and our model. It does **not** transfer, and this README will never imply that it does |
+| **Absolute ms and ₹** | p95 TTFT and ₹/1k requests for your fleet | **`kvsim calibrate` on your own hardware**, a few minutes. ⛔ Our error bar was measured on our GPU and our model. It does **not** transfer, and this README will never imply that it does. ⚠️ And even on our own T4, the timing model was optimistic under Phase 6's load (latency 5–222× the prediction): read ms, ₹ and replica counts as optimistic until a context-aware timing model is tested |
 
 > **So: why trust our numbers on your hardware?** You shouldn't. Run `kvsim calibrate` and use your own.
 > That is the same posture as the cost model, which ships every constant in a config with a source and a
