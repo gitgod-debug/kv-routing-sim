@@ -6,13 +6,15 @@ Give it your serving log. It returns a routing policy, a replica count, and a co
 prefix-cache model is calibrated against a live vLLM's own Prometheus counters, and **the calibration error
 is published**.
 
-> ## 🚧 Status: the calibration is measured (Phase 3, 2026-09-22), and so is the first finding (Phase 5, 2026-09-28) — on generated traffic, T4 only.
+> ## 🚧 Status (2026-09-28): the calibration and the finding are measured — T4 only; the two-GPU check is next.
 > The Real-Engine Calibration Report below is filled in from a live vLLM, against predictions committed
-> before the run; the finding comes from a test registered before it ran. Real traces, the two-GPU check
-> under pressure, and other hardware are still to come. Every number still written as
-> `TBD — not yet measured` **is exactly that**, and stays
-> so until it is measured — no placeholder here is ever quietly replaced by a plausible figure; see the
-> honesty gates in [`CHECKPOINTS.md`](CHECKPOINTS.md). Start at [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
+> before the run; the finding comes from a test registered before it ran, on generated traffic, and two
+> real trace families have tested it since (one falsified a prediction, one confirmed one). Still to
+> come: the two-GPU check on a live engine (registered), `kvsim calibrate`'s first run on a real GPU
+> (registered), and other hardware. Every number still written as `TBD — not yet measured` **is
+> exactly that**, and stays so until it is measured — no placeholder here is ever quietly replaced by a
+> plausible figure; see the honesty gates in [`CHECKPOINTS.md`](CHECKPOINTS.md). Start at
+> [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
 
 ---
 
