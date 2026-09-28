@@ -1,0 +1,44 @@
+# C1 — `kvsim calibrate`'s first run on a real GPU. Registered before it runs, with a dated entry in
+# docs/09-hypotheses.md. `scripts/c1_prepare.py` builds notebooks/c1_calibrate_t4.ipynb from this
+# file, with the package's wheel EMBEDDED (built from a clean tree, so the notebook runs exactly the
+# committed code), and writes the prediction to artifacts/results/c1_prereg/prediction.json.
+
+schema_version: 1
+
+# One vLLM server on one T4 — Phase 3's engine and flags, but WITHOUT --num-gpu-blocks-override: the
+# engine allocates its natural capacity, and C1b checks that `kvsim calibrate` reads that number.
+engine:
+  model: Qwen/Qwen3-4B
+  vllm: "0.30.0"
+  block_size: 16
+  max_model_len: 2048
+  max_num_seqs: 256
+  max_num_batched_tokens: 8192
+  gpu_memory_utilization: 0.85
+
+# The command's own defaults, written down so the prediction below can be derived from them.
+calibrate:
+  seed: 0
+  check_sessions: 16
+  check_turns: 3
+  token_range: [1000, 30000]
+  max_error: 0.05
+
+# ── The decision rules, fixed before the run. C1 holds only if both hold. ──────────────────────
+rules:
+  c1a: >-
+    kvsim calibrate exits 0 and marks the profile calibrated: its check's hit-rate error is at most
+    max_error AND every check request's cached-token count equals the model's.
+  c1b: >-
+    the KV capacity it reads from the engine equals the engine log's
+    "GPU KV cache size: T tokens" divided by block_size.
+
+# Reported, not tested.
+reported:
+  - the fitted timings against Phase 3's (0.70 ms per uncached token; 52.9 ms + 1.23 ms x batch)
+  - the capacity against the Phase 4 profile's 1,537 blocks (natural capacity can drift between launches)
+  - the command's wall-clock time
+
+# The prediction is computed with this profile's block size. The check needs far fewer blocks than
+# any T4 capacity, so nothing is evicted and the predicted hit rate does not depend on capacity.
+phase3_profile: configs/profiles/t4-qwen3-4b-vllm0.30.0.json

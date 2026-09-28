@@ -90,6 +90,7 @@ extend-select = ["E501"]
 # table row cannot be wrapped. The notebook it generates is excluded above for the same reason.
 "scripts/_phase3_notebook.py" = ["E501"]
 "scripts/_phase6_notebook.py" = ["E501"]
+"scripts/_c1_notebook.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
