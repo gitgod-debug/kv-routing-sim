@@ -126,7 +126,7 @@
   <h2>Run it on your own traffic</h2>
   <pre><code>pip install kv-routing-sim
 kvsim replay your-trace.jsonl --policies all --replicas 1-8 \
-  --profile configs/profiles/t4-qwen3-4b-vllm0.30.0.json --cost-model configs/cost_model.yaml</code></pre>
+  --profile t4-qwen3-4b-vllm0.30.0 --cost-model default</code></pre>
   <p class="muted">No upload box on purpose: a serving log holds your users' prompts. It stays on your
     machine, and prompts are hashed before they enter the simulator.</p>
 

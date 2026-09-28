@@ -1,0 +1,66 @@
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# The cost model. See ADR-006 and docs/06-methodology.md §2.
+#
+# THE RULE: every value here carries a `source:` and a `date:`. A skeptical reader must be able to
+# disagree with a constant, change it, re-run, and get their own number. No hidden divisors, and no
+# constant defined in Python.
+#
+# Every value was `<TBD>` until it was filled from a cited source (2026-09-22). That was deliberate:
+# an uncited constant should be STRUCTURALLY obvious, not merely discouraged. `eval/cost.py` refuses
+# to run while any `<TBD>` remains, rather than silently treating it as zero.
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+
+schema_version: 1
+currency: INR
+
+fx:
+  usd_to_inr: 95.87
+  # Federal Reserve H.10, noon buying rate for 18-SEP-2026 — the latest row published when checked.
+  # Parsed from the table itself, not from a search summary: one summary reported ~83.3, which is
+  # the September 2024 level. The RBI reference rate agrees within 0.3% (95.7245 on 12-SEP-2026).
+  source: https://www.federalreserve.gov/releases/h10/hist/dat00_in.htm
+  date: 2026-09-22
+
+# The reference SKU. ⚠️ This is NOT the box the calibration happened to run on — it is a named,
+# publicly-priced instance that a reader can look up. State it in every caption that carries a ₹.
+compute:
+  sku: g4dn.xlarge         # ONE Tesla T4, 4 vCPU, 16 GiB — the GPU the profile was measured on
+  # ⛔ NEVER price T4-measured timings with an A100/H100 hourly rate. That mixes hardware and produces
+  # a number that corresponds to no real deployment — the interpolation ADR-010 forbids.
+  provider: AWS EC2
+  region: us-east-1
+  gpus_per_instance: 1
+  price_per_hour_usd: 0.526  # On-Demand, Linux
+  # AWS's own page confirms the spec (https://aws.amazon.com/ec2/instance-types/g4/) but no longer
+  # lists prices; this mirror of the AWS Price List API showed $0.526, "Updated 9/22/2026".
+  source: https://instances.vantage.sh/aws/ec2/g4dn.xlarge
+  date: 2026-09-22
+
+# The SLO. This is a cost-model input, not a reporting choice: the cost denominator is SUCCESSFUL
+# requests, and "successful" means "met this". A configuration that serves more traffic by blowing
+# p95 has not got cheaper — it has changed the product.
+slo:
+  ttft_p95_ms: 2000
+  # MLPerf Inference rules, "Conversational" TTFT limit — 2,000 ms for BOTH Llama3.1-8B (the nearest
+  # in size to our Qwen3-4B) and Llama2-70b; anchored on human reading speed. ⚠️ MLPerf enforces it
+  # at the 99th percentile (Server scenario); this project reports p95 throughout (H2 is defined on
+  # p95), so ours is slightly LOOSER than MLPerf's. Stated, not hidden.
+  source: https://github.com/mlcommons/inference_policies/blob/master/inference_rules.adoc (commit ff7edba545, 2026-08-20)
+  date: 2026-09-22
+
+# What this model deliberately EXCLUDES, recorded so a reader knows it is a choice, not an
+# oversight. Compute is >90% of the bill for this workload, and adding poorly-sourced small terms
+# makes the headline number less trustworthy, not more.
+excluded:
+  - networking_egress
+  - control_plane_overhead
+  - engineering_time
+  - kv_cache_storage    # ephemeral; lives in HBM we are already paying for
+
+# The formula, written out so nobody has to reverse-engineer it from code:
+#
+#   ₹ per 1k successful requests
+#     = (replicas × price_per_hour_usd × usd_to_inr) ÷ successful_requests_per_hour × 1000
+#
+# `replicas` is the axis being swept, so cost is not a constant multiplier — which is the whole
+# point of H5: the recommendation may save money by REMOVING a replica.

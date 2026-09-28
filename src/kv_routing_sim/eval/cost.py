@@ -37,7 +37,15 @@ class CostModel:
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> CostModel:
-        raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        """From a YAML file, or `"default"` for the cited cost model shipped with the package (the
+        same file as `configs/cost_model.yaml`)."""
+        if str(path) == "default":
+            from .. import data
+
+            text = data.cost_model().read_text(encoding="utf-8")
+        else:
+            text = Path(path).read_text(encoding="utf-8")
+        raw = yaml.safe_load(text)
         missing = _find_tbd(raw)
         if missing:
             raise UnfilledCostModel(

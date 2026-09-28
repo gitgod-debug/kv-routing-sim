@@ -10,7 +10,8 @@
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
 **Last updated:** 2026-09-28 (the finding, H6, R1 on Mooncake, Phase 6 registered, the demo page and the
-10×/100× numbers, the preprint draft, `kvsim calibrate`; 167 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
+10×/100× numbers, the preprint draft, `kvsim calibrate`, a wheel that works outside a clone; 172 tests
+green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
 vLLM under eviction pressure to the token, against predictions committed before the run)
 **Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding** — *keep each user on one GPU until
 your tenants' prompts outgrow one GPU's cache; then route by prefix, and keep its load weight small* (H2b
@@ -547,8 +548,14 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 
 ## Phase 7 — Package, CLI, the static demo, hardening
 
-- [ ] `pip install kv-routing-sim`; `kvsim replay trace.jsonl --policies all --replicas 1-8
-      --format json|md|html`; semver + changelog
+- [~] `pip install kv-routing-sim`; `kvsim replay trace.jsonl --policies all --replicas 1-8
+      --format json|md|html`; semver + changelog.
+      ✅ 2026-09-28: the wheel builds, installs into a clean venv with PyYAML as its only dependency,
+      and runs `kvsim replay` from outside the repo — it now ships the measured T4 profile
+      (`--profile t4-qwen3-4b-vllm0.30.0`) and the cited cost model (`--cost-model default`),
+      byte-identical to `configs/` (`tests/test_packaging.py`); [`CHANGELOG.md`](CHANGELOG.md) for 0.1.0.
+      Left: `--format html`; project URLs in `pyproject.toml`, and absolute image links in the README
+      (PyPI shows neither relative links nor `<picture>`), once the repo is public; the PyPI upload
 - [~] ⭐ **`kvsim calibrate`** — expose the Phase-3 harness so a USER can fit a profile to their own GPU
       and model (~30 min). The ADR-010 mechanism, and the answer to *"why trust your numbers on my
       hardware?"* — *"you shouldn't; run this."* Needs the `[calib]` extra.

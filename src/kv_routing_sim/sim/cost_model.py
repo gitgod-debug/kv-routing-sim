@@ -83,18 +83,44 @@ def load_profile(path: str | Path) -> CostProfile:
     default is exactly how an uncalibrated number ends up published as a calibrated one. Keys that
     start with `_` are provenance for the reader, and are ignored here.
     """
-    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    return _profile_from_json(Path(path).read_text(encoding="utf-8"), str(path))
+
+
+def resolve_profile(spec: str | Path) -> CostProfile:
+    """A profile from a file, or by the NAME of one shipped with the package — so the same command
+    works from a clone and after `pip install` (`--profile t4-qwen3-4b-vllm0.30.0`).
+
+    ⛔ No guessing between the two: an existing file wins, a bare shipped name is the only
+    fallback, and anything else fails with the shipped names listed (ADR-004).
+    """
+    path = Path(spec)
+    if path.is_file():
+        return load_profile(path)
+    from .. import data
+
+    shipped = data.profiles()
+    name = str(spec).removesuffix(".json")
+    if name in shipped:
+        return _profile_from_json(shipped[name].read_text(encoding="utf-8"), f"shipped {name}")
+    raise FileNotFoundError(
+        f"no profile file {str(spec)!r}, and no shipped profile of that name. Shipped: "
+        f"{', '.join(sorted(shipped)) or 'none'}. Or measure your own: kvsim calibrate"
+    )
+
+
+def _profile_from_json(text: str, where: str) -> CostProfile:
+    raw = json.loads(text)
     if not isinstance(raw, dict):
-        raise TypeError(f"{path}: a profile must be a JSON object")
+        raise TypeError(f"{where}: a profile must be a JSON object")
     data = {k: v for k, v in raw.items() if not k.startswith("_")}
     known = {f.name for f in fields(CostProfile)}
     unknown = sorted(set(data) - known)
     if unknown:
-        raise ValueError(f"{path}: unknown profile field(s) {unknown}; known: {sorted(known)}")
+        raise ValueError(f"{where}: unknown profile field(s) {unknown}; known: {sorted(known)}")
     try:
         return CostProfile(**data)
     except TypeError as exc:  # a required field is missing
-        raise ValueError(f"{path}: {exc}") from None
+        raise ValueError(f"{where}: {exc}") from None
 
 
 # ⛔ A GUESS. Order-of-magnitude shapes for a Tesla T4 serving Qwen3-4B in fp16 — the hardware and
