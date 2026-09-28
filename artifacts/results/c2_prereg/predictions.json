@@ -1,0 +1,384 @@
+{
+ "script": "scripts/c2_prepare.py",
+ "date_utc": "2026-09-28T18:17:52+00:00",
+ "git_sha": "adfada5",
+ "git_dirty": false,
+ "seed": 0,
+ "hardware_path": "cpu-only",
+ "hardware": {
+  "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+  "python": "3.13.12",
+  "usable_cpus": 12,
+  "gpus": [
+   "NVIDIA GeForce GTX 1650, 4096 MiB, 7.5, 595.71.05"
+  ],
+  "gpu_name": "NVIDIA GeForce GTX 1650",
+  "gpu_memory_total": "4096 MiB",
+  "compute_capability": "7.5",
+  "driver_version": "595.71.05",
+  "mig_enabled": false,
+  "mig_mode_current": [
+   "[N/A]"
+  ]
+ },
+ "packages": {
+  "vllm": "not installed",
+  "torch": "not installed",
+  "numpy": "2.5.3",
+  "pydantic": "2.13.5",
+  "httpx": "not installed",
+  "prometheus-client": "not installed",
+  "matplotlib": "3.11.2"
+ },
+ "config": {
+  "schema_version": 1,
+  "engine": {
+   "model": "Qwen/Qwen3-4B",
+   "vllm": "0.30.0",
+   "block_size": 16,
+   "num_gpu_blocks": 1537,
+   "max_model_len": 2048,
+   "max_num_seqs": 256,
+   "max_num_batched_tokens": 8192
+  },
+  "profile": "configs/profiles/t4-qwen3-4b-vllm0.30.0.json",
+  "replicas": 2,
+  "measure_replica": 0,
+  "decode": {
+   "output_tokens": 64,
+   "skip_tokens": 8,
+   "reps": 2,
+   "grid": [
+    [
+     128,
+     1
+    ],
+    [
+     128,
+     2
+    ],
+    [
+     128,
+     4
+    ],
+    [
+     128,
+     8
+    ],
+    [
+     128,
+     16
+    ],
+    [
+     128,
+     32
+    ],
+    [
+     128,
+     64
+    ],
+    [
+     512,
+     1
+    ],
+    [
+     512,
+     2
+    ],
+    [
+     512,
+     4
+    ],
+    [
+     512,
+     8
+    ],
+    [
+     512,
+     16
+    ],
+    [
+     512,
+     32
+    ],
+    [
+     1024,
+     1
+    ],
+    [
+     1024,
+     2
+    ],
+    [
+     1024,
+     4
+    ],
+    [
+     1024,
+     8
+    ],
+    [
+     1024,
+     16
+    ],
+    [
+     1536,
+     1
+    ],
+    [
+     1536,
+     2
+    ],
+    [
+     1536,
+     4
+    ],
+    [
+     1536,
+     8
+    ],
+    [
+     1536,
+     12
+    ],
+    [
+     1984,
+     1
+    ],
+    [
+     1984,
+     2
+    ],
+    [
+     1984,
+     4
+    ],
+    [
+     1984,
+     8
+    ],
+    [
+     1984,
+     10
+    ]
+   ]
+  },
+  "prefill": {
+   "reps": 3,
+   "grid": [
+    [
+     0,
+     64
+    ],
+    [
+     0,
+     256
+    ],
+    [
+     0,
+     512
+    ],
+    [
+     0,
+     1024
+    ],
+    [
+     0,
+     1536
+    ],
+    [
+     0,
+     1984
+    ],
+    [
+     256,
+     64
+    ],
+    [
+     256,
+     256
+    ],
+    [
+     256,
+     704
+    ],
+    [
+     768,
+     64
+    ],
+    [
+     768,
+     256
+    ],
+    [
+     768,
+     704
+    ],
+    [
+     1280,
+     64
+    ],
+    [
+     1280,
+     256
+    ],
+    [
+     1280,
+     704
+    ]
+   ]
+  },
+  "cpu": {
+   "cells": [
+    [
+     512,
+     8
+    ],
+    [
+     1024,
+     16
+    ],
+    [
+     1536,
+     8
+    ]
+   ],
+   "reps": 2,
+   "settle_s": 20,
+   "background": {
+    "replica": 1,
+    "concurrency": 48,
+    "shared_prefix_tokens": 1344,
+    "private_tokens": 192,
+    "output_tokens": 64
+   }
+  },
+  "holdout": {
+   "shape": {
+    "n_sessions": 120,
+    "turns_per_session": 4,
+    "session_context_tokens": 150,
+    "user_turn_tokens": 40,
+    "assistant_turn_tokens": 60,
+    "output_tokens": 64,
+    "think_time_s": 6.0,
+    "seed": 0,
+    "prefix_sharing_ratio": 0.8
+   },
+   "workloads": {
+    "K1_half": {
+     "n_sessions": 120,
+     "turns_per_session": 4,
+     "session_context_tokens": 150,
+     "user_turn_tokens": 40,
+     "assistant_turn_tokens": 60,
+     "output_tokens": 64,
+     "think_time_s": 6.0,
+     "seed": 0,
+     "prefix_sharing_ratio": 0.8,
+     "arrival_rate": 0.5
+    },
+    "K64_quarter": {
+     "n_sessions": 120,
+     "turns_per_session": 4,
+     "session_context_tokens": 150,
+     "user_turn_tokens": 40,
+     "assistant_turn_tokens": 60,
+     "output_tokens": 64,
+     "think_time_s": 6.0,
+     "seed": 0,
+     "prefix_sharing_ratio": 0.8,
+     "arrival_rate": 0.25,
+     "n_shared_prefixes": 64,
+     "prefix_zipf_s": 1.0
+    }
+   }
+  },
+  "rules": {
+   "c2a_min_ratio": 1.5,
+   "c2b_min_ratio": 1.2,
+   "c2c_max_factor": 2.0,
+   "hit_rate_max_relative_error": 0.1
+  },
+  "predictions": {
+   "c2a": "holds",
+   "c2b": "fails",
+   "c2c": "holds"
+  }
+ },
+ "profile": {
+  "name": "t4-qwen3-4b-vllm0.30.0",
+  "prefill_base_s": 0.0,
+  "prefill_per_token_s": 0.0007014400878738409,
+  "decode_base_s": 0.05291123879934786,
+  "decode_per_seq_s": 0.001232162611867379,
+  "kv_cache_blocks": 1537,
+  "block_size": 16,
+  "max_num_seqs": 256,
+  "gpu": "Tesla T4",
+  "model": "Qwen/Qwen3-4B",
+  "engine_version": "0.30.0",
+  "calibrated": true,
+  "calibration_error": 0.002901,
+  "prefill_attn_s": 0.0,
+  "decode_per_ctx_token_s": 0.0,
+  "WARNING": "calibrated on Tesla T4 / Qwen/Qwen3-4B / 0.30.0"
+ },
+ "workloads": {
+  "K1_half": {
+   "n_sessions": 120,
+   "turns_per_session": 4,
+   "session_context_tokens": 150,
+   "user_turn_tokens": 40,
+   "assistant_turn_tokens": 60,
+   "output_tokens": 64,
+   "think_time_s": 6.0,
+   "seed": 0,
+   "prefix_sharing_ratio": 0.8,
+   "arrival_rate": 0.5
+  },
+  "K64_quarter": {
+   "n_sessions": 120,
+   "turns_per_session": 4,
+   "session_context_tokens": 150,
+   "user_turn_tokens": 40,
+   "assistant_turn_tokens": 60,
+   "output_tokens": 64,
+   "think_time_s": 6.0,
+   "seed": 0,
+   "prefix_sharing_ratio": 0.8,
+   "arrival_rate": 0.25,
+   "n_shared_prefixes": 64,
+   "prefix_zipf_s": 1.0
+  }
+ },
+ "trace_fingerprints_sha256": {
+  "K1_half": "66b4574a0067fb61fc9903e2da01fddbb9a52eaebb5431453a35244110024428",
+  "K64_quarter": "aeffe86955c67b30ecbab18afa0c30942ff617a149ee1cd3ce7cf43860a96136"
+ },
+ "predictions": {
+  "runs": {
+   "K1_half": {
+    "context-free profile": {
+     "hit_rate": 0.923039,
+     "prefix_cache_queries": 816000,
+     "prefix_cache_hits": 753200,
+     "preemptions": 0,
+     "ttft_p50_ms": 192.757,
+     "ttft_p95_ms": 325.614
+    }
+   },
+   "K64_quarter": {
+    "context-free profile": {
+     "hit_rate": 0.830412,
+     "prefix_cache_queries": 816000,
+     "prefix_cache_hits": 677616,
+     "preemptions": 0,
+     "ttft_p50_ms": 183.063,
+     "ttft_p95_ms": 1198.78
+    }
+   }
+  }
+ },
+ "predictions_sha256": "d39442f3a2f9f2e52ca5f378316fc720a2611cd1514c6c74a417d4154b1a84a6"
+}

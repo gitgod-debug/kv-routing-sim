@@ -1,0 +1,48 @@
+"""C2's registration must stay reproducible; the notebook must carry exactly what was registered.
+
+A deliberate change means re-running scripts/c2_prepare.py on a clean tree and a dated entry in
+docs/09-hypotheses.md — before the run, never after.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import pathlib
+import re
+
+from kv_routing_sim.sim.cost_model import load_profile
+from kv_routing_sim.sim.engine import run
+from kv_routing_sim.traces.generator import AgenticWorkload
+
+REPO = pathlib.Path(__file__).resolve().parents[1]
+PREREG = json.loads((REPO / "artifacts/results/c2_prereg/predictions.json").read_text())
+NOTEBOOK = json.loads((REPO / "notebooks/c2_timing_t4.ipynb").read_text())
+SRC = "".join("".join(c["source"]) for c in NOTEBOOK["cells"] if c["cell_type"] == "code")
+
+
+def _canonical(obj):
+    return json.dumps(obj, separators=(",", ":"), sort_keys=True).encode()
+
+
+def test_the_notebook_carries_the_registered_design_traffic_and_predictions():
+    assert re.search(r'PREDICTIONS_SHA256 = "([0-9a-f]{64})"', SRC).group(1) == \
+        PREREG["predictions_sha256"]
+    assert hashlib.sha256(_canonical(PREREG["predictions"])).hexdigest() == \
+        PREREG["predictions_sha256"]
+    for fp in PREREG["trace_fingerprints_sha256"].values():
+        assert fp in SRC
+    design = json.loads(re.search(r'DESIGN = json.loads\(r"""(.+?)"""\)', SRC).group(1))
+    assert design == {k: PREREG["config"][k] for k in ("decode", "prefill", "cpu")}
+    assert PREREG["git_dirty"] is False
+
+
+def test_the_context_free_predictions_reproduce_from_the_committed_code():
+    profile = load_profile(REPO / PREREG["config"]["profile"])
+    for name, spec in PREREG["workloads"].items():
+        trace, _ = AgenticWorkload(**spec).generate()
+        r = run(trace, policy="round-robin", n_replicas=1, seed=0, profile=profile,
+                cache_model="vllm")
+        want = PREREG["predictions"]["runs"][name]["context-free profile"]
+        assert round(r.hit_rate, 6) == want["hit_rate"], name
+        assert r.preemptions == want["preemptions"], name
