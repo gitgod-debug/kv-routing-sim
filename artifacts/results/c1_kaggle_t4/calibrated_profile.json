@@ -1,0 +1,229 @@
+{
+ "_what": "Fitted by `kvsim calibrate` against http://127.0.0.1:8000. Timings are figures for Tesla T4 serving Qwen/Qwen3-4B on vLLM 0.30.0; the capacity is what that engine allocated.",
+ "_source": {
+  "tool": "kvsim calibrate (kv-routing-sim 0.1.0)",
+  "date_utc": "2026-09-28T09:33:22+00:00",
+  "engine": {
+   "base": "http://127.0.0.1:8000",
+   "model": "Qwen/Qwen3-4B",
+   "version": "0.30.0",
+   "kv_cache_blocks": 1537,
+   "block_size": 16,
+   "max_num_seqs": 256,
+   "max_model_len": 2048,
+   "notes": [
+    "KV capacity: 1,537 blocks, from vllm:cache_config_info in /metrics"
+   ]
+  },
+  "seed": 0,
+  "max_error": 0.05,
+  "prefill_fit": {
+   "slope": 0.0010955836869889026,
+   "intercept": -0.17011658599155577,
+   "n": 24,
+   "r2": 0.96272725645225
+  },
+  "prefill_base_s_raw": -0.21171230265493726,
+  "decode_fit": {
+   "slope": 0.00017520623018009096,
+   "intercept": 0.0414205104332014,
+   "n": 5,
+   "r2": 0.0592109943180118
+  },
+  "decode_batches": [
+   {
+    "batch": 1,
+    "median_interval_s": 0.048294008460317624,
+    "requests_ok": 1,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 2,
+    "median_interval_s": 0.037955474507936876,
+    "requests_ok": 2,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 4,
+    "median_interval_s": 0.03918949224603311,
+    "requests_ok": 4,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 8,
+    "median_interval_s": 0.041337662492063075,
+    "requests_ok": 8,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 16,
+    "median_interval_s": 0.04575730759523912,
+    "requests_ok": 16,
+    "preemptions": 0.0,
+    "valid": true
+   }
+  ],
+  "prefill_points": [
+   {
+    "prompt_tokens": 64,
+    "uncached_tokens": 64,
+    "ttft_s": 0.06471597199993084
+   },
+   {
+    "prompt_tokens": 128,
+    "uncached_tokens": 128,
+    "ttft_s": 0.09281904800013763
+   },
+   {
+    "prompt_tokens": 256,
+    "uncached_tokens": 256,
+    "ttft_s": 0.13770931999988534
+   },
+   {
+    "prompt_tokens": 512,
+    "uncached_tokens": 512,
+    "ttft_s": 0.2854806330001338
+   },
+   {
+    "prompt_tokens": 768,
+    "uncached_tokens": 768,
+    "ttft_s": 0.505683289999979
+   },
+   {
+    "prompt_tokens": 1024,
+    "uncached_tokens": 1024,
+    "ttft_s": 0.7393477330001588
+   },
+   {
+    "prompt_tokens": 1536,
+    "uncached_tokens": 1536,
+    "ttft_s": 1.4575292640001862
+   },
+   {
+    "prompt_tokens": 2040,
+    "uncached_tokens": 2040,
+    "ttft_s": 2.207584309999902
+   },
+   {
+    "prompt_tokens": 64,
+    "uncached_tokens": 64,
+    "ttft_s": 0.05617530899985468
+   },
+   {
+    "prompt_tokens": 128,
+    "uncached_tokens": 128,
+    "ttft_s": 0.07390342000007877
+   },
+   {
+    "prompt_tokens": 256,
+    "uncached_tokens": 256,
+    "ttft_s": 0.14178648899996915
+   },
+   {
+    "prompt_tokens": 512,
+    "uncached_tokens": 512,
+    "ttft_s": 0.29661732899990056
+   },
+   {
+    "prompt_tokens": 768,
+    "uncached_tokens": 768,
+    "ttft_s": 0.5177590320001855
+   },
+   {
+    "prompt_tokens": 1024,
+    "uncached_tokens": 1024,
+    "ttft_s": 0.7442202589998033
+   },
+   {
+    "prompt_tokens": 1536,
+    "uncached_tokens": 1536,
+    "ttft_s": 1.4775689950001833
+   },
+   {
+    "prompt_tokens": 2040,
+    "uncached_tokens": 2040,
+    "ttft_s": 2.2827416949999133
+   },
+   {
+    "prompt_tokens": 64,
+    "uncached_tokens": 64,
+    "ttft_s": 0.05827662599995165
+   },
+   {
+    "prompt_tokens": 128,
+    "uncached_tokens": 128,
+    "ttft_s": 0.07563244700008909
+   },
+   {
+    "prompt_tokens": 256,
+    "uncached_tokens": 256,
+    "ttft_s": 0.14301929199996266
+   },
+   {
+    "prompt_tokens": 512,
+    "uncached_tokens": 512,
+    "ttft_s": 0.29817116300000635
+   },
+   {
+    "prompt_tokens": 768,
+    "uncached_tokens": 768,
+    "ttft_s": 0.5247981580000669
+   },
+   {
+    "prompt_tokens": 1024,
+    "uncached_tokens": 1024,
+    "ttft_s": 0.7399495559998286
+   },
+   {
+    "prompt_tokens": 1536,
+    "uncached_tokens": 1536,
+    "ttft_s": 1.4757485190000352
+   },
+   {
+    "prompt_tokens": 2040,
+    "uncached_tokens": 2040,
+    "ttft_s": 2.318524790999845
+   }
+  ],
+  "check": {
+   "requests": 48,
+   "sessions": 16,
+   "turns": 3,
+   "prefix_cache_reset": true,
+   "measured": {
+    "queries": 13776.0,
+    "hits": 9840.0,
+    "hit_rate": 0.7142857142857143
+   },
+   "predicted": {
+    "queries": 13776,
+    "hits": 9840,
+    "hit_rate": 0.7142857142857143
+   },
+   "relative_error": 0.0,
+   "cached_tokens_compared": 48,
+   "cached_tokens_equal": 48,
+   "requests_that_differ": []
+  },
+  "notes": [
+   "fitted prefill base was -211.71 ms (< 0, not physical); clamped to 0 \u2014 the decode fit holds the whole fixed cost, as on the T4"
+  ]
+ },
+ "name": "tesla-t4-qwen3-4b-vllm0.30.0",
+ "prefill_base_s": 0.0,
+ "prefill_per_token_s": 0.0010955836869889026,
+ "decode_base_s": 0.0414205104332014,
+ "decode_per_seq_s": 0.00017520623018009096,
+ "kv_cache_blocks": 1537,
+ "block_size": 16,
+ "max_num_seqs": 256,
+ "gpu": "Tesla T4",
+ "model": "Qwen/Qwen3-4B",
+ "engine_version": "0.30.0",
+ "calibrated": true,
+ "calibration_error": 0.0
+}
