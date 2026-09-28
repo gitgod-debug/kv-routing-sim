@@ -649,7 +649,7 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 - [ ] ⭐ **The `guidellm` PR merged** — see the upstream log
 - [~] 📄 **The preprint** (due ~Nov 9, cs.DC) — [`paper/main.tex`](paper/main.tex), drafted 2026-09-28:
       five pages that compile; every number mapped to its results file in
-      [`paper/README.md`](paper/README.md); 17 references, each checked on arXiv or at its source; no
+      [`paper/README.md`](paper/README.md); 19 references, each checked on arXiv or at its source; no
       "first" claims. Left: author details and the repository URL, Phase 6's result, the October
       prior-art re-audit, and the arXiv endorsement
 - [ ] Cross-link with `colpali-lite`: two instantiations of one method

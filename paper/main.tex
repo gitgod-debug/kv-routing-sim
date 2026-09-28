@@ -47,8 +47,10 @@ routing holds a 2\,s p95 time-to-first-token on 2~T4s where round-robin needs~3.
 after the test) and session-sticky cannot hold it on~8. Prefix-affinity without a load weight
 collapses whenever one prompt dominates. The direction of this flip survives four rescalings of the
 hardware's speed; the replica counts and the full policy ranking do not (Kendall's $\tau_b$ as low
-as 0.51). On two real traces (Mooncake), session-sticky and load-weighted prefix-affinity come within
-one replica of each other.
+as 0.51). On real traces, session-sticky and prefix-affinity come within one replica of each other:
+on Mooncake, whose prompts are shared across users, and on AgentX's coding-agent sessions, where
+nothing is. Prefix-affinity without a load weight fails at every load on the first and matches
+session-sticky on the second, so its collapse comes from shared prompts.
 \end{abstract}
 
 \section{Introduction}
@@ -82,10 +84,11 @@ hypotheses committed to a public log before each experiment ran. Our contributio
   working set to one replica's cache. Below it, session affinity needs the fewest replicas; above it,
   prefix affinity with a load weight does, and session affinity fails. Prefix affinity without a load
   weight collapses whenever one prompt dominates (\S\ref{sec:finding}).
-\item Two tests that could have broken the finding. Rescaling the hardware's speed keeps its direction
-  but not its replica counts, so replica counts must be measured on the target GPU
-  (\S\ref{sec:hardware}). On two real traces the effect does not appear, and the two good policies
-  tie within a replica (\S\ref{sec:real}).
+\item Three tests that could have broken the finding. Rescaling the hardware's speed keeps its
+  direction but not its replica counts, so replica counts must be measured on the target GPU
+  (\S\ref{sec:hardware}). On two real trace families the many-prompt advantage does not appear and
+  the two good policies tie within a replica; but the traces bracket the mechanism, since pure
+  prefix affinity fails exactly where prompts are shared across users (\S\ref{sec:real}).
 \end{itemize}
 Code, configurations, raw results with their provenance, and the dated log of every registration and
 outcome --- including four falsified hypotheses --- are public.
@@ -101,7 +104,9 @@ RadixAttention keeps the same information in a radix tree~\cite{zheng2023}.
 prefix locality against load~\cite{srivatsa2024}. Llumnix rebalances load across instances with live
 migration~\cite{sun2024}. Mooncake builds a KV-cache-centric, disaggregated serving architecture and
 released the request traces we replay~\cite{qin2024,mooncaketraces}. CacheWise pairs prefix-aware
-scheduling with reuse-aware eviction for coding agents~\cite{tiwari2026}. Our results on the load
+scheduling with reuse-aware eviction for coding agents~\cite{tiwari2026}, and agentic-kv-cache
+replays single-engine eviction policies on the AgentX and Mooncake traces we also use, finding LRU
+hard to beat~\cite{agentickv}; both work inside one engine. Our results on the load
 weight (\S\ref{sec:alpha}) bear on how routers that mix prefix and load signals set it.
 
 \paragraph{Simulators.} Vidur established trace-driven simulation of LLM serving and uses it to
@@ -305,61 +310,84 @@ target GPU.
 
 \subsection{Real traces}\label{sec:real}
 
-Mooncake released request traces from its production service~\cite{mooncaketraces}: each request
-lists its prompt as 512-token block hashes, global across requests, with no session ids. We replayed
-the tool-agent and conversation traces through an adapter that scales token counts by 1/32, so that
-each trace block becomes one 16-token block and a 4B model on a T4 can serve the traffic (at 1/16,
-round-robin could not hold the service level at any speed; the scale was fixed before the
-comparison). It infers sessions: a request continues the earlier request whose full blocks it
-extends, but never through a block that 100 or more different blocks follow --- the three shared
-system prompts, with fan-outs of 3{,}335--8{,}894, where no other block exceeds 15. We replayed the
-first hour, discarding its first 5 minutes as warm-up, at 1$\times$, 2$\times$ and 4$\times$ the recorded rate
-(tool-agent: 23{,}608 requests, 39\% of block reuse across sessions; conversation: 12{,}031 requests,
-10\%).
+We replayed two real trace families, each registered before its comparison ran, with scales and
+loads set by probes of round-robin alone, which carry no information about the policies compared.
+
+\paragraph{Mooncake (R1).} Mooncake released request traces from its production
+service~\cite{mooncaketraces}: each request lists its prompt as 512-token block hashes, global across
+requests, with no session ids. We replayed the tool-agent and conversation traces through an adapter
+that scales token counts by 1/32, so that each trace block becomes one 16-token block and a 4B model
+on a T4 can serve the traffic (at 1/16, round-robin could not hold the service level at any speed).
+It infers sessions: a request continues the earlier request whose full blocks it extends, but never
+through a block that 100 or more different blocks follow --- the three shared system prompts, with
+fan-outs of 3{,}335--8{,}894, where no other block exceeds 15. We replayed the first hour, discarding
+its first 5 minutes as warm-up, at 1$\times$, 2$\times$ and 4$\times$ the recorded rate (tool-agent:
+23{,}608 requests, 39\% of block reuse across sessions; conversation: 12{,}031 requests, 10\%). From
+H2b's mechanism we predicted that \PA$_{16}$ would need fewer replicas than \SSt{} on the tool-agent
+trace (its blocks shared across sessions come to 2.4 caches) and at no speed on the conversation
+trace. Both predictions failed (Table~\ref{tab:real}): \SSt{} and \PA$_\alpha$ are within one replica
+of each other at every speed, both beat the load balancers under load (6 T4s against round-robin's 8
+on the tool-agent trace at 4$\times$), and \PA{} without a load weight fails at every speed. Our
+explanation, written down before the run and not yet tested: the shared blocks counted over an hour
+are mostly not in use at the same time, so the working set a cache must hold at once is far smaller.
+
+\paragraph{AgentX (R2).} SemiAnalysis released 739 coding-agent sessions (59{,}274 requests), each
+request's prompt as 64-token block hashes that are local to its session~\cite{agentx}: the trace shows
+reuse within a session and nothing across users --- the complement of Mooncake. Sessions are real
+here. We replay 48 at a time at their recorded pace, scaled by 1/64 (sixteen trace blocks become one
+16-token block; at 1/32 round-robin held the service level at no speed), for three hours after 30
+minutes of warm-up, at 0.5$\times$, 1$\times$ and 2$\times$ that pace (6{,}063 requests from 136
+sessions; 95.9\% of block uses are reuse, none across sessions). With nothing shared across users,
+prefix affinity can only use the reuse that session affinity already keeps together, so we predicted
+that \PA$_{16}$ \emph{and} \PA{} without a load weight would each need replicas within one of \SSt{}
+at every speed. Both held, exactly: all three need 2 T4s at every speed. Round-robin needs 5 at
+2$\times$, and the load balancers' hit rate at 4 replicas is 0.59 against 0.93 for the policies that
+keep a session together; above 48 sessions, round-robin held the service level on no number of
+replicas at all.
 
 \begin{table}[t]
 \centering\small
-\caption{Mooncake traces at token scale 1/32: fewest T4s that hold p95 TTFT $\le 2$\,s at 1$\times$,
-2$\times$ and 4$\times$ the recorded rate (\miss: not held on 8). $\dagger$: post hoc.}
+\caption{Real traces: fewest T4s that hold p95 TTFT $\le 2$\,s at three speeds (\miss: not held on
+8). Mooncake at 1$\times$, 2$\times$, 4$\times$ its recorded rate and scale 1/32; AgentX at
+0.5$\times$, 1$\times$, 2$\times$ its recorded pace, 48 sessions at a time, scale 1/64. $\dagger$: post
+hoc.}
 \label{tab:real}
-\begin{tabular}{@{}lcc@{}}
+\begin{tabular}{@{}lccc@{}}
 \toprule
-Policy & Tool-agent & Conversation \\
+Policy & Tool-agent & Conversation & AgentX \\
 \midrule
-Round-robin            & 4\ 5\ 8 & 5\ 5\ 8 \\
-Least-loaded           & 4\ 5\ 7 & 5\ 5\ 8 \\
-Consistent hash        & 5\ 6\ \miss & 6\ 7\ \miss \\
-Session-sticky         & 4\ 4\ 6 & 5\ 5\ 7 \\
-\PA{} (no load weight) & \miss\ \miss\ \miss & \miss\ \miss\ \miss \\
-\PA$_{16}$ (registered) & 4\ 5\ 6 & 4\ 5\ 7 \\
-\PA$_{1}{}^{\dagger}$  & 4\ 5\ 6 & 5\ 5\ 7 \\
+Round-robin            & 4\ 5\ 8 & 5\ 5\ 8 & 2\ 2\ 5 \\
+Least-loaded           & 4\ 5\ 7 & 5\ 5\ 8 & 2\ 2\ 3 \\
+Consistent hash        & 5\ 6\ \miss & 6\ 7\ \miss & 2\ 2\ 3 \\
+Session-sticky         & 4\ 4\ 6 & 5\ 5\ 7 & 2\ 2\ 2 \\
+\PA{} (no load weight) & \miss\ \miss\ \miss & \miss\ \miss\ \miss & 2\ 2\ 2 \\
+\PA$_{16}$ (registered) & 4\ 5\ 6 & 4\ 5\ 7 & 2\ 2\ 2 \\
+\PA$_{1}{}^{\dagger}$  & 4\ 5\ 6 & 5\ 5\ 7 & 2\ 2\ 2 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-We registered (R1), from H2b's mechanism and this structure, that \PA$_{16}$ would need fewer
-replicas than \SSt{} on the tool-agent trace (its blocks shared across sessions come to 2.4 caches, and
-39\% of its reuse is between users) and at no speed on the conversation trace (only 10\% is between
-users). Both predictions failed (Table~\ref{tab:real}). \SSt{} and \PA$_\alpha$ are within one replica
-of each other at every speed on both traces, with hit rates within about a point; both beat the load
-balancers under load (on the tool-agent trace at 4$\times$, 6 T4s against round-robin's 8); \PA{}
-without a load weight fails at every speed. Our explanation, written down before the run and not yet
-tested: the shared blocks counted over an hour are mostly not in use at the same time, so the working
-set a cache must hold at once is far smaller than 2.4 caches.
+Together the two traces bracket the mechanism: prefix affinity without a load weight fails where
+prompts are shared across users and matches session affinity where none are, so its collapse comes
+from shared prompts, not from routing by prefix as such. Neither trace shows the many-prompt
+advantage of \S\ref{sec:finding}.
 
 \section{Discussion and limitations}
 
 \paragraph{For an operator.} Estimate the working set of the system prompts in flight against one
 replica's cache. Well below one cache, keep sessions on one replica. Well above it, route by prefix
-with a small load weight. Do not route by prefix alone when one prompt dominates the traffic. Then
-measure replica counts on your own GPU: ours are T4 counts, and the ranking itself moves with speed.
+with a small load weight. Do not route by prefix alone when one prompt dominates the traffic. When
+reuse is almost all within sessions, as in AgentX, any policy that keeps a session on one replica
+will do, and scattering sessions is what costs GPUs. Then measure replica counts on your own GPU:
+ours are T4 counts, and the ranking itself moves with speed.
 
 \paragraph{Limitations.} The finding comes from generated traffic; on the real traces we replayed, it
 did not appear. We measured one GPU (T4) and one model (Qwen3-4B, fp16); the hardware test rescales
 timings and does not measure other GPUs. Replays are open-loop: a real agent waits for each response,
 and its next turn could reuse the response's cached decode blocks, which our traces cannot express.
 The timing model has the two errors given above. The Mooncake traces were scaled by 1/32 and their
-sessions inferred. A live two-replica test of the finding's mechanism is registered, with its
+sessions inferred; the AgentX sessions were scaled by 1/64 and replayed at a chosen concurrency, and
+their session-local hashes hide any prompt their users really share. A live two-replica test of the finding's mechanism is registered, with its
 predictions committed, but has not yet run \todo{Phase 6 result, or remove}. At scale, an
 80{,}000-request trace simulates in 13.5--21\,s on one core; memory for its block hashes (537\,MiB) is
 the first limit.
@@ -370,7 +398,8 @@ Whether prefix-aware routing pays is not a property of the policy alone but of t
 prompts in flight and a replica's cache. Below one cache, keeping each session on one replica wins and
 routing by prefix alone collapses; above it, routing by prefix with a small load weight holds a latency
 target that session affinity cannot. The direction of this result survived every hardware rescaling we
-tried; its replica counts did not, and on two real traces the two good policies tied. We release the
+tried; its replica counts did not. On two real trace families the two good policies tied, and prefix
+routing without a load weight failed only where prompts were shared across users. We release the
 simulator, its calibration against a live vLLM and the full registration log, so that each claim can
 be checked and re-measured on other hardware.
 
@@ -420,6 +449,15 @@ R.~Qin, Z.~Li, W.~He, M.~Zhang, Y.~Wu, et al.
 \bibitem{mooncaketraces}
 Mooncake FAST'25 trace release (Apache-2.0).
 \newblock \url{https://github.com/kvcache-ai/Mooncake/tree/main/FAST25-release}.
+
+\bibitem{agentickv}
+agentic-kv-cache: single-engine KV-cache eviction policies on real agentic traces.
+\newblock \url{https://github.com/gauravapiscean/agentic-kv-cache}, 2026.
+
+\bibitem{agentx}
+SemiAnalysis.
+\newblock AgentX: coding-agent traces with KV block hashes (cc-traces-weka-042026, Apache-2.0).
+\newblock \url{https://huggingface.co/datasets/semianalysisai/cc-traces-weka-042026}, 2026.
 
 \bibitem{tiwari2026}
 S.~Tiwari, T.~Chugh, N.~Rickert, S.~Peter, R.~Mahajan, and H.~Shen.

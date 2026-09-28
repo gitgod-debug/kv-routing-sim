@@ -30,13 +30,14 @@ Nothing in the paper is typed from memory. If a result changes, change it here a
 | §5.2, Table 2, Figure 1 | `h2b` in [`phase5.json`](../artifacts/results/phase5_crossover/phase5.json), reproduced exactly by [`demo_grid.json`](../artifacts/results/demo_grid.json) |
 | §5.3 (post hoc) | the same grid; `docs/09-hypotheses.md`, amendment of 2026-09-28 |
 | §5.4 | [`h6_ranking/report.md`](../artifacts/results/h6_ranking/report.md), [`h6_crossover/report.md`](../artifacts/results/h6_crossover/report.md) |
-| §5.5, Table 3 | [`realtrace_mooncake/report.md`](../artifacts/results/realtrace_mooncake/report.md); the registration in `docs/09-hypotheses.md` |
+| §5.5, Table 3 — Mooncake (R1) | [`realtrace_mooncake/report.md`](../artifacts/results/realtrace_mooncake/report.md); the registration in `docs/09-hypotheses.md` |
+| §5.5, Table 3 — AgentX (R2) | [`realtrace_agentx/report.md`](../artifacts/results/realtrace_agentx/report.md); the probes and rules in [`configs/realtrace_agentx.yaml`](../configs/realtrace_agentx.yaml) |
 | §6, scale | [`artifacts/results/scale/report.md`](../artifacts/results/scale/report.md) |
 | §6, the live two-replica test | [`phase6_prereg/predictions.json`](../artifacts/results/phase6_prereg/predictions.json) — **not yet run** |
 
-The 17 references were each checked on 2026-09-28: the eight arXiv papers against their arXiv pages
-(title, authors, and venue where arXiv lists one), the rest against their repositories or the
-cost model's cited pages.
+The 19 references were each checked on 2026-09-28: the eight arXiv papers against their arXiv pages
+(title, authors, and venue where arXiv lists one), the rest against their repositories, the AgentX
+dataset card, or the cost model's cited pages.
 
 ## Before it goes to arXiv
 
