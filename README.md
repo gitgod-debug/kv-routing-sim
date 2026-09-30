@@ -209,8 +209,9 @@ kvsim replay trace.jsonl --policies all --replicas 1-16 \
 shipped ones are byte-for-byte `configs/profiles/` and `configs/cost_model.yaml`.)
 
 To get **your** numbers, point `kvsim calibrate` at your own running vLLM (prefix caching on). It
-fits the timings to your GPU and model, reads the KV capacity from the engine, and checks the cache
-model against the engine's own counters. That takes a few minutes and needs nothing beyond the core
+fits C2's context-aware timing model to your GPU and model — decode steps timed at several context
+lengths and batch sizes, prefill at several prompt lengths — reads the KV capacity from the engine,
+and checks the cache model against the engine's own counters. That takes a few minutes and needs nothing beyond the core
 install:
 
 ```bash
@@ -221,10 +222,12 @@ kvsim replay trace.jsonl --policies all --replicas 1-8 --profile mine.json --cos
 If the cache check misses (by more than 5%, or on any single request's cached tokens), the profile is
 written but **not** marked calibrated, and the command exits 1. **On a real T4 (C1, registered):** its
 cache check came out exact — all 48 requests' cached tokens, 9,840 of 13,776 tokens — and it read the
-engine's 1,537 blocks correctly, in 48 seconds. ⚠️ Its **timing** fit is a straight line, and T4
-prefill is not one: 0.71 ms per token up to 1,024 tokens, 1.12 ms at 2,040. So trust the profile's
-hit rates and capacity; treat its timings — and any replica count built on them — as rough
-([report](artifacts/results/c1_kaggle_t4/report.md)).
+engine's 1,537 blocks correctly, in 48 seconds ([report](artifacts/results/c1_kaggle_t4/report.md)).
+That version fitted a straight line with no context term, which C2 then showed is up to 7×
+optimistic; since 2026-09-30 the command fits the context-aware model instead, and recovers known
+context terms from a mock engine (3.97e-6 against 4e-6 s per context token). ⚠️ That new fit has
+not yet been run on a real GPU — its procedure has (C2, where it predicted held-out traffic within
+1.41×).
 
 ## ⭐ What transfers to your fleet, and what doesn't
 

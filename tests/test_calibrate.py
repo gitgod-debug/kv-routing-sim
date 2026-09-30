@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import pathlib
 import threading
 from http.server import ThreadingHTTPServer
@@ -22,19 +23,44 @@ from kv_routing_sim.sim.cost_model import load_profile
 REPO = pathlib.Path(__file__).resolve().parents[1]
 QUIET = {"log": lambda *_: None}
 SMALL = {"prefill_lengths": (64, 256, 1024, 2048), "reps": 2, "decode_batches": (1, 2, 4, 8),
-         "decode_tokens": 32, "check_sessions": 8, "check_turns": 3}
+         "decode_contexts": (32, 1024), "decode_tokens": 32, "check_sessions": 8, "check_turns": 3}
+# The context terms a second mock is given — C2's T4 fit is 3.5e-6 and 7.6e-7; these are close.
+CTX = {"MOCK_DECODE_PER_CTX_TOKEN_S": "4e-6", "MOCK_PREFILL_ATTN_S": "2e-8"}
 
 
-@pytest.fixture(scope="module")
-def mock_url():
+def _serve(env: dict[str, str]):
+    """A mock engine on a free port. `env` sets the mock's context terms while it is built."""
     spec = importlib.util.spec_from_file_location("phase3_dryrun",
                                                   REPO / "scripts" / "phase3_dryrun.py")
     dryrun = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(dryrun)
-    engine = dryrun.MockEngine(num_blocks=4000, block_size=16, max_num_seqs=64)
+    saved = {k: os.environ.get(k) for k in env}
+    os.environ.update(env)
+    try:
+        engine = dryrun.MockEngine(num_blocks=4000, block_size=16, max_num_seqs=64)
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
     server = ThreadingHTTPServer(("127.0.0.1", 0), dryrun._handler(engine, False, 4000))
     server.daemon_threads = True
     threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+@pytest.fixture(scope="module")
+def mock_url():
+    server = _serve({})
+    yield f"http://127.0.0.1:{server.server_address[1]}"
+    server.shutdown()
+    server.server_close()
+
+
+@pytest.fixture(scope="module")
+def ctx_mock_url():
+    server = _serve(CTX)
     yield f"http://127.0.0.1:{server.server_address[1]}"
     server.shutdown()
     server.server_close()
@@ -51,10 +77,23 @@ def test_calibration_recovers_the_mock_engines_own_timings(mock_url, tmp_path):
     # The mock's true coefficients, within what HTTP and JSON overhead can add on a busy machine.
     assert profile["decode_per_seq_s"] == pytest.approx(2.5e-3, rel=0.3)
     assert profile["prefill_per_token_s"] == pytest.approx(2e-5, rel=0.5)
+    # This mock has no context terms: the fit must not invent a large one.
+    assert profile["decode_per_ctx_token_s"] < 0.1 * float(CTX["MOCK_DECODE_PER_CTX_TOKEN_S"])
     out = tmp_path / "mock.json"
     out.write_text(json.dumps(profile))
     loaded = load_profile(out)  # the file is a profile the simulator accepts as it is
     assert loaded.calibrated and loaded.kv_cache_blocks == 4000
+
+
+def test_calibration_recovers_known_context_terms(ctx_mock_url):
+    """C2's point: decode and prefill cost grow with context. A mock given known context terms must
+    have them recovered — and the profile must carry them, or replicas would be sized optimistic."""
+    profile, ok = calibrate(Engine(ctx_mock_url, poll_s=0.05), model="mock", **SMALL, **QUIET)
+    assert ok and profile["calibration_error"] == 0.0
+    assert profile["decode_per_ctx_token_s"] == pytest.approx(
+        float(CTX["MOCK_DECODE_PER_CTX_TOKEN_S"]), rel=0.35)
+    assert profile["prefill_attn_s"] == pytest.approx(float(CTX["MOCK_PREFILL_ATTN_S"]), rel=0.5)
+    assert profile["decode_per_seq_s"] == pytest.approx(2.5e-3, rel=0.3)
 
 
 def test_a_wrong_block_size_is_caught_by_the_check(mock_url):

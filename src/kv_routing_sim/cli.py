@@ -241,6 +241,7 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
             block_size=args.block_size, max_num_seqs=args.max_num_seqs,
             prefill_lengths=_ints(args.prefill_lengths, "--prefill-lengths"), reps=args.reps,
             decode_batches=_ints(args.decode_batches, "--decode-batches"),
+            decode_contexts=_ints(args.decode_contexts, "--decode-contexts"),
             decode_tokens=args.decode_tokens, check_sessions=args.check_sessions,
             check_turns=args.check_turns, max_error=args.max_error, seed=args.seed,
             token_range=(lo_hi[0], lo_hi[1]),
@@ -322,6 +323,8 @@ def build_parser() -> argparse.ArgumentParser:
     cal.add_argument("--prefill-lengths", default="64,128,256,512,768,1024,1536,2048")
     cal.add_argument("--reps", type=int, default=3, help="repeats of each prefill length")
     cal.add_argument("--decode-batches", default="1,2,4,8,16")
+    cal.add_argument("--decode-contexts", default="32,512,1024",
+                     help="prompt lengths for the decode cells: they fit the context term")
     cal.add_argument("--decode-tokens", type=int, default=64)
     cal.add_argument("--check-sessions", type=int, default=16)
     cal.add_argument("--check-turns", type=int, default=3)

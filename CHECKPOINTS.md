@@ -614,7 +614,10 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       the check exact (48 of 48; 9,840 of 13,776 tokens), 1,537 blocks read = the engine log, 48 s.
       ⚠️ Its straight-line timing fit is not good enough to size a fleet: T4 prefill is 0.71 ms/token
       to 1,024 tokens (Phase 3's value) and 1.12 ms at 2,040; the line clamps a −212 ms intercept.
-      Still `[~]`: the timing fit needs the context-aware model (Phase 6)
+      Still `[~]`: the timing fit needs the context-aware model (Phase 6). 🔨 **2026-09-30:** it now
+      fits C2's context-aware model (decode cells over context × batch; `calib/fit.py`, the same
+      NNLS as C2's analysis) and recovers a mock's known context terms (3.97e-6 against 4e-6). The
+      new fit's first real-GPU run is left
 - [ ] **`configs/profiles/`** — committed calibration profiles keyed by
       `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
       from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no

@@ -110,7 +110,8 @@ result (ADR-003).
 
 | Piece | Responsibility |
 |---|---|
-| `calibrate.py` | `kvsim calibrate`: probe a running vLLM (health, model, version, and the KV capacity — **read, never estimated**), fit prefill per uncached token and the decode step per batch size, then check the cache model against the engine's own prefix-cache counters, request by request. Writes a profile that `--profile` accepts; one that fails the check is written but not marked calibrated. |
+| `calibrate.py` | `kvsim calibrate`: probe a running vLLM (health, model, version, and the KV capacity — **read, never estimated**), time decode steps over context length × batch size and prefill over prompt length, fit the context-aware model, then check the cache model against the engine's own prefix-cache counters, request by request. Writes a profile that `--profile` accepts; one that fails the check is written but not marked calibrated. |
+| `fit.py` | The context-aware timing model's fit — least squares with every coefficient ≥ 0 — the procedure C2 registered and validated on a T4 (held-out traffic within 1.41×). |
 
 **Standard library only, and no `vllm` import:** it talks to the engine over HTTP, so the core
 install never needs a GPU wheel (ADR-009). The *designed* split — `metrics_scrape.py`, `compare.py`,

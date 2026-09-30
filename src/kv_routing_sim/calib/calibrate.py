@@ -13,13 +13,16 @@ What it needs: a running vLLM (V1) with prefix caching on, reachable over HTTP. 
 be on this machine, and nothing beyond the standard library is used (the core install stays
 pyyaml-only, ADR-009).
 
-Three steps — Phase 3's procedure on the T4, made a command:
-  1. PREFILL. Sequential requests with unique random prompts of spread lengths and 1 output token.
-     Time-to-first-token against uncached tokens, least squares. As in Phase 3, the intercept holds
-     one decode step too (the simulator emits the first token at the END of the step that prefills),
-     so it is subtracted, and a negative remainder is clamped to 0 and said so.
-  2. DECODE. Batches of b concurrent requests. The median time between streamed tokens against b,
-     least squares. A batch that preempted is not used.
+Three steps — the procedure C2 registered and validated on a real T4 (docs/09, 2026-09-30):
+  1. DECODE. Batches of b concurrent requests with prompts of several context lengths L. A request's
+     step is the mean gap from its `skip`-th streamed token to its last; a cell's, the median over
+     the batch. A cell that preempted is not used.
+  2. PREFILL. Sequential requests with unique random prompts of spread lengths and 1 output token.
+     Both are fitted to the context-aware model of `calib/fit.py`, by least squares with every
+     coefficient ≥ 0: decode(b, S) = d0 + d1·b + d2·S, prefill(n, c) = p0 + p1·n + p2·n·(c + n/2).
+     One decode step is taken out of each TTFT first (the simulator emits the first token at the END
+     of the step that prefills). Until 2026-09-30 this was a straight line with no context term — C2
+     showed that line up to 7× optimistic on long prompts.
   3. CHECK. A small agentic workload with shared prefixes, sent one request at a time. The
      engine's own prefix-cache counters against the simulator's prediction with the fitted
      profile. The relative hit-rate error goes into the profile. Above --max-error, the profile is
@@ -56,12 +59,15 @@ from ..sim.cost_model import CostProfile
 from ..sim.engine import run
 from ..traces.hashing import chain_hashes
 from ..traces.schema import NormalizedRequest
+from .fit import fit_decode, fit_prefill
 
 # Token ids for the random prompts. Below the special tokens of every common vocabulary (Qwen and
 # Llama put theirs above 128,000) and above the byte and control range; --token-range overrides it.
 DEFAULT_TOKEN_RANGE = (1_000, 30_000)
 DEFAULT_PREFILL_LENGTHS = (64, 128, 256, 512, 768, 1024, 1536, 2048)
 DEFAULT_DECODE_BATCHES = (1, 2, 4, 8, 16)
+DEFAULT_DECODE_CONTEXTS = (32, 512, 1024)  # prompt lengths for the decode cells: the context term
+DECODE_SKIP_TOKENS = 8  # gaps are timed from this token on: past every prefill in the batch
 
 
 class CalibrationError(RuntimeError):
@@ -126,7 +132,7 @@ class Engine:
         req = urllib.request.Request(self.base + "/v1/completions", data=json.dumps(body).encode(),
                                      headers={"Content-Type": "application/json"})
         rec: dict[str, Any] = {"t_send": time.perf_counter(), "t_first": None, "t_last": None,
-                               "usage": None, "error": None}
+                               "t_chunks": [], "usage": None, "error": None}
         try:
             with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
                 for raw in resp:
@@ -142,6 +148,7 @@ class Engine:
                         if rec["t_first"] is None:
                             rec["t_first"] = now
                         rec["t_last"] = now
+                        rec["t_chunks"].append(now)
                     if obj.get("usage"):
                         rec["usage"] = obj["usage"]
         except urllib.error.HTTPError as exc:
@@ -342,50 +349,58 @@ def measure_prefill(engine: Engine, info: EngineInfo, rng: random.Random, *,
 
 
 def measure_decode(engine: Engine, info: EngineInfo, rng: random.Random, *,
-                   batches: tuple[int, ...], output_tokens: int,
-                   token_range: tuple[int, int]) -> list[dict[str, Any]]:
-    """For each batch size b: b concurrent requests, the median time between their tokens."""
+                   batches: tuple[int, ...], contexts: tuple[int, ...], output_tokens: int,
+                   token_range: tuple[int, int],
+                   skip: int = DECODE_SKIP_TOKENS) -> list[dict[str, Any]]:
+    """For each context length L and batch size b that fit the cache without preempting: b
+    concurrent requests of L random tokens; a request's step is its mean gap from token `skip`
+    on."""
     rows = []
-    for b in sorted({x for x in batches if 1 <= x <= info.max_num_seqs}):
-        before = settled_metrics(engine)
-        prompts = [_prompt(rng, 32, token_range) for _ in range(b)]
-        with ThreadPoolExecutor(max_workers=b) as pool:
-            recs = list(pool.map(lambda ids: engine.stream(info.model, ids, output_tokens),
-                                 prompts))
-        preemptions = _delta(before, settled_metrics(engine), "preemptions")
-        intervals = sorted((r["t_last"] - r["t_first"]) / (output_tokens - 1)
-                           for r in recs if _check(r, 32, output_tokens) is None)
-        rows.append({
-            "batch": b,
-            "median_interval_s": statistics.median(intervals) if intervals else None,
-            "requests_ok": len(intervals),
-            "preemptions": preemptions,
-            # A batch that preempted measured recomputation, not a decode step.
-            "valid": len(intervals) == b and preemptions == 0,
-        })
+    budget = int(0.8 * info.kv_cache_blocks)  # headroom: a preempted cell times recomputation
+    for L in sorted({min(x, info.max_model_len - output_tokens - 1) for x in contexts if x > 0}):
+        per = -(-(L + output_tokens) // info.block_size)
+        for b in sorted({x for x in batches if 1 <= x <= info.max_num_seqs}):
+            if b * per > budget:
+                continue
+            before = settled_metrics(engine)
+            prompts = [_prompt(rng, L, token_range) for _ in range(b)]
+            with ThreadPoolExecutor(max_workers=b) as pool:
+                recs = list(pool.map(lambda ids: engine.stream(info.model, ids, output_tokens),
+                                     prompts))
+            preemptions = _delta(before, settled_metrics(engine), "preemptions")
+            steps = sorted((r["t_chunks"][-1] - r["t_chunks"][skip])
+                           / (len(r["t_chunks"]) - 1 - skip)
+                           for r in recs if _check(r, L, output_tokens) is None
+                           and len(r["t_chunks"]) == output_tokens)
+            rows.append({
+                "batch": b, "context": L,
+                "step_s": statistics.median(steps) if steps else None,
+                "requests_ok": len(steps), "preemptions": preemptions,
+                # A cell that preempted timed recomputation, not decode steps.
+                "valid": len(steps) == b and preemptions == 0,
+            })
     return rows
 
 
-def fit(prefill: list[dict[str, float]], decode: list[dict[str, Any]]) -> dict[str, Any]:
+def fit(prefill: list[dict[str, float]], decode: list[dict[str, Any]], *,
+        output_tokens: int, skip: int = DECODE_SKIP_TOKENS) -> dict[str, Any]:
+    """The context-aware model of calib/fit.py: decode on the valid cells, then prefill with one
+    fitted decode step taken out of each TTFT."""
     ok = [r for r in decode if r["valid"]]
-    if len(ok) < 2:
-        raise CalibrationError(f"fewer than two usable decode batches ({len(ok)}): no decode fit")
-    dec = ols([float(r["batch"]) for r in ok], [r["median_interval_s"] for r in ok])
-    pre = ols([p["uncached_tokens"] for p in prefill], [p["ttft_s"] for p in prefill])
+    if len({(r["batch"], r["context"]) for r in ok}) < 3:
+        raise CalibrationError(f"fewer than three usable decode cells ({len(ok)}): no decode fit")
+    dec = fit_decode(ok, (skip + output_tokens) / 2.0)
+    pre = fit_prefill([{"cached_tokens": p["prompt_tokens"] - p["uncached_tokens"],
+                        "uncached_tokens": p["uncached_tokens"], "ttft_s": p["ttft_s"]}
+                       for p in prefill], dec)
     notes = []
-    base_raw = pre["intercept"] - (dec["intercept"] + dec["slope"])
-    base = base_raw
-    if base < 0:
-        notes.append(f"fitted prefill base was {base_raw * 1e3:.2f} ms (< 0, not physical); "
-                     "clamped to 0 — the decode fit holds the whole fixed cost, as on the T4")
-        base = 0.0
-    if dec["slope"] < 0:
-        notes.append("⚠️ decode time FALLS with batch size here; the fit is kept, but check the "
-                     "engine was otherwise idle")
-    return {"prefill_base_s": base, "prefill_per_token_s": pre["slope"],
-            "decode_base_s": dec["intercept"], "decode_per_seq_s": dec["slope"],
-            "prefill_fit": pre, "decode_fit": dec, "prefill_base_s_raw": base_raw,
-            "notes": notes}
+    if not dec["per_ctx_token_s"] and not pre["attn_s"]:
+        notes.append("both context terms fitted to 0: on this engine cost did not grow with "
+                     "context over the lengths measured")
+    return {"prefill_base_s": pre["base_s"], "prefill_per_token_s": pre["per_token_s"],
+            "prefill_attn_s": pre["attn_s"], "decode_base_s": dec["base_s"],
+            "decode_per_seq_s": dec["per_seq_s"], "decode_per_ctx_token_s": dec["per_ctx_token_s"],
+            "prefill_fit": pre, "decode_fit": dec, "notes": notes}
 
 
 # ── step 3: does the cache model predict this engine? ─────────────────────────────────────────
@@ -499,6 +514,7 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
               block_size: int | None = None, max_num_seqs: int | None = None,
               prefill_lengths: tuple[int, ...] = DEFAULT_PREFILL_LENGTHS, reps: int = 3,
               decode_batches: tuple[int, ...] = DEFAULT_DECODE_BATCHES,
+              decode_contexts: tuple[int, ...] = DEFAULT_DECODE_CONTEXTS,
               decode_tokens: int = 64, check_sessions: int = 16, check_turns: int = 3,
               max_error: float = 0.05, seed: int = 0,
               token_range: tuple[int, int] = DEFAULT_TOKEN_RANGE,
@@ -514,15 +530,18 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
 
     prefill = measure_prefill(engine, info, rng, lengths=prefill_lengths, reps=reps,
                               token_range=token_range)
-    decode = measure_decode(engine, info, rng, batches=decode_batches,
+    decode = measure_decode(engine, info, rng, batches=decode_batches, contexts=decode_contexts,
                             output_tokens=decode_tokens, token_range=token_range)
-    f = fit(prefill, decode)
-    log(f"prefill  {f['prefill_per_token_s'] * 1e3:.3f} ms per uncached token + "
+    f = fit(prefill, decode, output_tokens=decode_tokens)
+    cells = [r for r in decode if r["valid"]]
+    log(f"decode   {f['decode_base_s'] * 1e3:.1f} ms + {f['decode_per_seq_s'] * 1e3:.2f} ms × "
+        f"batch + {f['decode_per_ctx_token_s'] * 1e6:.2f} ms per 1K context tokens  (R² "
+        f"{f['decode_fit']['r2']:.2f}, {len(cells)} cells: contexts "
+        f"{' '.join(str(c) for c in sorted({r['context'] for r in cells}))})")
+    log(f"prefill  {f['prefill_per_token_s'] * 1e3:.3f} ms per new token + "
+        f"{f['prefill_attn_s'] * 1e6:.3f} ms per new token per 1K attended + "
         f"{f['prefill_base_s'] * 1e3:.1f} ms  (R² {f['prefill_fit']['r2']:.2f}, "
         f"{len(prefill)} requests)")
-    log(f"decode   {f['decode_base_s'] * 1e3:.1f} ms + {f['decode_per_seq_s'] * 1e3:.2f} ms × "
-        f"batch  (R² {f['decode_fit']['r2']:.2f}, batches "
-        f"{' '.join(str(r['batch']) for r in decode if r['valid'])})")
     for note in f["notes"]:
         log(f"         {note}")
 
@@ -532,6 +551,8 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
         prefill_per_token_s=f["prefill_per_token_s"],
         decode_base_s=f["decode_base_s"],
         decode_per_seq_s=f["decode_per_seq_s"],
+        prefill_attn_s=f["prefill_attn_s"],
+        decode_per_ctx_token_s=f["decode_per_ctx_token_s"],
         kv_cache_blocks=info.kv_cache_blocks,
         block_size=info.block_size,
         max_num_seqs=info.max_num_seqs,
@@ -572,9 +593,8 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
             "seed": seed,
             "max_error": max_error,
             "prefill_fit": f["prefill_fit"],
-            "prefill_base_s_raw": f["prefill_base_s_raw"],
             "decode_fit": f["decode_fit"],
-            "decode_batches": decode,
+            "decode_cells": decode,
             "prefill_points": prefill,
             "check": check,
             "notes": f["notes"],
