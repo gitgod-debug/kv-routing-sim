@@ -1,0 +1,163 @@
+{
+ "script": "scripts/c2_analyze.py",
+ "fit": {
+  "decode": {
+   "base_s": 0.040134812311633544,
+   "per_seq_s": 0.00033595622179426437,
+   "per_ctx_token_s": 3.4952927062706023e-06,
+   "points": 56,
+   "r2": 0.9793115922482835
+  },
+  "prefill": {
+   "base_s": 0.0,
+   "per_token_s": 0.00031888614178891746,
+   "attn_s": 7.575762731263971e-07,
+   "points": 45,
+   "r2": 0.9983649931906841
+  },
+  "context_free": {
+   "decode": {
+    "base_s": 0.05601165851987834,
+    "per_seq_s": 0.0010269509165426237,
+    "per_ctx_token_s": 0.0,
+    "points": 56,
+    "r2": 0.3147969980440346
+   },
+   "prefill": {
+    "base_s": 0.0,
+    "per_token_s": 0.0009696110359829757,
+    "attn_s": 0.0,
+    "points": 45,
+    "r2": 0.9133944599834953
+   }
+  }
+ },
+ "c2a": {
+  "step_L128_b8_s": 0.04573646719090954,
+  "step_L1536_b8_s": 0.08772320858181812,
+  "ratio": 1.9180145290988664,
+  "min_ratio": 1.5,
+  "holds": true,
+  "decided": true
+ },
+ "c2b": {
+  "cells": [
+   {
+    "L": 512,
+    "b": 8,
+    "alone_itl_s": 0.06086486970336783,
+    "contended_itl_s": 0.06082725896822608,
+    "ratio": 0.9993820616831178,
+    "client_alone_s": 0.05678433615000089,
+    "client_contended_s": 0.055609257336363335
+   },
+   {
+    "L": 1024,
+    "b": 16,
+    "alone_itl_s": 0.16222783524354967,
+    "contended_itl_s": 0.16242877675794368,
+    "ratio": 1.0012386377103062,
+    "client_alone_s": 0.10671492355909115,
+    "client_contended_s": 0.10581478573181832
+   },
+   {
+    "L": 1536,
+    "b": 8,
+    "alone_itl_s": 0.1369388636002051,
+    "contended_itl_s": 0.13962406603170818,
+    "ratio": 1.0196087681824393,
+    "client_alone_s": 0.0872074652772736,
+    "client_contended_s": 0.08896092713181775
+   }
+  ],
+  "median_ratio": 1.0012386377103062,
+  "min_ratio": 1.2,
+  "holds": false,
+  "decided": true
+ },
+ "c2c": {
+  "runs": [
+   {
+    "workload": "K1_half",
+    "measured": {
+     "hit_rate": 0.9230392156862746,
+     "preemptions": 0,
+     "ttft_p50_ms": 1316.1282230003053,
+     "ttft_p95_ms": 2324.7621290001916,
+     "invalid": 0,
+     "worst_send_lag_ms": 3.590569000124333
+    },
+    "context_aware": {
+     "hit_rate": 0.9230392156862746,
+     "preemptions": 6,
+     "ttft_p50_ms": 1445.3983010601235,
+     "ttft_p95_ms": 3277.289840630232
+    },
+    "context_free": {
+     "hit_rate": 0.9230392156862746,
+     "preemptions": 0,
+     "ttft_p50_ms": 193.1089277558442,
+     "ttft_p95_ms": 325.9624138066499
+    },
+    "factor": {
+     "p50": 1.098219972644556,
+     "p95": 1.409731257984529
+    },
+    "hit_rate_error": 0.0
+   },
+   {
+    "workload": "K64_quarter",
+    "measured": {
+     "hit_rate": 0.8304313725490196,
+     "preemptions": 0,
+     "ttft_p50_ms": 551.0856240002795,
+     "ttft_p95_ms": 2090.831961999811,
+     "invalid": 0,
+     "worst_send_lag_ms": 1.3800230001379532
+    },
+    "context_aware": {
+     "hit_rate": 0.8304313725490196,
+     "preemptions": 0,
+     "ttft_p50_ms": 419.9102691840437,
+     "ttft_p95_ms": 1891.8353083004577
+    },
+    "context_free": {
+     "hit_rate": 0.8304117647058824,
+     "preemptions": 0,
+     "ttft_p50_ms": 183.1960889301456,
+     "ttft_p95_ms": 1198.6981526820273
+    },
+    "factor": {
+     "p50": 1.3123890136603031,
+     "p95": 1.1051870915117465
+    },
+    "hit_rate_error": 0.0
+   }
+  ],
+  "max_factor": 2.0,
+  "decided": true,
+  "holds": true
+ },
+ "fitted_profile": {
+  "name": "t4-qwen3-4b-vllm0.30.0-ctx",
+  "prefill_base_s": 0.0,
+  "prefill_per_token_s": 0.00031888614178891746,
+  "decode_base_s": 0.040134812311633544,
+  "decode_per_seq_s": 0.00033595622179426437,
+  "kv_cache_blocks": 1537,
+  "block_size": 16,
+  "max_num_seqs": 256,
+  "gpu": "Tesla T4",
+  "model": "Qwen/Qwen3-4B",
+  "engine_version": "0.30.0",
+  "calibrated": true,
+  "calibration_error": null,
+  "prefill_attn_s": 7.575762731263971e-07,
+  "decode_per_ctx_token_s": 3.4952927062706023e-06
+ },
+ "predicted_outcomes": {
+  "c2a": "holds",
+  "c2b": "fails",
+  "c2c": "holds"
+ }
+}
