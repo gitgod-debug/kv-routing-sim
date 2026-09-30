@@ -55,7 +55,7 @@ HARDWARE_PATHS = ("single-replica", "multi-gpu", "mig", "memory-split", "cpu-onl
 PROVENANCE_PATHS = ("src", "scripts", "configs", "notebooks", "pyproject.toml")
 
 
-def _git(*args: str) -> str:
+def _git(*args: str, strip: bool = True) -> str:
     try:
         out = subprocess.run(
             ["git", "-C", str(REPO_ROOT), *args],
@@ -64,7 +64,9 @@ def _git(*args: str) -> str:
             timeout=10,
             check=False,  # a missing git or a non-repo is reported as "unknown", never fatal
         )
-        return out.stdout.strip()
+        # `status --porcelain` lines START with a meaningful space (" D" = deleted, unstaged):
+        # those callers keep the leading whitespace.
+        return out.stdout.strip() if strip else out.stdout.rstrip()
     except (OSError, subprocess.SubprocessError):
         return ""
 
@@ -178,16 +180,20 @@ def results_header(
     if hardware_path not in HARDWARE_PATHS:
         raise ValueError(f"hardware_path must be one of {HARDWARE_PATHS}, got {hardware_path!r}")
 
+    status = _git("status", "--porcelain", "--", *PROVENANCE_PATHS, strip=False)
     header = {
         "script": script,
         "date_utc": datetime.now(UTC).isoformat(timespec="seconds"),
         "git_sha": _git("rev-parse", "--short", "HEAD") or "unknown",
-        "git_dirty": bool(_git("status", "--porcelain", "--", *PROVENANCE_PATHS)),
+        "git_dirty": bool(status),
         "seed": seed,
         "hardware_path": hardware_path,
         "hardware": _hardware(),
         "packages": _package_versions(),
     }
+    if status:
+        # WHICH paths were uncommitted, so a reader can tell a deleted notebook from edited code.
+        header["git_dirty_paths"] = status.splitlines()[:50]
     if extra:
         header.update(extra)
     return header

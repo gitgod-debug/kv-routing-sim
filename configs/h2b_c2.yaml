@@ -1,0 +1,34 @@
+# H2b under C2's timing model — does the finding survive a timing model that matches the engine?
+# Registered 2026-09-30, BEFORE it runs, with a dated entry in docs/09-hypotheses.md.
+#
+# Why: every replica count in the finding came from the context-free T4 profile, which Phase 6 found
+# optimistic by 5–222× on these ~1,700-token prompts. C2 fitted a context-aware profile on
+# micro-benchmarks, and it predicted held-out traffic within 1.41× (C2c, registered) and — post hoc —
+# Phase 6's six two-replica runs within 1.02–1.79×. This re-runs H2b's test under that profile.
+# `scripts/run_h2b_c2.py` is the procedure; it chooses nothing after seeing a result.
+
+schema_version: 1
+h2b_config: configs/phase5_crossover.yaml   # session shape, sharing 0.8, Zipf 1, K, cost model, SLO
+profile: configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json   # C2's fitted, context-aware T4 profile
+cache_model: vllm
+alpha: 16                                   # alpha* from Phase 5's A1, fixed as in H2b
+seeds: [0, 1, 2]                            # as in H2b
+
+# The grid moves down in load and up in replicas, because each T4 is now slower: Phase 6 found two
+# live T4s overloaded at 1 session/s with 64 prompts. Loads 6 and 8 are dropped (nothing is expected
+# to hold on 16 there); 0.25 and 0.5 are added. Fixed before any run.
+loads: [0.25, 0.5, 1, 2, 3, 4]              # sessions per second
+replicas: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+policies_reported: [round-robin, least-loaded, radix-affinity]   # beside sticky and balanced@alpha*
+alphas_reported: [1]                        # the many-prompt weight Phase 5 found after the test
+
+# ── The decision rules — H2b's, unchanged ───────────────────────────────────────────────────────
+# R(policy) = the fewest replicas (1–16) that hold the SLO on every seed; 17 if none. At each
+# (K, load) the winner is the policy with the smaller R, of balanced affinity at alpha* and
+# session-sticky; equal R is a tie.
+#   (a) at K = 1, balanced affinity wins at NO load;
+#   (b) at K = 64, balanced affinity wins at ONE load or more;
+#   (c) no reversal along K: at no load does affinity win at a smaller K and sticky at a larger one.
+# H2b-C2 holds only if all three hold.
+prediction: holds   # a cache miss costs more once attention over the prompt is priced in, so
+                    # prefix routing should matter more at K = 64, and sticky's balance still wins at K = 1
