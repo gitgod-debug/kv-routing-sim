@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Precompute the demo grid: tenant prompts × load × replicas × policy -> one JSON file.
 
-    python scripts/build_grid.py        # -> artifacts/results/demo_grid.json
+    python scripts/build_grid.py                   # context-free profile -> demo_grid.json
+    python scripts/build_grid.py --source h2b_c2   # C2's context-aware one -> demo_grid_ctx.json
 
 ⭐ THIS IS THE DEMO'S ENTIRE BACKEND (ADR-011). The static page (`site/`) ships this file and its
 selectors look answers up in it: no server, nothing to wake, and every number comes from this
@@ -13,12 +14,16 @@ TTFT target and what it costs. Traffic, prompt counts, loads, replicas, seeds an
 from Phase 5's config and results, and a guard stops the build unless the grid reproduces Phase 5's
 H2b required-replica table exactly: the demo cannot drift from the experiment it illustrates.
 
+`--source h2b_c2` builds the same grid on C2's context-aware T4 profile, with the loads and replicas
+of configs/h2b_c2.yaml, and guards it against that registered re-test's table instead.
+
 ⚠️ T4 figures, generated traffic, one model. The direction of the K flip survived H6's hardware
 rescales; the replica counts and rupees did not transfer (H6's ranking half). The page says so.
 """
 
 from __future__ import annotations
 
+import argparse
 import gzip
 import json
 import os
@@ -41,8 +46,10 @@ from kv_routing_sim.traces.generator import AgenticWorkload
 REPO = pathlib.Path(__file__).resolve().parents[1]
 P5 = REPO / "configs" / "phase5_crossover.yaml"
 P5_RESULTS = REPO / "artifacts" / "results" / "phase5_crossover" / "phase5.json"
-NOT_MET = 9  # no replica count from 1 to 8 holds the SLO (Phase 5's convention)
+H2B_C2 = REPO / "configs" / "h2b_c2.yaml"
+H2B_C2_RESULTS = REPO / "artifacts" / "results" / "h2b_c2" / "h2b_c2.json"
 FIELDS = ("hit_rate", "p50_ms", "p95_ms", "inr_per_1k", "meets_slo")
+_SOURCE = "phase5"  # set in main() and in every worker: which profile, grid and guard
 
 
 def label(policy: str, alpha: float | None) -> str:
@@ -57,6 +64,31 @@ def _p5() -> dict[str, Any]:
 @lru_cache(maxsize=1)
 def _p5_results() -> dict[str, Any]:
     return json.loads(P5_RESULTS.read_text())
+
+
+@lru_cache(maxsize=1)
+def _src() -> dict[str, Any]:
+    """The profile, loads and replicas to build on, and the registered table the grid must match.
+    The traffic is always Phase 5's H2b traffic."""
+    if _SOURCE == "phase5":
+        p5 = _p5()
+        return {"profile": p5["profile"], "loads": p5["loads"], "replicas": p5["replicas"],
+                "guard": json.loads(P5_RESULTS.read_text())["h2b"]["required_replicas"],
+                "out": "demo_grid.json",
+                "reproduces": ("artifacts/results/phase5_crossover/phase5.json "
+                               "(h2b.required_replicas)")}
+    cfg = yaml.safe_load(H2B_C2.read_text())
+    return {"profile": cfg["profile"], "loads": cfg["loads"], "replicas": cfg["replicas"],
+            "guard": json.loads(H2B_C2_RESULTS.read_text())["required_replicas"],
+            "out": "demo_grid_ctx.json",
+            "reproduces": "artifacts/results/h2b_c2/h2b_c2.json (required_replicas)"}
+
+
+def _init_worker(source: str) -> None:
+    global _SOURCE
+    _SOURCE = source
+    _src.cache_clear()
+    _profile.cache_clear()
 
 
 def _policies() -> list[tuple[str, float | None]]:
@@ -81,7 +113,7 @@ def _trace(k: int, load: float):
 
 @lru_cache(maxsize=1)
 def _profile():
-    return load_profile(REPO / _p5()["profile"])
+    return load_profile(REPO / _src()["profile"])
 
 
 @lru_cache(maxsize=1)
@@ -99,17 +131,24 @@ def _job(key: tuple) -> tuple[tuple, Point]:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--source", choices=("phase5", "h2b_c2"), default="phase5")
+    args = ap.parse_args()
+    _init_worker(args.source)
     sys.path.insert(0, str(REPO / "scripts"))
     from _spike_common import results_header
 
-    p5 = _p5()
+    p5, src = _p5(), _src()
     ks, seeds = p5["h2b"]["n_shared_prefixes"], p5["h2b"]["seeds"]
-    loads, replicas, policies = p5["loads"], p5["replicas"], _policies()
-    payload = results_header("scripts/build_grid.py", seed=0, hardware_path="cpu-only")
+    loads, replicas, policies = src["loads"], src["replicas"], _policies()
+    not_met = max(replicas) + 1  # no replica count in the grid holds the SLO
+    payload = results_header("scripts/build_grid.py", seed=0, hardware_path="cpu-only",
+                             extra={"source": args.source})
     jobs = [(k, ld, p, al, n, s) for k in ks for ld in loads for p, al in policies
             for n in replicas for s in seeds]
     t0 = time.monotonic()
-    with ProcessPoolExecutor(max(1, (os.cpu_count() or 2) - 1)) as ex:
+    with ProcessPoolExecutor(max(1, (os.cpu_count() or 2) - 1), initializer=_init_worker,
+                             initargs=(args.source,)) as ex:
         results = list(ex.map(_job, jobs, chunksize=4))
     wall = time.monotonic() - t0
     runs: dict[tuple, list[Point]] = {}
@@ -117,21 +156,22 @@ def main() -> int:
         runs.setdefault((k, ld, p, al, n), []).append(point)
     agg = {key: average_points(pts) for key, pts in runs.items()}
 
-    # Guard: every cell here is also in Phase 5's H2b grid — same traces, seeds, profile, cost
-    # model and code path. If the fewest replicas holding the SLO differ anywhere, the page would
-    # show numbers the experiment did not produce: stop instead of writing the file.
-    want = _p5_results()["h2b"]["required_replicas"]
+    # Guard: every cell here is also in the registered experiment's grid — same traces, seeds,
+    # profile, cost model and code path. If the fewest replicas holding the SLO differ anywhere,
+    # the page would show numbers the experiment did not produce: stop instead of writing.
+    want = src["guard"]
     for k in ks:
         for ld in loads:
             for p, al in policies:
-                got = next((n for n in replicas if agg[(k, ld, p, al, n)].meets_slo), NOT_MET)
+                got = next((n for n in replicas if agg[(k, ld, p, al, n)].meets_slo), not_met)
                 exp = want[str(k)][str(ld)][label(p, al)]
                 if got != exp:
                     raise SystemExit(
                         f"error: K={k} at {ld}/s, {label(p, al)} needs {got} replicas here but "
-                        f"{exp} in Phase 5. The code or the config drifted; not writing the grid."
+                        f"{exp} in {src['reproduces']}. The code or the config drifted; not "
+                        "writing the grid."
                     )
-    print("the grid reproduces Phase 5's H2b required-replica table exactly")
+    print(f"the grid reproduces {src['reproduces']} exactly")
 
     def cell(k: int, ld: float, p: str, al: float | None, n: int) -> list:
         a = agg[(k, ld, p, al, n)]
@@ -158,11 +198,11 @@ def main() -> int:
         "slo_p95_ttft_ms": _cost().ttft_p95_slo_ms,
         "profile": _profile().provenance(),
         "cost_model": _cost().provenance,
-        "reproduces": "artifacts/results/phase5_crossover/phase5.json (h2b.required_replicas)",
+        "reproduces": src["reproduces"],
         "n_simulator_runs": len(jobs),
         "build_wall_clock_s": round(wall, 1),
     })
-    out = REPO / "artifacts" / "results" / "demo_grid.json"
+    out = REPO / "artifacts" / "results" / src["out"]
     out.write_text(json.dumps(payload, separators=(",", ":"), default=str) + "\n",
                    encoding="utf-8")
     raw = out.stat().st_size
