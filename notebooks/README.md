@@ -21,7 +21,15 @@ below is kept as the record of how it was run.
 
 ---
 
-## ▶ Run next — `c2_timing_t4.ipynb` (about an hour)
+## ✅ C2 — ran on 2026-09-30: all three registered predictions came true
+
+Decode cost grows with context length (1.92× from 128 to 1,536 tokens at batch 8); a busy second
+engine did not slow the first (1.00×); and the context-aware model fitted on parts A and B predicted
+the held-out traffic within 1.10–1.41×, where the old profile was up to 7× optimistic.
+[Report](../artifacts/results/c2_kaggle_t4/report.md). Nothing here needs running now; the section
+below is kept as the record of how it was run.
+
+## How C2 was run — `c2_timing_t4.ipynb` (about an hour)
 
 **What it tests:** why Phase 6's latency was 5–222× the prediction. It measures decode and prefill
 speed against context length on one T4 (parts A, B), checks whether a busy second engine slows the
