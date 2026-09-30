@@ -979,3 +979,63 @@ with C2a holding, the context term is real but not enough: chunked prefill (whic
 not model) or the single-sequence decode oddity may matter under load. And D is one engine: a model
 that predicts it still has to be re-checked on two replicas before the README's replica counts
 change.
+
+### 2026-09-30 — C2 RAN: all three registered predictions came true. Context, not CPU.
+Report: [`artifacts/results/c2_kaggle_t4/report.md`](../artifacts/results/c2_kaggle_t4/report.md),
+from the committed `scripts/c2_analyze.py` (unchanged since `adfada5`). The registered notebook ran
+once (05:33 UTC); predictions, traffic fingerprints and design match the registration; all 56 decode,
+45 prefill, 12 contention and 960 held-out measurements are valid; both engines had 1,537 blocks.
+
+**As registered.**
+- **C2a holds** (predicted: holds). At batch 8 the decode step is 87.7 ms at 1,536 tokens of context
+  and 45.7 ms at 128 — **1.92×** (needed ≥ 1.5; predicted ~3×).
+- **C2b does not hold** (predicted: fails). With replica 1 kept busy by a 48-stream client, replica 0's
+  engine-side inter-token latency changed by a median factor of **1.00** (needed ≥ 1.2); the
+  client-side steps agree. CPU contention did not slow the engine on this box.
+- **C2c holds** (predicted: holds). Fitted on parts A and B only — decode **40.1 ms + 0.34 ms per
+  sequence + 3.5 ms per 1,000 context tokens in the batch**; prefill **0.32 ms per new token + 0.76 ms
+  per new token per 1,000 tokens attended** — the model predicts the held-out runs' p50 and p95 TTFT
+  within **1.10×, 1.41× (K1 at 0.5/s) and 1.31×, 1.11× (K64 at 0.25/s)**. The context-free profile
+  was 3.0–7.1× (p50) and 1.7–7.1× (p95) optimistic on the same traffic. Hit rates: exact on one
+  replica too (0.9230, 0.8304).
+
+**Reported, not tested.** The decode fit's R² is 0.979 with the context term and 0.315 without it. The
+single-sequence oddity is back (batch 1 slower than batch 2 at 128 and 512 tokens). The fitted prefill
+reproduces C1's independent 2,040-token measurement (2.28 s predicted against 2.28 s measured).
+
+**Post hoc, and labelled so** ([`posthoc_phase6.md`](../artifacts/results/c2_kaggle_t4/posthoc_phase6.md),
+`scripts/c2_posthoc_phase6.py`). The context terms were added *because of* Phase 6, so Phase 6 is not a
+clean test of them; but the coefficients above never saw a Phase 6 number. Replaying Phase 6's second
+run with each request on the replica that really served it, at the time it was really sent, the model
+lands within **1.02–1.79×** of all six runs' p50 and p95 TTFT, and near their preemption counts
+(25/18, 0/0, 65/67, 68/62, 88/83, 55/48 model/measured). The context-free profile was 5–222× off. So
+the timing model now explains two live replicas too — which is what licenses re-running the finding
+on it, next.
+
+### 2026-09-30 — H2b under C2's timing REGISTERED before it runs
+Design and rules: [`configs/h2b_c2.yaml`](../configs/h2b_c2.yaml). Procedure: `scripts/run_h2b_c2.py`.
+Profile: [`configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json`](../configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json),
+C2's fitted profile, unchanged. A pipeline check ran first on a 6-session config outside the design.
+
+**Why.** Every replica count in the finding came from the context-free profile, which C2 and Phase 6
+show is optimistic by several times on these prompts. The finding's *direction* survived H6's
+rescalings, but those scaled every cost together; a context term changes costs unevenly — a cache
+miss now also pays attention over the prompt, and decode pays for context whether it was cached or
+not. So the finding is re-tested, not assumed.
+
+**The setup.** Phase 5's H2b traffic unchanged (200 sessions × 4 turns, sharing 0.8, K = 1, 4, 16, 64
+tenant prompts, Zipf 1), balanced affinity at α\* = 16 against session-sticky, three seeds, the same
+cost model and 2 s p95 SLO. Loads **0.25, 0.5, 1, 2, 3, 4** sessions/s and replicas **1–16**, moved
+down and up because each T4 is now slower (6 and 8 sessions/s dropped). Reported beside them: α = 1,
+pure affinity, round-robin, least-loaded.
+
+**How it is decided — H2b's rules, unchanged.** (a) at K = 1, balanced affinity needs fewer replicas
+than session-sticky at no load; (b) at K = 64 it does at one load or more; (c) no reversal along K.
+Holds only if all three hold. **Predicted: holds** — a miss costs more once attention over the prompt
+is priced in, so prefix routing should matter more at K = 64, while sticky's balance still wins at
+K = 1.
+
+**What would be uncomfortable, written down now.** If decode — which every policy pays in full,
+whatever it cached — now dominates the cost, the policies' differences may shrink into ties
+everywhere, and (b) can fail for lack of any win. That would say the finding's replica savings were
+an artefact of the context-free model.

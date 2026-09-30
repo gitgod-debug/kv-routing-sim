@@ -1,0 +1,53 @@
+{
+ "_what": "C2's context-aware timing model for one Tesla T4 serving Qwen3-4B (fp16) on vLLM 0.30.0, 1,537 KV blocks. Fitted by scripts/c2_analyze.py on C2's parts A and B (decode steps over context x batch, prefill with cached prefixes); it predicted C2's held-out traffic within 1.10-1.41x (C2c, registered) where the context-free profile t4-qwen3-4b-vllm0.30.0 was 1.7-7.1x optimistic. Copied unchanged from artifacts/results/c2_kaggle_t4/fitted_profile.json.",
+ "_source": {
+  "date_utc": "2026-09-30T06:23:10+00:00",
+  "fit": {
+   "decode": {
+    "base_s": 0.040134812311633544,
+    "per_seq_s": 0.00033595622179426437,
+    "per_ctx_token_s": 3.4952927062706023e-06,
+    "points": 56,
+    "r2": 0.9793115922482835
+   },
+   "prefill": {
+    "base_s": 0.0,
+    "per_token_s": 0.00031888614178891746,
+    "attn_s": 7.575762731263971e-07,
+    "points": 45,
+    "r2": 0.9983649931906841
+   },
+   "context_free": {
+    "decode": {
+     "base_s": 0.05601165851987834,
+     "per_seq_s": 0.0010269509165426237,
+     "per_ctx_token_s": 0.0,
+     "points": 56,
+     "r2": 0.3147969980440346
+    },
+    "prefill": {
+     "base_s": 0.0,
+     "per_token_s": 0.0009696110359829757,
+     "attn_s": 0.0,
+     "points": 45,
+     "r2": 0.9133944599834953
+    }
+   }
+  }
+ },
+ "name": "t4-qwen3-4b-vllm0.30.0-ctx",
+ "prefill_base_s": 0.0,
+ "prefill_per_token_s": 0.00031888614178891746,
+ "decode_base_s": 0.040134812311633544,
+ "decode_per_seq_s": 0.00033595622179426437,
+ "kv_cache_blocks": 1537,
+ "block_size": 16,
+ "max_num_seqs": 256,
+ "gpu": "Tesla T4",
+ "model": "Qwen/Qwen3-4B",
+ "engine_version": "0.30.0",
+ "calibrated": true,
+ "calibration_error": null,
+ "prefill_attn_s": 7.575762731263971e-07,
+ "decode_per_ctx_token_s": 3.4952927062706023e-06
+}

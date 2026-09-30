@@ -1,0 +1,146 @@
+[
+ {
+  "workload": "K1",
+  "policy": "round-robin",
+  "measured": {
+   "ttft_p50_ms": 2618.6701709999625,
+   "ttft_p95_ms": 11394.694915999935,
+   "preemptions": 18,
+   "hit_rate": 0.8795490196078432
+  },
+  "context_aware": {
+   "ttft_p50_ms": 2500.243376099718,
+   "ttft_p95_ms": 20449.291435411025,
+   "hit_rate": 0.8795490196078432,
+   "preemptions": 25
+  },
+  "context_free": {
+   "ttft_p50_ms": 231.49683070496963,
+   "ttft_p95_ms": 437.012584260259,
+   "hit_rate": 0.8795490196078432,
+   "preemptions": 0
+  },
+  "factor_p50": 1.0473661068487603,
+  "factor_p95": 1.7946326414318492
+ },
+ {
+  "workload": "K1",
+  "policy": "session-sticky",
+  "measured": {
+   "ttft_p50_ms": 1044.0097900000183,
+   "ttft_p95_ms": 1768.759333999924,
+   "preemptions": 0,
+   "hit_rate": 0.9213725490196079
+  },
+  "context_aware": {
+   "ttft_p50_ms": 930.6779072010158,
+   "ttft_p95_ms": 2040.5218827586823,
+   "hit_rate": 0.9213725490196079,
+   "preemptions": 0
+  },
+  "context_free": {
+   "ttft_p50_ms": 191.4444421505408,
+   "ttft_p95_ms": 302.8643222254317,
+   "hit_rate": 0.9213725490196079,
+   "preemptions": 0
+  },
+  "factor_p50": 1.121773474928447,
+  "factor_p95": 1.153645859860531
+ },
+ {
+  "workload": "K1",
+  "policy": "radix-affinity",
+  "measured": {
+   "ttft_p50_ms": 41331.99645500008,
+   "ttft_p95_ms": 106339.39455300015,
+   "preemptions": 67,
+   "hit_rate": 0.9230392156862746
+  },
+  "context_aware": {
+   "ttft_p50_ms": 48300.55212725727,
+   "ttft_p95_ms": 128484.67651203094,
+   "hit_rate": 0.9230392156862746,
+   "preemptions": 65
+  },
+  "context_free": {
+   "ttft_p50_ms": 259.3721561331961,
+   "ttft_p95_ms": 481.9913412313923,
+   "hit_rate": 0.9230392156862746,
+   "preemptions": 0
+  },
+  "factor_p50": 1.168599541999965,
+  "factor_p95": 1.2082509690046568
+ },
+ {
+  "workload": "K64",
+  "policy": "round-robin",
+  "measured": {
+   "ttft_p50_ms": 62828.0190989999,
+   "ttft_p95_ms": 108274.38720099986,
+   "preemptions": 62,
+   "hit_rate": 0.6946862745098039
+  },
+  "context_aware": {
+   "ttft_p50_ms": 61432.70866074588,
+   "ttft_p95_ms": 109931.31011955279,
+   "hit_rate": 0.6946862745098039,
+   "preemptions": 68
+  },
+  "context_free": {
+   "ttft_p50_ms": 1708.01732659044,
+   "ttft_p95_ms": 5815.2257532564845,
+   "hit_rate": 0.6944313725490197,
+   "preemptions": 34
+  },
+  "factor_p50": 1.0227128262561145,
+  "factor_p95": 1.0153029997341572
+ },
+ {
+  "workload": "K64",
+  "policy": "session-sticky",
+  "measured": {
+   "ttft_p50_ms": 16267.878307999808,
+   "ttft_p95_ms": 56709.7081569998,
+   "preemptions": 83,
+   "hit_rate": 0.8223333333333334
+  },
+  "context_aware": {
+   "ttft_p50_ms": 18425.318028629874,
+   "ttft_p95_ms": 62292.83565302748,
+   "hit_rate": 0.8222941176470588,
+   "preemptions": 88
+  },
+  "context_free": {
+   "ttft_p50_ms": 359.23607219510245,
+   "ttft_p95_ms": 5242.730049665624,
+   "hit_rate": 0.8233725490196079,
+   "preemptions": 21
+  },
+  "factor_p50": 1.1326196126983035,
+  "factor_p95": 1.0984510003220418
+ },
+ {
+  "workload": "K64",
+  "policy": "radix-affinity",
+  "measured": {
+   "ttft_p50_ms": 5847.01667399986,
+   "ttft_p95_ms": 32504.22000100025,
+   "preemptions": 48,
+   "hit_rate": 0.8455490196078431
+  },
+  "context_aware": {
+   "ttft_p50_ms": 8561.42524583727,
+   "ttft_p95_ms": 38989.98916110168,
+   "hit_rate": 0.8459019607843137,
+   "preemptions": 55
+  },
+  "context_free": {
+   "ttft_p50_ms": 213.08504870398792,
+   "ttft_p95_ms": 1317.4035352668766,
+   "hit_rate": 0.8432941176470589,
+   "preemptions": 0
+  },
+  "factor_p50": 1.4642382129518576,
+  "factor_p95": 1.1995362189863914
+ }
+]
