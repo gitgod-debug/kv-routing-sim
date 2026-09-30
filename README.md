@@ -6,94 +6,104 @@ Give it your serving log. It returns a routing policy, a replica count, and a co
 prefix-cache model is calibrated against a live vLLM's own Prometheus counters, and **the calibration error
 is published**.
 
-> ## 🚧 Status (2026-09-28): the cache model is proven on one and two live T4s; the timing model is not.
+> ## 🚧 Status (2026-09-30): the cache model and the timing model are both checked against a live engine — and the finding was re-tested on them, and changed.
 > The Real-Engine Calibration Report below is filled in from a live vLLM, against predictions committed
-> before the run; the finding comes from a test registered before it ran, on generated traffic, and two
-> real trace families have tested it since (one falsified a prediction, one confirmed one). On **two
-> live T4s** (Phase 6, run twice) the hit rates matched within 1.4% and the policies came out in the
-> predicted order — but latency was **5–222× worse** than the simulator predicted, so every **replica
-> count** here is a simulator figure, likely optimistic, until a better timing model is tested. Every
-> number still written as `TBD — not yet measured` **is exactly that**; see the honesty gates in
+> before the run. On **two live T4s** (Phase 6, run twice) every hit rate matched within 1.4% — but the
+> first timing model was 5–222× optimistic on latency. **C2** (registered) found why — decode and
+> prefill cost grow with context length; CPU contention was ruled out — and fitted a context-aware T4
+> model that predicts held-out traffic within 1.41×. Re-tested on that model, **half of the old
+> headline was falsified** (below). Replica counts are T4 figures on generated traffic. Every number
+> still written as `TBD — not yet measured` **is exactly that**; see the honesty gates in
 > [`CHECKPOINTS.md`](CHECKPOINTS.md). Start at [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
 
 ---
 
 ## The finding
 
-> **Keep each user on one GPU — until your tenants' system prompts outgrow one GPU's KV cache. Then
-> route by prefix, and keep its load weight small.**
+> **Keep each user on one GPU.** On a T4 timing model checked against the live engine, session-sticky
+> routing needs the fewest GPUs — or ties for them — at 22 of 24 points, from one shared system prompt
+> to 64 tenants' prompts. Routing by prefix raises the hit rate once prompts outgrow the cache, but on
+> this model it did not save a GPU with the registered load weight.
 
-Measured on simulated agentic traffic, with the cache model and the T4 timings calibrated against a live
-vLLM (the credential, below), a 2-second p95 TTFT target, and the test registered before it ran (H2b in
-[`docs/09-hypotheses.md`](docs/09-hypotheses.md)).
+Measured on simulated agentic traffic, with the cache model calibrated against a live vLLM (the
+credential, below), the context-aware T4 timing model of C2, a 2-second p95 TTFT target, and the test
+registered before it ran ([`docs/09-hypotheses.md`](docs/09-hypotheses.md), 2026-09-30).
 
 | Distinct system prompts (85 blocks each) | Working set ÷ one T4's cache | Fewest T4s that hold the target at 2 sessions/s |
 |---|---:|---|
-| 1 | 0.06 | session-sticky **2** · balanced prefix-affinity 3 · round-robin 3 |
-| 64 | 2.66 | balanced prefix-affinity **5** (**4** with a load weight of 1 or none — found after the test) · session-sticky, round-robin, least-loaded: **not held on 8** |
+| 1 | 0.06 | session-sticky **5** · round-robin 7 · balanced prefix-affinity 10 |
+| 64 | 2.66 | session-sticky **10** · balanced prefix-affinity 11 · round-robin 16 · least-loaded: not held on 16 *(prefix-affinity with a load weight of 1: **8** — found after the test)* |
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/figures/flip-dark.svg">
-  <img src="docs/figures/flip-light.svg" width="100%" alt="Left: T4s needed at 2 sessions/s as distinct system prompts grow from 1 to 64. Session-sticky needs 2 with one prompt but cannot hold the target on 8 with 64; prefix-affinity with load weight 1 needs 4 there. Right: hit rate on 4 T4s. Round-robin falls from 0.84 to 0.53, session-sticky to 0.82, prefix-affinity with load weight 1 stays at 0.87 or above.">
+  <img src="docs/figures/flip-light.svg" width="100%" alt="Left: T4s needed at 2 sessions/s as distinct system prompts grow from 1 to 64, on the context-aware timing model. Session-sticky needs 5 with one prompt and 10 with 64; balanced prefix-affinity needs 10 and 11; round-robin 7 and 16. Right: hit rate on 8 T4s. Round-robin falls from 0.81 to 0.47, session-sticky from 0.92 to 0.80, prefix-affinity with load weight 1 stays near 0.87.">
 </picture>
 
 *Drawn by [`scripts/make_figures.py`](scripts/make_figures.py) from
-[`demo_grid.json`](artifacts/results/demo_grid.json), which reproduces Phase 5's table; 3 seeds per point,
-a point counts only if every seed holds the target. Replica counts are simulator figures for a T4 —
-and, the live check below shows, optimistic ones.*
+[`demo_grid_ctx.json`](artifacts/results/demo_grid_ctx.json), which reproduces the registered re-test's
+table exactly; 3 seeds per point, a point counts only if every seed holds the target. T4 figures.*
 
-- **One shared prompt:** session-sticky needed the fewest GPUs at every load — 25–43% fewer than
-  round-robin — and *pure* prefix-affinity collapsed: it sends every session to the one replica holding
-  the prompt, and lost 60–260 s of p95 TTFT from 2 sessions/s (H2, falsified).
-- **Many prompts:** the order flips. Round-robin's hit rate fell from 0.84 to 0.53 and session-sticky's
-  from 0.92 to 0.82; prefix-affinity kept 0.87–0.92.
-- **The load weight matters, and it should shrink as prompts multiply** (reported, not tested): 8–16 was
-  best with one prompt. With 16 or 64 prompts, a weight of 1 and no weight at all needed the same number
-  of GPUs at every load, while the registered weight of 16 needed up to 4 more, or could not hold the
-  target on 8.
+- **One shared prompt:** session-sticky needs the fewest GPUs at every load, and its saving over
+  round-robin grows with load — equal at 1 session/s, then 5 against 7, 6 against 9, 7 against 12
+  (29–42% fewer at 2–4 sessions/s). *Pure* prefix-affinity still collapses under load: it sends every
+  session to the one replica holding the prompt (H2, falsified).
+- **Many prompts:** prefix routing still gets the better hit rate (0.87 with a small load weight, 0.80
+  for session-sticky, 0.47 for round-robin at 64 prompts), but it no longer turns that into fewer
+  GPUs. With context priced in, decode — which every policy pays in full, cached or not — is a large
+  share of the cost, and concentrating sessions onto the replicas that hold their prompt makes batches
+  uneven; session-sticky's balance is worth more than the extra hits.
+- **The two exceptions, found after the test:** with a load weight of 1, prefix routing saved 2 of 10
+  GPUs at 64 prompts and 2 sessions/s, and 1 of 4 at 16 prompts and 1 session/s. Not a finding until
+  a registered test says so.
 
-**The live check (Phase 6, registered; run twice on two T4s).** The finding's traffic at 1 session/s,
-one prompt (K1) and 64 (K64), three routers on two live vLLM replicas:
+**How this finding changed.** Until 2026-09-30 it read *"…until your tenants' system prompts outgrow
+one GPU's KV cache; then route by prefix"* — at 64 prompts, balanced prefix-affinity held the target
+on 5 T4s where session-sticky could not on 8. That was a correct result about the first, context-free
+timing model, and that model was wrong about the engine: on two live T4s (Phase 6) latency came out
+5–222× its prediction. C2 found the missing term and fitted a model that predicts held-out traffic —
+and, post hoc, Phase 6's two replicas within 1.02–1.79×. Re-tested on it, as registered, the "route
+by prefix" half was **falsified**. Both versions, and why, are in
+[`docs/09-hypotheses.md`](docs/09-hypotheses.md).
+
+**The live check (Phase 6, registered; run twice on two T4s).** The traffic at 1 session/s, one prompt
+(K1) and 64 (K64), three routers on two live vLLM replicas:
 
 | | K1: sticky · round-robin · affinity | K64: sticky · round-robin · affinity |
 |---|---|---|
 | **Hit rate**, predicted | 0.921 · 0.880 · 0.923 | 0.821 · 0.694 · **0.844** |
 | **Hit rate**, live (two runs) | 0.921 · 0.880 · 0.923 — to four decimals | 0.810–0.822 · 0.695 · **0.844–0.846** |
-| **p95 TTFT**, predicted | 0.35 s · 0.44 s · 0.48 s | 1.55 s · 5.8 s · 1.26 s |
+| **p95 TTFT**, first timing model | 0.35 s · 0.44 s · 0.48 s | 1.55 s · 5.8 s · 1.26 s |
+| **p95 TTFT**, context-aware model (post hoc) | 2.0 s · 20.4 s · 128 s | 62 s · 110 s · 39 s |
 | **p95 TTFT**, live (two runs) | **1.8–1.9 s** · 11–15 s · ~106 s | 57–72 s · ~110 s · **32–39 s** |
 
-The **mechanism held live**: every hit rate within 1.4% of its prediction, and prefix-affinity above
-session-sticky at 64 prompts (the registered test). The latency *order* matched the prediction too —
-sticky best at K1, affinity best at K64 — though that was observed, not registered. But the engines
-were **overloaded** where the simulator saw headroom: decode steps took 2.7–4.0× what the fitted
-profile says, which at this load became waits 5–222× longer. So the replica counts above are
-simulator figures and likely optimistic for long agentic prompts on a T4; the cause (context length
-or CPU contention) is not yet tested. [Report](artifacts/results/phase6_kaggle_t4/report.md).
+Every hit rate matched within 1.4%, in the predicted order. The first timing model missed latency by
+5–222×; the context-aware one, which never saw these numbers, lands within 1.02–1.79×
+([Phase 6](artifacts/results/phase6_kaggle_t4/report.md) ·
+[post-hoc replay](artifacts/results/c2_kaggle_t4/posthoc_phase6.md)).
 
-**See it flip yourself:** the demo page ([`site/`](site/index.html)) looks up every point of this grid —
-prompts × load × replicas × six policies, 3,456 simulator runs, rebuilt by
-[`scripts/build_grid.py`](scripts/build_grid.py) only if it reproduces the experiment's table exactly. To
-open it from a clone: `python -m http.server` in the repo root, then `http://localhost:8000/site/`.
+**See it yourself:** the demo page ([`site/`](site/index.html)) looks up every point of the re-test's
+grid — prompts × load (0.25–4 sessions/s) × replicas (1–16) × six policies, 6,912 simulator runs,
+rebuilt by [`scripts/build_grid.py`](scripts/build_grid.py) only if it reproduces the registered table
+exactly. To open it from a clone: `python -m http.server` in the repo root, then
+`http://localhost:8000/site/`.
 
-**On real traffic, the many-prompt advantage is not yet shown — but the mechanism is.** Two real
-trace families, each test registered before it ran:
+**On real traffic** — two trace families, each test registered before it ran, both on the **first**
+timing model (not yet re-run on the context-aware one):
 
 | Real trace | What is shared | Session-sticky vs prefix-affinity | Pure prefix-affinity | Round-robin |
 |---|---|---|---|---|
 | **Mooncake** FAST'25 (R1, scale 1/32, sessions inferred) | prompts across users | within one replica (predicted a win on tool-agent: **falsified**) | fails at every speed | 8 T4s vs 6 at 4× tool-agent |
 | **AgentX**, coding-agent sessions (R2, scale 1/64, real sessions) | nothing across users | **identical**: 2 T4s at every speed (**as predicted**) | 2 T4s at every speed — **no collapse** | 5 T4s vs 2 at 2×; hit rate 0.59 vs 0.93 |
 
-So pure prefix-affinity collapses because of prompts shared across users, not because it routes by
+Pure prefix-affinity collapses because of prompts shared across users, not because it routes by
 prefix; and on agent traffic like AgentX the rule is simply *keep each session on one replica, by any
-policy that does*. Why affinity did not beat session-sticky on Mooncake is not yet tested — most
-likely its shared blocks are spread over an hour rather than hot at once.
+policy that does* — the same advice as the finding above.
 
-⚠️ **Scope:** generated traffic, one model (Qwen3-4B). The replica counts are T4 figures. The full
-ranking of the seven policies does **not** transfer to other hardware (H6's ranking half,
-falsified) — but the **direction of this flip** did: under a 2× or 4× faster GPU and a 2× cheaper
-or dearer prefill it shifted and never inverted (H6's crossover half, holds). `azrabano23/disagg-sim` published that locality can lose to load balancing, and llm-d
-weighs prefix and load scores by hand-set weights; this is the measured condition that decided between
-them, on this setup.
+⚠️ **Scope:** generated traffic, one GPU type (T4), one model (Qwen3-4B). The replica counts are T4
+figures on the context-aware model. H6 (the policy ranking under faster and slower GPUs) was tested
+on the first, context-free model and is not yet re-run. `azrabano23/disagg-sim` published that
+locality can lose to load balancing, and llm-d weighs prefix and load scores by hand-set weights; on
+this setup, with timing checked against the engine, balance won.
 
 ## The credential — the Real-Engine Calibration Report
 
@@ -110,7 +120,7 @@ A README needs both, and needs them apart.
 | **Hit-rate error vs live engine** | ⭐ **Zero** on 2 sequential shapes × 3 runs — every counter, and every one of 120 requests' cached tokens, to the token. **+0.3%** (relative) on the concurrent shape, predicted by a timing profile fitted without it. Plain LRU on the same runs **over-predicts** by **11.9 points** (W1) and **19.7%** (W3) |
 | **The residual, explained** | Sequential: none to explain. The engine's `kv_block_*` histograms: counts exact (963 and 1,880 events); distributions identical bucket for bucket on W2; W1's small residual (max CDF distance 0.042) traced — post-hoc, labelled so — to the **timing** fit, not the cache model |
 | **2-replica validation** | Round-robin across **two physical T4s**: 1,088 prefill tokens computed, **1,088 predicted** (Phase 0 v2). **Under pressure (Phase 6, run twice): all 12 runs' hit rates within 1.4%** (K1 to four decimals), 1,537 blocks per replica, three routers, preemptions included |
-| **Timing under load** | ⚠️ **Not validated — optimistic.** On Phase 6's ~1,700-token prompts the engines' decode steps took 2.7–4.0× the fitted profile and p95 TTFT came out 5–222× the prediction ([report](artifacts/results/phase6_kaggle_t4/report.md)). On Phase 3's shorter, cache-bound W3 it was within 6.7% |
+| **Timing under load** | The first, context-free profile was **optimistic**: on Phase 6's ~1,700-token prompts, p95 TTFT came out 5–222× its prediction. ✅ **Fixed by C2 (2026-09-30, registered):** decode cost grows with context (1.92× from 128 to 1,536 tokens) and CPU contention was ruled out (1.00×); the context-aware profile `t4-qwen3-4b-vllm0.30.0-ctx`, fitted on micro-benchmarks, predicted held-out traffic within **1.10–1.41×** — and, post hoc, Phase 6's two live replicas within 1.02–1.79× ([report](artifacts/results/c2_kaggle_t4/report.md)) |
 
 **`/metrics` fields consumed, by name:** `vllm:prefix_cache_queries` · `vllm:prefix_cache_hits` ·
 `vllm:prompt_tokens_by_source{source="local_compute"|"local_cache_hit"}` · `vllm:num_preemptions` ·
@@ -185,12 +195,14 @@ kvsim replay trace.jsonl --policies all --replicas 1-8 --format md
 Runs on your laptop. **Your trace never leaves your machine**, and prompts are hashed at the adapter
 boundary, so prompt text never enters the simulator at all.
 
-To use measured timings instead of the built-in guess, pass a profile. The one measured so far is
-ours — Tesla T4, Qwen3-4B, vLLM 0.30.0 — and it ships with the package, as does the cited cost model:
+To use measured timings instead of the built-in guess, pass a profile. Ours — Tesla T4, Qwen3-4B,
+vLLM 0.30.0 — ships with the package, as does the cited cost model. Use the context-aware one: it is
+the one checked against live latency (C2); `t4-qwen3-4b-vllm0.30.0`, the first, context-free profile,
+is kept for the record and is optimistic on long prompts.
 
 ```bash
-kvsim replay trace.jsonl --policies all --replicas 1-8 \
-  --profile t4-qwen3-4b-vllm0.30.0 --cost-model default
+kvsim replay trace.jsonl --policies all --replicas 1-16 \
+  --profile t4-qwen3-4b-vllm0.30.0-ctx --cost-model default
 ```
 
 (`--profile` also takes a path to any profile file, and `--cost-model` a path to your own YAML — the
@@ -222,8 +234,8 @@ so the honest answer comes in three tiers, and they must not be blended (ADR-010
 | | What you get | What it costs you |
 |---|---|---|
 | **Policy ranking** | *Which* policy wins on your workload shape, and roughly by how much | ⛔ **Not free.** **H6 was tested and FALSIFIED (2026-09-28):** under a 2× faster GPU, or prefill 2× cheaper or dearer, the full order of the seven policies changed (Kendall's τ-b as low as 0.51). What held — noticed after the run, not registered: session-sticky needed the fewest replicas at all 48 points. So read a ranking as a result for *our* T4 unless you calibrate |
-| **The crossover boundary** | Whether prefix-affinity is worth implementing for *your* prompts and load | ✅ **Its direction transfers:** H6's crossover half held (2026-09-28) — the flip from session-sticky to prefix-affinity as prompts outgrow one GPU's cache survived all four hardware rescalings. *Where* it happens, in replicas, is still a T4 figure |
-| **Absolute ms and ₹** | p95 TTFT and ₹/1k requests for your fleet | **`kvsim calibrate` on your own hardware**, a few minutes. ⛔ Our error bar was measured on our GPU and our model. It does **not** transfer, and this README will never imply that it does. ⚠️ And even on our own T4, the timing model was optimistic under Phase 6's load (latency 5–222× the prediction): read ms, ₹ and replica counts as optimistic until a context-aware timing model is tested |
+| **Whether prefix routing pays** | Whether prefix-affinity is worth implementing for *your* prompts and load | ⚠️ **On our T4, with timing checked against the engine: mostly not** — session-sticky needs the fewest replicas or ties at 22 of 24 points (2026-09-30). On the first, context-free timing model it paid once prompts outgrew one GPU's cache, and that flip survived four hardware rescalings (H6's crossover half) — but the model itself was wrong about the engine. So the answer depends on the timing model: measure yours |
+| **Absolute ms and ₹** | p95 TTFT and ₹/1k requests for your fleet | **`kvsim calibrate` on your own hardware**, a few minutes. ⛔ Our error bar was measured on our GPU and our model. It does **not** transfer, and this README will never imply that it does. On our own T4 the first, context-free timing model was 5–222× optimistic under load; the context-aware one (C2) predicts held-out traffic within 1.41× |
 
 > **So: why trust our numbers on your hardware?** You shouldn't. Run `kvsim calibrate` and use your own.
 > That is the same posture as the cost model, which ships every constant in a config with a source and a
@@ -235,8 +247,8 @@ The GPU appears **once**, on our calibration box, offline, before anything is pu
 deployed is pure CPU Python:
 
 - **PyPI** — on your machine. The real usage path.
-- **A static demo page** — a precomputed grid with sliders, so you can see the recommendation flip in
-  ten seconds with nothing installed. No server, so **nothing to wake up**, and every number on it comes
+- **A static demo page** — a precomputed grid with selectors, so you can see the recommendation change
+  with the prompts and the load in ten seconds, with nothing installed. No server, so **nothing to wake up**, and every number on it comes
   from a committed script with a pinned seed. It is a **shop window, not a service**. ⛔ It deliberately
   does not accept uploaded production traces: those are your users' prompts, and they belong on your
   machine.
@@ -307,7 +319,7 @@ delete it and get it back, it doesn't ship.**
 | [`docs/02-architecture-decisions.md`](docs/02-architecture-decisions.md) | ADR-001…012: why this shape, this fidelity, this hardware |
 | [`docs/04-prior-art.md`](docs/04-prior-art.md) | What exists, what to cite, **and the sentences that must never be written** |
 | [`docs/06-methodology.md`](docs/06-methodology.md) | The statistics protocol and the cost model |
-| [`docs/09-hypotheses.md`](docs/09-hypotheses.md) | **H1–H6, pre-registered before any code existed** — with dated results |
+| [`docs/09-hypotheses.md`](docs/09-hypotheses.md) | **Every hypothesis, pre-registered** — H1–H6, H2b, R1–R2, C1–C2, Phase 6 and the re-test — with dated results, falsified ones included |
 | [`docs/11-where-we-are.md`](docs/11-where-we-are.md) | The whole story so far, in plain words |
 | [`CHECKPOINTS.md`](CHECKPOINTS.md) | Where the build actually is |
 
