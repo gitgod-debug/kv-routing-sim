@@ -1039,3 +1039,39 @@ K = 1.
 whatever it cached — now dominates the cost, the policies' differences may shrink into ties
 everywhere, and (b) can fail for lack of any win. That would say the finding's replica savings were
 an artefact of the context-free model.
+
+### 2026-09-30 — ⛔ H2b under C2's timing RAN: FALSIFIED. On the validated timing model, prefix routing no longer saves GPUs at 64 prompts.
+Report: [`artifacts/results/h2b_c2/report.md`](../artifacts/results/h2b_c2/report.md) — 6,912 runs in
+319 s at `c0c8b18`. The tree was dirty only by the four registered notebooks deleted from disk and
+an untracked zip, both under `notebooks/` (listed in the results header); every line of code the run
+used is committed.
+
+**As registered: FALSIFIED — predicted to hold.** (a) holds: at K = 1 balanced affinity (α\* = 16)
+never needs fewer replicas than session-sticky. (c) holds: no reversal along K. **(b) fails**: at
+K = 64 balanced affinity wins at no load — it ties at 0.25, 0.5 and 1 session/s (2, 3, 5 replicas),
+loses at 2 (11 against sticky's 10), and at 3 and 4 nothing holds the SLO on 16. So the second half of
+the headline — "then route by prefix" — does not survive a timing model that matches the engine.
+It rested on the context-free profile, which C2 and Phase 6 showed is optimistic by several times.
+
+**Reported, not tested — found after the run, and labelled so.**
+- **Session-sticky needs the fewest replicas, or ties for them, at 22 of the 24 (K, load) points.**
+  The two exceptions are prefix routing with a small load weight or none: 3 against 4 replicas at
+  K = 16 and 1 session/s (α = 1 and pure affinity), and **8 against 10 at K = 64 and 2 sessions/s**
+  (α = 1). Both are post hoc (α = 1 was Phase 5's post-hoc weight), so neither is a finding.
+- **The mechanism is still there, and no longer enough.** At K = 64 prefix routing keeps the better
+  hit rate (0.87 with α = 1, 0.83 with α = 16, against sticky's 0.80 and round-robin's 0.47 on 8
+  replicas at 2 sessions/s). But with context priced in, decode — which every policy pays in full,
+  cached or not — is a large share of the cost, and concentrating sessions onto the replicas that
+  hold their prompt makes batches uneven. The balance session-sticky keeps is worth more than the
+  extra hits.
+- **The replica counts roughly double.** At K = 1 and 2 sessions/s: session-sticky 5 T4s (2 on the
+  context-free model), round-robin 7 (3), balanced affinity 10 (3). Session-sticky's saving over
+  round-robin grows with load: equal at 1 session/s, then 5 against 7, 6 against 9, 7 against 12.
+
+**What it changes.** The README's headline loses its second half. What the evidence now supports:
+keep each user on one GPU — on the validated T4 model it is the best or tied-best policy almost
+everywhere in this grid, including when tenants' prompts outgrow one cache; routing by prefix raises
+the hit rate there but does not, with the registered weight, save a GPU. The earlier finding stays
+in this log as written: it was a correct result about the context-free model, and that model was
+wrong about the engine. Which of H1–H6, R1 and R2 change on the validated model is not yet tested —
+they all ran on the context-free profile.
