@@ -9,18 +9,20 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-09-28 (the finding, H6, R1 on Mooncake and R2 on AgentX, **Phase 6 and C1 run
-on Kaggle — both hold**, the demo page and the 10×/100× numbers, the preprint draft, `kvsim calibrate`,
-a wheel that works outside a clone; 179 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
+**Last updated:** 2026-09-30 (**C2 ran — all three predictions true; the finding re-tested on the
+validated timing model and its "route by prefix" half FALSIFIED**; before that: H6, R1 and R2, Phase 6
+and C1, the demo, the preprint draft, `kvsim calibrate`, a wheel that works outside a clone. Tests
+green except the three that read the four registered notebooks now deleted from disk. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
 vLLM under eviction pressure to the token, against predictions committed before the run)
-**Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding** — *keep each user on one GPU until
-your tenants' prompts outgrow one GPU's cache; then route by prefix, and keep its load weight small* (H2b
-holds; H2 falsified) · 🔨 **4** — H6's ranking half ⛔ and crossover half ✅; real traffic: R1
-(Mooncake) ⛔, R2 (AgentX) ✅ · ✅ **6** — hit rates on two live T4s within 1.4%, policy order held
-(run twice); ⚠️ latency 5–222× the prediction — the timing model is the weak part · 🔨 **7** — demo
-page, grid, figure and 10×/100× done; `kvsim calibrate` proven on a real T4 (C1); PyPI left · 🔨 **8** —
-the preprint is drafted. ▶ **Next:** run C2 on Kaggle (`notebooks/c2_timing_t4.ipynb`, ~1 h) —
-the context-aware timing model, registered, with a held-out test.
+**Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding — changed 2026-09-30:** *keep each
+user on one GPU*; on the validated timing model session-sticky needs the fewest T4s or ties at 22 of 24
+points, and the old second half (*then route by prefix*) was falsified on re-test · 🔨 **4** — H6 and
+R1/R2 ran on the first, context-free timing model (not yet re-run) · ✅ **6** — hit rates on two live
+T4s within 1.4% (run twice); latency explained by C2 · ✅ **C2** — context, not CPU; the context-aware
+model predicts held-out traffic within 1.41× · 🔨 **7** — demo on the validated grid, 10×/100× done,
+`kvsim calibrate` proven on a real T4 (C1); PyPI left · 🔨 **8** — the preprint rewritten around the
+reversal. ▶ **Next:** `kvsim calibrate` fits the context terms; re-run H6 and R1/R2 on the validated
+model; restore the four deleted notebooks (`git checkout -- notebooks/`).
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -88,7 +90,7 @@ the context-aware timing model, registered, with a held-out test.
 | **2b** | **Cache model = vLLM's block pool** 🆕 | `[x]` | Every eviction behaviour cites a line of vLLM's source; naive LRU kept as the ablation; both still reproduce v1/v2 exactly |
 | 3 | **Real-Engine Calibration Report** | `[x]` ✅ exact on W1 + W2, +0.3% on W3 | Predicted-vs-measured on **≥2 shapes**, ≥3 live runs each, error bars, **residual explained with the `kv_block_*` histograms** — tests **H3 + H4** |
 | 4 | **Seven** policies + Pareto sweep | `[~]` H1 ⛔ · H5 1 of 4 · H6 ranking ⛔, crossover ✅ · α swept · R1 (Mooncake) ⛔ · R2 (AgentX) ✅ · property + golden tests ✅ — per-cell CIs left | Tests **H1 + H5 + H6** |
-| 5 | **The crossover finding** | `[x]` H2 ⛔ · **H2b ✅** — the README headline, with its figure | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
+| 5 | **The crossover finding** | `[x]` H2 ⛔ · H2b ✅ on the first timing model, ⛔ on the validated one (2026-09-30) — the headline changed | The sharing-ratio × load boundary published as a curve with CIs — tests **H2**. ⛔ never cut |
 | 6 | Sim-to-real 2-replica validation | `[x]` ✅ HOLDS, run twice (2026-09-28): hit rates within 1.4%, S2 in order · ⚠️ timing 5–222× optimistic | Predicted vs measured across two MIG instances, or the documented fallback and why |
 | 7 | Package · CLI · static demo · hardening | `[~]` demo page + grid + 10×/100× ✅ · `kvsim calibrate` ✅ on a real T4 (C1) · PyPI left | `pip install` + `kvsim replay` + a **static** demo page (ADR-011) + "what breaks at 10×/100×" answered with measured numbers |
 | 8 | Write-up & launch | `[ ]` | README numbers-first, Show HN, **the `guidellm` PR open** |
@@ -522,7 +524,9 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       tenants' prompts outgrow one GPU's cache; then route by prefix, and keep its load weight small.*
       (Reworded 2026-09-28 from "with a small load weight": see docs/09's amendment.) ✅ The
       flip's direction survived all four hardware rescales — **H6's crossover half HOLDS**
-      ([`report.md`](artifacts/results/h6_crossover/report.md)); replica counts stay T4 figures
+      ([`report.md`](artifacts/results/h6_crossover/report.md)); replica counts stay T4 figures.
+      ⛔ **2026-09-30: on the validated, context-aware timing model the re-test FALSIFIED this**
+      (below, Phase 6) — the headline is now *keep each user on one GPU*
 
 ---
 
@@ -554,7 +558,7 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 - [x] Predicted vs measured hit rate across the pair — ✅ all 12 runs within 1.4%; S2 in order *(v2's
       round-robin arm was the first data point — predicted 1,088 tokens computed, hit rate 0.966862,
       committed before it ran)*
-- [~] ⭐ **A context-aware timing model**, fitted on data Phase 6 did not produce and registered before
+- [x] ⭐ **A context-aware timing model**, fitted on data Phase 6 did not produce and registered before
       it is checked: a single-engine decode sweep across context lengths (~100 to ~2,000 tokens) ×
       batch sizes, which also tells context cost from CPU contention. Phase 6's measured latencies
       are then the held-out test — seen already, so labelled post hoc — and a fresh two-replica run
@@ -563,7 +567,21 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       model has two context terms (zero by default — every earlier result unchanged); parts A–C
       measure decode, prefill and contention, part D is held-out traffic the fit never sees. C2a
       (context real) / C2b (contention real) / C2c (D within 2×) — predicted holds / fails / holds.
-      Dry-run against mocks with known terms: recovered, C2c within 1.05×. **Run it on Kaggle**
+      Dry-run against mocks with known terms: recovered, C2c within 1.05×.
+      ✅ **C2 RAN 2026-09-30 — all three predictions came true** ([`report.md`](artifacts/results/c2_kaggle_t4/report.md)):
+      C2a holds (context 1.92×), C2b fails (contention 1.00× — context, not CPU), C2c holds
+      (held-out traffic within 1.10–1.41×; the old profile was up to 7.1× optimistic). Shipped as
+      the profile `t4-qwen3-4b-vllm0.30.0-ctx`. Post hoc, labelled so: replayed at Phase 6's
+      measured placement it lands within 1.02–1.79× of all six live two-replica runs
+- [x] ⭐ **Re-test the finding on the new timing model** — H2b's rules unchanged, on
+      `t4-qwen3-4b-vllm0.30.0-ctx`, loads 0.25–4/s, replicas 1–16. Registered 2026-09-30
+      ([`configs/h2b_c2.yaml`](configs/h2b_c2.yaml)); predicted: holds. ⛔ **FALSIFIED**
+      ([`report.md`](artifacts/results/h2b_c2/report.md)): at 64 prompts balanced affinity ties
+      sticky at 0.25–1/s and loses at 2 (11 against 10). Post hoc: sticky best or tied at 22 of 24
+      points; the exceptions are prefix routing with a small weight (8 against 10 at K=64, 2/s)
+- [ ] Re-run H6 and R1/R2 on the validated model — they ran on the context-free profile
+- [ ] **Restore the four registered notebooks** deleted from disk on 2026-09-30 (Phase 0, 3, 6,
+      C1): `git checkout -- notebooks/`. Safe in git; their tests fail until then
 - [x] ⛔ **TTFT percentiles only from separate GPUs** — the notebook runs one server per physical GPU.
       They are **T4** percentiles, and reported, not tested
 - [-] **Fallback, decided in advance** — not needed: two replicas ran. (It was: if 2 replicas prove

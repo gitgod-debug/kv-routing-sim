@@ -72,28 +72,28 @@
   <p class="sub">Which KV-cache routing policy should you run — and on how many GPUs? A simulator whose
     cache model was checked against a live vLLM, and whose tests were written down before they ran.</p>
 
-  <div class="finding"><strong>Keep each user on one GPU — until your tenants' system prompts outgrow one
-    GPU's KV cache. Then route by prefix, and keep its load weight small.</strong></div>
+  <div class="finding"><strong>Keep each user on one GPU.</strong> On a T4 timing model checked against the
+    live engine, session-sticky routing needs the fewest GPUs — or ties for them — at 22 of 24 points,
+    from one shared system prompt to 64 tenants' prompts. Routing by prefix raises the hit rate, but did
+    not save a GPU with the registered load weight.</div>
 
   <div class="scroll">
     <table aria-label="The finding in numbers">
       <thead><tr><th>Distinct system prompts</th><th class="num">Working set ÷ one T4's cache</th>
         <th>Fewest T4s that hold a 2 s p95 time-to-first-token at 2 sessions/s</th></tr></thead>
       <tbody>
-        <tr><td>1</td><td class="num">0.06</td><td>session-sticky <strong>2</strong> · balanced prefix-affinity 3 · round-robin 3</td></tr>
-        <tr><td>64</td><td class="num">2.66</td><td>balanced prefix-affinity <strong>5</strong> (4 with a load weight of 1 or none — found after the test) · session-sticky, round-robin, least-loaded: not held on 8</td></tr>
+        <tr><td>1</td><td class="num">0.06</td><td>session-sticky <strong>5</strong> · round-robin 7 · balanced prefix-affinity 10</td></tr>
+        <tr><td>64</td><td class="num">2.66</td><td>session-sticky <strong>10</strong> · balanced prefix-affinity 11 · round-robin 16 (prefix-affinity with a load weight of 1: 8 — found after the test)</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="note"><strong>Scope, before you trust it.</strong> Generated agentic traffic, Qwen3-4B, T4 timings.
-    The direction of this flip survived a 2× and 4× faster GPU and a 2× cheaper or dearer prefill; the
-    replica counts did not. On real traces — Mooncake, whose prompts are shared across users, and
-    AgentX's coding-agent sessions, where nothing is — session-sticky and prefix-affinity came out
-    within one replica of each other: the many-prompt advantage is not yet shown on real traffic.
-    Prefix-affinity without a load weight failed only where prompts were shared. On <strong>two live
-    T4s</strong> the hit rates matched the simulator within 1.4% and the policies kept their order,
-    but latency was 5–222× worse than predicted: <strong>the T4 counts below are simulator figures,
-    and optimistic.</strong></p>
+  <p class="note"><strong>Scope, before you trust it.</strong> Generated agentic traffic, Qwen3-4B, T4
+    timings from a context-aware model that predicted held-out traffic within 1.41× and, after the fact,
+    two live T4s within 1.02–1.79× (C2). <strong>This finding changed on 2026-09-30:</strong> on the
+    first, context-free timing model — 5–222× optimistic on live GPUs — prefix routing won once
+    prompts outgrew one GPU's cache; re-tested on the validated model, that half was falsified. On real
+    traces (run on the first model) session-sticky and prefix-affinity came out within one replica of
+    each other.</p>
 
   <h2>The credential — checked against a live vLLM</h2>
   <p>vLLM 0.30.0, Qwen3-4B (fp16), a deliberately small 512-block cache that overflows, three runs of each
@@ -110,6 +110,9 @@
   </div>
   <p class="muted">Hit rate = <code>vllm:prefix_cache_hits ÷ vllm:prefix_cache_queries</code>, two counters.
     Every request's cached-token count matched too.</p>
+  <p>And the timing: a context-aware T4 model, fitted on micro-benchmarks, predicted held-out traffic
+    within 1.41× — where the first, context-free model was up to 7× optimistic (C2, registered). Every
+    number on this page uses it.</p>
 
   <h2>Try it — every answer below is precomputed, nothing runs</h2>
   <div class="controls">
@@ -129,8 +132,8 @@
 
   <h2>Run it on your own traffic</h2>
   <pre><code>pip install kv-routing-sim
-kvsim replay your-trace.jsonl --policies all --replicas 1-8 \
-  --profile t4-qwen3-4b-vllm0.30.0 --cost-model default</code></pre>
+kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
+  --profile t4-qwen3-4b-vllm0.30.0-ctx --cost-model default</code></pre>
   <p class="muted">No upload box on purpose: a serving log holds your users' prompts. It stays on your
     machine, and prompts are hashed before they enter the simulator.</p>
 
@@ -140,7 +143,7 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-8 \
 (function () {
   "use strict";
   const $ = (id) => document.getElementById(id);
-  const state = { k: 0, load: 1, rep: 3 };  // indices into the axes: K = 1, 2 sessions/s, 4 T4s
+  const state = { k: 0, load: 0, rep: 0 };  // indices into the axes; set from the grid on load
   let G = null;
 
   // Readable names for the grid's policy labels ("radix-affinity-balanced@16" -> a load weight).
@@ -253,19 +256,30 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-8 \
   }
   // Published: the grid sits next to the page. Previewed from a clone (`python -m http.server` in
   // the repo root, then open /site/): it is read from where build_grid.py wrote it.
+  // Which uncommitted paths the build saw (its results header lists them): code, or only notebooks/.
+  function dirtyNote(g) {
+    if (!g.git_dirty) return "";
+    const paths = (g.git_dirty_paths || []).map((x) => x.slice(3));
+    return paths.length && paths.every((x) => x.startsWith("notebooks/"))
+      ? " (uncommitted changes under notebooks/ only, no code)" : " (with uncommitted code changes)";
+  }
   function load(urls) {
     return fetch(urls[0]).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
       .catch((e) => (urls.length > 1 ? load(urls.slice(1)) : Promise.reject(e)));
   }
-  load(["demo_grid.json", "../artifacts/results/demo_grid.json"]).then((g) => {
+  load(["demo_grid_ctx.json", "../artifacts/results/demo_grid_ctx.json"]).then((g) => {
     G = g;
+    // Open on the README table's column: 2 sessions/s, and 8 T4s if the grid has them.
+    const two = g.axes.loads.indexOf(2), eight = g.axes.replicas.indexOf(8);
+    state.load = two >= 0 ? two : Math.floor(g.axes.loads.length / 2);
+    state.rep = eight >= 0 ? eight : Math.floor(g.axes.replicas.length / 2);
     $("foot").textContent = `Grid: ${g.n_simulator_runs.toLocaleString()} simulator runs ` +
       `(${g.seeds.length} seeds each point), built ${g.date_utc.slice(0, 10)} (UTC) at commit ${g.git_sha} by ` +
-      `scripts/build_grid.py${g.git_dirty ? " (with uncommitted changes)" : ""}, and checked to reproduce ` +
-      `the Phase 5 experiment's table exactly.`;
+      `scripts/build_grid.py${dirtyNote(g)}, and checked to reproduce ` +
+      `${g.source === "h2b_c2" ? "the registered re-test's table (H2b on C2's timing)" : "the Phase 5 experiment's table"} exactly.`;
     render();
     window.addEventListener("resize", () => chart(state.load));
-  }).catch(() => { $("answer").textContent = "Could not load demo_grid.json."; });
+  }).catch(() => { $("answer").textContent = "Could not load demo_grid_ctx.json."; });
 })();
 </script>
 </body>

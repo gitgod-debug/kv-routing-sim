@@ -64,6 +64,12 @@ vLLM.
 cited prices, and the first full calibrated sweep was designed, registered and run. Its headline:
 the simple "keep each user on one GPU" policy beat the clever cache-seeking ones (§6).
 
+**30 Sep — the timing model fixed, and the finding changed.** C2 ran on Kaggle: all three
+predictions came true — context length slows decode and prefill, CPU contention does not, and a new
+context-aware model predicts traffic it never saw within 1.4×. Re-running the finding's test on that
+model (registered first), the "then route by prefix" half failed. The headline is now *keep each user
+on one GPU* (findings 18 and 19 below).
+
 **28 Sep — the finding, and the tests around it** (§6b).
 - **H6:** we re-ran the whole Phase 4 sweep as if on four other GPUs (2× and 4× faster; prefill 2×
   cheaper or dearer). The *order* of the policies moved more than we had allowed: **the ranking half
@@ -112,11 +118,11 @@ the simple "keep each user on one GPU" policy beat the clever cache-seeking ones
    change one-at-a-time results, and flagged it for concurrent ones.
 8. **Cache-seeking routing backfires under load, and the simple policy wins** — see §6. The early
    hint from the uncalibrated simulator survived calibration.
-9. ⭐ **The finding: keep each user on one GPU — until your tenants' system prompts outgrow one GPU's
-   cache; then route by prefix, and keep its load weight small.** With one prompt, session-sticky needs
-   2 T4s where round-robin needs 3. With 64 prompts, prefix routing needs 4–5, and session-sticky
-   cannot hold the target with 8. *Why it matters:* the choice follows from one number an operator can
-   compute — the size of their prompts compared with one GPU's cache.
+9. **The first finding (28 Sep) — later overturned, see 18:** *keep each user on one GPU until your
+   tenants' system prompts outgrow one GPU's cache; then route by prefix, and keep its load weight
+   small.* With one prompt, session-sticky needed 2 T4s where round-robin needed 3; with 64 prompts,
+   prefix routing needed 4–5 and session-sticky could not hold the target with 8 — on the first,
+   context-free timing model.
 10. **"Send it to the GPU that has the prompt" fails whenever one prompt is popular:** it piles every
     user onto one GPU (H2, falsified). A load weight fixes that, but the right weight shrinks as prompts
     multiply: 8–16 with one prompt, 1 or none with 16 or more.
@@ -145,6 +151,20 @@ the simple "keep each user on one GPU" policy beat the clever cache-seeking ones
 17. **`kvsim calibrate` works on a real GPU** (C1): its cache check was exact on a T4 and it read the
     engine's capacity correctly. Its prefill measurements also show why a straight line is not
     enough: 0.71 ms per token up to 1,024 tokens, 1.12 ms at 2,040.
+18. ⭐ **The finding now: keep each user on one GPU.** C2 (30 Sep, registered) found why the timing
+    model was wrong: decode and prefill get slower as the context grows, and a busy second GPU did
+    *not* slow the first. A new model with a context term predicted traffic it had never seen within
+    1.4×, and — checked afterwards — Phase 6's two live GPUs within 1.8×. We then re-ran the finding's
+    test on it, as registered — and **its second half failed**: with 64 prompts, prefix routing no
+    longer needed fewer GPUs. Keep-on-one-GPU needs the fewest GPUs, or ties, at 22 of 24 points; at
+    2 sessions/s it needs 5 T4s with one prompt (round-robin 7) and 10 with 64 prompts (prefix
+    routing 11, round-robin 16). *Why it matters:* the cache model was exact from the start, and it
+    was not enough — the routing answer changed with the timing model. We predicted the old finding
+    would hold, and wrote down that it did not.
+19. **Prefix routing still gets the better hit rate with many prompts** (0.87 against 0.80), but it no
+    longer saves GPUs: every policy pays the full decode cost of the context, cached or not, and
+    crowding sessions onto the GPUs that hold their prompt makes the work uneven. With a small load
+    weight it saved 2 of 10 GPUs at one point — found after the test, so not a finding.
 
 ## 5. What we decided, and why
 
@@ -268,7 +288,7 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 | 2b | Cache model rebuilt to follow vLLM's real rules | ✅ done |
 | 3 | **The calibration** — model vs real engine, pre-registered | ✅ **done: exact** |
 | 4 | Calibrated sweep; H1, H5, H6; the load weight; real traces | ✅ mostly — H6's ranking half ⛔, its crossover half ✅; Mooncake (R1) ⛔; AgentX (R2) ✅ |
-| 5 | **The finding** — where prefix-aware routing starts paying off | ✅ **done** — H2 ⛔, **H2b ✅** |
+| 5 | **The finding** — when prefix-aware routing pays | ✅ **done, and changed** — H2 ⛔; H2b ✅ on the first timing model, ⛔ on the validated one: *keep each user on one GPU* |
 | 6 | Two-GPU real-engine check under pressure | ✅ **holds**, run twice — hit rates within 1.4%; ⚠️ latency 5–222× the prediction |
 | 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | 🔨 demo, figure, 10×/100× done; `kvsim calibrate` works on a real T4 (C1); PyPI left |
 | 8 | Write-up, launch, the upstream pull request | 🔨 the guidellm fix is ready; the preprint is drafted (`paper/`) |
@@ -276,9 +296,6 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 ## 9. What is left
 
 **Manual steps (they need an account):**
-- Run [`notebooks/c2_timing_t4.ipynb`](../notebooks/c2_timing_t4.ipynb) on Kaggle (GPU T4 ×2,
-  Internet on, Run All, about an hour) and bring back `c2_results.zip` — the test of the new,
-  context-aware timing model.
 - File the vLLM issue (the draft is the upstream log #1).
 - Open the guidellm issue, then the pull request (the patch is in `docs/upstream/`, the text in
   the upstream log #7–8).

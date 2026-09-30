@@ -39,21 +39,19 @@ replica, and what the choice costs in GPUs. We build a trace-driven multi-replic
 cache model follows vLLM~0.30.0's block pool, and check it against a live engine before using it:
 with predictions committed in advance, it reproduces every prefix-cache counter exactly on two
 sequential workloads under eviction pressure, and predicts the hit rate within 0.3\% on a concurrent
-one, where a plain LRU model is off by 19.7\%. On two live replicas under the traffic of our finding
-it predicts every hit rate within 1.4\% and the order of the policies; its timing model, however,
-under-predicts latency there by 5--222$\times$, so the replica counts below are simulator figures and
-optimistic. With timings fitted on a Tesla~T4 and each hypothesis registered before it ran, we find
-that one ratio decides the policy: the working set of the tenants' system prompts over one replica's
-cache. With one shared prompt (0.06 of a cache), session-sticky routing holds a 2\,s p95
-time-to-first-token on 2~simulated T4s where round-robin needs~3. With 64 prompts
-(2.66 caches), prefix-affinity with a load weight holds it on~5 (4 with a smaller weight, found
-after the test) and session-sticky cannot hold it on~8. Prefix-affinity without a load weight
-collapses whenever one prompt dominates. The direction of this flip survives four rescalings of the
-hardware's speed; the replica counts and the full policy ranking do not (Kendall's $\tau_b$ as low
-as 0.51). On real traces, session-sticky and prefix-affinity come within one replica of each other:
-on Mooncake, whose prompts are shared across users, and on AgentX's coding-agent sessions, where
-nothing is. Prefix-affinity without a load weight fails at every load on the first and matches
-session-sticky on the second, so its collapse comes from shared prompts.
+one and within 1.4\% on two live replicas. Its first timing model fared worse: on the live replicas,
+latency came out 5--222$\times$ its prediction. A registered test found why --- decode and prefill
+cost grow with context length, while CPU contention changed nothing --- and a context-aware model
+fitted on micro-benchmarks predicts held-out traffic within 1.41$\times$. The routing answer turned on
+which timing model was used. On the first, a registered test found that once the tenants' system
+prompts outgrow one replica's cache, prefix affinity with a load weight needs fewer GPUs (5~T4s where
+session affinity cannot hold a 2\,s p95 time-to-first-token on 8), and the result survived four
+rescalings of the hardware's speed. Re-tested on the validated model, it was falsified: session
+affinity needs the fewest GPUs, or ties for them, at 22 of 24 points, from one shared prompt to 64.
+Prefix affinity keeps its higher hit rate, but with decode paid in full whatever is cached, it no
+longer saves a GPU with the registered load weight. On real traces the two policies come within one
+replica of each other, and prefix affinity without a load weight fails only where prompts are shared
+across users.
 \end{abstract}
 
 \section{Introduction}
@@ -82,20 +80,23 @@ hypotheses committed to a public log before each experiment ran. Our contributio
 \item A trace-driven multi-replica simulator whose cache model follows vLLM~0.30.0's block pool. With
   predictions committed before the run, it reproduces a live engine's prefix-cache counters exactly
   on two sequential workloads under eviction pressure, and within 0.3\% on a concurrent one; on two
-  live replicas it predicts every hit rate within 1.4\%, though latency is far worse than its timing
-  model predicts (\S\ref{sec:calibration}).
-\item A finding from a registered test: the policy is decided by the ratio of the tenants' prompt
-  working set to one replica's cache. Below it, session affinity needs the fewest replicas; above it,
-  prefix affinity with a load weight does, and session affinity fails. Prefix affinity without a load
-  weight collapses whenever one prompt dominates (\S\ref{sec:finding}).
-\item Three tests that could have broken the finding. Rescaling the hardware's speed keeps its
-  direction but not its replica counts, so replica counts must be measured on the target GPU
-  (\S\ref{sec:hardware}). On two real trace families the many-prompt advantage does not appear and
-  the two good policies tie within a replica; but the traces bracket the mechanism, since pure
-  prefix affinity fails exactly where prompts are shared across users (\S\ref{sec:real}).
+  live replicas it predicts every hit rate within 1.4\% (\S\ref{sec:calibration}).
+\item A context-aware timing model. A registered test on a T4 shows that decode and prefill cost grow
+  with context length and that CPU contention does not matter; fitted on micro-benchmarks, the model
+  predicts held-out traffic within 1.41$\times$, where a context-free model was up to 7$\times$
+  optimistic (\S\ref{sec:calibration}).
+\item A routing finding, and its reversal. On the context-free model a registered test found that
+  prefix affinity pays once the tenants' prompts outgrow one replica's cache, and hardware
+  rescalings did not change that (\S\ref{sec:finding}, \S\ref{sec:hardware}). Re-tested on the
+  validated model, it was falsified: session affinity needs the fewest replicas, or ties, almost
+  everywhere (\S\ref{sec:retest}). A simulator's routing advice is only as good as its timing model,
+  and hit rates alone do not decide it.
+\item Two real trace families, which bracket the one mechanism that held throughout: prefix affinity
+  without a load weight fails exactly where prompts are shared across users (\S\ref{sec:real}).
 \end{itemize}
 Code, configurations, raw results with their provenance, and the dated log of every registration and
-outcome --- including four falsified hypotheses --- are public.
+outcome --- including five falsified hypotheses, one of them the re-test that overturned our
+own first finding --- are public.
 
 \section{Background and related work}
 
@@ -224,12 +225,29 @@ engines were overloaded. From vLLM's own statistics, decode steps took 2.7--4.0$
 fitted profile says at every batch size, which at two requests per second per engine is enough to
 start the spiral of queueing, a full cache, preemption and recomputation. The order of the policies
 by p95 TTFT still matched the prediction in both workloads and both runs --- an observation, not a
-test. Two causes are possible and neither is tested: the profile has no context-length term, and
-these prompts are about 1{,}700 tokens; or CPU contention between two engines and a client on four
-vCPUs. A packaged calibration command run on a fresh T4 engine is consistent with the first. It reproduced
-that engine's counters exactly on a separate check (48 of 48 requests), and its prefill measurements
-cost 0.71\,ms per token up to 1{,}024 tokens --- the value above --- but 1.12\,ms at 2{,}040, a curve no
-straight line fits.
+test. Two causes were possible: the profile has no context-length term, and these prompts are about
+1{,}700 tokens; or CPU contention between two engines and a client on four vCPUs. A packaged
+calibration command run on a fresh T4 engine pointed at the first: it reproduced that engine's
+counters exactly on a separate check (48 of 48 requests), and its prefill cost 0.71\,ms per token up
+to 1{,}024 tokens --- the value above --- but 1.12\,ms at 2{,}040, a curve no straight line fits.
+
+\paragraph{A context-aware timing model.} We then registered a test of both causes on one T4, with
+the fitting procedure and the analysis committed before the run. Attention reads every earlier token,
+so the model gains two terms: prefill$(n, c) = p_0 + p_1 n + p_2\, n\,(c + n/2)$ for $n$ new tokens
+after $c$ cached ones, and decode$(b, S) = d_0 + d_1 b + d_2 S$ for $b$ sequences with $S$ context
+tokens between them. Fitted with non-negative least squares on 56 decode measurements (context
+128--1{,}984 tokens, batch 1--64) and 45 prefill measurements, it gives $d_0 = 40.1$\,ms,
+$d_1 = 0.34$\,ms, $d_2 = 3.5$\,ms per 1{,}000 context tokens, $p_1 = 0.32$\,ms and $p_2 = 0.76$\,ms per
+new token per 1{,}000 attended ($R^2$ 0.979 and 0.998; 0.315 and 0.913 without the context terms).
+All three registered predictions came true. The context term is real: at batch 8 a decode step takes
+1.92$\times$ longer at 1{,}536 tokens of context than at 128. CPU contention is not: with the second
+engine and a 48-stream client busy, the first engine's inter-token latency, measured inside the
+engine, changed by a factor of 1.00. And the fitted model predicts two held-out runs of this paper's
+traffic on one engine within 1.10--1.41$\times$ at p50 and p95, where the context-free profile was up
+to 7.1$\times$ optimistic. Post hoc --- the terms were added because of this very test, though their
+coefficients never saw its data --- replaying both runs above with each request on the replica that
+served it, at the time it was sent, the model lands within 1.02--1.79$\times$ of all six p50 and p95
+values, and near their preemption counts.
 
 \begin{table}[t]
 \centering\small
@@ -253,9 +271,11 @@ K64 prefix-affinity & 0.844 & 0.844--0.846 & 1.26 & 32--39 \\
 
 \section{Results}
 
-Every replica count in this section is the simulator's, on the T4 profile of
-\S\ref{sec:calibration}; for prompts of this length that profile proved optimistic on live engines,
-so the counts are best read as relative, not absolute.
+Sections~\ref{sec:one}, \ref{sec:finding} and \ref{sec:alpha}--\ref{sec:real} ran on the first,
+context-free T4 profile, as each was registered at the time; for prompts of this length that profile
+proved optimistic on live engines, so their replica counts are best read as relative. Section~\ref{sec:retest}
+re-tests the finding on the context-aware model of \S\ref{sec:calibration}, which predicts live
+latency.
 
 \subsection{One shared prompt: session affinity wins}\label{sec:one}
 
@@ -264,7 +284,8 @@ assistant turns, 64 output tokens, 6\,s between turns) sharing one system prompt
 sharing of 0.3 or 0.8; 1--8 sessions per second; seven policies; 1--8 replicas; five seeds. \SSt{}
 needed the fewest replicas at every load on both traces --- from 2 sessions per second, 25--43\% fewer
 than \RR{} --- by spreading
-sessions evenly (load imbalance at most 1.09) while keeping each session's history on its replica.
+sessions evenly (load imbalance at most 1.09) while keeping each session's history on its replica;
+on the validated model its lead grows (\S\ref{sec:retest}).
 \PA{} sent every new session to the replica holding the shared prompt: its load imbalance equalled
 the number of replicas, it preempted 110--212 times per run and so evicted the prefix it was
 protecting, and from 2 sessions per second no fleet of up to 8 held the service level.
@@ -277,22 +298,13 @@ replicas over its 12 (trace, load) points of 64, 57, 58, 48, 45, 48 and 49; $\al
 fixed for the tests below. Even at $\alpha^*$, \PA$_\alpha$ needed more replicas than \SSt{} (45
 against 36 in total).
 
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.94\textwidth]{figures/flip.pdf}
-\caption{The flip. Left: fewest T4s that hold p95 TTFT $\le 2$\,s at 2 sessions per second as the
-number of distinct system prompts grows (``$>8$'': not held on 8). Right: prefix-cache hit rate on 4 T4s
-at the same load. Below each $K$: the prompts' working set over one T4's usable cache. Three seeds per
-point; a point holds only if every seed does. \PA$_{16}$ is the registered policy; \PA$_1$ was found
-after the test.}
-\label{fig:flip}
-\end{figure*}
 
 \begin{table*}[t]
 \centering\small
-\caption{Fewest T4s that hold p95 TTFT $\le 2$\,s at 1, 2, 3 and 4 sessions per second, for $K$
-tenant prompts (\miss: not held on 8). Bold: the fewest at every load for that $K$. At 6 and 8
-sessions per second nothing holds for $K \ge 16$. $\dagger$: post hoc.}
+\caption{On the \emph{first, context-free} timing model: fewest T4s that hold p95 TTFT $\le 2$\,s at
+1, 2, 3 and 4 sessions per second, for $K$ tenant prompts (\miss: not held on 8). Bold: the fewest at
+every load for that $K$. At 6 and 8 sessions per second nothing holds for $K \ge 16$. $\dagger$: post
+hoc. Re-tested on the validated model in Table~\ref{tab:retest}.}
 \label{tab:flip}
 \begin{tabular}{@{}lcccc@{}}
 \toprule
@@ -309,21 +321,73 @@ Session-sticky         & \textbf{1\ 2\ 3\ 3} & \textbf{1\ 2\ 3\ 4} & 2\ 3\ 5\ 6 
 \end{tabular}
 \end{table*}
 
-\subsection{Many prompts: the flip}\label{sec:finding}
+\subsection{Many prompts, on the first timing model: the flip}\label{sec:finding}
 
 The registered test (H2b) kept these sessions and an 85-block system prompt (sharing 0.8), but gave
 the traffic $K \in \{1, 4, 16, 64\}$ tenants, each with its own prompt, drawn with Zipf(1) popularity
 (48 of the 64 prompts occur). The prompts' working set is 85, 340, 1{,}360 and 4{,}080 blocks: 0.06,
 0.22, 0.89 and 2.66 of one T4's 1{,}536 usable blocks. Loads were 1--8 sessions per second on 1--8
 replicas, with three seeds. The rule: \PA$_{16}$ never beats \SSt{} at $K = 1$, beats it somewhere at
-$K = 64$, and the winner never reverses along $K$. It holds (Table~\ref{tab:flip},
-Figure~\ref{fig:flip}). At 2 sessions per second, \SSt{} needs 2 T4s at $K = 1$ and cannot hold the
+$K = 64$, and the winner never reverses along $K$. On the first timing model it holds
+(Table~\ref{tab:flip}). At 2 sessions per second, \SSt{} needs 2 T4s at $K = 1$ and cannot hold the
 service level on 8 at $K = 64$, where \PA$_{16}$ needs 5 (and 8 at 3 sessions per second).
 
 The hit rates at 4 replicas and 2 sessions per second show why. As $K$ grows from 1 to 64, \RR's
 falls from 0.84 to 0.53, because every replica must cache every prompt, and \SSt's falls from 0.92 to
 0.82, because each replica still caches every prompt its sessions use. \PA{} keeps 0.87--0.92,
 because each prompt lives on one replica.
+
+\subsection{Re-tested on the validated timing model}\label{sec:retest}
+
+Every count above came from the context-free profile, which \S\ref{sec:calibration} shows is
+optimistic by several times on these prompts. We therefore registered a re-test of H2b --- the same
+traffic, rules and seeds --- on the context-aware T4 model, with loads moved down to 0.25--4 sessions
+per second and replicas up to 16, because each T4 is now slower. We predicted it would hold: a cache
+miss costs more once attention over the prompt is priced in. It was falsified
+(Table~\ref{tab:retest}, Figure~\ref{fig:flip}). Rules (a) and (c) hold, but at $K = 64$ \PA$_{16}$
+wins at no load: it ties \SSt{} at 0.25--1 session per second (2, 3 and 5 replicas), loses at 2 (11
+against 10), and above that nothing holds on 16.
+
+After the test --- and labelled so --- \SSt{} needs the fewest replicas, or ties for them, at 22 of
+the 24 ($K$, load) points; the two exceptions are prefix affinity with a load weight of 1 or none (3
+against 4 replicas at $K = 16$ and 1 session per second, 8 against 10 at $K = 64$ and 2). The mechanism
+of \S\ref{sec:finding} is still there: at $K = 64$ and 2 sessions per second, \PA$_1$ keeps a hit rate
+of 0.87 on 8 replicas against \SSt's 0.80 and \RR's 0.47. It no longer pays, because decode --- which
+every policy pays in full, cached or not --- is now a large share of the cost, and concentrating
+sessions on the replicas that hold their prompt makes batches uneven: session affinity's balance is
+worth more than the extra hits. With one prompt its lead over \RR{} grows with load: equal at 1
+session per second, then 5 against 7 T4s, 6 against 9 and 7 against 12.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.94\textwidth]{figures/flip.pdf}
+\caption{On the validated, context-aware timing model. Left: fewest T4s that hold p95 TTFT
+$\le 2$\,s at 2 sessions per second as the number of distinct system prompts grows (``$>16$'': not held
+on 16). Right: prefix-cache hit rate on 8 T4s at the same load. Below each $K$: the prompts' working
+set over one T4's usable cache. Three seeds per point; a point holds only if every seed does.
+\PA$_{16}$ is the registered policy; \PA$_1$ was found after the test.}
+\label{fig:flip}
+\end{figure*}
+
+\begin{table*}[t]
+\centering\small
+\caption{The re-test, on the validated timing model: fewest T4s that hold p95 TTFT $\le 2$\,s at
+0.25, 0.5, 1, 2, 3 and 4 sessions per second, for $K$ tenant prompts (\miss: not held on 16).
+$\dagger$: post hoc.}
+\label{tab:retest}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+& $K = 1$ & $K = 4$ & $K = 16$ & $K = 64$ \\
+\midrule
+Round-robin            & 1\ 2\ 3\ 7\ 9\ 12 & 1\ 2\ 4\ 7\ 9\ 12 & 1\ 3\ 6\ 11\ 16\ \miss & 2\ 4\ 9\ 16\ \miss\ \miss \\
+Least-loaded           & 1\ 2\ 4\ 11\ 14\ \miss & 1\ 2\ 5\ 10\ 15\ \miss & 1\ 4\ 9\ \miss\ \miss\ \miss & 3\ 7\ 13\ \miss\ \miss\ \miss \\
+Session-sticky         & 1\ 2\ 3\ 5\ 6\ 7 & 1\ 2\ 3\ 5\ 6\ 9 & 1\ 2\ 4\ 7\ 12\ 16 & 2\ 3\ 5\ 10\ \miss\ \miss \\
+\PA{} (no load weight) & 1\ \miss\ \miss\ \miss\ \miss\ \miss & 1\ 2\ 3\ \miss\ \miss\ \miss & 1\ 2\ 3\ \miss\ \miss\ \miss & 2\ 3\ 5\ \miss\ \miss\ \miss \\
+\PA$_{16}$ (registered) & 1\ 2\ 4\ 10\ \miss\ \miss & 1\ 2\ 4\ 9\ 16\ \miss & 1\ 3\ 5\ 9\ 16\ \miss & 2\ 3\ 5\ 11\ \miss\ \miss \\
+\PA$_{1}{}^{\dagger}$  & 1\ 2\ \miss\ \miss\ \miss\ \miss & 1\ 2\ 3\ \miss\ \miss\ \miss & 1\ 2\ 3\ \miss\ \miss\ \miss & 2\ 3\ 5\ 8\ \miss\ \miss \\
+\bottomrule
+\end{tabular}
+\end{table*}
 
 \subsection{How large a load weight}\label{sec:alpha}
 
@@ -335,9 +399,10 @@ weight cuts the other way: with one prompt, \PA$_1$ and \PA{} collapse from 2 se
 at $K = 4$ and 4 sessions per second only \PA$_{16}$ holds among the affinity policies (on 6). But
 there \SSt{} needs the fewest replicas, or ties for them, at every load. So the weight that works
 shrinks as prompts multiply, and a router with one fixed prefix-versus-load weight would have to set
-it from the prompt working set.
+it from the prompt working set. On the validated model (\S\ref{sec:retest}) a weight of 1 is also
+behind both points where anything beat session affinity --- again found after the test.
 
-\subsection{Does it survive other hardware?}\label{sec:hardware}
+\subsection{Does it survive other hardware? (first timing model)}\label{sec:hardware}
 
 We registered (H6) a rescaling of the T4 profile's timing coefficients --- prefill and decode both
 $\times 0.5$ and $\times 0.25$ (a 2$\times$ and a 4$\times$ faster GPU), and prefill alone $\times 0.5$
@@ -355,12 +420,15 @@ Post hoc: \SSt{} was among the policies with the fewest replicas at all 48 point
 \SSt{} win at $K = 64$, and no reversal along $K$. With prefill twice as dear, almost nothing holds
 the service level at $K = 64$, and the flip appears at $K = 16$ instead. The direction of the finding
 transfers across these rescalings; the replica counts, and a full ranking, have to be measured on the
-target GPU.
+target GPU. All four rescalings were of the first, context-free model: they scale every cost
+together, where a context term changes costs unevenly --- which is how the flip survived them and not
+the validated model (\S\ref{sec:retest}).
 
 \subsection{Real traces}\label{sec:real}
 
 We replayed two real trace families, each registered before its comparison ran, with scales and
 loads set by probes of round-robin alone, which carry no information about the policies compared.
+Both ran on the first timing model and have not been re-run on the validated one.
 
 \paragraph{Mooncake (R1).} Mooncake released request traces from its production
 service~\cite{mooncaketraces}: each request lists its prompt as 512-token block hashes, global across
@@ -419,26 +487,32 @@ Session-sticky         & 4\ 4\ 6 & 5\ 5\ 7 & 2\ 2\ 2 \\
 Together the two traces bracket the mechanism: prefix affinity without a load weight fails where
 prompts are shared across users and matches session affinity where none are, so its collapse comes
 from shared prompts, not from routing by prefix as such. Neither trace shows the many-prompt
-advantage of \S\ref{sec:finding}.
+advantage of \S\ref{sec:finding} --- consistent with \S\ref{sec:retest}, where it did not survive a
+timing model that matches the engine.
 
 \section{Discussion and limitations}
 
-\paragraph{For an operator.} Estimate the working set of the system prompts in flight against one
-replica's cache. Well below one cache, keep sessions on one replica. Well above it, route by prefix
-with a small load weight. Do not route by prefix alone when one prompt dominates the traffic. When
-reuse is almost all within sessions, as in AgentX, any policy that keeps a session on one replica
-will do, and scattering sessions is what costs GPUs. Then measure replica counts on your own GPU:
-ours come from a T4 timing model that proved optimistic under load, and the ranking itself moves
-with speed.
+\paragraph{For an operator.} Keep each session on one replica: on the validated T4 model it needed the
+fewest GPUs, or tied for them, almost everywhere --- with one shared prompt and with 64. Never route by
+prefix alone when one prompt dominates the traffic. A prefix router with a small load weight gained up
+to 2 of 10 GPUs at one point with many prompts, found after the test: worth testing on your own
+timing, not assuming. And measure that timing with context in it: a context-free model reversed the
+recommendation here, and our replica counts are T4 counts.
 
-\paragraph{Limitations.} The finding comes from generated traffic; on the real traces we replayed, it
-did not appear. We measured one GPU (T4) and one model (Qwen3-4B, fp16); the hardware test rescales
+\paragraph{For simulator builders.} The cache model was exact from the start, and it was not enough.
+Hit rates favoured prefix affinity with many prompts under both timing models; which policy needed
+fewer GPUs depended on a term the first model lacked. Validating the timing model against live
+latency, not only the cache model against live counters, is what changed the answer.
+
+\paragraph{Limitations.} The finding comes from generated traffic; the real traces were replayed on
+the first timing model only. We measured one GPU (T4) and one model (Qwen3-4B, fp16); the hardware test rescales
 timings and does not measure other GPUs. Replays are open-loop: a real agent waits for each response,
 and its next turn could reuse the response's cached decode blocks, which our traces cannot express.
-The timing model is the weakest part: besides the two errors given above, it has no context-length
-term, and on two live replicas with ${\sim}$1{,}700-token prompts latency came out 5--222$\times$ its
-prediction. A context-aware timing model, fitted on data it is not then tested on, is the next step.
-The Mooncake traces were scaled by 1/32 and their
+The context-aware timing model was fitted on one engine with contexts up to 2{,}000 tokens; it was
+tested on held-out traffic on one engine (registered) and on two replicas only after the fact, and
+it keeps the single-sequence decode oddity above. The hardware rescalings (\S\ref{sec:hardware}) and
+the real traces (\S\ref{sec:real}) ran on the first, context-free model. The Mooncake traces were
+scaled by 1/32 and their
 sessions inferred; the AgentX sessions were scaled by 1/64 and replayed at a chosen concurrency, and
 their session-local hashes hide any prompt their users really share. At scale, an
 80{,}000-request trace simulates in 13.5--21\,s on one core; memory for its block hashes (537\,MiB) is
@@ -446,15 +520,15 @@ the first limit.
 
 \section{Conclusion}
 
-Whether prefix-aware routing pays is not a property of the policy alone but of the ratio between the
-prompts in flight and a replica's cache. Below one cache, keeping each session on one replica wins and
-routing by prefix alone collapses; above it, routing by prefix with a small load weight holds a latency
-target that session affinity cannot. The direction of this result survived every hardware rescaling we
-tried; its replica counts did not. On two live replicas the cache model and the order of the
-policies held, and the timing model did not: the replica counts are optimistic. On two real trace
-families the two good policies tied, and prefix routing without a load weight failed only where
-prompts were shared across users. We release the
-simulator, its calibration against a live vLLM and the full registration log, so that each claim can
+Whether prefix-aware routing pays depended less on the policy than on the timing model used to judge
+it. On a context-free model, routing by prefix paid once the tenants' prompts outgrew one replica's
+cache, and hardware rescalings did not change that. On a model that prices attention over context ---
+fitted on micro-benchmarks, and predicting held-out live traffic within 1.41$\times$ --- the same
+registered test failed: keeping each session on one replica needed the fewest GPUs, or tied,
+almost everywhere, while prefix routing kept the better hit rate without turning it into fewer GPUs.
+Routing by prefix alone collapsed wherever one prompt dominated, on every model and on real traces. We
+release the simulator, its calibration against a live vLLM --- cache and timing --- and the full
+registration log, including the test that overturned our own first finding, so that each claim can
 be checked and re-measured on other hardware.
 
 \small

@@ -6,7 +6,7 @@ name: pages
 on:
   push:
     branches: [master]
-    paths: ["site/**", "artifacts/results/demo_grid.json", ".github/workflows/pages.yml"]
+    paths: ["site/**", "artifacts/results/demo_grid*.json", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -29,7 +29,7 @@ jobs:
       - name: Put the page and its grid side by side
         run: |
           mkdir -p _site
-          cp site/index.html artifacts/results/demo_grid.json _site/
+          cp site/index.html artifacts/results/demo_grid.json artifacts/results/demo_grid_ctx.json _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

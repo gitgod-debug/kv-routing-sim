@@ -37,11 +37,12 @@ of claim:
 
 And separately from both, the thing a reader should be able to repeat without opening the repo:
 
-3. **The finding** *(measured 2026-09-28)* — **keep each user on one GPU until your tenants' system
-   prompts outgrow one GPU's KV cache; then route by prefix, and keep its load weight small.** The
-   boundary is one ratio: the prompts' working set over one replica's cache. *(It was first framed as
-   a sharing-ratio × load crossover against least-loaded — H2 — and that framing was falsified; the
-   dated record is in [`09-hypotheses.md`](09-hypotheses.md).)*
+3. **The finding** *(changed 2026-09-30)* — **keep each user on one GPU.** On a T4 timing model checked
+   against the live engine, session-sticky routing needs the fewest GPUs, or ties for them, at 22 of 24
+   points, from one shared prompt to 64 tenants' prompts. *(It read "…until your tenants' prompts
+   outgrow one GPU's cache; then route by prefix" on the first, context-free timing model; re-tested
+   on the validated one, that half was falsified. Before that, a sharing-ratio × load framing — H2 —
+   was falsified too. The dated record of all of it is in [`09-hypotheses.md`](09-hypotheses.md).)*
 
 ---
 

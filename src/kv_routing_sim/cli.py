@@ -1,7 +1,7 @@
 """The `kvsim` command line.
 
     kvsim replay    trace.jsonl --policies all --replicas 1-8 --format md \
-                    --profile t4-qwen3-4b-vllm0.30.0 --cost-model default
+                    --profile t4-qwen3-4b-vllm0.30.0-ctx --cost-model default
     kvsim generate  --sharing 0.6 --out trace.jsonl
     kvsim crossover --sharing 0.1,0.3,0.5,0.7,0.9 --rates 4,8,16 --profile <profile.json>
     kvsim calibrate --engine http://localhost:8000 --out configs/profiles/mine.json

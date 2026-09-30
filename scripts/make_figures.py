@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""The README's figure — the flip — drawn from the committed demo grid.
+"""The README's figure, drawn from the committed demo grid on the validated timing model.
 
     python scripts/make_figures.py  # -> docs/figures/flip-*.svg and paper/figures/flip.pdf
 
-Needs the [analysis] extra (matplotlib). It reads `artifacts/results/demo_grid.json`, which
-`scripts/build_grid.py` writes only when it reproduces Phase 5's H2b table exactly, so the figure
-shows the experiment's numbers and runs nothing itself. Same grid in, same bytes out.
+Needs the [analysis] extra (matplotlib). It reads `artifacts/results/demo_grid_ctx.json`, which
+`scripts/build_grid.py --source h2b_c2` writes only when it reproduces the registered re-test's
+table (H2b on C2's context-aware T4 model) exactly, so the figure shows the experiment's numbers and
+runs nothing itself. Same grid in, same bytes out. (Until 2026-09-30 it drew `demo_grid.json`, the
+context-free model's grid — whose "flip" the re-test falsified.)
 
 Left: the fewest T4s that hold the 2 s p95 TTFT target, as distinct tenant prompts multiply.
 Right: the prefix-cache hit rate on a fixed fleet — the mechanism behind the left panel.
@@ -23,11 +25,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
-GRID = REPO / "artifacts" / "results" / "demo_grid.json"
+GRID = REPO / "artifacts" / "results" / "demo_grid_ctx.json"
 OUT = REPO / "docs" / "figures"
 PAPER = REPO / "paper" / "figures" / "flip.pdf"  # the preprint's copy: pdfLaTeX does not read SVG
 LOAD = 2  # sessions/s: the README table's column
-REPLICAS = 4  # the fleet the hit rates are read on, as in Phase 5's write-up
+REPLICAS = 8  # the fleet the hit rates are read on, as in the re-test's report
 
 THEMES = {
     "light": {"fg": "#1d1d1b", "muted": "#5f5d57", "grid": "#dedad2"},
