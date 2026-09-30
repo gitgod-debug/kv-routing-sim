@@ -185,7 +185,7 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-8 \
     });
     let msg;
     if (!best) {
-      msg = "Nothing holds the 2 s target on 8 T4s at this point.";
+      msg = `Nothing holds the 2 s target on ${A.replicas[A.replicas.length - 1]} T4s at this point.`;
     } else {
       const ties = A.policies.filter((n, p) => p !== best.p && needed(k, l, p) === best.ri);
       const rrNeed = needed(k, l, A.policies.indexOf("round-robin"));
@@ -223,11 +223,16 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-8 \
     const colors = ["#8d8a82", "#1f9d6a", "#3a78d8", "#c2542d"];
     const W = svg.clientWidth || 600, H = 220, L = 44, R = 24, T = 12, B = 34;
     const x = (i) => L + (W - L - R) * (i / (A.prompts.length - 1));
-    const y = (v) => T + (H - T - B) * (1 - (v - 1) / 8);  // 1..9, where 9 = not held on 8
+    const maxR = A.replicas[A.replicas.length - 1], none = maxR + 1;  // none = not held on maxR
+    const y = (v) => T + (H - T - B) * (1 - (v - 1) / maxR);
     let s = "";
-    for (let v = 1; v <= 9; v += 2) {
+    const tick = maxR > 8 ? 3 : 2;
+    const ticks = [];
+    for (let v = 1; v < maxR; v += tick) ticks.push(v);
+    ticks.push(none);  // the top line: not held on the largest fleet
+    for (const v of ticks) {
       s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="currentColor" opacity="0.12"/>` +
-           `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v === 9 ? "✗" : v}</text>`;
+           `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v === none ? "✗" : v}</text>`;
     }
     A.prompts.forEach((k, i) => { s += `<text x="${x(i)}" y="${H - 12}" text-anchor="middle">K = ${k}</text>`; });
     show.forEach((name, j) => {
@@ -235,7 +240,7 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-8 \
       const off = (j - (show.length - 1) / 2) * 2.5;  // nudge so equal counts do not hide each other
       const pts = A.prompts.map((_, i) => {
         const ri = needed(i, l, p);
-        return [x(i), y(ri < 0 ? 9 : A.replicas[ri]) + off];
+        return [x(i), y(ri < 0 ? none : A.replicas[ri]) + off];
       });
       s += `<polyline fill="none" stroke="${colors[j]}" stroke-width="2.5" points="${pts.map((q) => q.join(",")).join(" ")}"/>`;
       pts.forEach((q) => { s += `<circle cx="${q[0]}" cy="${q[1]}" r="3.5" fill="${colors[j]}"/>`; });
@@ -243,7 +248,8 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-8 \
     svg.innerHTML = s;
     $("legend").innerHTML = show.map((n, j) => `<span style="--c:${colors[j]}">${nice(n)}</span>`).join("");
     $("chartcap").textContent = `T4s needed to hold the 2 s p95 target at ${A.loads[l]} sessions/s as the ` +
-      `number of distinct system prompts (K) grows; ✗ = not held on 8. T4 figures, generated traffic.`;
+      `number of distinct system prompts (K) grows; ✗ = not held on ${A.replicas[A.replicas.length - 1]}. ` +
+      `T4 figures, generated traffic.`;
   }
   // Published: the grid sits next to the page. Previewed from a clone (`python -m http.server` in
   // the repo root, then open /site/): it is read from where build_grid.py wrote it.

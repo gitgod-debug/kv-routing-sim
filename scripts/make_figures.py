@@ -28,7 +28,6 @@ OUT = REPO / "docs" / "figures"
 PAPER = REPO / "paper" / "figures" / "flip.pdf"  # the preprint's copy: pdfLaTeX does not read SVG
 LOAD = 2  # sessions/s: the README table's column
 REPLICAS = 4  # the fleet the hit rates are read on, as in Phase 5's write-up
-NOT_MET = 9  # drawn above 8: no replica count from 1 to 8 holds the target
 
 THEMES = {
     "light": {"fg": "#1d1d1b", "muted": "#5f5d57", "grid": "#dedad2"},
@@ -49,10 +48,16 @@ def _series(grid: dict[str, Any]) -> list[tuple[str, str, str, str]]:
     ]
 
 
+def _not_met(grid: dict[str, Any]) -> int:
+    """Drawn one above the largest fleet: no replica count in the grid holds the target."""
+    return max(grid["axes"]["replicas"]) + 1
+
+
 def _needed(grid: dict[str, Any], k: int, load: int, policy: str) -> int:
     ax = grid["axes"]
     cells = grid["cells"][k][load][ax["policies"].index(policy)]
-    return next((n for n, c in zip(ax["replicas"], cells, strict=True) if c[4] == 1), NOT_MET)
+    return next((n for n, c in zip(ax["replicas"], cells, strict=True) if c[4] == 1),
+                _not_met(grid))
 
 
 def draw(grid: dict[str, Any], theme: str) -> plt.Figure:
@@ -89,8 +94,10 @@ def draw(grid: dict[str, Any], theme: str) -> plt.Figure:
         right.plot(x, hit, color=colour, marker=marker, linewidth=2, markersize=6)
 
     left.set_title(f"T4s needed at {LOAD} sessions/s (p95 TTFT ≤ 2 s)", color=t["fg"], fontsize=11)
-    left.set_yticks(range(1, 10), [str(v) for v in range(1, 9)] + ["> 8"])  # not held on 8
-    left.set_ylim(0.5, 9.5)
+    top = _not_met(grid)
+    vals = list(range(1, top)) if top <= 9 else list(range(1, top - 1, 3))
+    left.set_yticks([*vals, top], [str(v) for v in vals] + [f"> {top - 1}"])  # not held
+    left.set_ylim(0.5, top + 0.5)
     right.set_title(f"Prefix-cache hit rate on {REPLICAS} T4s at {LOAD} sessions/s", color=t["fg"],
                     fontsize=11)
     right.set_ylim(0.45, 1.0)
