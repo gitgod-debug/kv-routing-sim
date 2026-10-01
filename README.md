@@ -230,7 +230,8 @@ recorded data then showed that timing cold prompts alone would have put a held-o
 5.7–7.2×, so since 2026-10-01 it also times new tokens after a cached prefix — the case agentic
 traffic is made of ([pre-check](artifacts/results/c3_prereg/precheck.md), post hoc). ⚠️ That new fit
 has not yet been run on a real GPU — its procedure has (C2, where it predicted held-out traffic
-within 1.41×).
+within 1.41×). Its first real run is registered as **C3** — rules and predictions committed, the
+notebook built ([`configs/c3_calibrate.yaml`](configs/c3_calibrate.yaml)) — and has not happened yet.
 
 ## ⭐ What transfers to your fleet, and what doesn't
 

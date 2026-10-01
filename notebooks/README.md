@@ -21,6 +21,30 @@ below is kept as the record of how it was run.
 
 ---
 
+## ▶ Run next — C3: `c3_calibrate_t4.ipynb` (about 50 minutes)
+
+**What it tests:** `kvsim calibrate` in its new form — the one that fits C2's context-aware timing
+model — on a real GPU for the first time. The notebook starts one vLLM server on a T4, runs the
+command, sends three kinds of traffic that no fit has seen, and runs the command once more.
+Registered before the run: [`configs/c3_calibrate.yaml`](../configs/c3_calibrate.yaml) and
+`docs/09-hypotheses.md` (2026-10-01).
+
+| | Rule | Predicted |
+|---|---|---|
+| **C3a** | the command exits 0, its cache check is exact (48 of 48 requests) and it reads the engine's 1,537 blocks | holds |
+| **C3b** | the profile it writes predicts the traffic's p50 and p95 TTFT within 2× | holds |
+| **C3c** | the profile C2 fitted on 2026-09-30 predicts the same traffic within 2× — its numbers were written down before the run | holds |
+
+**On Kaggle:** *File → Import notebook* → `c3_calibrate_t4.ipynb` → *Settings: Accelerator **GPU T4 ×2**
+(one T4 is used), Internet **on*** → *Run All*. When it ends, download **`c3_results.zip`** from the
+Output panel and put it in this repo's `notebooks/` folder. Results are saved after every part: if a
+cell stops with ⛔, download the zip anyway. ⚠️ Run it **once**; if you must run it again, bring back
+both zips.
+
+The notebook carries the package's own wheel (built from commit `016d167`), so the GPU box runs
+exactly the committed code and needs no copy of this repo. It decides nothing: it measures, and
+`scripts/c3_analyze.py` — committed before the run — decides.
+
 ## ✅ C2 — ran on 2026-09-30: all three registered predictions came true
 
 Decode cost grows with context length (1.92× from 128 to 1,536 tokens at batch 8); a busy second

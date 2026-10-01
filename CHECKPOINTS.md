@@ -9,10 +9,11 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-09-30 (**C2 ran — all three predictions true; the finding re-tested on the
-validated timing model and its "route by prefix" half FALSIFIED**; before that: H6, R1 and R2, Phase 6
-and C1, the demo, the preprint draft, `kvsim calibrate`, a wheel that works outside a clone. 189
-tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
+**Last updated:** 2026-10-01 (**C3 registered** — the context-aware `kvsim calibrate`'s first run on a
+real GPU; before it, a pre-check on C2's data added one measurement to the command. 2026-09-30: C2
+ran — all three predictions true; the finding re-tested on the validated timing model and its "route
+by prefix" half FALSIFIED. Before that: H6, R1 and R2, Phase 6 and C1, the demo, the preprint draft,
+`kvsim calibrate`, a wheel that works outside a clone. 204 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
 vLLM under eviction pressure to the token, against predictions committed before the run)
 **Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding — changed 2026-09-30:** *keep each
 user on one GPU*; on the validated timing model session-sticky needs the fewest T4s or ties at 22 of 24
@@ -21,8 +22,9 @@ R1/R2 ran on the first, context-free timing model (not yet re-run) · ✅ **6** 
 T4s within 1.4% (run twice); latency explained by C2 · ✅ **C2** — context, not CPU; the context-aware
 model predicts held-out traffic within 1.41× · 🔨 **7** — demo on the validated grid, 10×/100× done,
 `kvsim calibrate` proven on a real T4 (C1); PyPI left · 🔨 **8** — the preprint rewritten around the
-reversal. ▶ **Next:** run C3 on Kaggle (the new `kvsim calibrate` on a real T4); re-run H6 and
-R1/R2 on the validated model.
+reversal (optional: the project does not need it). ▶ **Next:** run C3 on Kaggle —
+[`notebooks/c3_calibrate_t4.ipynb`](notebooks/c3_calibrate_t4.ipynb), registered 2026-10-01, ~50
+minutes, bring back `c3_results.zip`; then re-run H6 and R1/R2 on the validated model.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -616,8 +618,19 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       to 1,024 tokens (Phase 3's value) and 1.12 ms at 2,040; the line clamps a −212 ms intercept.
       Still `[~]`: the timing fit needs the context-aware model (Phase 6). 🔨 **2026-09-30:** it now
       fits C2's context-aware model (decode cells over context × batch; `calib/fit.py`, the same
-      NNLS as C2's analysis) and recovers a mock's known context terms (3.97e-6 against 4e-6). The
-      new fit's first real-GPU run is left
+      NNLS as C2's analysis) and recovers a mock's known context terms (3.97e-6 against 4e-6).
+      🔨 **2026-10-01, before spending a GPU:** a pre-check on C2's recorded data
+      ([`precheck.md`](artifacts/results/c3_prereg/precheck.md), post hoc) — fitted on the cells
+      the command measured, cold prompts only, the model put a held-out p95 off by 5.7–7.2×; with
+      C2's cached-prefix cells, within 1.36×. The command now times those cells too
+      (`--prefill-cached`, `--prefill-new`).
+      🔨 **C3 registered 2026-10-01** ([`configs/c3_calibrate.yaml`](configs/c3_calibrate.yaml),
+      [`c3_calibrate_t4.ipynb`](notebooks/c3_calibrate_t4.ipynb) with the wheel of the clean commit
+      `016d167`): C3a the command works (check exact, capacity read) / C3b its profile predicts
+      three held-out workloads within 2× / C3c C2's profile predicts them within 2×, from numbers
+      registered now — predicted holds / holds / holds. The third workload has a shape no design
+      decision saw. Dry-run against a mock with known terms: recovered, all three within 1.07×.
+      **Left: run it on Kaggle**
 - [ ] **`configs/profiles/`** — committed calibration profiles keyed by
       `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
       from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no
@@ -691,11 +704,14 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 - [ ] Show HN + X thread, with the engine and version
       **in** the title
 - [ ] ⭐ **The `guidellm` PR merged** — see the upstream log
-- [~] 📄 **The preprint** (due ~Nov 9, cs.DC) — [`paper/main.tex`](paper/main.tex), drafted 2026-09-28:
-      five pages that compile; every number mapped to its results file in
+- [~] 📄 **The preprint — OPTIONAL** (the project is complete without it; the plan calls arXiv
+      "optional upside", useful only for research-heavy teams; if wanted, due ~Nov 9, cs.DC) —
+      [`paper/main.tex`](paper/main.tex), drafted 2026-09-28, rewritten 2026-09-30 around the
+      reversal: seven pages that compile; every number mapped to its results file in
       [`paper/README.md`](paper/README.md); 19 references, each checked on arXiv or at its source; no
-      "first" claims. Left: author details and the repository URL, Phase 6's result, the October
-      prior-art re-audit, and the arXiv endorsement
+      "first" claims. If it is published: author details and the repository URL, the October
+      prior-art re-audit, C3's result, and the arXiv endorsement. If not: it stays a draft, or its
+      text becomes a blog post
 - [ ] Cross-link with `colpali-lite`: two instantiations of one method
 
 ---

@@ -1,6 +1,6 @@
 # 11 — Where we are, in plain words
 
-**Written 2026-09-22; brought up to date 2026-09-28.** Everything this project has done so far, what it found, what was decided and
+**Written 2026-09-22; brought up to date 2026-10-01.** Everything this project has done so far, what it found, what was decided and
 why, what went wrong along the way, and what is left — in plain words, for someone who has forgotten
 all of it. The other docs have the detail; this one has the story.
 
@@ -165,6 +165,13 @@ on one GPU* (findings 18 and 19 below).
     longer saves GPUs: every policy pays the full decode cost of the context, cached or not, and
     crowding sessions onto the GPUs that hold their prompt makes the work uneven. With a small load
     weight it saved 2 of 10 GPUs at one point — found after the test, so not a finding.
+20. **`kvsim calibrate` was missing one measurement, and we found it before spending a GPU.** The
+    command timed prefill only on *cold* prompts (nothing cached). We took the data C2 had already
+    recorded, kept only what the command would have measured, and asked: would that have been
+    enough? No — it put the slow end of a held-out run (p95) off by 5.7–7.2×. Real agent traffic is
+    a long cached prefix plus a few new tokens, and cold prompts never measure that case. The
+    command now measures it too, and the same check comes out within 1.36×. This was done after
+    the fact, on old data, and is labelled so; the real test is C3, on a GPU.
 
 ## 5. What we decided, and why
 
@@ -290,36 +297,53 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 | 4 | Calibrated sweep; H1, H5, H6; the load weight; real traces | ✅ mostly — H6's ranking half ⛔, its crossover half ✅; Mooncake (R1) ⛔; AgentX (R2) ✅ |
 | 5 | **The finding** — when prefix-aware routing pays | ✅ **done, and changed** — H2 ⛔; H2b ✅ on the first timing model, ⛔ on the validated one: *keep each user on one GPU* |
 | 6 | Two-GPU real-engine check under pressure | ✅ **holds**, run twice — hit rates within 1.4%; ⚠️ latency 5–222× the prediction |
-| 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | 🔨 demo, figure, 10×/100× done; `kvsim calibrate` works on a real T4 (C1); PyPI left |
+| 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | 🔨 demo, figure, 10×/100× done; `kvsim calibrate` works on a real T4 (C1); its new timing fit is registered for its first real run (C3); PyPI left |
 | 8 | Write-up, launch, the upstream pull request | 🔨 the guidellm fix is ready; the preprint is drafted (`paper/`) |
 
 ## 9. What is left
 
 **Manual steps (they need an account):**
+- ▶ **Run C3 on Kaggle** — `notebooks/c3_calibrate_t4.ipynb`, about 50 minutes; bring back
+  `c3_results.zip`. The steps are in [`notebooks/README.md`](../notebooks/README.md).
 - File the vLLM issue (the draft is the upstream log #1).
 - Open the guidellm issue, then the pull request (the patch is in `docs/upstream/`, the text in
   the upstream log #7–8).
-- Ask someone for an arXiv endorsement, by mid-October.
+- *Optional:* ask someone for an arXiv endorsement, by mid-October — only if the preprint is to be
+  published. The project does not need it (see below).
 - Create the GitHub repository, push, and turn on Pages (Settings → Pages → Source: *GitHub Actions*).
 
 **Next on the build side:**
 - ✅ done 28 Sep: the preprint draft (`paper/`), and `kvsim calibrate` — so a user can measure their
   own GPU, as H6 says they must — which worked on a real T4 (C1);
 - ✅ done 28 Sep: Phase 6's write-up — it held on hit rates and exposed the timing model;
-- ⭐ **next: a timing model that knows about context length** — a one-GPU Kaggle run that measures
-  decode speed at several context lengths and batch sizes, then a model fitted on it and tested on
-  data it was not fitted on. Until then, every GPU count stays marked as optimistic;
+- ✅ done 30 Sep: a timing model that knows about context length (C2), and the finding re-tested
+  on it — which changed the finding;
 - ✅ done 28 Sep: the AgentX trace (R2 holds), and a contributor guide with three good first issues;
+- ✅ done 1 Oct: `kvsim calibrate` now also times prefill after a cached prefix; C3 is registered;
+- ⭐ **next, after C3's zip comes back:** its write-up, whatever it says;
+- then: re-run H6 and the two real traces (R1, R2) on the validated timing model — they all ran on
+  the first one;
 - later: the PyPI release.
 
+**The preprint (`paper/`) is optional.** It is a 7-page draft that tells the same story as the
+README. The project is complete without it: the repo, the README, the demo page and the calibration
+reports are the deliverable. Publishing it on arXiv only helps for research-heavy teams, and the
+plan itself calls that "optional upside". If it is not published, it can stay as a draft, or its
+text can become a blog post.
+
 **Known limits, owned rather than hidden:**
-- the timing model is the weak part: it cannot express the slow single-sequence decode, it charges
-  a little too much (~20 ms) for a request arriving at an idle GPU, it has no term for context
-  length — and on two live GPUs with ~1,700-token prompts it was 5–222× optimistic (Phase 6);
+- the timing model is the weak part. The first one had no term for context length, and on two
+  live GPUs with ~1,700-token prompts it was 5–222× optimistic (Phase 6). The context-aware one
+  (C2) predicts held-out traffic within 1.41× — but it still cannot express the slow
+  single-sequence decode, and close to saturation a few percent of error in it moves the slow end
+  (p95) by a lot;
+- H6 and both real-trace results (R1, R2) were run on the first timing model and have not been
+  re-run on the validated one;
 - every replay is *open-loop* — real agents wait for an answer before sending the next turn, and would
   then reuse the answer's cache blocks, which we cannot measure this way;
 - one GPU type (T4) and one model (Qwen3-4B) so far;
-- one real trace family (Mooncake), scaled down 32× to fit a T4, with sessions inferred.
+- two real trace families, both scaled down to fit a T4: Mooncake (32× smaller, sessions
+  inferred) and AgentX (coding-agent sessions, token counts 64× smaller).
 
 ## 10. Where to find things
 
