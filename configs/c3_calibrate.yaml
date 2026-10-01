@@ -1,0 +1,112 @@
+# C3 — the context-aware `kvsim calibrate` on a real GPU. Does the profile it writes predict traffic
+# it never saw — and does the profile C2 fitted on another day predict this day's traffic, from
+# numbers written down now?
+# Registered 2026-10-01, BEFORE it runs, with a dated entry in docs/09-hypotheses.md.
+#
+# Why: C1 proved the command's cache check and capacity reading on a real T4, with its first,
+# straight-line timing fit. C2 showed that line up to 7× optimistic and validated a context-aware
+# model — fitted by an analysis script, on 101 measured points. Since 2026-09-30 the command fits
+# that model itself, from fewer cells of its own, and that fit has only ever met a mock engine. C3 is
+# its first real one. `scripts/c3_prepare.py` builds the notebook with the package's wheel embedded
+# (so the GPU box runs exactly the committed code); `scripts/c3_analyze.py` is the whole analysis,
+# committed before the run: nothing below is chosen after a result.
+
+schema_version: 1
+engine:                           # C2's flags exactly, one server on one T4
+  model: Qwen/Qwen3-4B
+  vllm: 0.30.0
+  block_size: 16
+  num_gpu_blocks: 1537
+  max_model_len: 2048
+  max_num_seqs: 256
+  max_num_batched_tokens: 8192
+replicas: 1
+measure_replica: 0
+
+# The profile C3c tests: C2's fit, committed 2026-09-30. What it predicts for part 2 is computed by
+# scripts/c3_prepare.py and written to artifacts/results/c3_prereg/predictions.json before the run.
+profile: configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json
+
+# ── Parts 1 and 3: the command, as a user runs it. Every timing cell is its default — the defaults
+# are copied into the registration file from the code, so a later change of one cannot pass as this
+# run. Part 1 (the first seed) is the tested run. Part 3 repeats it with another seed AFTER the
+# traffic, so the two fits bracket it in time: reported, not tested.
+calibrate:
+  seeds: [0, 1]
+  check_sessions: 16
+  check_turns: 3
+  token_range: [1000, 30000]
+  max_error: 0.05
+
+# ── Part 2: held-out traffic on the same engine, open-loop at its arrival times. Neither profile
+# is fitted on it. Measured exactly as C2's part D was (the notebook reuses that cell).
+holdout:
+  shape: &shape
+    n_sessions: 120
+    turns_per_session: 4
+    session_context_tokens: 150
+    user_turn_tokens: 40
+    assistant_turn_tokens: 60
+    output_tokens: 64
+    think_time_s: 6.0
+    seed: 0
+    prefix_sharing_ratio: 0.8
+  workloads:
+    # C2's two, unchanged (the same trace fingerprints): prompts of 1,550–1,850 tokens.
+    K1_half:     {<<: *shape, arrival_rate: 0.5}
+    K64_quarter: {<<: *shape, arrival_rate: 0.25, n_shared_prefixes: 64, prefix_zipf_s: 1.0}
+    # NEW — the only one no design decision has seen. The command's prefill cells were changed on
+    # 2026-10-01 after a pre-check on C2's recording of the two above (scripts/c3_precheck.py), so
+    # for the command those two are no longer blind. This one is: shorter prompts (630–1,130
+    # tokens), half the sharing, six turns, eight prompts, another seed. Its rate is 60% of the rate
+    # at which C2's profile says the queue runs away (0.5 sessions/s): loaded, but not at the knee.
+    T6_K8:
+      n_sessions: 120
+      turns_per_session: 6
+      session_context_tokens: 150
+      user_turn_tokens: 40
+      assistant_turn_tokens: 60
+      output_tokens: 64
+      think_time_s: 6.0
+      seed: 1
+      prefix_sharing_ratio: 0.5
+      n_shared_prefixes: 8
+      prefix_zipf_s: 1.0
+      arrival_rate: 0.3
+
+# ── The decision rules, fixed before the run ────────────────────────────────────────────────────
+rules:
+  # C3a — the command works on a real engine. Its first run (the first seed) exits 0 and marks the
+  # profile calibrated; the hits and queries its check measured equal the registered prediction;
+  # every check request's cached tokens equal the model's; and the capacity it read equals the
+  # engine log's "GPU KV cache size" ÷ block_size. All five, recomputed from the raw files.
+  #
+  # C3b — its profile predicts traffic it never saw: for EVERY workload, p50 AND p95 TTFT within
+  # this factor of the measured ones (either direction) — replayed on one replica at the times the
+  # requests were really sent, exactly as C2c was decided (scripts/c2_analyze.py's replay).
+  c3b_max_factor: 2.0
+  # C3c — C2's profile predicts another day: for EVERY workload, the p50 and p95 TTFT registered
+  # for it (computed now, at the scheduled times) within this factor of the measured ones.
+  c3c_max_factor: 2.0
+  # Reported beside them, not part of any rule: each workload's hit rate within this of the
+  # prediction (the cache model's claim, on one replica).
+  hit_rate_max_relative_error: 0.10
+  # Percentiles on both sides by the notebook's nearest-rank rule; measured ones over valid
+  # requests. A rule whose data is missing is UNDECIDED, and an undecided rule does not hold.
+
+# Reported, not tested:
+#   - the second run of the command (the other seed): its check, its coefficients, and what its
+#     profile predicts for part 2 — how much does one fit move?
+#   - the command's coefficients against C2's fit
+#   - C2's profile replayed at the real send times (the scheduled-time numbers are the tested ones)
+#   - the measured p50 and p95 of C2's two workloads against C2's own session (2026-09-30)
+#   - the command's wall-clock time
+#   - `scripts/c3_analyze.py --grid`: H2b-C2's registered grid (scripts/run_h2b_c2.py, its config
+#     unchanged but for the profile) on the command's profile, against the committed table — does a
+#     second calibration of the same GPU give the same GPU counts?
+
+# ── The predictions, written before the run ────────────────────────────────────────────────────
+predictions:
+  c3a: holds      # C1's check was exact with this seed; the timing cells are C2's, which ran clean
+  c3b: holds      # the pre-check: the command's cells on C2's data predicted both within 1.36×
+  c3c: holds      # C2c held at 1.41× on the same two workloads; K1_half's p95 is the one at risk
