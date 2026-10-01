@@ -36,7 +36,7 @@ The first public version: planned for PyPI before 2026-11-20.
   `kvsim calibrate` for your own numbers.
 - `kvsim calibrate`'s cache check and capacity reading were proven on a real T4 (C1); its
   context-aware timing fit so far only against the mock engine, though the same procedure predicted
-  held-out traffic on a real T4 (C2).
+  held-out traffic on a real T4 (C2). Its first real-GPU run is registered (C3) and not yet run.
 - `kvsim calibrate` times prompts of up to 2,048 tokens and decode contexts of up to 1,024 by
   default. Longer prompts are an extrapolation unless you measure there (`--prefill-lengths`,
   `--prefill-cached`, `--decode-contexts`).
