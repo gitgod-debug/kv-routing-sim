@@ -12,18 +12,28 @@ import importlib.util
 import json
 import os
 import pathlib
+import random
 import threading
 from http.server import ThreadingHTTPServer
 
 import pytest
 
-from kv_routing_sim.calib.calibrate import CalibrationError, Engine, calibrate, ols, probe
+from kv_routing_sim.calib.calibrate import (
+    CalibrationError,
+    Engine,
+    EngineInfo,
+    calibrate,
+    measure_prefill,
+    ols,
+    probe,
+)
 from kv_routing_sim.sim.cost_model import load_profile
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 QUIET = {"log": lambda *_: None}
-SMALL = {"prefill_lengths": (64, 256, 1024, 2048), "reps": 2, "decode_batches": (1, 2, 4, 8),
-         "decode_contexts": (32, 1024), "decode_tokens": 32, "check_sessions": 8, "check_turns": 3}
+SMALL = {"prefill_lengths": (64, 256, 1024, 2048), "reps": 2, "prefill_cached": (256, 1024),
+         "prefill_new": (64, 512), "decode_batches": (1, 2, 4, 8), "decode_contexts": (32, 1024),
+         "decode_tokens": 32, "check_sessions": 8, "check_turns": 3}
 # The context terms a second mock is given — C2's T4 fit is 3.5e-6 and 7.6e-7; these are close.
 CTX = {"MOCK_DECODE_PER_CTX_TOKEN_S": "4e-6", "MOCK_PREFILL_ATTN_S": "2e-8"}
 
@@ -94,6 +104,50 @@ def test_calibration_recovers_known_context_terms(ctx_mock_url):
         float(CTX["MOCK_DECODE_PER_CTX_TOKEN_S"]), rel=0.35)
     assert profile["prefill_attn_s"] == pytest.approx(float(CTX["MOCK_PREFILL_ATTN_S"]), rel=0.5)
     assert profile["decode_per_seq_s"] == pytest.approx(2.5e-3, rel=0.3)
+
+
+def test_prefill_is_also_timed_after_a_cached_prefix(ctx_mock_url):
+    """Agentic traffic is a long cached prefix and few new tokens — the case cold prompts never
+    measure (scripts/c3_precheck.py). Each such cell must reach the fit with the cached tokens the
+    ENGINE reported, not the ones the design hoped for."""
+    profile, _ = calibrate(Engine(ctx_mock_url, poll_s=0.05), model="mock", **SMALL, **QUIET)
+    points = profile["_source"]["prefill_points"]
+    after = [(p["prompt_tokens"] - p["uncached_tokens"], p["uncached_tokens"]) for p in points
+             if p["uncached_tokens"] < p["prompt_tokens"]]
+    cells = {(c, n) for c in SMALL["prefill_cached"] for n in SMALL["prefill_new"]}
+    assert set(after) == cells and len(after) == SMALL["reps"] * len(cells)
+    cold = [p for p in points if p["uncached_tokens"] == p["prompt_tokens"]]
+    assert len(cold) == SMALL["reps"] * len(SMALL["prefill_lengths"])
+    assert profile["_source"]["notes"] == []  # this engine reports cached tokens: nothing assumed
+
+
+class _Silent(Engine):
+    """Answers every completion at once and reports no per-request cached tokens. No network."""
+
+    def __init__(self):
+        super().__init__("http://silent", poll_s=0.0)
+        self.sent = []
+
+    def stream(self, model, ids, max_tokens):
+        self.sent.append(len(ids))
+        return {"t_send": 0.0, "t_first": 0.1, "t_last": 0.1, "t_chunks": [0.1], "error": None,
+                "usage": {"prompt_tokens": len(ids), "completion_tokens": max_tokens}}
+
+
+def test_cached_prefix_cells_that_do_not_fit_the_engine_are_skipped():
+    engine, notes = _Silent(), []
+    info = EngineInfo("http://silent", "m", "0", kv_cache_blocks=4000, block_size=16,
+                      max_num_seqs=8, max_model_len=1024)
+    points = measure_prefill(engine, info, random.Random(0), lengths=(64, 4096), reps=1,
+                             token_range=(1000, 2000), cached=(250, 768, 1280), new=(64, 704),
+                             notes=notes)
+    # 4096 is cut to what the engine accepts; 250 becomes 240, whole blocks; 768 + 704 and both
+    # 1280 cells exceed 1,024 tokens and are not sent.
+    assert [(p["prompt_tokens"], p["uncached_tokens"]) for p in points] == [
+        (64, 64), (1016, 1016), (304, 64), (944, 704), (832, 64)]
+    assert max(engine.sent) <= 1016
+    # No cached-token report from this engine: the designed prefix is assumed, and said so once.
+    assert len(notes) == 1 and "assumed" in notes[0]
 
 
 def test_a_wrong_block_size_is_caught_by_the_check(mock_url):

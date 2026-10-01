@@ -17,7 +17,12 @@ Three steps — the procedure C2 registered and validated on a real T4 (docs/09,
   1. DECODE. Batches of b concurrent requests with prompts of several context lengths L. A request's
      step is the mean gap from its `skip`-th streamed token to its last; a cell's, the median over
      the batch. A cell that preempted is not used.
-  2. PREFILL. Sequential requests with unique random prompts of spread lengths and 1 output token.
+  2. PREFILL. Sequential requests with 1 output token: cold prompts of spread lengths, AND new
+     tokens after a cached prefix (a warm request of c tokens, then c + n with the same first c).
+     ⚠️ The cached-prefix cells are not optional detail. Agentic traffic is mostly "a long cached
+     prefix, few new tokens", and cold prompts never measure that case: fitted on C2's cold cells
+     alone, the same model mispredicted a held-out p95 by 5.7–7.2×; with the cached-prefix cells,
+     both held-out workloads came within 1.36× (scripts/c3_precheck.py; docs/09, 2026-10-01).
      Both are fitted to the context-aware model of `calib/fit.py`, by least squares with every
      coefficient ≥ 0: decode(b, S) = d0 + d1·b + d2·S, prefill(n, c) = p0 + p1·n + p2·n·(c + n/2).
      One decode step is taken out of each TTFT first (the simulator emits the first token at the END
@@ -32,6 +37,10 @@ Three steps — the procedure C2 registered and validated on a real T4 (docs/09,
 block size, the partial-block rule and prefix matching on YOUR engine — the things that broke in
 Phase 0 — but not eviction under pressure. That was tested once, on vLLM 0.30.0 (Phase 3: exact); a
 different engine version is exactly where it could stop holding.
+
+⚠️ What the timings cover. By default prompts of up to 2,048 tokens and decode contexts of up to
+1,024 — the range C2 validated. Longer prompts are an extrapolation of the fitted curve: if your
+traffic is longer, measure there (--prefill-lengths, --prefill-cached, --decode-contexts).
 
 ⛔ The KV capacity is READ, never estimated: `vllm:cache_config_info` in /metrics, else GET
 /server_info, else --kv-blocks. On the T4 an estimate from memory arithmetic was 56% too high.
@@ -65,6 +74,9 @@ from .fit import fit_decode, fit_prefill
 # Llama put theirs above 128,000) and above the byte and control range; --token-range overrides it.
 DEFAULT_TOKEN_RANGE = (1_000, 30_000)
 DEFAULT_PREFILL_LENGTHS = (64, 128, 256, 512, 768, 1024, 1536, 2048)
+# Prefill after a cached prefix: c cached tokens, then n new ones — the cells of C2's part B.
+DEFAULT_PREFILL_CACHED = (256, 768, 1280)
+DEFAULT_PREFILL_NEW = (64, 256, 704)
 DEFAULT_DECODE_BATCHES = (1, 2, 4, 8, 16)
 DEFAULT_DECODE_CONTEXTS = (32, 512, 1024)  # prompt lengths for the decode cells: the context term
 DECODE_SKIP_TOKENS = 8  # gaps are timed from this token on: past every prefill in the batch
@@ -327,24 +339,47 @@ def _check(rec: dict[str, Any], prompt_tokens: int, max_tokens: int) -> str | No
 
 
 def measure_prefill(engine: Engine, info: EngineInfo, rng: random.Random, *,
-                    lengths: tuple[int, ...], reps: int,
-                    token_range: tuple[int, int]) -> list[dict[str, float]]:
-    """(uncached tokens, TTFT) pairs from sequential, unique prompts with one output token."""
+                    lengths: tuple[int, ...], reps: int, token_range: tuple[int, int],
+                    cached: tuple[int, ...] = (), new: tuple[int, ...] = (),
+                    notes: list[str] | None = None) -> list[dict[str, float]]:
+    """(prompt tokens, uncached tokens, TTFT) from sequential prompts with one output token: cold
+    prompts of each length, then `new` tokens after each `cached` prefix, which its own request
+    warms first. The cached tokens are the engine's own report; without one, the designed prefix
+    is assumed."""
     cap = info.max_model_len - 8
     lengths = tuple(sorted({min(n, cap) for n in lengths if n > 0}))
+    prefixes = tuple(sorted({c - c % info.block_size for c in cached if c >= info.block_size}))
     for _ in range(2):  # warm-up: first requests after start-up pay one-off costs
         engine.stream(info.model, _prompt(rng, 32, token_range), 1)
+
+    def timed(ids: list[int], assumed_cached: int, what: str) -> dict[str, float]:
+        rec = engine.stream(info.model, ids, 1)
+        why = _check(rec, len(ids), 1)
+        if why:
+            raise CalibrationError(f"prefill request ({what}) failed: {why}")
+        reported = ((rec["usage"] or {}).get("prompt_tokens_details") or {}).get("cached_tokens")
+        if reported is None and assumed_cached and notes is not None and not notes:
+            notes.append("the engine does not report per-request cached tokens "
+                         "(--enable-prompt-tokens-details); each warmed prefix was assumed cached")
+        hit = assumed_cached if reported is None else reported
+        return {"prompt_tokens": len(ids), "uncached_tokens": len(ids) - hit,
+                "ttft_s": rec["t_first"] - rec["t_send"]}
+
     points = []
     for _ in range(reps):
         for n in lengths:
-            rec = engine.stream(info.model, _prompt(rng, n, token_range), 1)
-            why = _check(rec, n, 1)
-            if why:
-                raise CalibrationError(f"prefill request of {n} tokens failed: {why}")
-            cached = ((rec["usage"] or {}).get("prompt_tokens_details") or {}).get(
-                "cached_tokens") or 0
-            points.append({"prompt_tokens": n, "uncached_tokens": n - cached,
-                           "ttft_s": rec["t_first"] - rec["t_send"]})
+            points.append(timed(_prompt(rng, n, token_range), 0, f"{n} cold tokens"))
+        for c in prefixes:
+            for n in new:
+                if n <= 0 or c + n > cap:
+                    continue
+                prefix = _prompt(rng, c, token_range)
+                warm = engine.stream(info.model, prefix, 1)
+                why = _check(warm, c, 1)
+                if why:
+                    raise CalibrationError(f"warming a {c}-token prefix failed: {why}")
+                points.append(timed(prefix + _prompt(rng, n, token_range), c,
+                                    f"{n} new tokens after {c} cached"))
     return points
 
 
@@ -513,6 +548,8 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
               name: str | None = None, kv_blocks: int | None = None,
               block_size: int | None = None, max_num_seqs: int | None = None,
               prefill_lengths: tuple[int, ...] = DEFAULT_PREFILL_LENGTHS, reps: int = 3,
+              prefill_cached: tuple[int, ...] = DEFAULT_PREFILL_CACHED,
+              prefill_new: tuple[int, ...] = DEFAULT_PREFILL_NEW,
               decode_batches: tuple[int, ...] = DEFAULT_DECODE_BATCHES,
               decode_contexts: tuple[int, ...] = DEFAULT_DECODE_CONTEXTS,
               decode_tokens: int = 64, check_sessions: int = 16, check_turns: int = 3,
@@ -528,8 +565,10 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
     for note in info.notes:
         log(f"         {note}")
 
+    prefill_notes: list[str] = []
     prefill = measure_prefill(engine, info, rng, lengths=prefill_lengths, reps=reps,
-                              token_range=token_range)
+                              token_range=token_range, cached=prefill_cached, new=prefill_new,
+                              notes=prefill_notes)
     decode = measure_decode(engine, info, rng, batches=decode_batches, contexts=decode_contexts,
                             output_tokens=decode_tokens, token_range=token_range)
     f = fit(prefill, decode, output_tokens=decode_tokens)
@@ -541,7 +580,10 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
     log(f"prefill  {f['prefill_per_token_s'] * 1e3:.3f} ms per new token + "
         f"{f['prefill_attn_s'] * 1e6:.3f} ms per new token per 1K attended + "
         f"{f['prefill_base_s'] * 1e3:.1f} ms  (R² {f['prefill_fit']['r2']:.2f}, "
-        f"{len(prefill)} requests)")
+        f"{len(prefill)} requests, "
+        f"{sum(1 for q in prefill if q['uncached_tokens'] < q['prompt_tokens'])} after a cached "
+        "prefix)")
+    f["notes"] = [*prefill_notes, *f["notes"]]
     for note in f["notes"]:
         log(f"         {note}")
 

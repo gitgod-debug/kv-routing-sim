@@ -18,9 +18,9 @@ The first public version: planned for PyPI before 2026-11-20.
 - **Trace adapters:** `vllm-jsonl`, `openai-log`, and `mooncake` (the FAST'25 traces: 512-token
   block hashes, sessions inferred). Prompts enter as block hashes only; no text is ever read.
 - **`kvsim calibrate`** — fit the context-aware timing model to your own running vLLM (decode cells
-  over context length × batch, `--decode-contexts`; prefill over prompt length), read its KV
-  capacity, and check the cache model against its counters, request by request. Standard library
-  only.
+  over context length × batch, `--decode-contexts`; prefill over prompt length, cold and after a
+  cached prefix, `--prefill-cached` and `--prefill-new`), read its KV capacity, and check the cache
+  model against its counters, request by request. Standard library only.
 - **A context-aware timing model** (C2): prefill and decode cost grow with context length. Both
   terms default to zero, so every earlier profile gives the same results as before.
 - **`kvsim generate`** (agentic traffic with shared prompts, including many tenants) and
@@ -37,4 +37,7 @@ The first public version: planned for PyPI before 2026-11-20.
 - `kvsim calibrate`'s cache check and capacity reading were proven on a real T4 (C1); its
   context-aware timing fit so far only against the mock engine, though the same procedure predicted
   held-out traffic on a real T4 (C2).
+- `kvsim calibrate` times prompts of up to 2,048 tokens and decode contexts of up to 1,024 by
+  default. Longer prompts are an extrapolation unless you measure there (`--prefill-lengths`,
+  `--prefill-cached`, `--decode-contexts`).
 - `--format html` is not built; `md` and `json` are.

@@ -240,6 +240,8 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
             model=args.model, gpu=args.gpu, name=args.name, kv_blocks=args.kv_blocks,
             block_size=args.block_size, max_num_seqs=args.max_num_seqs,
             prefill_lengths=_ints(args.prefill_lengths, "--prefill-lengths"), reps=args.reps,
+            prefill_cached=_ints(args.prefill_cached, "--prefill-cached"),
+            prefill_new=_ints(args.prefill_new, "--prefill-new"),
             decode_batches=_ints(args.decode_batches, "--decode-batches"),
             decode_contexts=_ints(args.decode_contexts, "--decode-contexts"),
             decode_tokens=args.decode_tokens, check_sessions=args.check_sessions,
@@ -321,7 +323,11 @@ def build_parser() -> argparse.ArgumentParser:
     cal.add_argument("--block-size", type=int, default=None)
     cal.add_argument("--max-num-seqs", type=int, default=None)
     cal.add_argument("--prefill-lengths", default="64,128,256,512,768,1024,1536,2048")
-    cal.add_argument("--reps", type=int, default=3, help="repeats of each prefill length")
+    cal.add_argument("--prefill-cached", default="256,768,1280",
+                     help="cached-prefix lengths: new tokens are timed after each (0 = none)")
+    cal.add_argument("--prefill-new", default="64,256,704",
+                     help="new-token counts timed after each cached prefix")
+    cal.add_argument("--reps", type=int, default=3, help="repeats of each prefill cell")
     cal.add_argument("--decode-batches", default="1,2,4,8,16")
     cal.add_argument("--decode-contexts", default="32,512,1024",
                      help="prompt lengths for the decode cells: they fit the context term")
