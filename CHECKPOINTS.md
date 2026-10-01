@@ -11,8 +11,8 @@
 
 **Last updated:** 2026-09-30 (**C2 ran — all three predictions true; the finding re-tested on the
 validated timing model and its "route by prefix" half FALSIFIED**; before that: H6, R1 and R2, Phase 6
-and C1, the demo, the preprint draft, `kvsim calibrate`, a wheel that works outside a clone. Tests
-green except the three that read the four registered notebooks now deleted from disk. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
+and C1, the demo, the preprint draft, `kvsim calibrate`, a wheel that works outside a clone. 189
+tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
 vLLM under eviction pressure to the token, against predictions committed before the run)
 **Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding — changed 2026-09-30:** *keep each
 user on one GPU*; on the validated timing model session-sticky needs the fewest T4s or ties at 22 of 24
@@ -21,8 +21,8 @@ R1/R2 ran on the first, context-free timing model (not yet re-run) · ✅ **6** 
 T4s within 1.4% (run twice); latency explained by C2 · ✅ **C2** — context, not CPU; the context-aware
 model predicts held-out traffic within 1.41× · 🔨 **7** — demo on the validated grid, 10×/100× done,
 `kvsim calibrate` proven on a real T4 (C1); PyPI left · 🔨 **8** — the preprint rewritten around the
-reversal. ▶ **Next:** `kvsim calibrate` fits the context terms; re-run H6 and R1/R2 on the validated
-model; restore the four deleted notebooks (`git checkout -- notebooks/`).
+reversal. ▶ **Next:** run C3 on Kaggle (the new `kvsim calibrate` on a real T4); re-run H6 and
+R1/R2 on the validated model.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -580,8 +580,8 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       sticky at 0.25–1/s and loses at 2 (11 against 10). Post hoc: sticky best or tied at 22 of 24
       points; the exceptions are prefix routing with a small weight (8 against 10 at K=64, 2/s)
 - [ ] Re-run H6 and R1/R2 on the validated model — they ran on the context-free profile
-- [ ] **Restore the four registered notebooks** deleted from disk on 2026-09-30 (Phase 0, 3, 6,
-      C1): `git checkout -- notebooks/`. Safe in git; their tests fail until then
+- [x] **Restore the four registered notebooks** deleted from disk on 2026-09-30 (Phase 0, 3, 6,
+      C1) — restored from git on 2026-10-01; their tests pass again (189 green)
 - [x] ⛔ **TTFT percentiles only from separate GPUs** — the notebook runs one server per physical GPU.
       They are **T4** percentiles, and reported, not tested
 - [-] **Fallback, decided in advance** — not needed: two replicas ran. (It was: if 2 replicas prove
