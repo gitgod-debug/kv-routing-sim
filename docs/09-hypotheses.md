@@ -197,12 +197,18 @@ calibration cannot cash.
 |---|---|---|---|
 | **H1** | Prefix-affinity dominates hit rate under high sharing | Phase 4 | `[x]` ⛔ **FALSIFIED 2026-09-22 — by load.** Holds exactly at 1–2 sessions/s; gone or reversed from 3/s, where concentration forces preemption |
 | **H2** | ⭐ The crossover boundary exists and is monotonic | Phase 5 | `[x]` ⛔ **FALSIFIED 2026-09-28** — pure affinity loses at every sharing > 0 (the opposite direction); the balanced policy has no monotone boundary |
-| **H2b** | ⭐ Prefix-affinity pays once the tenants' prompts outgrow one replica's cache | Phase 5 | `[x]` ✅ **HOLDS 2026-09-28** — sticky wins at K = 1; affinity holds the SLO at K = 64 where sticky cannot on 8 |
+| **H2b** | ⭐ Prefix-affinity pays once the tenants' prompts outgrow one replica's cache | Phase 5, then re-tested on C2's timing model | `[x]` ✅ held 2026-09-28 **on the first, context-free timing model** — sticky wins at K = 1; affinity holds the SLO at K = 64 where sticky cannot on 8 · ⛔ **FALSIFIED 2026-09-30 on the validated model**: at K = 64 affinity wins at no load (ties at 0.25–1 session/s, 11 T4s against sticky's 10 at 2) |
 | **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[x]` ✅ **PASSED 2026-09-22** — **zero** error on 2 sequential shapes under eviction pressure (3 runs each, every counter and all 120 requests' cached tokens); **+0.3%** on the concurrent shape |
 | **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[x]` ✅ **supported, in its second amendment's form (2026-09-22):** plain LRU's residual on a live engine is **capacity** skew (−11.9 pts when requests hold decode blocks, 0.17 without); histogram counts exact, W2 distributions identical |
 | **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[~]` **holds only for balanced affinity at LOW sharing** (1–3 fewer T4s); falsified elsewhere. Session-sticky (untested) needs the fewest everywhere |
 | **R1** | Real traffic (Mooncake): affinity beats sticky on tool-agent, never on conversation | R1 | `[x]` ⛔ **FALSIFIED 2026-09-28** — both directions wrong; sticky and balanced affinity within one replica; pure affinity fails everywhere |
 | **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 + 5 (CPU-only re-runs) | `[x]` ⛔ ranking half **FALSIFIED** — τ-b down to 0.51 · ✅ crossover half **HOLDS** — H2b's flip shifts but never inverts in all four regimes (both 2026-09-28) |
+
+| **R2** | Real traffic (AgentX): with nothing shared across users, sticky and balanced affinity tie, and pure affinity does not collapse | R2 | `[x]` ✅ **HOLDS 2026-09-28** (on the context-free timing model) |
+| **Phase 6** | The simulator's hit rates hold on two live replicas: each within 10%, policies in the predicted order | Phase 6 | `[x]` ✅ **HOLDS 2026-09-28**, run twice — every hit rate within 1.4% · ⚠️ latency came out 5–222× the prediction (not a registered rule; explained by C2) |
+| **C1** | `kvsim calibrate` works on a real GPU: its cache check exact, the capacity it reads equal to the engine's | C1 | `[x]` ✅ **HOLDS 2026-09-28** — 48 of 48 requests; its straight-line timing fit is rough |
+| **C2** | Timing: decode slows with context (C2a); a busy second GPU slows the first (C2b); a context-aware model predicts held-out traffic within 2× (C2c) | C2 | `[x]` **2026-09-30, all three as predicted** — C2a ✅ 1.92× · C2b ⛔ 1.00× · C2c ✅ within 1.41× |
+| **C3** | The context-aware `kvsim calibrate` on a real GPU: it works (C3a); its profile predicts traffic it never saw within 2× (C3b); C2's profile predicts another day within 2×, from numbers registered before (C3c) | C3 | `[~]` **registered 2026-10-01** — `configs/c3_calibrate.yaml`; not run yet |
 
 **Amendments:** *(add dated entries below, never edit above)*
 
@@ -1110,3 +1116,79 @@ for each request, not the one the design intended.
 the command's 32, six cold lengths for its eight, a cache reset before every cell where the command
 has none); and the two workloads it replays have now been used to choose the command's design. C3 is
 the test, and it adds a workload that no design decision has seen.
+
+### 2026-10-01 — C3 REGISTERED before it runs: the context-aware `kvsim calibrate` on a real GPU
+Design and rules: [`configs/c3_calibrate.yaml`](../configs/c3_calibrate.yaml). Notebook:
+`notebooks/c3_calibrate_t4.ipynb`, built by `scripts/c3_prepare.py` with the package's wheel inside
+it. Analysis: `scripts/c3_analyze.py`. Registered numbers, the wheel's hash and the commit it was
+built from: `artifacts/results/c3_prereg/predictions.json`. All committed before the run.
+
+**Why.** `kvsim calibrate` is the project's answer to "why trust your numbers on my hardware?". C1
+proved its cache check and its capacity reading on a real T4, with its first, straight-line timing
+fit. C2 showed that line up to 7× optimistic and validated a context-aware model — but fitted by an
+analysis script, on 101 measured points. The command now fits that model itself, from fewer cells of
+its own, and that fit has only ever met a mock engine.
+
+**The setup.** One vLLM 0.30.0 server, Qwen3-4B on one T4, C2's flags (1,537 blocks).
+- **Part 1** — the command, every timing cell at its default, seed 0. This is the tested run.
+- **Part 2** — three held-out workloads on the same engine, sent and measured by the cell that
+  measured C2's part D. Two are C2's own, unchanged (`K1_half`, `K64_quarter`: the same trace
+  fingerprints). The third, `T6_K8`, is new: prompts of 630–1,130 tokens instead of 1,550–1,850,
+  half the sharing, six turns, eight prompts, another seed, at 0.3 sessions/s. It is there because
+  the pre-check above used C2's recording of the first two to change the command's design; for the
+  command, only `T6_K8` is still blind.
+- **Part 3** — the command again, seed 1, after the traffic. Reported, not tested.
+
+**The rules.**
+- **C3a — the command works on a real engine.** Its first run exits 0 and marks the profile
+  calibrated; the hits and queries its check measured equal the registered prediction (**9,840 of
+  13,776 tokens**); all **48** check requests' cached tokens equal the model's; and the capacity it
+  read equals the engine log's `GPU KV cache size` ÷ 16. All five, recomputed from the raw files.
+- **C3b — its profile predicts traffic it never saw.** For every workload, p50 and p95 TTFT within
+  **2×** of the measured ones, replayed at the times the requests were really sent — C2c's rule and
+  C2c's replay code.
+- **C3c — C2's profile predicts another day.** For every workload, the numbers below within **2×**
+  of the measured ones. They are computed now, at the scheduled times, from the profile committed
+  on 2026-09-30:
+
+  | workload | hit rate | p50 TTFT | p95 TTFT | preemptions |
+  |---|---:|---:|---:|---:|
+  | `K1_half` | 0.9230 | 1,443 ms | 3,277 ms | 6 |
+  | `K64_quarter` | 0.8304 | 420 ms | 1,892 ms | 0 |
+  | `T6_K8` | 0.8517 | 304 ms | 659 ms | 0 |
+
+A rule whose data is missing is undecided, and an undecided rule does not hold.
+
+**Predicted: all three hold.** C3a: C1's check was exact with this seed, and the timing cells are
+C2's, which ran clean. C3b: the pre-check put the command's cells within 1.36× on C2's data. C3c:
+C2c held at 1.41× on the two shared workloads.
+
+**What would be uncomfortable, written down now.**
+- **`K1_half` sits at the knee, and it can sink C3b and C3c by itself.** C2's profile predicts 6
+  preemptions there, where C2's engine had none, and a p95 of 3.3 s against the 2.3 s C2 measured —
+  already 1.41×. A session a few percent faster than C2's moves the measured p95 down and that
+  factor toward 2; a few percent slower can push the real engine over the edge the model already
+  sees. One of a rule's six numbers failing while the other five are close would say "the model
+  is fragile at saturation", not "the model is wrong" — and the write-up must say which, with the
+  numbers.
+- **`T6_K8` is half the prompt length of anything this model was tested on with traffic.** If the
+  fixed costs (decode base, per sequence) are off, it shows there and not at 1,700 tokens.
+- **The command's cells are not C2's.** 15 decode cells measured once, against 28 measured twice; a
+  32-token context where C2 started at 128; no cache reset between cells. The pre-check could not
+  test any of that.
+- **If C3b fails where C3c holds,** the model is right and the command's measurement is not good
+  enough. The README would then have to say that `kvsim calibrate`'s timings are not to be trusted
+  yet — in the place where it now says they are untested.
+- **If the two seeds disagree** (parts 1 and 3) by more than the factors are away from 2×, a
+  single run of the command is luck, and a user who runs it once cannot rely on it.
+
+**Reported, not tested** (listed in the config before the run): the second run of the command; its
+coefficients against C2's fit; C2's profile replayed at the real send times; the two shared
+workloads against C2's own session; and — `scripts/c3_analyze.py --grid` — the registered H2b-C2
+grid re-run on the command's profile against the committed table: does a second calibration of the
+same GPU give the same GPU counts?
+
+**Dry-run** (`scripts/c3_dryrun.py`, a mock engine with known context terms, where the model is the
+engine): the command recovers them (decode 4.00e-6 against 4e-6 s per context token; prefill
+attention 2.2e-8 against 2e-8), its check is exact, and all three rules hold within 1.07×. That
+proves the plumbing, and nothing about vLLM.

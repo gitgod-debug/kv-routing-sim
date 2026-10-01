@@ -150,6 +150,20 @@ def test_cached_prefix_cells_that_do_not_fit_the_engine_are_skipped():
     assert len(notes) == 1 and "assumed" in notes[0]
 
 
+def test_the_command_lines_default_cells_are_the_librarys():
+    """The default cells are named twice — the parser's strings and the library's constants. If
+    they drift apart, the documented procedure and the one that runs are different procedures."""
+    from kv_routing_sim.calib import calibrate as lib
+    from kv_routing_sim.cli import _ints, build_parser
+
+    ns = build_parser().parse_args(["calibrate", "--out", "x.json"])
+    assert _ints(ns.prefill_lengths, "") == lib.DEFAULT_PREFILL_LENGTHS
+    assert _ints(ns.prefill_cached, "") == lib.DEFAULT_PREFILL_CACHED
+    assert _ints(ns.prefill_new, "") == lib.DEFAULT_PREFILL_NEW
+    assert _ints(ns.decode_batches, "") == lib.DEFAULT_DECODE_BATCHES
+    assert _ints(ns.decode_contexts, "") == lib.DEFAULT_DECODE_CONTEXTS
+
+
 def test_a_wrong_block_size_is_caught_by_the_check(mock_url):
     """With 32-token blocks the model mispredicts almost every request's cached tokens, while the
     total hit rate moves by only a few percent — which is why every request is compared."""
