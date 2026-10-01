@@ -324,6 +324,7 @@ delete it and get it back, it doesn't ship.**
 | [`docs/06-methodology.md`](docs/06-methodology.md) | The statistics protocol and the cost model |
 | [`docs/09-hypotheses.md`](docs/09-hypotheses.md) | **Every hypothesis, pre-registered** — H1–H6, H2b, R1–R2, C1–C2, Phase 6 and the re-test — with dated results, falsified ones included |
 | [`docs/11-where-we-are.md`](docs/11-where-we-are.md) | The whole story so far, in plain words |
+| [`docs/12-story-notes.md`](docs/12-story-notes.md) | Short pieces written to be told, each with its proof linked — starting with the day the finding changed |
 | [`CHECKPOINTS.md`](CHECKPOINTS.md) | Where the build actually is |
 
 **Sibling project:** [`colpali-lite`](../colpali-economics) — the same method (cost and tail latency under a
