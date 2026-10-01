@@ -1075,3 +1075,38 @@ the hit rate there but does not, with the registered weight, save a GPU. The ear
 in this log as written: it was a correct result about the context-free model, and that model was
 wrong about the engine. Which of H1–H6, R1 and R2 change on the validated model is not yet tested —
 they all ran on the context-free profile.
+
+### 2026-10-01 — POST HOC, no GPU: `kvsim calibrate`'s own cells, checked on C2's data. Cold prompts alone are not enough.
+Report: [`artifacts/results/c3_prereg/precheck.md`](../artifacts/results/c3_prereg/precheck.md), made
+by `scripts/c3_precheck.py`.
+
+**Why it was run.** Since 2026-09-30 `kvsim calibrate` fits C2's context-aware model — but from its
+own, smaller set of cells: 15 decode cells measured once (C2: 28, twice), and prefill on **cold
+prompts only** (C2: also after a cached prefix). Before a GPU is spent on that command's first real
+run (C3), the question was whether those cells would have been enough on the data C2 already
+recorded.
+
+**What it did.** It took from C2's recording the cells the command would have measured, fitted them
+with the command's own code, and replayed C2's two held-out workloads with the result — the replay
+C2c was decided on.
+
+**Result.** With cold prompts only, K1_half's p95 comes out at 13.2 s and 16.7 s (the two decode
+reps) against 2.3 s measured: **5.7× and 7.2×**, far past C2c's 2× limit. With C2's cached-prefix
+cells added, every factor is within **1.36×** (K1_half 1.03–1.21×).
+
+**Why.** On a cold prompt the tokens attended to are always half the prompt, so cold cells measure
+only n and n². The fit split them as 0.239 ms per token + 0.842 ms per token per 1K attended, with
+a 20.8 ms base; C2's full fit has 0.319 + 0.758 and no base. Both describe cold prompts equally
+well. Agentic traffic is the other case — about 1,570 cached tokens and 130 new ones per request on
+K1_half — and there the cold-only fit charges 14% more prefill time. K1_half runs at the knee of
+the load curve, where 14% more service time becomes several times more queueing.
+
+**What changed.** `kvsim calibrate` now also times new tokens after a cached prefix — 64, 256 and
+704 new tokens after 256, 768 and 1,280 cached ones, which are C2's part-B cells
+(`--prefill-cached`, `--prefill-new`) — and gives the fit the cached-token count the engine reports
+for each request, not the one the design intended.
+
+**What this is not.** Not a test. It is post hoc; it uses C2's cells as stand-ins (context 128 for
+the command's 32, six cold lengths for its eight, a cache reset before every cell where the command
+has none); and the two workloads it replays have now been used to choose the command's design. C3 is
+the test, and it adds a workload that no design decision has seen.

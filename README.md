@@ -210,9 +210,9 @@ shipped ones are byte-for-byte `configs/profiles/` and `configs/cost_model.yaml`
 
 To get **your** numbers, point `kvsim calibrate` at your own running vLLM (prefix caching on). It
 fits C2's context-aware timing model to your GPU and model — decode steps timed at several context
-lengths and batch sizes, prefill at several prompt lengths — reads the KV capacity from the engine,
-and checks the cache model against the engine's own counters. That takes a few minutes and needs nothing beyond the core
-install:
+lengths and batch sizes, prefill at several prompt lengths and after a cached prefix — reads the KV
+capacity from the engine, and checks the cache model against the engine's own counters. That takes a
+few minutes and needs nothing beyond the core install:
 
 ```bash
 kvsim calibrate --engine http://localhost:8000 --out mine.json
@@ -225,9 +225,12 @@ cache check came out exact — all 48 requests' cached tokens, 9,840 of 13,776 t
 engine's 1,537 blocks correctly, in 48 seconds ([report](artifacts/results/c1_kaggle_t4/report.md)).
 That version fitted a straight line with no context term, which C2 then showed is up to 7×
 optimistic; since 2026-09-30 the command fits the context-aware model instead, and recovers known
-context terms from a mock engine (3.97e-6 against 4e-6 s per context token). ⚠️ That new fit has
-not yet been run on a real GPU — its procedure has (C2, where it predicted held-out traffic within
-1.41×).
+context terms from a mock engine (3.97e-6 against 4e-6 s per context token). A check on C2's
+recorded data then showed that timing cold prompts alone would have put a held-out p95 off by
+5.7–7.2×, so since 2026-10-01 it also times new tokens after a cached prefix — the case agentic
+traffic is made of ([pre-check](artifacts/results/c3_prereg/precheck.md), post hoc). ⚠️ That new fit
+has not yet been run on a real GPU — its procedure has (C2, where it predicted held-out traffic
+within 1.41×).
 
 ## ⭐ What transfers to your fleet, and what doesn't
 
