@@ -221,6 +221,45 @@ either policy.***
   the same token ranges** — so those grids cannot show that weakness, and "session-sticky needs the
   fewest GPUs" was measured where sticky is at its best.
 
+**Two more things in SMetric that this repo had counted as its own** *(read later the same day)*.
+
+- **The prefill cost model.** SMetric's load model is cost(n, L) = c_linear·n + c_attn·n·(L − n/2):
+  n new tokens, each attending on average to L − n/2 of a context of L. It cites KunServe (Cheng et
+  al., EuroSys 2026) for it — a paper this pass did not open. With L = c + n that is exactly the
+  prefill term C2 fitted on 2026-09-30: p1·n + p2·n·(c + n/2). C2's registration derived it from
+  the cost of attention and knew neither paper. **The form is prior art.** The T4 coefficients, and
+  the registered test that the model predicts held-out traffic within 1.41×, are this repo's.
+- **What plain session-sticky routing loses.** SMetric's ablation starts from *"basic
+  session-centric"* routing, *"similar to llm-d (session)"*, and adds migration: +8.8% peak
+  throughput for a rule based on load, a further +7.2% for the one based on the SLO (colocation;
+  +27.9% and +24.7% with prefill and decode on separate instances) — *"confirming that
+  session-centric scheduling alone cannot handle overloading cases."* So on its traces, never
+  moving a session costs about a seventh of peak throughput. This repo's grids say sticky is best
+  or tied, and they could not have said otherwise: no session in them is long enough to overload
+  anything.
+
+**Two definitions read from code, because this repo's own code states them loosely** *(the same
+day; the files are named so the next reader can check)*.
+
+- **LMetric, as its authors run it** — `blitz-serving/blitz-router`, branch `lmetric/camera-ready`,
+  `docs/dsl/policies.md` and `schema.md`: *"Select min by prefill_tokens(req, sctx) · (sctx.bs +
+  1)"*, where `bs` is the replica's running plus queued requests, and `prefill_tokens` is the
+  prefill tokens already queued there plus this request's own after its cache hit. The `+ 1` keeps
+  idle replicas apart by their queued prefill. That repo also carries the authors' versions of the
+  baselines — vLLM, Bailian, AIBrix, Dynamo, Preble, llm-d — as one-line definitions.
+- **What a production router knows about the caches.** In that router the prefix index follows the
+  engine's own step events. Dynamo's design doc says the same of its router: cached blocks are
+  *"maintained globally by the KvIndexer using a prefix tree built from worker-reported KV
+  events"*, and routing from the router's own dispatch history is the *approximate* mode
+  (`--no-router-kv-events`). ⛔ **This repo's `policies/radix_affinity.py` says the opposite** —
+  that its dispatch-only view is "exactly as SGLang's router and Dynamo's KV-aware router do", and
+  that a view of the true caches "would be pure fiction". For event-driven routers the true view
+  is the real one, late by an event. The simulator models only the approximate kind. That is a
+  limit to state, and a second index mode to build before either published policy is run here.
+  (Dynamo's score, from the same doc: new prefill blocks after an overlap credit, plus the blocks
+  its active requests will decode — not the "matched blocks − α · backlog" this repo's
+  `radix_affinity_balanced.py` attributes to it.)
+
 **What this does to the finding.** *"Keep each user on one GPU"* was published, from production
 traces and real clusters, two months before this repo measured it on a simulated T4. So were its
 two companions: pure prefix-affinity crowds sessions onto few instances and loses (both papers'
