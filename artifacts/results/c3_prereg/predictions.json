@@ -379,5 +379,14 @@
    }
   }
  },
- "predictions_sha256": "be7f0a763637def2b2d2a16af1a4ea0b6586c8fec777abd4b0d10e705a309d86"
+ "predictions_sha256": "be7f0a763637def2b2d2a16af1a4ea0b6586c8fec777abd4b0d10e705a309d86",
+ "amendments": [
+  {
+   "date_utc": "2026-10-05T09:31:17+00:00",
+   "git_sha": "045df00",
+   "why": "The first attempt stopped when the engine was launched, before any measurement: Kaggle's new image keeps a torchaudio built for another CUDA than the torch vLLM installs. A pre-flight cell now repairs that, refuses a GPU that is not a T4 and checks that vLLM can start, and every early stop leaves a zip.",
+   "notebook_sha256_before": "abbb1b9141cd26bbb7a6e3184280d5a0373c5d4bfd1f42b59c91713ae5370baa",
+   "notebook_sha256_after": "12ca0cab2959bd8ed8a8934a6ba8204844b67394e762d8b0fe588b06d3cefdf4"
+  }
+ ]
 }
