@@ -213,6 +213,8 @@ calibration cannot cash.
 | **T1** | The simulator's per-token latency matches the engine's: mean inter-token latency within 1.5× on the five held-out runs on disk | T1 | `[x]` ⛔ **DOES NOT HOLD 2026-10-05** (predicted: holds) — within 1.07× on the three runs off the knee, **1.54× and 1.71× too slow** on the two at it |
 | **T2** | Under a target with both halves (p95 TTFT ≤ 2 s **and** p95 time per output token ≤ 100 ms), on three calibrations: sticky still best or tied with 1 and 4 prompts (T2a), never worse than round-robin or least-loaded (T2b), and the first-token counts were optimistic by ≥ 1.5× (T2c) | T2 | `[x]` ✅ **2026-10-05, all three as predicted, on all three calibrations** — T2a 12 of 12 · T2b no exception · T2c 1.93–2.00× · ⚠️ these are the model's counts, and T1 says its per-token latency is unchecked where they live |
 
+| **C4** | On a real T4: `kvsim calibrate` with its repeats (C4a); decode of batches that share a prefix — free by itself (D1a), still a straight line past the cache (D1b); an arriving request's stall = its prefill (D2); per-request token times on traffic around the limit (T3a, T3b); one run's spread covers another's count (E); the 64-prompt question on fresh fits (F1, F2) | C4 | `[~]` **registered 2026-10-05** — `configs/c4_per_token.yaml`; not run yet |
+
 **Amendments:** *(add dated entries below, never edit above)*
 
 ### 2026-09-22 — H4 is NOT dead. It has not been tested yet, because we used the wrong flag.
@@ -1559,3 +1561,108 @@ battery. The rule this breaks is simple, and now written down in `CONTRIBUTING.m
 - **Next, on a GPU:** per-request token times on traffic around the per-token limit; decode cells
   that share a prefix; what an arriving request costs the sequences already decoding; and
   `kvsim calibrate` with its repeats.
+
+### 2026-10-05 — C4 REGISTERED before it runs: the per-token model where it matters, on a real GPU
+Design and rules: [`configs/c4_per_token.yaml`](../configs/c4_per_token.yaml). Notebook:
+`notebooks/c4_per_token_t4.ipynb`, built by `scripts/c4_prepare.py` with the package's wheel inside
+it. Analysis: `scripts/c4_analyze.py`, and `scripts/c4_grids.py` for the two rules decided
+afterwards on a CPU. Registered numbers, the wheel's hash and the commit it was built from:
+`artifacts/results/c4_prereg/predictions.json`. All committed before the run.
+
+**Why.** Four things from today rest on something a GPU has not shown.
+- **T1** found the simulator's per-token latency within 7% of a live engine off the knee, and
+  1.5–1.7× too slow at it — where its decode cost is a straight line drawn eight times past the
+  largest batch any calibration cell measured.
+- **T2** says a target with both halves doubles the replica counts — in a regime, under 100 ms per
+  token, where no traffic has ever been measured.
+- **`kvsim calibrate`'s repeats**, and the spread `kvsim replay` prints from them, have met only a
+  mock engine.
+- **The 64-prompt question** has one hint for prefix routing under the first-token target (a load
+  weight of 1), none under the two-part one — on calibrations that were also used to find the hint.
+
+**The setup.** One vLLM 0.30.0 server, Qwen3-4B on one T4, C2's and C3's flags (1,537 blocks),
+behind C3's pre-flight. Every predicted number below is from profile A, the shipped C2 fit.
+- **Part 1** — `kvsim calibrate`, every cell at its default: three repeats of each. The tested run.
+- **Part 2** — decode steps of batches that **share a cached prefix**: a 1,360-token prefix cached
+  by one request, then b requests of prefix + 48 unique tokens, for b = 8, 12, 16, 32, 64, 96 and
+  128, twice each. The batch's summed context goes from 11,552 to **184,832 tokens — 9.2× the
+  largest C2 ever fitted** (20,200), which a cell of unique prompts cannot do: it would not fit the
+  cache. Two controls with unique prompts of the same length (b = 8, 12).
+- **Part 2b** — what an arriving request costs the sequences already decoding: b = 8, 32 and 64
+  sequences are decoding; about 25 tokens in, one more request arrives with 128 new tokens. Every
+  running sequence sees one long gap. The simulator's rule — that step costs prefill + decode,
+  added — has never been measured directly.
+- **Part 3** — three held-out workloads on new seeds, every request's first and last token time
+  kept, and the engine's own per-request histogram read before and after (its buckets have a bound
+  at exactly 0.1 s, so "what share of requests is within the limit" needs no interpolation):
+
+  | workload | prompts | profile A: p95 ms per token | share within 100 ms | mean gap | p95 TTFT |
+  |---|---|---:|---:|---:|---:|
+  | `long_below` — the finding's traffic at a fifth of the knee load | 1,550–1,850 | **82.9** | 100.0% | 64.1 ms | 400 ms |
+  | `short_at` — shorter prompts, eight of them, six turns | 630–1,130 | **104.3** | 91.4% | 65.5 ms | 382 ms |
+  | `long_above` — the finding's traffic at twice `long_below`'s load | 1,550–1,850 | **298.5** | 46.1% | 131.9 ms | 736 ms |
+
+- **Part 4** — the command twice more (seeds 1, 2), after the traffic.
+
+**The rules.** "Within f×" is either direction; medians over repeats; a rule without its data is
+undecided, and undecided does not hold.
+- **C4a** — the command works, with its repeats: C3a's five conditions on the first run, and the
+  profile carries the fit of each of its 3 repeats.
+- **D1a** — sharing a prefix costs nothing by itself: the shared cell's step within **1.10×** of
+  the unique-prompt control's, at b = 8 and 12.
+- **D1b** — the straight line continues: profile A's step within **1.25×** of the measured one at
+  every shared cell past the largest fitted (b = 16 … 128; A says 126, 212, 385, 557 and 729 ms).
+- **D2** — prefill and decode add up: the extra gap at the arrival within **1.5×** of what A
+  charges (184 ms at every cell).
+- **T3a** — A's p95 time per output token within **1.25×** of the p95 measured client-side, on all
+  three workloads.
+- **T3b** — A's verdict on the 100 ms limit equals the engine's own (95% of its requests within
+  it, from its histogram), on the two workloads registered at least 15% from the limit:
+  `long_below` (A: meets it) and `long_above` (A: does not). `short_at` sits on the limit by
+  design; its verdict is not tested, its numbers are.
+- **E** — decided afterwards, in the simulator: over every ordered pair of the three runs of the
+  command, 18 cells and both targets, the count from one run's pooled fit lies inside the range
+  of the other run's fits (pooled and repeats) in at least **90%** of cases. This is the claim
+  `kvsim replay`'s "how firm" line makes.
+- **F1, F2** — decided afterwards, on the three fresh pooled fits, at 64 prompts. **F1:** under
+  the first-token target, at 2 sessions/s, the load weight of 1 needs fewer replicas than
+  session-sticky on every fit. **F2:** under the two-part target, on every fit, the load weight of
+  1 holds nothing there on 32 replicas, and balanced affinity (α 16) needs fewer replicas than
+  session-sticky at no more than 2 of the 6 loads.
+
+**Predicted: all nine hold.** C4a: C3a held, and the repeats are more of the same requests. D1a:
+attention reads the whole context whether its blocks are shared or not. D1b and D2: T1's failure
+at the knee needs only a 10–15% error at large batches, which the knee then multiplies — so I
+expect the model somewhat too slow at b ≥ 64 and still inside 1.25×. T3: T1 found the *mean* within
+7% at these loads; the per-request tail is the new part. E is the one I am least sure of: nothing
+like it has been measured. F1 and F2 repeat what calibrations A, B and C showed.
+
+**What would be uncomfortable, written down now.**
+- **If D1b and D2 both hold comfortably,** the micro-benchmarks do not explain T1's failure. What
+  is left is that at the knee no realistic accuracy is enough — which C3 already suggested (3–5%
+  became 4.17×) — and the tool should then say "this workload is at the knee" instead of printing
+  a number there.
+- **If D1b fails,** the decode model's form is wrong for traffic that shares a prompt, in the
+  pessimistic direction; `kvsim calibrate` needs shared-prefix cells, and every count on such
+  traffic near the first-token limit has been too high.
+- **If D2 fails,** the rule that composes a step is wrong, and every per-token number — T2's
+  factor of two first — goes with it.
+- **If T3a fails,** the factor of two is not merely unchecked but contradicted where it lives, and
+  the README has to say that instead.
+- **If T3b fails on `long_below`** — the model says the tokens are fast enough and the engine says
+  not — the simulator would under-provision for streaming. That is the dangerous direction.
+- **If E fails,** the spread the tool now prints is too narrow to be relied on, and the "how firm"
+  line needs a warning stronger than "a floor".
+- **If F1 fails,** the hint was noise. **If F2 fails,** there is a saving under both halves after
+  all, and the exploratory reading of T2 was wrong.
+- **One session, one image, one day.** Whatever this shows about another day is shown only by its
+  agreement with profile A, fitted five days earlier on another image.
+
+**Dry-run** (`scripts/c4_dryrun.py`: a mock engine with known context terms, the small
+registration's predictions made with the mock's own profile, so every timing rule must hold with a
+factor near 1): the shared-prefix cells come out within 0.6% of the model and of their
+unique-prompt controls, the stall cells within 7%, the three workloads' p95 time per token within
+1.2%; the engine's histogram share equals the client-side share on all three; all six timing rules
+hold, and E and F are decided from the grids. That proves the plumbing — the shared-prefix cell,
+the stall cell, the per-request token times, the histogram reader, the grids — and nothing about
+vLLM.

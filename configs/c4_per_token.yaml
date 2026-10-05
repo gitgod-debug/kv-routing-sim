@@ -1,0 +1,175 @@
+# C4 — the per-token model where it matters, on a real T4.
+# Registered 2026-10-05, BEFORE it runs, with a dated entry in docs/09-hypotheses.md.
+#
+# Why: two results of 2026-10-05 could not be checked from data on disk.
+#   T1 — the simulator's per-token latency is within 7% of a live engine off the knee of the load
+#        curve and 1.5–1.7× too slow at it; there, its decode cost is a straight line drawn eight
+#        times past the largest batch any calibration cell ever measured.
+#   T2 — under a target with both halves the replica counts double, in a regime (under 100 ms per
+#        token) where no traffic has ever been measured.
+# And two things built that day have met only a mock engine: `kvsim calibrate`'s repeats, and the
+# spread `kvsim replay` prints from them. C4 is one GPU session for all of it.
+# `scripts/c4_prepare.py` builds the notebook with the package's wheel embedded;
+# `scripts/c4_analyze.py` and `scripts/c4_grids.py` are the whole analysis, committed before the
+# run: nothing below is chosen after a result.
+
+schema_version: 1
+engine:                           # C2's and C3's flags exactly, one server on one T4
+  model: Qwen/Qwen3-4B
+  vllm: 0.30.0
+  block_size: 16
+  num_gpu_blocks: 1537
+  max_model_len: 2048
+  max_num_seqs: 256
+  max_num_batched_tokens: 8192
+replicas: 1
+measure_replica: 0
+
+# The profile every registered prediction below is made with: A, the shipped C2 fit of 2026-09-30.
+profile: configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json
+
+slo:                              # the two-part target of configs/tpot_slo.yaml
+  ttft_p95_ms: 2000
+  tpot_p95_ms: 100
+
+# ── Parts 1 and 4: `kvsim calibrate` as a user runs it, every timing cell at its default — now
+# measured three times each, with the fit of each repeat kept. Run once before everything
+# (the first seed: the tested run) and once per further seed after the traffic.
+calibrate:
+  seeds: [0, 1, 2]
+  check_sessions: 16
+  check_turns: 3
+  token_range: [1000, 30000]
+  max_error: 0.05
+
+# ── Part 2: decode steps of batches that SHARE a cached prefix ──────────────────────────────────
+# Every calibration cell so far is b sequences with unique prompts, so the batch's summed context
+# cannot exceed the KV cache: the largest ever measured is 20,200 tokens (C2). A shared system
+# prompt is stored once, so far more sequences fit — and each still attends over all of it. Here:
+# a prefix of 1,360 tokens (the shared prompt of the finding's traffic) cached by one request,
+# then b requests of prefix + 48 unique tokens, sent together. Timed as C2's part A was: a
+# request's step = the mean gap from token `skip_tokens` to its last; the cell's = the median.
+# Blocks: 85 shared + 7 per sequence, so 128 sequences need 981 of 1,536 — no preemption expected.
+decode_shared:
+  prefix_tokens: 1360
+  suffix_tokens: 48
+  output_tokens: 64
+  skip_tokens: 8
+  reps: 2
+  batches: [8, 12, 16, 32, 64, 96, 128]     # summed context 11,552 … 184,832: 0.6× … 9.2× C2's largest
+  controls: [[1408, 8], [1408, 12]]         # [L, b] with UNIQUE prompts of the same length (C2's cell)
+
+# ── Part 2b: what one arriving request costs the sequences already decoding ─────────────────────
+# b sequences that share the cached prefix are decoding 96 tokens each; `delay` seconds in, one more
+# request arrives — the prefix plus 128 new tokens. The step that prefills it carries everyone
+# else's next token, so each running sequence sees one long gap. The simulator's rule: that step
+# costs prefill + decode, added. Per sequence: the gap that ends with the late request's first
+# token, minus the median of its other gaps; the cell's = the median over sequences.
+stall:
+  output_tokens: 96
+  reps: 2
+  cells: [[8, 128, 2.0], [32, 128, 5.0], [64, 128, 9.5]]   # [b, new tokens, delay s ≈ 25 tokens in]
+
+# ── Part 3: held-out traffic around the per-token limit ─────────────────────────────────────────
+# Three workloads on one engine, open-loop at their arrival times, chosen with profile A so that
+# its p95 time per output token is under the limit, at it, and over it. Every request's first and
+# last token time is kept (client-side), and the engine's own per-request histogram
+# (vllm:request_time_per_output_token_seconds, which has a bucket bound at exactly 0.1 s) is read
+# before and after each run. New seeds: no fit and no design decision has seen these traces.
+holdout:
+  shape: &shape
+    session_context_tokens: 150
+    user_turn_tokens: 40
+    assistant_turn_tokens: 60
+    output_tokens: 64
+    think_time_s: 6.0
+  workloads:
+    # One shared prompt, prompts of 1,550–1,850 tokens — the finding's traffic — at a fifth of the
+    # load that puts one T4 at the first-token knee. Profile A: p95 82.9 ms per token.
+    long_below:  {<<: *shape, n_sessions: 60, turns_per_session: 4, prefix_sharing_ratio: 0.8,
+                  seed: 12, arrival_rate: 0.1}
+    # Shorter prompts (630–1,130 tokens), eight prompts, six turns. Profile A: p95 104.3 ms — on
+    # the limit, so its verdict is not tested (T3b), only its numbers (T3a).
+    short_at:    {<<: *shape, n_sessions: 64, turns_per_session: 6, prefix_sharing_ratio: 0.5,
+                  n_shared_prefixes: 8, prefix_zipf_s: 1.0, seed: 11, arrival_rate: 0.15}
+    # The finding's traffic at twice long_below's load. Profile A: p95 298.5 ms, mean 132 ms — the
+    # load range where T1 found the mean right; here the per-request tail is tested.
+    long_above:  {<<: *shape, n_sessions: 96, turns_per_session: 4, prefix_sharing_ratio: 0.8,
+                  seed: 13, arrival_rate: 0.2}
+
+# ── After the run, on a CPU: the fresh calibrations in the simulator (scripts/c4_grids.py) ──────
+# The traffic, cache model and seeds are H2b-C2's (read from configs/h2b_c2.yaml).
+grids:
+  h2b_config: configs/h2b_c2.yaml
+  # E — how firm a count is. Every fit of every run (the pooled one and each repeat's).
+  firmness: {prompts: [1, 64], loads: [0.5, 1, 2], replicas_max: 24,
+             policies: [session-sticky, round-robin, radix-affinity-balanced@16]}
+  # F — the 64-prompt question. The pooled fit of every run.
+  prompts64: {prompts: [64], loads: [0.25, 0.5, 1, 2, 3, 4], replicas_max: 32,
+              policies: [session-sticky, radix-affinity-balanced@16, radix-affinity-balanced@1]}
+
+# ── The decision rules, fixed before the run ────────────────────────────────────────────────────
+# "Within f×" is either direction: max(a ÷ b, b ÷ a) ≤ f. Medians are over repeats. A rule whose
+# data is missing or invalid is UNDECIDED, and an undecided rule does not hold.
+rules:
+  # C4a — the command, with its repeats, works on a real engine. Its first run exits 0 and marks
+  # the profile calibrated; its check's hits and queries equal the registered prediction; every
+  # check request's cached tokens equal the model's; the capacity it read equals the engine log's;
+  # AND the profile carries the fit of each of its 3 repeats.
+  c4a_repeats: 3
+  # D1a — sharing a prefix costs nothing by itself: at each control's batch size, the shared cell's
+  # step is within this factor of the unique-prompt control's.
+  d1a_max_factor: 1.10
+  # D1b — the straight line continues past the cache: for EVERY shared cell whose summed context
+  # is beyond the largest C2 fitted (b ≥ 16), profile A's step is within this factor of the
+  # measured one.
+  d1b_max_factor: 1.25
+  # D2 — prefill and decode add up: at every stall cell, the extra gap is within this factor of
+  # what profile A charges for the arriving request (its prefill, plus one more sequence in the
+  # step).
+  d2_max_factor: 1.5
+  # T3a — per-request token latency on traffic: for EVERY workload, profile A's p95 time per
+  # output token (registered below, at the scheduled times) is within this factor of the p95
+  # measured client-side.
+  t3a_max_factor: 1.25
+  # T3b — the verdict on the per-token half: for the workloads whose registered p95 is at least
+  # this far (relative) from the limit, the model's verdict (p95 ≤ limit?) equals the engine's:
+  # at least 95% of its requests at or under the limit, read from its own histogram (from the
+  # client-side times if the engine has no such histogram, and the report says which).
+  t3b_min_margin: 0.15
+  # E — the spread the tool prints covers another calibration of the same engine: over every
+  # ordered pair of runs (i, j), every cell of the firmness grid and both targets, the count from
+  # run j's pooled fit lies between the smallest and the largest count over run i's fits (pooled
+  # and repeats), in at least this share of cases.
+  e_min_coverage: 0.90
+  # F1 — the first-token hint repeats: at 64 prompts and 2 sessions/s, prefix affinity with a load
+  # weight of 1 needs fewer replicas than session-sticky under the first-token target, on EVERY
+  # fresh pooled fit.
+  f1_load: 2
+  # F2 — and there is no saving with both halves: under the two-part target, on EVERY fresh pooled
+  # fit, (i) the load weight of 1 does not hold the target at 64 prompts and 2 sessions/s on 32
+  # replicas, and (ii) balanced affinity (α 16) needs fewer replicas than session-sticky at no
+  # more than this many of the six loads.
+  f2_max_loads_won: 2
+
+# Reported, not tested:
+#   - the second and third runs of the command (their checks, coefficients, repeats);
+#   - every cell's signed error against profile A, and against each fresh fit;
+#   - each workload's mean inter-token latency, p50, first-token latency and hit rate against the
+#     registered numbers; the engine's histogram share against the client-side share;
+#   - each fresh pooled fit's prediction of the three workloads, replayed at the real send times;
+#   - E with the range widened by one replica, and how often profile A's count is covered;
+#   - the 64-prompt table under both targets on every fresh fit.
+
+# ── The predictions, written before the run ────────────────────────────────────────────────────
+predictions:
+  c4a: holds
+  d1a: holds
+  d1b: holds    # with the model somewhat too slow at the largest batches: T1's knee failure needs
+                # only a 10–15% error there, which a load at the knee then multiplies
+  d2: holds
+  t3a: holds    # T1 found the MEAN within 7% at these loads and above; the tail is the new part
+  t3b: holds
+  e: holds      # the least sure: nothing like it has been measured
+  f1: holds     # 8 against 10–12 on calibrations A, B and C
+  f2: holds

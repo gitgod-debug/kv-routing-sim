@@ -46,6 +46,12 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 NOTEBOOK = REPO / "notebooks" / "phase3_calibration.ipynb"
 QWEN3_VOCAB = 151_936
 LE = (0.001, 0.01, 0.1, 1.0, 10.0, 100.0)  # the mock's histogram buckets; the real ones differ
+# vLLM 0.30.0's INTER_TOKEN_LATENCY_BUCKETS (v1/metrics/buckets.py:83-103) — used there for both
+# vllm:inter_token_latency_seconds and vllm:request_time_per_output_token_seconds. Copied exactly:
+# a notebook that reads "share of requests at or under 100 ms per token" off the engine's
+# histogram needs the 0.1 boundary to be where the real engine has it.
+ITL_LE = (0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0,
+          20.0, 40.0, 80.0)
 
 
 # ── the mock engine ───────────────────────────────────────────────────────────────────────────
@@ -69,6 +75,10 @@ class MockEngine:
             decode_per_ctx_token_s=float(os.environ.get("MOCK_DECODE_PER_CTX_TOKEN_S", "0")),
         )
         self.itl = [0.0, 0]  # vllm:inter_token_latency_seconds — sum, count
+        self.itl_obs: list[float] = []  # …and every observation, for its buckets
+        # vllm:request_time_per_output_token_seconds — one observation per FINISHED request:
+        # (last token − first token) ÷ (tokens − 1), or 0 for a single token (stats.py:549-562).
+        self.tpot_obs: list[float] = []
         self.cv = threading.Condition()
         self.replica = self._new_replica()
         self.folded: dict[str, float] = {}  # counters of replicas retired by a reset
@@ -105,8 +115,13 @@ class MockEngine:
             with self.cv:
                 while not self.replica.has_work:
                     self.cv.wait()
-                dur, finished = self.replica.step(time.monotonic() - self.t0)
+                step_start = time.monotonic() - self.t0
+                dur, finished = self.replica.step(step_start)
                 done = {s.request.request_id for s in finished}
+                for seq in finished:
+                    gaps = seq.tokens_emitted - 1
+                    self.tpot_obs.append(
+                        (step_start + dur - seq.first_token_ts) / gaps if gaps > 0 else 0.0)
                 out = []
                 for seq in [*self.replica.running, *finished]:
                     rid, n = seq.request.request_id, seq.tokens_emitted
@@ -114,6 +129,7 @@ class MockEngine:
                         if self.emitted[rid] > 0:  # a token after the first: one step's gap
                             self.itl[0] += dur * (n - self.emitted[rid])
                             self.itl[1] += n - self.emitted[rid]
+                            self.itl_obs.extend([dur] * (n - self.emitted[rid]))
                         if self.emitted[rid] == 0:  # first token: vLLM books the prompt here
                             cached = seq.matched_blocks * self.bs
                             self.tokens["prompt"] += seq.request.prompt_tokens
@@ -173,6 +189,7 @@ class MockEngine:
             running, waiting = len(self.replica.running), len(self.replica.queue)
             tk = dict(self.tokens)
             itl_sum, itl_count = self.itl
+            itl_obs, tpot_obs = list(self.itl_obs), list(self.tpot_obs)
         lab = 'engine="0",model_name="mock"'
         rows = [
             "# HELP vllm:prefix_cache_queries Prefix cache queries, in terms of number of tokens.",
@@ -197,6 +214,15 @@ class MockEngine:
             f"vllm:inter_token_latency_seconds_sum{{{lab}}} {float(itl_sum)}",
             f"vllm:inter_token_latency_seconds_count{{{lab}}} {float(itl_count)}",
         ]
+        for fam, vals in (("vllm:inter_token_latency_seconds", itl_obs),
+                          ("vllm:request_time_per_output_token_seconds", tpot_obs)):
+            for le in ITL_LE:
+                n = sum(1 for v in vals if v <= le)
+                rows.append(f'{fam}_bucket{{{lab},le="{le}"}} {float(n)}')
+            rows.append(f'{fam}_bucket{{{lab},le="+Inf"}} {float(len(vals))}')
+            if fam.endswith("per_output_token_seconds"):  # the other family's are written above
+                rows.append(f"{fam}_count{{{lab}}} {float(len(vals))}")
+                rows.append(f"{fam}_sum{{{lab}}} {float(sum(vals))}")
         for fam, key in (
             ("vllm:kv_block_lifetime_seconds", "lifetime"),
             ("vllm:kv_block_idle_before_evict_seconds", "idle"),

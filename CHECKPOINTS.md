@@ -696,8 +696,14 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       balanced affinity are 1–2 replicas apart there, with no steady winner. ⚠️ Grids B and C
       carry a dirty header (other files were edited while they ran): 720 of 720 sampled cells
       reproduce from a clean checkout ([`verification.json`](artifacts/results/t2_two_part_slo/verification.json)).
-      **Left:** the GPU check — per-request token times around the limit, shared-prefix decode
-      cells, what an arriving request costs those already decoding
+      🔨 **C4 registered 2026-10-05** ([`configs/c4_per_token.yaml`](configs/c4_per_token.yaml)):
+      one GPU session — `kvsim calibrate` with its repeats, three times (C4a); decode of batches
+      that share a prefix, up to a summed context 9.2× the largest ever fitted (D1a, D1b); what an
+      arriving request costs those already decoding (D2); three held-out workloads under, on and
+      over the 100 ms limit, every request's token times kept and the engine's own histogram read
+      (T3a, T3b); then, in the simulator, whether one run's spread covers another's count (E) and
+      the 64-prompt question on the fresh fits under both targets (F1, F2). Predicted: all nine
+      hold. Dry-run against the mock: every timing rule within 7%. **Left:** the run
 - [ ] **`configs/profiles/`** — committed calibration profiles keyed by
       `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
       from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no
