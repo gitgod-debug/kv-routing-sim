@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import importlib.util
+import itertools
 import json
 import pathlib
 import re
@@ -70,6 +71,24 @@ def test_c2s_two_workloads_are_the_traces_c2_measured():
         assert PREREG["trace_fingerprints_sha256"][name] == fp
     assert set(PREREG["trace_fingerprints_sha256"]) - set(c2["trace_fingerprints_sha256"]) == \
         {"T6_K8"}
+
+
+def test_every_amendment_is_recorded_and_the_notebook_is_the_last_one():
+    """`c3_prepare.py --amend` rebuilds the notebook without touching anything registered — the
+    tests above hold either way. Each amendment records why, at which commit, and the notebook's
+    hash before and after: so the committed notebook is the registered one, or the last recorded
+    amendment of it, and never a silent third thing."""
+    amendments = PREREG.get("amendments", [])
+    if not amendments:
+        return
+    text = (REPO / "notebooks/c3_calibrate_t4.ipynb").read_text(encoding="utf-8")
+    assert amendments[-1]["notebook_sha256_after"] == hashlib.sha256(text.encode()).hexdigest()
+    for earlier, later in itertools.pairwise(amendments):
+        assert later["notebook_sha256_before"] == earlier["notebook_sha256_after"]
+    intro = "".join(NOTEBOOK["cells"][0]["source"])
+    for a in amendments:
+        assert "dirty" not in a["git_sha"]  # amended from committed code only
+        assert f"(commit `{a['git_sha']}`): {a['why']}" in intro  # and said on page one
 
 
 def test_the_command_still_measures_the_registered_cells():

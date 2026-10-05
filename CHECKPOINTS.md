@@ -9,11 +9,15 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-10-01 (**C3 registered** — the context-aware `kvsim calibrate`'s first run on a
+**Last updated:** 2026-10-05 (**C3's first attempt did not start** — Kaggle's software image
+changed and vLLM could not be imported; nothing was measured. The notebook is amended with a
+pre-flight that repairs it, checked on Kaggle's image with a probe; nothing registered changed. GPU
+runs now go through Kaggle's API, `scripts/kaggle_run.py`. 2026-10-01: **C3 registered** — the
+context-aware `kvsim calibrate`'s first run on a
 real GPU; before it, a pre-check on C2's data added one measurement to the command. 2026-09-30: C2
 ran — all three predictions true; the finding re-tested on the validated timing model and its "route
 by prefix" half FALSIFIED. Before that: H6, R1 and R2, Phase 6 and C1, the demo, the preprint draft,
-`kvsim calibrate`, a wheel that works outside a clone. 204 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
+`kvsim calibrate`, a wheel that works outside a clone. 221 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
 vLLM under eviction pressure to the token, against predictions committed before the run)
 **Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding — changed 2026-09-30:** *keep each
 user on one GPU*; on the validated timing model session-sticky needs the fewest T4s or ties at 22 of 24
@@ -22,9 +26,9 @@ R1/R2 ran on the first, context-free timing model (not yet re-run) · ✅ **6** 
 T4s within 1.4% (run twice); latency explained by C2 · ✅ **C2** — context, not CPU; the context-aware
 model predicts held-out traffic within 1.41× · 🔨 **7** — demo on the validated grid, 10×/100× done,
 `kvsim calibrate` proven on a real T4 (C1); PyPI left · 🔨 **8** — the preprint rewritten around the
-reversal (optional: the project does not need it). ▶ **Next:** run C3 on Kaggle —
-[`notebooks/c3_calibrate_t4.ipynb`](notebooks/c3_calibrate_t4.ipynb), registered 2026-10-01, ~50
-minutes, bring back `c3_results.zip`; then re-run H6 and R1/R2 on the validated model.
+reversal (optional: the project does not need it). ▶ **Next:** run C3 on Kaggle through the API —
+[`notebooks/c3_calibrate_t4.ipynb`](notebooks/c3_calibrate_t4.ipynb), registered 2026-10-01, amended
+2026-10-05, ~50 minutes; then re-run H6 and R1/R2 on the validated model.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -630,7 +634,14 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       three held-out workloads within 2× / C3c C2's profile predicts them within 2×, from numbers
       registered now — predicted holds / holds / holds. The third workload has a shape no design
       decision saw. Dry-run against a mock with known terms: recovered, all three within 1.07×.
-      **Left: run it on Kaggle**
+      ⚠️ **2026-10-05: the first attempt did not start** — Kaggle's image now ships a
+      `torchaudio` built for another CUDA than the torch vLLM installs, under the version vLLM
+      pins, so pip kept it and vLLM could not be imported. Nothing was measured
+      ([record](artifacts/results/c3_env_failure/)). The notebook is amended, not re-registered: a
+      pre-flight cell repairs it, refuses a GPU that is not a T4 and checks `vllm serve --help` in
+      the first minute; every early stop leaves a zip. Checked on Kaggle's own image with a probe
+      notebook that starts no engine. The same wheel, traffic, predictions and rules.
+      **Left: the run itself** — now through Kaggle's API (`scripts/kaggle_run.py`)
 - [ ] **`configs/profiles/`** — committed calibration profiles keyed by
       `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
       from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no

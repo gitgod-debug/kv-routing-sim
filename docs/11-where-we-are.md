@@ -285,6 +285,12 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
   at code, configs and notebooks.
 - **Our first scale for the real trace was too big for a T4** — every policy failed. We changed it
   before the real run and wrote down why.
+- **The GPU box changed under us** (5 Oct). Kaggle updated its software, and the engine could no
+  longer start: one package it needs was built for a different CUDA version, under the same version
+  number, so the installer left it in place. C3's first attempt stopped before measuring anything.
+  The notebook now checks the software in its first minute and repairs that package; we tested the
+  repair on Kaggle's own image with a small probe notebook before running the real one. Nothing
+  that was registered changed.
 
 ## 8. Where we are right now
 
@@ -303,8 +309,6 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 ## 9. What is left
 
 **Manual steps (they need an account):**
-- ▶ **Run C3 on Kaggle** — `notebooks/c3_calibrate_t4.ipynb`, about 50 minutes; bring back
-  `c3_results.zip`. The steps are in [`notebooks/README.md`](../notebooks/README.md).
 - File the vLLM issue (the draft is the upstream log #1).
 - Open the guidellm issue, then the pull request (the patch is in `docs/upstream/`, the text in
   the upstream log #7–8).

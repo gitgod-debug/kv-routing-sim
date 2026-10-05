@@ -22,6 +22,10 @@ Reported, not tested (all listed in the config before the run): the command's se
 its profile predicts; the coefficients against C2's fit; C2's profile at the real send times; C2's
 own session's measurements of the two workloads it shares; and, with --grid, H2b-C2's registered
 grid re-run on the command's profile against the committed table (a few minutes of CPU).
+
+Amended 2026-10-05, before any measurement existed (docs/09): the report also states the software
+the run used, beside C2's, and what the notebook's pre-flight repaired — Kaggle's image changed
+between the two sessions, and C3c compares across them. A line of reporting; no rule is touched.
 """
 
 from __future__ import annotations
@@ -52,6 +56,7 @@ COEFFICIENTS = (
     ("prefill attention, per new × 1K attended tokens", "prefill_attn_s", 1e6, "ms", 3),
 )
 C2_SESSION = REPO / "artifacts" / "results" / "c2_kaggle_t4" / "analysis.json"
+C2_RUN = REPO / "artifacts" / "results" / "c2_kaggle_t4" / "c2.json"
 H2B = REPO / "artifacts" / "results" / "h2b_c2" / "h2b_c2.json"
 
 
@@ -94,6 +99,33 @@ def command_facts(run: dict | None, raw: dict | None, pred: dict, blocks: int | 
                                 for k in ("decode_fit", "prefill_fit")},
         "notes": raw and raw["_source"].get("notes"),
     }
+
+
+def software(data: dict) -> dict[str, Any]:
+    """Reported: what the run's box had installed, and what the pre-flight had to repair."""
+    env, pre = data.get("environment") or {}, data.get("preflight") or {}
+    return {
+        "python": env.get("python"), "packages": env.get("packages") or {},
+        "torch_cuda_build": (pre.get("torch") or {}).get("cuda_build"),
+        "torch_family": {k: v.get("version") for k, v in (pre.get("packages") or {}).items()
+                         if v.get("installed")},
+        "repairs": [{"package": r["package"], "was": r["was"].get("version"),
+                     "error": r["was"].get("error"), "did": r["did"],
+                     "now": r["now"].get("version") if r["now"].get("installed") else "removed",
+                     "imports": bool(r["now"].get("ok"))}
+                    for r in pre.get("repairs") or []],
+    }
+
+
+def _software_line(sw: dict) -> str | None:
+    pk = sw["packages"]
+    if not sw["python"] and not pk:
+        return None
+    parts = [f"Python {sw['python'] or '?'}"]
+    parts += [f"{name} {pk[name]}" for name in ("vllm", "torch", "transformers") if pk.get(name)]
+    if sw["torch_cuda_build"]:
+        parts.append(f"torch built for CUDA {sw['torch_cuda_build']}")
+    return " · ".join(parts)
 
 
 # ── C3b and C3c: the held-out traffic ───────────────────────────────────────────────────────────
@@ -177,6 +209,9 @@ def analyze(data: dict, prereg: dict, results: pathlib.Path) -> dict[str, Any]:
                   "holds": complete and holds_c}
     out["c2_fit"] = {key: getattr(c2_profile, key) for _, key, *_ in COEFFICIENTS}
     out["predicted_outcomes"] = cfg["predictions"]
+    out["software"] = software(data)
+    if C2_RUN.exists():  # reported: the box C2's profile was fitted on — C3c compares across them
+        out["c2_software"] = software(json.loads(C2_RUN.read_text()))
     if C2_SESSION.exists():  # reported: what C2's own session measured on the shared workloads
         out["c2_session"] = {r["workload"]: {q: r["measured"][f"ttft_{q}_ms"]
                                              for q in ("p50", "p95")}
@@ -271,6 +306,18 @@ def markdown(a: dict, data: dict, prereg: dict) -> str:
         (f"| **C3c** — C2's profile predicts another day within {a['c3c']['max_factor']:g}× | "
          f"{cfg['predictions']['c3c']} | **{v('c3c')}** |"),
         "",
+    ]
+    here = _software_line(a["software"])
+    if here:
+        then = _software_line(a["c2_software"]) if a.get("c2_software") else None
+        lines += [f"Software: {here}." + (f" C2's session, where the profile C3c tests was "
+                                          f"fitted: {then}." if then else ""), ""]
+    for r in a["software"]["repairs"]:
+        lines += [(f"Pre-flight repair, before anything was measured: `{r['package']}` "
+                   f"{r['was'] or '?'} could not be imported ({(r['error'] or '')[:160]}) → "
+                   f"`pip {r['did']}` → {r['now']}"
+                   f"{', which imports' if r['imports'] else ''}."), ""]
+    lines += [
         f"## The command — seed {seeds[0]} is the tested run, seed {seeds[1]} is reported",
         "",
         "| condition | " + " | ".join(f"seed {s}" for s in seeds) + " |",

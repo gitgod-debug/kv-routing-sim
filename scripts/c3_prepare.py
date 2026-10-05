@@ -15,6 +15,14 @@ What is registered here, before the run:
     C2's profile predicts for it at the scheduled times — hit rate, p50 and p95 TTFT (C3c).
 What the command's own profile predicts (C3b) cannot be registered: it does not exist until the run.
 The procedure that will produce it — scripts/c3_analyze.py — is committed with this script instead.
+
+    python scripts/c3_prepare.py --amend "WHY, as one sentence."
+
+rebuilds the notebook from the current builder WITHOUT touching anything registered — for plumbing
+the run turned out to need, such as a repair of the GPU box's software. It refuses unless the
+config, the traffic, the predictions and the command's default cells all come out as registered,
+re-embeds the registered wheel byte for byte, and records the reason, the commit and the
+notebook's hash before and after in the registration file. A dated entry in docs/09 goes with it.
 """
 
 from __future__ import annotations
@@ -25,6 +33,7 @@ import hashlib
 import json
 import pathlib
 import random
+import re
 import subprocess
 import sys
 import tempfile
@@ -118,6 +127,62 @@ def build_wheel() -> tuple[bytes, str]:
         return whl.read_bytes(), whl.name
 
 
+def _sha(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def amend(args: argparse.Namespace, cfg: dict[str, Any], header: dict[str, Any], dirty: str,
+          workloads: dict[str, Any], fingerprints: dict[str, str], pred: dict[str, Any],
+          pred_sha: str) -> int:
+    """The notebook rebuilt from the current builder, with everything registered left as it is."""
+    prereg = json.loads(args.prereg.read_text())
+    old = args.notebook.read_text(encoding="utf-8")
+    same = {
+        "the config": cfg == prereg["config"],
+        "the held-out workloads": workloads == prereg["workloads"],
+        "the traces' fingerprints": fingerprints == prereg["trace_fingerprints_sha256"],
+        "the predictions": pred == prereg["predictions"]
+        and pred_sha == prereg["predictions_sha256"],
+        "the command's default cells": command_defaults() == prereg["command_defaults"],
+    }
+    if not all(same.values()):
+        raise SystemExit("error: not an amendment — these no longer come out as registered: "
+                         f"{', '.join(k for k, ok in same.items() if not ok)}. Changing them "
+                         "means a new registration (run without --amend, and say why in docs/09).")
+    src = "".join("".join(c["source"]) for c in json.loads(old)["cells"]
+                  if c["cell_type"] == "code")
+    wheel = base64.b64decode(re.search(r'b64decode\("""([A-Za-z0-9+/=]*)"""\)', src).group(1))
+    if hashlib.sha256(wheel).hexdigest() != prereg["wheel"]["sha256"]:
+        raise SystemExit("error: the notebook no longer carries the registered wheel")
+    # The registered wheel must still BE the repo's code, or the notebook would run one thing
+    # while the tests and the dry-run check another.
+    moved = subprocess.run(["git", "diff", "--quiet", prereg["wheel"]["built_from"], "HEAD", "--",
+                            "src", "pyproject.toml"], cwd=REPO, check=False).returncode
+    if moved and not args.allow_dirty:
+        raise SystemExit("error: src/ or pyproject.toml changed since "
+                         f"{prereg['wheel']['built_from']}, the commit the registered wheel was "
+                         "built from. That needs a new registration, not an amendment.")
+
+    amendments = [*prereg.get("amendments", []),
+                  {"date_utc": header["date_utc"],
+                   "git_sha": header["git_sha"] + ("-dirty" if dirty else ""),
+                   "why": args.amend, "notebook_sha256_before": _sha(old)}]
+    new = build_notebook(cfg, workloads, fingerprints, pred, pred_sha,
+                         wheel_b64=base64.b64encode(wheel).decode(),
+                         wheel_sha=prereg["wheel"]["sha256"], wheel_name=prereg["wheel"]["name"],
+                         git_sha=prereg["wheel"]["built_from"], amendments=amendments)
+    amendments[-1]["notebook_sha256_after"] = _sha(new)
+    prereg["amendments"] = amendments
+    args.notebook.write_text(new, encoding="utf-8")
+    args.prereg.write_text(json.dumps(prereg, indent=1, default=str) + "\n")
+    print(f"amended at {amendments[-1]['git_sha']}: {args.amend}")
+    print(f"registered and unchanged: wheel {prereg['wheel']['sha256'][:16]}… · predictions "
+          f"{pred_sha[:16]}… · {len(fingerprints)} traces · the config")
+    print(f"wrote {args.prereg}\nwrote {args.notebook} "
+          f"({args.notebook.stat().st_size / 1024:.0f} KiB)")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--config", type=pathlib.Path, default=REPO / "configs" / "c3_calibrate.yaml")
@@ -130,6 +195,9 @@ def main() -> int:
                          "registered run")
     ap.add_argument("--no-wheel", action="store_true",
                     help="embed no wheel — for the dry-run, which uses the installed package")
+    ap.add_argument("--amend", metavar="WHY",
+                    help="rebuild the notebook WITHOUT touching anything registered, and record "
+                         "WHY (one sentence) in the registration file — see the top of this file")
     args = ap.parse_args()
     dirty = subprocess.run(["git", "status", "--porcelain", "--", *CODE], cwd=REPO,
                            capture_output=True, text=True, check=True).stdout.strip()
@@ -166,6 +234,8 @@ def main() -> int:
         print(f"  check, seed {seed}: hit rate {c['hit_rate']} ({c['hits']:,} of {c['queries']:,} "
               f"tokens, {c['requests']} requests)")
     pred_sha = sha256(pred)
+    if args.amend:
+        return amend(args, cfg, header, dirty, workloads, fingerprints, pred, pred_sha)
 
     if args.no_wheel:
         data, name = b"", "none.whl"

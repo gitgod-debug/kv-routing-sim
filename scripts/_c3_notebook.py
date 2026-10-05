@@ -6,10 +6,14 @@ as in C1), sends three held-out workloads the way C2's part D did, and runs the 
 It only MEASURES; the verdict is computed afterwards by scripts/c3_analyze.py, committed before the
 run.
 
-Nothing here is new harness: the environment, traffic port, server and warm-up cells are Phase 6's,
-the wheel cell is C1's, and the streaming client and the held-out run are cut out of C2's client
-cell as they are — so C3's traffic is measured by the code that measured C2's. `@@NAME@@` markers
-are filled in `build_notebook`.
+Nothing that MEASURES is new harness: the environment, traffic port, server and warm-up cells are
+Phase 6's, the wheel cell is C1's, and the streaming client and the held-out run are cut out of
+C2's client cell as they are — so C3's traffic is measured by the code that measured C2's.
+
+One cell is C3's own, added 2026-10-05 after the first attempt stopped before any measurement
+(docs/09): PREFLIGHT_CELL. It checks, in about a minute, that the box's software can start vLLM at
+all, repairs the one fault that attempt met, and makes every early stop leave a zip. `@@NAME@@`
+markers are filled in `build_notebook`.
 """
 
 from __future__ import annotations
@@ -48,7 +52,7 @@ engine. This is its first real one.
 The command comes from the package's wheel, **embedded in this notebook** (sha256
 `@@WHEEL_SHA_SHORT@@…`, built from commit `@@GIT_SHA@@`). This notebook decides nothing: it measures,
 and `scripts/c3_analyze.py` decides.
-"""
+@@AMENDMENTS@@"""
 
 HOW_TO_RUN = """
 **How to run.** Kaggle → *Settings* → Accelerator **GPU T4 ×2** (one T4 is used), Internet **on** →
@@ -56,6 +60,9 @@ HOW_TO_RUN = """
 ~5 for the command again. Results are saved after every part, so if a cell stops with ⛔, download
 **`c3_results.zip`** anyway — the parts before it are in it. At the end, download `c3_results.zip`
 from the Output panel and bring it back. Run it once: a second run is a second experiment.
+
+Section 2b checks the box's software in about a minute, before anything long. If it stops with ⛔,
+nothing was measured: bring back the zip and that cell's output.
 """
 
 CONFIG_CELL = r'''
@@ -82,8 +89,158 @@ STARTUP_TIMEOUT_S = 1800      # the first start downloads ~8 GB of weights and c
 OUT_DIR = "c3_results"
 '''
 
-CALIBRATE_CELL = r'''
+PREFLIGHT_CELL = r'''
+# ── Pre-flight (added 2026-10-05, docs/09). Can this box's software start vLLM at all? Answered in
+#    about a minute, before the 8 GB download — and repaired where the repair is known.
+#
+#    Why it exists: `pip install vllm` brings the torch build vLLM pins, but KEEPS any package whose
+#    version number already satisfies a pin. Kaggle's image ships torchaudio 2.11.0 built for another
+#    CUDA than that torch — the very version vLLM pins — so pip keeps it, and then nothing that
+#    imports transformers can start: vLLM stops with "PyTorch and TorchAudio were compiled with
+#    different CUDA versions". The repair puts back the build from PyPI, which is what pip installs
+#    on a clean box. vLLM itself, its version and its flags are not touched.
+import importlib
+import importlib.metadata
 import zipfile
+
+PREFLIGHT = {"repairs": []}
+_FAMILY = ("torchaudio", "torchvision", "torchcodec")  # none is needed by a text model; any can break
+
+# Run in a FRESH interpreter: is the module installed, and does importing it work?
+_PROBE = """
+import importlib, importlib.metadata as md, importlib.util, json, sys
+mod = sys.argv[1]
+if importlib.util.find_spec(mod) is None:
+    print("PROBE " + json.dumps({"installed": False}))
+    sys.exit(0)
+try:
+    ver = md.version(mod)
+except Exception:
+    ver = None
+try:
+    importlib.import_module(mod)
+    out = {"installed": True, "version": ver, "ok": True}
+except BaseException as e:
+    out = {"installed": True, "version": ver, "ok": False,
+           "error": (type(e).__name__ + ": " + str(e))[:500]}
+print("PROBE " + json.dumps(out))
+"""
+_TORCH = """
+import json, torch
+ok = torch.cuda.is_available()
+print("PROBE " + json.dumps({"version": torch.__version__, "cuda_build": torch.version.cuda,
+                             "cuda_available": ok,
+                             "device": torch.cuda.get_device_name(0) if ok else None}))
+"""
+
+
+def _run(cmd, timeout=1200):
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+        return p.returncode, p.stdout + p.stderr
+    except Exception as e:  # a missing binary or a timeout is an answer too
+        return -1, repr(e)
+
+
+def _answer(code, *args):
+    """The PROBE line a fresh interpreter printed, or why there is none."""
+    rc, out = _run([sys.executable, "-c", code, *args], 600)
+    line = next((ln for ln in reversed(out.splitlines()) if ln.startswith("PROBE ")), None)
+    if line is None:
+        return {"installed": True, "version": None, "ok": False,
+                "error": f"no answer (exit {rc}): {out[-400:]}"}
+    return json.loads(line[6:])
+
+
+def _probe(mod):
+    return _answer(_PROBE, mod)
+
+
+def _pinned(mod, requires=None):
+    """The exact version vLLM's own metadata requires of `mod`, or None if it pins none."""
+    if requires is None:
+        try:
+            requires = importlib.metadata.requires("vllm") or []
+        except importlib.metadata.PackageNotFoundError:
+            return None
+    for req in requires:
+        m = re.match(r"\s*" + re.escape(mod) + r"\s*==\s*([0-9][0-9A-Za-z.]*)\s*(;.*)?$", req)
+        if m and "extra" not in (m.group(2) or ""):
+            return m.group(1)
+    return None
+
+
+def repair(mod, probe=None, run=None, pinned=None):
+    """A package that is installed but cannot be imported: put back the build vLLM pins, from PyPI
+    — what pip installs on a clean box. If that does not import either, remove it: a text model
+    needs none of these, and transformers skips what is not installed."""
+    probe, run, pinned = probe or _probe, run or _run, pinned or _pinned
+    was = probe(mod)
+    if not was["installed"] or was["ok"]:
+        return was
+    pip, steps, want = [sys.executable, "-m", "pip"], [], pinned(mod)
+    if want:
+        steps.append(pip + ["install", "-q", "--no-deps", "--force-reinstall", "--index-url",
+                            "https://pypi.org/simple", f"{mod}=={want}"])
+    steps.append(pip + ["uninstall", "-y", "-q", mod])
+    now = was
+    for cmd in steps:
+        rc, out = run(cmd)
+        now = probe(mod)
+        PREFLIGHT["repairs"].append({"package": mod, "was": was, "did": " ".join(cmd[3:]),
+                                     "returncode": rc, "now": now, "output_tail": out[-400:]})
+        if not now["installed"] or now["ok"]:
+            break
+    return now
+
+
+def diag_zip():
+    """What an early stop leaves behind: the environment, every package's version, and whatever
+    is in the results folder — the engine's whole log, if it got that far."""
+    PREFLIGHT["pip_freeze"] = _run([sys.executable, "-m", "pip", "freeze"], 300)[1].splitlines()
+    pathlib.Path(OUT_DIR, "preflight.json").write_text(
+        json.dumps({"environment": ENV, "preflight": PREFLIGHT}, indent=1, default=str))
+    with zipfile.ZipFile(f"{OUT_DIR}.zip", "w", zipfile.ZIP_DEFLATED) as z:
+        for f in sorted(pathlib.Path(OUT_DIR).glob("*")):
+            if f.suffix != ".whl":
+                z.write(f)
+    return f"{OUT_DIR}.zip"
+
+
+# ── run it
+importlib.invalidate_caches()
+PREFLIGHT["torch"] = _answer(_TORCH)
+print("torch      ", PREFLIGHT["torch"])
+if not PREFLIGHT["torch"].get("cuda_available"):
+    diag_zip()
+    raise Stop("⛔ torch cannot use a GPU in this environment — the reason is above. Nothing was "
+               "measured. Bring back c3_results.zip and this cell's output.")
+if "T4" not in (PREFLIGHT["torch"].get("device") or ""):
+    diag_zip()
+    raise Stop(f"⛔ the GPU is {PREFLIGHT['torch'].get('device')!r}, not a Tesla T4. C3 is registered "
+               "for one T4, and the profile C3c tests is a T4 profile: nothing is measured on "
+               "other hardware. Kaggle: Settings → Accelerator → GPU T4 ×2.")
+PREFLIGHT["packages"] = {}
+for _mod in _FAMILY:
+    PREFLIGHT["packages"][_mod] = repair(_mod)
+    print(f"{_mod:11s}", PREFLIGHT["packages"][_mod])
+for _r in PREFLIGHT["repairs"]:
+    print(f"  repaired {_r['package']}: was {_r['was'].get('version')} — "
+          f"{(_r['was'].get('error') or '')[:120]}\n    did: pip {_r['did']}\n    now: {_r['now']}")
+_rc, _out = _run(["vllm", "serve", "--help"], 900)
+PREFLIGHT["vllm_cli"] = {"returncode": _rc, "output_tail": _out[-3000:]}
+if _rc != 0:
+    print(_out[-3000:])
+    diag_zip()
+    raise Stop("⛔ `vllm serve --help` fails in this environment, so no engine can start — the "
+               "reason is above. Nothing was measured. Bring back c3_results.zip and this "
+               "cell's output.")
+diag_zip()
+print(f"vllm        its command line starts ✓ · {len(PREFLIGHT['repairs'])} repair step(s) · "
+      "pre-flight saved")
+'''
+
+CALIBRATE_CELL = r'''
 
 
 def run_calibrate(seed):
@@ -137,7 +294,8 @@ RESULTS = {"notebook": "notebooks/c3_calibrate_t4.ipynb", "fingerprints": FINGER
 
 def save():
     """Write everything measured so far, and the zip: a later failure keeps the earlier parts."""
-    RESULTS.update({"environment": ENV, "metric_and_source_audit": AUDIT, "capacity": CAPACITY,
+    RESULTS.update({"environment": ENV, "preflight": PREFLIGHT, "metric_and_source_audit": AUDIT,
+                    "capacity": CAPACITY,
                     "engine_argv": [engine_argv(i) for i in range(N_REPLICAS)]})
     pathlib.Path(OUT_DIR, "c3.json").write_text(json.dumps(RESULTS, indent=1, default=str))
     with zipfile.ZipFile(f"{OUT_DIR}.zip", "w", zipfile.ZIP_DEFLATED) as z:
@@ -190,6 +348,19 @@ def _swap(text: str, old: str, new: str) -> str:
     return text.replace(old, new)
 
 
+def _start_cell() -> str:
+    """Phase 6's start cell — but here a stop comes before `save()` exists, so each one writes the
+    diagnostics zip first, and its message says so."""
+    cell = _swap(START_CELL,
+                 'raise Stop(f"⛔ replica {_i} did not start — the log tail is above. Download '
+                 'the zip.")',
+                 'diag_zip()\n        raise Stop(f"⛔ replica {_i} did not start — the log tail is '
+                 'above. Nothing was measured. "\n                   "Bring back c3_results.zip: '
+                 'it holds the whole log.")')
+    return _swap(cell, "        raise Stop(f\"⛔ replica {_i} logged ",
+                 "        diag_zip()\n        raise Stop(f\"⛔ replica {_i} logged ")
+
+
 def _client_cell() -> str:
     """C2's streaming client and its held-out run, byte for byte — but for the label of the
     prediction printed beside each run, which here is C2's profile, not the context-free one."""
@@ -205,7 +376,7 @@ def _client_cell() -> str:
 
 def build_notebook(cfg: dict[str, Any], workloads: dict[str, Any], fingerprints: dict[str, str],
                    pred: dict[str, Any], pred_sha: str, *, wheel_b64: str, wheel_sha: str,
-                   wheel_name: str, git_sha: str) -> str:
+                   wheel_name: str, git_sha: str, amendments: list[dict[str, Any]] = ()) -> str:
     e, c, rules, p = cfg["engine"], cfg["calibrate"], cfg["rules"], cfg["predictions"]
     check0 = pred["check"][str(c["seeds"][0])]
     fill = {
@@ -224,6 +395,11 @@ def build_notebook(cfg: dict[str, Any], workloads: dict[str, Any], fingerprints:
         "CHECK_QUERIES": f"{check0['queries']:,}", "CHECK_N": str(check0["requests"]),
         "MAX_B": f"{rules['c3b_max_factor']:g}", "MAX_C": f"{rules['c3c_max_factor']:g}",
         "PRED_A": p["c3a"], "PRED_B": p["c3b"], "PRED_C": p["c3c"],
+        # What was changed after registration, and that nothing registered was: said on page one.
+        "AMENDMENTS": "".join(
+            f"\n**Amended {a['date_utc'][:10]}** (commit `{a['git_sha']}`): {a['why']} Nothing "
+            "registered changed — the same wheel, traffic, predictions and rules.\n"
+            for a in amendments),
     }
 
     def sub(text: str) -> str:
@@ -245,6 +421,8 @@ def build_notebook(cfg: dict[str, Any], workloads: dict[str, Any], fingerprints:
         _code(sub(ENV_CELL)),
         _md("## 2 — Install vLLM, pinned — and kv-routing-sim, from the wheel embedded here"),
         _code(INSTALL_CELL.replace("@@VLLM@@", e["vllm"])),
+        _md("## 2b — Pre-flight: can this box's software start the engine at all?"),
+        _code(PREFLIGHT_CELL),
         _code(sub(WHEEL_CELL)),
         _md("## 3 — Audit: does the installed engine contain the code the model cites?"),
         _code(AUDIT_CELL),
@@ -253,7 +431,7 @@ def build_notebook(cfg: dict[str, Any], workloads: dict[str, Any], fingerprints:
         _code(sub(data_cell)),
         _md("## 5 — One server"),
         _code(sub(SERVERS_CELL)),
-        _code(sub(START_CELL)),
+        _code(sub(_start_cell())),
         _md("## 6 — The client, the command, the held-out run, and saving"),
         _code(sub(_client_cell())),
         _code(sub(WARMUP_CELL)),

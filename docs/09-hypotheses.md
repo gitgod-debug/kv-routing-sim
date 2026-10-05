@@ -1192,3 +1192,62 @@ same GPU give the same GPU counts?
 engine): the command recovers them (decode 4.00e-6 against 4e-6 s per context token; prefill
 attention 2.2e-8 against 2e-8), its check is exact, and all three rules hold within 1.07×. That
 proves the plumbing, and nothing about vLLM.
+
+### 2026-10-05 — C3's first attempt did not start: the GPU box's software changed. The notebook is amended; nothing registered is.
+Record: [`artifacts/results/c3_env_failure/`](../artifacts/results/c3_env_failure/) — the stopped
+cell's output, and the probe that checked the repair on Kaggle's image.
+
+**What happened.** The notebook stopped in section 5, when it launched the engine: `vllm` exited at
+import with *"PyTorch and TorchAudio were compiled with different CUDA versions. PyTorch has CUDA
+version 13.0 whereas TorchAudio has CUDA version 12.8."* No request was sent, `kvsim calibrate`
+never ran, and no zip exists — the cell's message said "download the zip" before any cell that
+writes one had run. **There is no measurement from this attempt, so nothing was seen.**
+
+**Why.** Kaggle's image changed between C2 (2026-09-30, Python 3.12.13) and now (Python 3.13.15).
+It ships `torch 2.11.0+cu128`, `torchaudio 2.11.0+cu128`, `torchvision 0.26.0+cu128`. vLLM 0.30.0
+pins `torch==2.13.0`, `torchaudio==2.11.0` and `torchvision==0.28.0`. So `pip install vllm` replaces
+torch and torchvision with the builds from PyPI (CUDA 13.0) — and **keeps the image's torchaudio**,
+because `2.11.0+cu128` satisfies `==2.11.0`. Everything that imports `transformers` then fails, vLLM
+first.
+
+**How the repair was checked, before a GPU hour was spent on it.**
+- *On this machine* (Python 3.13.12): a clean `pip install vllm==0.30.0` starts; with
+  `torchaudio 2.11.0+cu128` put in, `vllm` cannot start; the pre-flight cell puts it right.
+- *On Kaggle's image*, with a probe notebook that starts no engine (`scripts/c3_probe.py`, 400 s):
+  the pre-flight found `torchaudio 2.11.0+cu128` failing with the same error, ran
+  `pip install --no-deps --force-reinstall --index-url https://pypi.org/simple torchaudio==2.11.0`,
+  and after it torchaudio, torchvision and torchcodec import, `vllm serve --help` exits 0, and
+  torch sees a Tesla T4.
+- A second probe, CPU only: a run that ends in an error still keeps the files it wrote. So "results
+  are saved after every part" also holds for a run started through the API.
+
+**What changed — plumbing, and one line of reporting.**
+- A **pre-flight cell** right after the install (`scripts/_c3_notebook.py`). In fresh interpreters
+  it checks that torch sees a GPU and that the GPU is a **T4** (C3 is registered for one; no other
+  hardware is measured); it checks that `torchaudio`, `torchvision` and `torchcodec` import, puts
+  one that does not back to the version vLLM itself pins, from PyPI, and removes it if that fails
+  too (a text model needs none of them); then `vllm serve --help` must exit 0, or the notebook
+  stops there — in the first minute, not after the 8 GB download.
+- **Every early stop now writes `c3_results.zip`** (the environment, `pip freeze`, the engine's
+  whole log) and says that nothing was measured.
+- The pre-flight's record is saved with the results, and the report now states the software of the
+  run beside C2's — **one line of reporting** in `scripts/c3_analyze.py`. No rule is touched.
+- The run is now started through Kaggle's API (`scripts/kaggle_run.py`: a push is "Save & Run All"),
+  as a private notebook on the same T4 ×2 machine with internet on. The notebook, the image and
+  the hardware are what a run by hand gets; no browser is attached.
+
+**What did not change:** the config and its rules, the predictions (`predictions_sha256`
+`be7f0a76…`), the three traces (the same fingerprints), the command's default cells, and the wheel
+— the same bytes (sha256 `4c1c388b…`), re-embedded, not rebuilt. `scripts/c3_prepare.py --amend`
+refuses to run unless every one of these comes out as registered, and writes the reason, the commit
+and the notebook's hash before and after into `predictions.json`; `tests/test_c3_prereg.py` checks
+that chain, and `tests/test_c3_notebook.py` the pre-flight's logic.
+
+**One more thing that would be uncomfortable, written before the run.** C3c asks whether the profile
+fitted on 2026-09-30 predicts another day. That other day now has another image as well: Python
+3.13.15 instead of 3.12.13, `transformers` 5.16.1 instead of 5.17.0, NVIDIA driver 580.178 instead
+of 580.159. torch is the same build (2.13.0, CUDA 13.0), so the GPU's share of each step should not
+move; the CPU's share might. **If C3c fails and C3b holds, the image is a suspect alongside the
+profile**, and the write-up must say so instead of choosing one.
+
+**"Run it once" still stands.** The attempt produced no data, so the next run is the first.

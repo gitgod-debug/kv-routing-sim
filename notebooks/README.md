@@ -35,15 +35,32 @@ Registered before the run: [`configs/c3_calibrate.yaml`](../configs/c3_calibrate
 | **C3b** | the profile it writes predicts the traffic's p50 and p95 TTFT within 2× | holds |
 | **C3c** | the profile C2 fitted on 2026-09-30 predicts the same traffic within 2× — its numbers were written down before the run | holds |
 
-**On Kaggle:** *File → Import notebook* → `c3_calibrate_t4.ipynb` → *Settings: Accelerator **GPU T4 ×2**
-(one T4 is used), Internet **on*** → *Run All*. When it ends, download **`c3_results.zip`** from the
-Output panel and put it in this repo's `notebooks/` folder. Results are saved after every part: if a
-cell stops with ⛔, download the zip anyway. ⚠️ Run it **once**; if you must run it again, bring back
-both zips.
+**Two ways to run it — the same notebook, image and hardware either way:**
+
+- *Through Kaggle's API* (how it is run since 2026-10-05):
+  `python scripts/kaggle_run.py notebooks/c3_calibrate_t4.ipynb --slug kvsim-c3-calibrate-t4 --out <folder>`.
+  It pushes the notebook as a **private** notebook on the T4 ×2 machine with internet on — a push is
+  "Save & Run All" — waits, and downloads everything the notebook wrote and its log. It needs the
+  `kaggle` package and an API token where that tool looks for one (`~/.kaggle/access_token`); no
+  token may ever be put in this repo.
+- *By hand:* *File → Import notebook* → `c3_calibrate_t4.ipynb` → *Settings: Accelerator **GPU T4 ×2**
+  (one T4 is used), Internet **on*** → *Run All*. When it ends, download **`c3_results.zip`** from the
+  Output panel and put it in this repo's `notebooks/` folder.
+
+Results are saved after every part: if a cell stops with ⛔, the zip is still there. ⚠️ Run it
+**once**; a second run is a second experiment and needs a dated entry in `docs/09-hypotheses.md`
+first.
 
 The notebook carries the package's own wheel (built from commit `016d167`), so the GPU box runs
 exactly the committed code and needs no copy of this repo. It decides nothing: it measures, and
 `scripts/c3_analyze.py` — committed before the run — decides.
+
+**Amended 2026-10-05.** The first attempt stopped before any measurement: Kaggle's image had
+changed, and vLLM could not start ([record](../artifacts/results/c3_env_failure/)). The notebook
+now begins with a **pre-flight** that repairs the one broken package, refuses a GPU that is not a
+T4, and checks that vLLM can start — in the first minute. Nothing registered changed: the same
+wheel, traffic, predictions and rules. ⚠️ The older notebooks below (Phase 6, C1, C2) do not have
+this cell; on today's image they would stop the same way.
 
 ## ✅ C2 — ran on 2026-09-30: all three registered predictions came true
 
