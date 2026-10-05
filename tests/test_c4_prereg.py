@@ -1,0 +1,142 @@
+"""C4's registration must stay reproducible; the notebook must carry exactly what was registered.
+
+The notebook embeds the package's wheel, the held-out traffic's fingerprints, the design of every
+cell, and the predictions. If any of them drifts from artifacts/results/c4_prereg/predictions.json,
+the GPU run would test something other than what was registered. A deliberate change means
+re-running scripts/c4_prepare.py on a clean tree, and a dated entry in docs/09-hypotheses.md saying
+why — before the run, never after.
+"""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import importlib.util
+import itertools
+import json
+import pathlib
+import re
+import sys
+
+import yaml
+
+from kv_routing_sim.sim.cost_model import load_profile
+from kv_routing_sim.traces.generator import AgenticWorkload
+
+REPO = pathlib.Path(__file__).resolve().parents[1]
+PREREG = json.loads((REPO / "artifacts/results/c4_prereg/predictions.json").read_text())
+NOTEBOOK = json.loads((REPO / "notebooks/c4_per_token_t4.ipynb").read_text())
+CODE = ["".join(c["source"]) for c in NOTEBOOK["cells"] if c["cell_type"] == "code"]
+SRC = "".join(CODE)
+
+
+def _load(name: str):
+    spec = importlib.util.spec_from_file_location(name, REPO / "scripts" / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+prepare = _load("c4_prepare")
+
+
+def _canonical(obj):
+    return json.dumps(obj, separators=(",", ":"), sort_keys=True).encode()
+
+
+def test_the_notebook_carries_the_registered_wheel_traffic_design_and_predictions():
+    wheel = base64.b64decode(re.search(r'b64decode\("""([A-Za-z0-9+/=]+)"""\)', SRC).group(1))
+    assert hashlib.sha256(wheel).hexdigest() == PREREG["wheel"]["sha256"]
+    assert f'!= "{PREREG["wheel"]["sha256"]}"' in SRC  # and the notebook checks that hash itself
+    assert re.search(r'PREDICTIONS_SHA256 = "([0-9a-f]{64})"', SRC).group(1) == \
+        PREREG["predictions_sha256"]
+    assert hashlib.sha256(_canonical(PREREG["predictions"])).hexdigest() == \
+        PREREG["predictions_sha256"]
+    pred = json.loads(re.search(r'PRED = json.loads\(r"""(.+?)"""\)', SRC).group(1))
+    assert pred == PREREG["predictions"]
+    for fp in PREREG["trace_fingerprints_sha256"].values():
+        assert fp in SRC
+    cfg = PREREG["config"]
+    design = json.loads(re.search(r'DESIGN = json.loads\(r"""(.+?)"""\)', SRC).group(1))
+    assert design["decode_shared"] == cfg["decode_shared"] and design["stall"] == cfg["stall"]
+    assert design["decode"] == {"output_tokens": cfg["decode_shared"]["output_tokens"],
+                                "skip_tokens": cfg["decode_shared"]["skip_tokens"]}
+    assert json.loads(re.search(r'CAL = json.loads\(r"""(.+?)"""\)', SRC).group(1)) == \
+        cfg["calibrate"]
+    assert "TPOT_LIMIT_S = 0.1" in SRC and cfg["slo"]["tpot_p95_ms"] == 100
+    assert PREREG["git_dirty"] is False  # registered from committed code only
+
+
+def test_the_registered_config_is_the_committed_one():
+    assert PREREG["config"] == yaml.safe_load((REPO / "configs/c4_per_token.yaml").read_text())
+
+
+def test_the_registered_predictions_reproduce_from_the_committed_code():
+    cfg = PREREG["config"]
+    profile = load_profile(REPO / cfg["profile"])
+    traces = {name: list(AgenticWorkload(**spec).iter_with_tokens())
+              for name, spec in PREREG["workloads"].items()}
+    assert prepare.predictions(cfg, traces, profile) == PREREG["predictions"]
+    assert prepare.fitted_max_summed_context() == PREREG["fitted_max_summed_context"] == 20_200
+
+
+def test_what_the_registration_says_about_its_own_design():
+    """The numbers the docs quote from the registration, and the properties its rules rely on."""
+    pred, cfg = PREREG["predictions"], PREREG["config"]
+    runs = {k: v["profile A"] for k, v in pred["runs"].items()}
+    # Under the limit, on it, over it — as the config says they were chosen.
+    assert runs["long_below"]["meets_per_token_limit"] and runs["long_below"]["margin"] >= 0.15
+    assert runs["short_at"]["margin"] < 0.15
+    assert not runs["long_above"]["meets_per_token_limit"] and runs["long_above"]["margin"] > 1
+    assert [round(runs[k]["tpot_p95_ms"], 1) for k in ("long_below", "short_at", "long_above")] \
+        == [82.9, 104.3, 298.5]
+    # The shared cells reach far past anything a calibration cell measured.
+    top = PREREG["fitted_max_summed_context"]
+    beyond = [int(b) for b, v in pred["decode_shared"].items() if v["summed_context"] > top]
+    assert beyond == [16, 32, 64, 96, 128]
+    assert round(pred["decode_shared"]["128"]["summed_context"] / top, 1) == 9.2
+    # Every stall cell: the same arriving request, so the same predicted extra gap.
+    extras = {round(v["extra_gap_s"] * 1e3, 1) for v in pred["stall"].values()}
+    assert extras == {184.4}
+    # The check the command sends does not depend on the seed's timing cells.
+    assert {(c["hits"], c["queries"], c["requests"]) for c in pred["check"].values()} == {
+        (9840, 13776, 48)}
+    assert cfg["calibrate"]["seeds"] == [0, 1, 2]
+
+
+def test_the_command_measures_the_registered_cells():
+    assert prepare.command_defaults() == PREREG["command_defaults"]
+    assert PREREG["command_defaults"]["reps"] == 3 == PREREG["config"]["rules"]["c4a_repeats"]
+
+
+def test_the_notebooks_parts_are_in_the_registered_order():
+    heads = ["".join(c["source"]).strip().splitlines()[0] for c in NOTEBOOK["cells"]
+             if c["cell_type"] == "markdown" and "".join(c["source"]).startswith("## ")]
+    order = [h.split("—")[0].strip() for h in heads]
+    assert order == ["## 0", "## 1", "## 2", "## 2b", "## 3", "## 4", "## 5", "## 6", "## 7",
+                     "## 8", "## 8b", "## 9", "## 10", "## 11"]
+    # The pre-flight runs after the install and before anything that needs the engine.
+    install = next(i for i, s in enumerate(CODE) if "pip install -q vllm==" in s)
+    preflight = next(i for i, s in enumerate(CODE) if "PREFLIGHT = {" in s)
+    start = next(i for i, s in enumerate(CODE) if "start_server(_i)" in s)
+    assert install < preflight < start
+    # The command runs once before the cells and the traffic, and the other seeds after.
+    part1 = next(i for i, s in enumerate(CODE) if 'run_calibrate(CAL["seeds"][0])' in s)
+    traffic = next(i for i, s in enumerate(CODE) if "run_holdout(_name)" in s)
+    part4 = next(i for i, s in enumerate(CODE) if 'CAL["seeds"][1:]' in s)
+    assert part1 < traffic < part4
+
+
+def test_every_amendment_is_recorded_and_the_notebook_is_the_last_one():
+    amendments = PREREG.get("amendments", [])
+    if not amendments:
+        return
+    text = (REPO / "notebooks/c4_per_token_t4.ipynb").read_text(encoding="utf-8")
+    assert amendments[-1]["notebook_sha256_after"] == hashlib.sha256(text.encode()).hexdigest()
+    for earlier, later in itertools.pairwise(amendments):
+        assert later["notebook_sha256_before"] == earlier["notebook_sha256_after"]
+    intro = "".join(NOTEBOOK["cells"][0]["source"])
+    for a in amendments:
+        assert "dirty" not in a["git_sha"]
+        assert f"(commit `{a['git_sha']}`): {a['why']}" in intro

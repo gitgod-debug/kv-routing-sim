@@ -21,6 +21,28 @@ below is kept as the record of how it was run.
 
 ---
 
+## ▶ Run next — C4: `c4_per_token_t4.ipynb` (about 67 minutes)
+
+**What it tests:** the simulator's *second* speed — how fast the tokens after the first arrive —
+where it matters, and `kvsim calibrate` with its new repeats. Registered before the run:
+[`configs/c4_per_token.yaml`](../configs/c4_per_token.yaml) and `docs/09-hypotheses.md`
+(2026-10-05). Nine rules; predicted: all hold.
+
+| Part | What it measures | Rules |
+|---|---|---|
+| 1, 4 | `kvsim calibrate`, three times, each timing cell measured three times | C4a; then E, F1, F2 in the simulator |
+| 2 | decode steps of batches that share a cached prefix — up to 128 sequences, a summed context 9.2× the largest any calibration cell measured | D1a, D1b |
+| 2b | the long gap every decoding sequence sees when one more request arrives | D2 |
+| 3 | three held-out workloads under, on and over a 100 ms per-token limit, every request's token times kept | T3a, T3b |
+
+**How it is run:**
+`python scripts/kaggle_run.py notebooks/c4_per_token_t4.ipynb --slug kvsim-c4-per-token-t4 --out <folder>`
+(a private notebook on the T4 ×2 machine, internet on; see C3's section below for running by hand).
+Then, with no GPU: `python scripts/c4_grids.py` and `python scripts/c4_analyze.py`. ⚠️ Run it
+**once**.
+
+The notebook carries the package's own wheel (built from commit `c5b5d74`) and C3's pre-flight.
+
 ## ✅ C3 — ran on 2026-10-05: all three registered rules hold
 
 `kvsim calibrate` works on a real T4 (its cache check exact, 48 of 48 requests, in 160 seconds); the
