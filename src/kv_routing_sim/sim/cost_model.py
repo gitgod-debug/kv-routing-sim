@@ -35,7 +35,7 @@ every profile fitted before C2 keeps its results to the bit. C2 (configs/c2_timi
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
 
 from ..cache.capacity import SHAPES, kv_blocks_for
@@ -130,6 +130,37 @@ def resolve_profile(spec: str | Path) -> CostProfile:
         f"no profile file {str(spec)!r}, and no shipped profile of that name. Shipped: "
         f"{', '.join(sorted(shipped)) or 'none'}. Or measure your own: kvsim calibrate"
     )
+
+
+def replicate_profiles(spec: str | Path) -> list[CostProfile]:
+    """The profile's REPLICATES: the same profile with the timing coefficients fitted on each
+    repeat of the calibration alone (`kvsim calibrate` writes them under `_source.replicates`).
+
+    They exist to answer "how firm is this replica count?": sizing is re-run on each, and the
+    spread is shown. Empty for a profile without them — the two shipped ones, and any profile
+    written before 2026-10-05 — which is a statement that the spread is unknown, not that it is 0.
+    """
+    path = Path(spec)
+    if path.is_file():
+        text = path.read_text(encoding="utf-8")
+    else:
+        from .. import data
+
+        shipped = data.profiles()
+        name = str(spec).removesuffix(".json")
+        if name not in shipped:
+            return []
+        text = shipped[name].read_text(encoding="utf-8")
+    raw = json.loads(text)
+    reps = ((raw.get("_source") or {}).get("replicates") if isinstance(raw, dict) else None) or []
+    if not reps:
+        return []
+    base = _profile_from_json(text, str(spec))
+    timing = ("prefill_base_s", "prefill_per_token_s", "prefill_attn_s", "decode_base_s",
+              "decode_per_seq_s", "decode_per_ctx_token_s")
+    return [replace(base, name=f"{base.name}#repeat{r.get('rep', i)}",
+                    **{k: float(r[k]) for k in timing})
+            for i, r in enumerate(reps)]
 
 
 def _profile_from_json(text: str, where: str) -> CostProfile:

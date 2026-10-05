@@ -11,6 +11,8 @@
   * `rank.py`       — Kendall's tau-b, with ties handled: the statistic H6 is decided on.
   * `recommend.py`  — frontier + an SLO → ONE policy, ONE replica count, and the ₹ delta vs
                       round-robin. This output is the thing no competitor produces.
+  * `spread.py`     — how firm a replica count is: the same sizing on each repeat of the
+                      calibration alone, side by side with the pooled answer.
   * `sweep.py`      — policy × replicas × seeds → points, and `crossover_sweep`, the H2 grid with
                       the sharing ratio as its own axis.
 """
@@ -20,10 +22,12 @@ from .cost import CostModel, UnfilledCostModel
 from .pareto import Point, frontier, to_point
 from .rank import kendall_tau_b
 from .recommend import Recommendation, recommend
+from .spread import replica_spread, required_replicas
 from .sweep import crossover_sweep, sweep
 
 __all__ = [
     "CI", "CostModel", "Point", "Recommendation", "UnfilledCostModel",
     "bootstrap_ci_grouped", "crossover_sweep", "frontier", "kendall_tau_b",
-    "paired_bootstrap_delta", "recommend", "sweep", "to_point",
+    "paired_bootstrap_delta", "recommend", "replica_spread", "required_replicas", "sweep",
+    "to_point",
 ]

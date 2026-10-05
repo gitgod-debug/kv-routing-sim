@@ -22,8 +22,14 @@ from typing import Any
 from . import policies as policy_pkg
 from .eval.cost import CostModel, UnfilledCostModel
 from .eval.recommend import recommend
+from .eval.spread import replica_spread
 from .eval.sweep import crossover_sweep, sweep
-from .sim.cost_model import UNCALIBRATED_DEFAULT, CostProfile, resolve_profile
+from .sim.cost_model import (
+    UNCALIBRATED_DEFAULT,
+    CostProfile,
+    replicate_profiles,
+    resolve_profile,
+)
 from .traces import adapters
 from .traces.generator import AgenticWorkload
 from .traces.schema import TraceStats
@@ -90,6 +96,21 @@ def _slo_mark(meets: bool | None) -> str:
     return "—" if meets is None else ("✅" if meets else "❌")
 
 
+def _count(n: int | None, swept_up_to: int) -> str:
+    return f"not met on {swept_up_to}" if n is None else str(n)
+
+
+def _firmness(row: dict[str, Any], spread: dict[str, Any]) -> str:
+    """One sentence beside the recommendation: its replica count on each repeat's fit."""
+    top = spread["swept_up_to"]
+    if row["firm"]:
+        return (f"how firm: the same count on each of the calibration's {spread['repeats']} "
+                "repeats taken alone")
+    return (f"⚠️ how firm: {_count(row['min'], top)} to {_count(row['max'], top)} replicas "
+            f"across the calibration's {spread['repeats']} repeats taken alone — size for the "
+            "larger")
+
+
 def _slo_sentence(cost: CostModel | None) -> str | None:
     """What "meets SLO" was decided on — and, when the per-token half is off, that it is."""
     if cost is None:
@@ -123,6 +144,9 @@ def _markdown(payload: dict[str, Any]) -> str:
                 f"{rec['replica_delta_vs_baseline']:+d} replicas"
             )
             lines.append("")
+        firm = ((payload.get("replica_spread") or {}).get("replicas") or {}).get(r["policy"])
+        if firm:
+            lines += [_firmness(firm, payload["replica_spread"]), ""]
         if rec.get("WARNING"):
             lines += [f"> ⚠️ {rec['WARNING']}", ""]
 
@@ -146,6 +170,31 @@ def _markdown(payload: dict[str, Any]) -> str:
         lines.append("")
         if payload.get("slo"):
             lines += [payload["slo"], ""]
+    spread = payload.get("replica_spread")
+    if spread and spread.get("replicas"):
+        top = spread["swept_up_to"]
+        lines += [
+            "## How firm are the replica counts?",
+            "",
+            (f"The calibration measured every timing cell {spread['repeats']} times. The same "
+             "sizing, on the fit of each repeat alone:"),
+            "",
+            "| policy | all repeats together | each repeat alone |",
+            "|---|---:|---|",
+        ]
+        for policy, row in spread["replicas"].items():
+            lines.append(f"| {policy} | {_count(row['pooled'], top)} | "
+                         f"{' · '.join(_count(n, top) for n in row['repeats'])} |")
+        lines += [
+            "",
+            ("This is what ONE calibration's own repeats disagree by — a floor on the "
+             "uncertainty, not a confidence interval. It knows nothing about another day or "
+             "another software image: three calibrations of our own T4 agreed exactly on 71% of "
+             "counts and within one replica on 96%."),
+            "",
+        ]
+    elif payload.get("replica_spread_note"):
+        lines += [f"> ⚠️ {payload['replica_spread_note']}", ""]
     if payload.get("trace"):
         lines += ["## Trace", "", "```json", json.dumps(payload["trace"], indent=2), "```", ""]
     return "\n".join(lines)
@@ -186,6 +235,20 @@ def cmd_replay(args: argparse.Namespace) -> int:
     rec = recommend(points, **({"slo": cost.slo_label} if cost is not None else {}))
     if not rec.calibrated:
         print(UNCALIBRATED_BANNER, file=sys.stderr)
+    # How firm is the count? Only a measured profile and an SLO make the question meaningful.
+    spread, spread_note = None, None
+    if cost is not None and profile.calibrated and not args.no_spread:
+        replicates = replicate_profiles(args.profile)
+        if replicates:
+            spread = replica_spread(trace, policies=names, replica_counts=replicas,
+                                    seeds=tuple(range(args.seeds)), cost=cost,
+                                    pooled_points=points, replicates=replicates, trace_info=info)
+        else:
+            spread_note = (
+                "This profile carries no per-repeat fits, so how firm these replica counts are "
+                "cannot be shown. For scale: three calibrations of our own T4 agreed on a count "
+                "exactly at 71% of points and within one replica at 96%. A profile written by "
+                "`kvsim calibrate` shows its own spread.")
     _emit(
         {
             "trace": info,
@@ -193,6 +256,8 @@ def cmd_replay(args: argparse.Namespace) -> int:
             "points": [p.as_dict() for p in points],
             "recommendation": rec.as_dict(),
             "slo": _slo_sentence(cost),
+            "replica_spread": spread,
+            "replica_spread_note": spread_note,
         },
         args.format,
         args.out,
@@ -303,6 +368,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="a profile .json, or a shipped profile's name: t4-qwen3-4b-vllm0.30.0")
     r.add_argument("--format", default="md", choices=("md", "json"))
     r.add_argument("--out", default=None)
+    r.add_argument("--no-spread", action="store_true",
+                   help="skip re-sizing on each repeat of the calibration (one extra sweep per "
+                        "repeat); the replica counts are then shown without their spread")
     r.set_defaults(func=cmd_replay)
 
     g = sub.add_parser("generate", help="write a synthetic agentic trace")
@@ -344,7 +412,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="cached-prefix lengths: new tokens are timed after each (0 = none)")
     cal.add_argument("--prefill-new", default="64,256,704",
                      help="new-token counts timed after each cached prefix")
-    cal.add_argument("--reps", type=int, default=3, help="repeats of each prefill cell")
+    cal.add_argument("--reps", type=int, default=3,
+                     help="repeats of every timing cell; the profile keeps the fit of each")
     cal.add_argument("--decode-batches", default="1,2,4,8,16")
     cal.add_argument("--decode-contexts", default="32,512,1024",
                      help="prompt lengths for the decode cells: they fit the context term")

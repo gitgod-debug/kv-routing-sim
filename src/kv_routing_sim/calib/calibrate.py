@@ -42,6 +42,14 @@ different engine version is exactly where it could stop holding.
 1,024 — the range C2 validated. Longer prompts are an extrapolation of the fitted curve: if your
 traffic is longer, measure there (--prefill-lengths, --prefill-cached, --decode-contexts).
 
+⭐ HOW FIRM IS THE FIT? Every timing cell is measured `--reps` times (3), and the profile carries,
+beside the fit on all of it, the fit on EACH repeat alone (`_source.replicates`). C3 ran this
+command twice on one engine, 25 minutes apart: the coefficients differed by 3–5%, and for a
+workload at the knee of the load curve that moved a predicted p95 from 1.08× the measured one to
+4.17×. One fit hides that; `kvsim replay` re-runs its sizing on each repeat's fit and shows the
+range of replica counts next to the one it recommends. The range is what THIS calibration's own
+repeats disagree by — a floor on the uncertainty, not a confidence interval.
+
 ⛔ The KV capacity is READ, never estimated: `vllm:cache_config_info` in /metrics, else GET
 /server_info, else --kv-blocks. On the T4 an estimate from memory arithmetic was 56% too high.
 """
@@ -352,7 +360,7 @@ def measure_prefill(engine: Engine, info: EngineInfo, rng: random.Random, *,
     for _ in range(2):  # warm-up: first requests after start-up pay one-off costs
         engine.stream(info.model, _prompt(rng, 32, token_range), 1)
 
-    def timed(ids: list[int], assumed_cached: int, what: str) -> dict[str, float]:
+    def timed(ids: list[int], assumed_cached: int, what: str, rep: int) -> dict[str, float]:
         rec = engine.stream(info.model, ids, 1)
         why = _check(rec, len(ids), 1)
         if why:
@@ -362,13 +370,13 @@ def measure_prefill(engine: Engine, info: EngineInfo, rng: random.Random, *,
             notes.append("the engine does not report per-request cached tokens "
                          "(--enable-prompt-tokens-details); each warmed prefix was assumed cached")
         hit = assumed_cached if reported is None else reported
-        return {"prompt_tokens": len(ids), "uncached_tokens": len(ids) - hit,
+        return {"rep": rep, "prompt_tokens": len(ids), "uncached_tokens": len(ids) - hit,
                 "ttft_s": rec["t_first"] - rec["t_send"]}
 
     points = []
-    for _ in range(reps):
+    for rep in range(reps):
         for n in lengths:
-            points.append(timed(_prompt(rng, n, token_range), 0, f"{n} cold tokens"))
+            points.append(timed(_prompt(rng, n, token_range), 0, f"{n} cold tokens", rep))
         for c in prefixes:
             for n in new:
                 if n <= 0 or c + n > cap:
@@ -379,41 +387,44 @@ def measure_prefill(engine: Engine, info: EngineInfo, rng: random.Random, *,
                 if why:
                     raise CalibrationError(f"warming a {c}-token prefix failed: {why}")
                 points.append(timed(prefix + _prompt(rng, n, token_range), c,
-                                    f"{n} new tokens after {c} cached"))
+                                    f"{n} new tokens after {c} cached", rep))
     return points
 
 
 def measure_decode(engine: Engine, info: EngineInfo, rng: random.Random, *,
                    batches: tuple[int, ...], contexts: tuple[int, ...], output_tokens: int,
-                   token_range: tuple[int, int],
-                   skip: int = DECODE_SKIP_TOKENS) -> list[dict[str, Any]]:
+                   token_range: tuple[int, int], skip: int = DECODE_SKIP_TOKENS,
+                   reps: int = 1) -> list[dict[str, Any]]:
     """For each context length L and batch size b that fit the cache without preempting: b
     concurrent requests of L random tokens; a request's step is its mean gap from token `skip`
-    on."""
+    on. The whole set is measured `reps` times, one full pass after another — so a slow drift of
+    the engine shows as a difference between repeats instead of hiding inside one cell."""
     rows = []
     budget = int(0.8 * info.kv_cache_blocks)  # headroom: a preempted cell times recomputation
-    for L in sorted({min(x, info.max_model_len - output_tokens - 1) for x in contexts if x > 0}):
-        per = -(-(L + output_tokens) // info.block_size)
-        for b in sorted({x for x in batches if 1 <= x <= info.max_num_seqs}):
-            if b * per > budget:
-                continue
-            before = settled_metrics(engine)
-            prompts = [_prompt(rng, L, token_range) for _ in range(b)]
-            with ThreadPoolExecutor(max_workers=b) as pool:
-                recs = list(pool.map(lambda ids: engine.stream(info.model, ids, output_tokens),
-                                     prompts))
-            preemptions = _delta(before, settled_metrics(engine), "preemptions")
-            steps = sorted((r["t_chunks"][-1] - r["t_chunks"][skip])
-                           / (len(r["t_chunks"]) - 1 - skip)
-                           for r in recs if _check(r, L, output_tokens) is None
-                           and len(r["t_chunks"]) == output_tokens)
-            rows.append({
-                "batch": b, "context": L,
-                "step_s": statistics.median(steps) if steps else None,
-                "requests_ok": len(steps), "preemptions": preemptions,
-                # A cell that preempted timed recomputation, not decode steps.
-                "valid": len(steps) == b and preemptions == 0,
-            })
+    for rep in range(reps):
+        for L in sorted({min(x, info.max_model_len - output_tokens - 1)
+                         for x in contexts if x > 0}):
+            per = -(-(L + output_tokens) // info.block_size)
+            for b in sorted({x for x in batches if 1 <= x <= info.max_num_seqs}):
+                if b * per > budget:
+                    continue
+                before = settled_metrics(engine)
+                prompts = [_prompt(rng, L, token_range) for _ in range(b)]
+                with ThreadPoolExecutor(max_workers=b) as pool:
+                    recs = list(pool.map(
+                        lambda ids: engine.stream(info.model, ids, output_tokens), prompts))
+                preemptions = _delta(before, settled_metrics(engine), "preemptions")
+                steps = sorted((r["t_chunks"][-1] - r["t_chunks"][skip])
+                               / (len(r["t_chunks"]) - 1 - skip)
+                               for r in recs if _check(r, L, output_tokens) is None
+                               and len(r["t_chunks"]) == output_tokens)
+                rows.append({
+                    "rep": rep, "batch": b, "context": L,
+                    "step_s": statistics.median(steps) if steps else None,
+                    "requests_ok": len(steps), "preemptions": preemptions,
+                    # A cell that preempted timed recomputation, not decode steps.
+                    "valid": len(steps) == b and preemptions == 0,
+                })
     return rows
 
 
@@ -436,6 +447,33 @@ def fit(prefill: list[dict[str, float]], decode: list[dict[str, Any]], *,
             "prefill_attn_s": pre["attn_s"], "decode_base_s": dec["base_s"],
             "decode_per_seq_s": dec["per_seq_s"], "decode_per_ctx_token_s": dec["per_ctx_token_s"],
             "prefill_fit": pre, "decode_fit": dec, "notes": notes}
+
+
+COEFFICIENTS = ("prefill_base_s", "prefill_per_token_s", "prefill_attn_s", "decode_base_s",
+                "decode_per_seq_s", "decode_per_ctx_token_s")
+
+
+def fit_replicates(prefill: list[dict[str, float]], decode: list[dict[str, Any]], *,
+                   output_tokens: int, skip: int = DECODE_SKIP_TOKENS) -> list[dict[str, Any]]:
+    """The same fit on EACH repeat's measurements alone: how much the six coefficients move when
+    this engine is measured again a minute later. A repeat with too few usable decode cells has no
+    fit and is left out; with a single repeat there is nothing to compare, and the list is empty.
+    """
+    reps = sorted({p.get("rep", 0) for p in prefill} | {r.get("rep", 0) for r in decode})
+    if len(reps) < 2:
+        return []
+    out = []
+    for rep in reps:
+        try:
+            f = fit([p for p in prefill if p.get("rep", 0) == rep],
+                    [r for r in decode if r.get("rep", 0) == rep],
+                    output_tokens=output_tokens, skip=skip)
+        except CalibrationError:
+            continue
+        out.append({"rep": rep, **{k: f[k] for k in COEFFICIENTS},
+                    "decode_cells": f["decode_fit"]["points"],
+                    "prefill_points": f["prefill_fit"]["points"]})
+    return out if len(out) >= 2 else []
 
 
 # ── step 3: does the cache model predict this engine? ─────────────────────────────────────────
@@ -570,12 +608,14 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
                               token_range=token_range, cached=prefill_cached, new=prefill_new,
                               notes=prefill_notes)
     decode = measure_decode(engine, info, rng, batches=decode_batches, contexts=decode_contexts,
-                            output_tokens=decode_tokens, token_range=token_range)
+                            output_tokens=decode_tokens, token_range=token_range, reps=reps)
     f = fit(prefill, decode, output_tokens=decode_tokens)
+    replicates = fit_replicates(prefill, decode, output_tokens=decode_tokens)
     cells = [r for r in decode if r["valid"]]
     log(f"decode   {f['decode_base_s'] * 1e3:.1f} ms + {f['decode_per_seq_s'] * 1e3:.2f} ms × "
         f"batch + {f['decode_per_ctx_token_s'] * 1e6:.2f} ms per 1K context tokens  (R² "
-        f"{f['decode_fit']['r2']:.2f}, {len(cells)} cells: contexts "
+        f"{f['decode_fit']['r2']:.2f}, {len(cells)} measurements of "
+        f"{len({(r['batch'], r['context']) for r in cells})} cells: contexts "
         f"{' '.join(str(c) for c in sorted({r['context'] for r in cells}))})")
     log(f"prefill  {f['prefill_per_token_s'] * 1e3:.3f} ms per new token + "
         f"{f['prefill_attn_s'] * 1e6:.3f} ms per new token per 1K attended + "
@@ -583,6 +623,16 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
         f"{len(prefill)} requests, "
         f"{sum(1 for q in prefill if q['uncached_tokens'] < q['prompt_tokens'])} after a cached "
         "prefix)")
+    if replicates:
+        def span(key: str, scale: float, digits: int) -> str:
+            vals = [r[key] * scale for r in replicates]
+            return f"{min(vals):.{digits}f}–{max(vals):.{digits}f}"
+
+        log(f"repeats  the same fit on each of the {len(replicates)} repeats alone: decode "
+            f"{span('decode_base_s', 1e3, 1)} ms + {span('decode_per_seq_s', 1e3, 2)} × batch + "
+            f"{span('decode_per_ctx_token_s', 1e6, 2)} per 1K context; prefill "
+            f"{span('prefill_per_token_s', 1e3, 3)} per token + "
+            f"{span('prefill_attn_s', 1e6, 3)} per 1K attended")
     f["notes"] = [*prefill_notes, *f["notes"]]
     for note in f["notes"]:
         log(f"         {note}")
@@ -638,6 +688,8 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
             "decode_fit": f["decode_fit"],
             "decode_cells": decode,
             "prefill_points": prefill,
+            # The fit on each repeat alone — `kvsim replay` sizes on each and shows the range.
+            "replicates": replicates,
             "check": check,
             "notes": f["notes"],
         },

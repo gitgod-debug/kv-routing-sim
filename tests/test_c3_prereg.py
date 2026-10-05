@@ -92,6 +92,11 @@ def test_every_amendment_is_recorded_and_the_notebook_is_the_last_one():
 
 
 def test_the_command_still_measures_the_registered_cells():
-    """C3 runs the command with no cell option, so its defaults ARE the registered design. Until
-    C3 has run, a changed default means a new registration, not an edit to this test."""
+    """C3 ran the command with no cell option, so its defaults WERE the registered design.
+
+    C3 has run (2026-10-05), from the wheel its notebook carries — that wheel, not today's source,
+    is what the result describes. The cells below are still the command's defaults. One thing has
+    changed since, because of what C3 found: the command now measures its decode cells `--reps`
+    times, as it always did its prefill cells, and keeps the fit of each repeat. C3 measured them
+    once."""
     assert prepare.command_defaults() == PREREG["command_defaults"]
