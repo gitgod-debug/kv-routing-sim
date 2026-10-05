@@ -19,15 +19,18 @@ from http.server import ThreadingHTTPServer
 import pytest
 
 from kv_routing_sim.calib.calibrate import (
+    COEFFICIENTS,
     CalibrationError,
     Engine,
     EngineInfo,
     calibrate,
+    fit,
+    fit_replicates,
     measure_prefill,
     ols,
     probe,
 )
-from kv_routing_sim.sim.cost_model import load_profile
+from kv_routing_sim.sim.cost_model import load_profile, replicate_profiles
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 QUIET = {"log": lambda *_: None}
@@ -93,6 +96,19 @@ def test_calibration_recovers_the_mock_engines_own_timings(mock_url, tmp_path):
     out.write_text(json.dumps(profile))
     loaded = load_profile(out)  # the file is a profile the simulator accepts as it is
     assert loaded.calibrated and loaded.kv_cache_blocks == 4000
+    # Every timing cell was measured `reps` times, and the profile keeps the fit of each repeat —
+    # what `kvsim replay` sizes on to show how firm a replica count is.
+    src = profile["_source"]
+    cells = {(c["batch"], c["context"]) for c in src["decode_cells"]}
+    assert len(src["decode_cells"]) == SMALL["reps"] * len(cells)
+    assert sorted({c["rep"] for c in src["decode_cells"]}) == list(range(SMALL["reps"]))
+    assert [r["rep"] for r in src["replicates"]] == list(range(SMALL["reps"]))
+    for rep in src["replicates"]:
+        assert set(COEFFICIENTS) <= set(rep)
+        # The mock is the same engine on every repeat: each one finds its per-sequence cost.
+        assert rep["decode_per_seq_s"] == pytest.approx(2.5e-3, rel=0.3)
+    reps = replicate_profiles(out)
+    assert len(reps) == SMALL["reps"] and all(r.kv_cache_blocks == 4000 for r in reps)
 
 
 def test_calibration_recovers_known_context_terms(ctx_mock_url):
@@ -119,6 +135,62 @@ def test_prefill_is_also_timed_after_a_cached_prefix(ctx_mock_url):
     cold = [p for p in points if p["uncached_tokens"] == p["prompt_tokens"]]
     assert len(cold) == SMALL["reps"] * len(SMALL["prefill_lengths"])
     assert profile["_source"]["notes"] == []  # this engine reports cached tokens: nothing assumed
+
+
+def _synthetic(scale_by_rep: dict[int, float]) -> tuple[list[dict], list[dict]]:
+    """Timing points an engine with known coefficients would give — each repeat's engine the true
+    one scaled, so the fit of that repeat alone must come out scaled the same."""
+    d0, d1, d2 = 0.04, 3e-4, 3.5e-6
+    p0, p1, p2 = 0.0, 3e-4, 7.5e-7
+    mid = (8 + 64) / 2
+    prefill, decode = [], []
+    for rep, x in scale_by_rep.items():
+        for L in (128, 512, 1024):
+            for b in (1, 2, 4, 8):
+                decode.append({"rep": rep, "batch": b, "context": L, "valid": True,
+                               "step_s": x * (d0 + d1 * b + d2 * b * (L + mid))})
+        for c, n in ((0, 64), (0, 512), (0, 1024), (256, 64), (768, 256), (1280, 704)):
+            ttft = x * (p0 + p1 * n + p2 * n * (c + n / 2) + d0 + d1 + d2 * (c + n))
+            prefill.append({"rep": rep, "prompt_tokens": c + n, "uncached_tokens": n,
+                            "ttft_s": ttft})
+    return prefill, decode
+
+
+def test_the_fit_of_each_repeat_alone_shows_how_much_the_engine_moved():
+    """Three repeats; the engine is 10% slower in the second and 5% faster in the third. The pooled
+    fit lands in between — and hides that. The per-repeat fits show it."""
+    prefill, decode = _synthetic({0: 1.0, 1: 1.1, 2: 0.95})
+    pooled = fit(prefill, decode, output_tokens=64)
+    reps = fit_replicates(prefill, decode, output_tokens=64)
+    assert [r["rep"] for r in reps] == [0, 1, 2]
+    for r, x in zip(reps, (1.0, 1.1, 0.95), strict=True):
+        assert r["decode_per_ctx_token_s"] == pytest.approx(3.5e-6 * x)
+        assert r["decode_base_s"] == pytest.approx(0.04 * x)
+        assert r["prefill_per_token_s"] == pytest.approx(3e-4 * x)
+        assert r["prefill_attn_s"] == pytest.approx(7.5e-7 * x)
+        assert (r["decode_cells"], r["prefill_points"]) == (12, 6)
+    lo, hi = (f(r["decode_per_ctx_token_s"] for r in reps) for f in (min, max))
+    assert lo < pooled["decode_per_ctx_token_s"] < hi
+
+
+def test_one_repeat_has_nothing_to_compare_and_a_broken_one_is_left_out():
+    prefill, decode = _synthetic({0: 1.0})
+    assert fit_replicates(prefill, decode, output_tokens=64) == []  # one repeat: no spread
+    # Points from before repeats were tagged (no "rep" key) are one repeat, not an error.
+    untagged = ([{k: v for k, v in p.items() if k != "rep"} for p in prefill],
+                [{k: v for k, v in c.items() if k != "rep"} for c in decode])
+    assert fit_replicates(*untagged, output_tokens=64) == []
+    # A repeat whose decode cells all preempted has no fit of its own: it is dropped, not guessed.
+    prefill, decode = _synthetic({0: 1.0, 1: 1.1, 2: 0.95})
+    for c in decode:
+        if c["rep"] == 1:
+            c["valid"] = False
+    assert [r["rep"] for r in fit_replicates(prefill, decode, output_tokens=64)] == [0, 2]
+    # …and if that leaves a single one, there is again nothing to compare.
+    for c in decode:
+        if c["rep"] == 2:
+            c["valid"] = False
+    assert fit_replicates(prefill, decode, output_tokens=64) == []
 
 
 class _Silent(Engine):

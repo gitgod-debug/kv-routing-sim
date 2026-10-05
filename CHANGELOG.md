@@ -23,6 +23,10 @@ The first public version: planned for PyPI before 2026-11-20.
   model against its counters, request by request. Standard library only.
 - **A context-aware timing model** (C2): prefill and decode cost grow with context length. Both
   terms default to zero, so every earlier profile gives the same results as before.
+- **How firm is a replica count?** `kvsim calibrate` measures every timing cell `--reps` times (3)
+  and keeps the fit of each repeat alone in the profile; `kvsim replay` sizes on each and prints
+  the range of replica counts beside its recommendation (`--no-spread` skips the extra sweeps). A
+  profile without repeats says its spread is unknown.
 - **Time per output token.** Every run now also measures each request's time per output token
   (last token − first token, over the tokens after the first — MLPerf's TPOT, vLLM's
   `request_time_per_output_token`), and `kvsim replay` prints its p95 beside the first-token
