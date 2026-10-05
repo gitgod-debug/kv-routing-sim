@@ -1,5 +1,5 @@
 {
- "kernel": "<account>/kvsim-c3-preflight-probe",
+ "kernel": "kvsim-c3-preflight-probe",
  "status": "KernelWorkerStatus.COMPLETE",
  "failure_message": "",
  "notebook": "built by scripts/c3_probe.py",

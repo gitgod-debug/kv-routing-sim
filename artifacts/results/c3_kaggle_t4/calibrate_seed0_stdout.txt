@@ -1,0 +1,7 @@
+engine   http://127.0.0.1:8000 · vLLM 0.30.0 · Qwen/Qwen3-4B · GPU Tesla T4
+         KV capacity: 1,537 blocks, from vllm:cache_config_info in /metrics
+decode   43.7 ms + 0.00 ms × batch + 3.60 ms per 1K context tokens  (R² 0.87, 15 cells: contexts 32 512 1024)
+prefill  0.295 ms per new token + 0.776 ms per new token per 1K attended + 2.2 ms  (R² 1.00, 51 requests, 27 after a cached prefix)
+check    hit rate: engine 0.7143, model 0.7143 → error 0.00% over 48 requests
+         per-request cached tokens: 48 of 48 equal
+wrote c3_results/calibrated_profile_seed0.json — calibrated. Use it: kvsim replay <trace> --profile c3_results/calibrated_profile_seed0.json

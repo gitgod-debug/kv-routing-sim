@@ -72,28 +72,33 @@
   <p class="sub">Which KV-cache routing policy should you run — and on how many GPUs? A simulator whose
     cache model was checked against a live vLLM, and whose tests were written down before they ran.</p>
 
-  <div class="finding"><strong>Keep each user on one GPU.</strong> On a T4 timing model checked against the
-    live engine, session-sticky routing needs the fewest GPUs — or ties for them — at 22 of 24 points,
-    from one shared system prompt to 64 tenants' prompts. Routing by prefix raises the hit rate, but did
-    not save a GPU with the registered load weight.</div>
+  <div class="finding"><strong>Keep each user on one GPU.</strong> On three calibrations of the same T4,
+    session-sticky routing needs the fewest GPUs — or ties for them — at every load with one shared
+    system prompt and with four, and never needs more than round-robin or least-loaded. Whether routing
+    by prefix then saves GPUs with 64 tenants' prompts is <strong>not settled</strong>: the registered
+    test said no on one calibration and yes on two others. Read every GPU count as ± one.</div>
 
   <div class="scroll">
     <table aria-label="The finding in numbers">
       <thead><tr><th>Distinct system prompts</th><th class="num">Working set ÷ one T4's cache</th>
-        <th>Fewest T4s that hold a 2 s p95 time-to-first-token at 2 sessions/s</th></tr></thead>
+        <th>Fewest T4s that hold a 2 s p95 time-to-first-token at 2 sessions/s — on calibrations A · B · C</th></tr></thead>
       <tbody>
-        <tr><td>1</td><td class="num">0.06</td><td>session-sticky <strong>5</strong> · round-robin 7 · balanced prefix-affinity 10</td></tr>
-        <tr><td>64</td><td class="num">2.66</td><td>session-sticky <strong>10</strong> · balanced prefix-affinity 11 · round-robin 16 (prefix-affinity with a load weight of 1: 8 — found after the test)</td></tr>
+        <tr><td>1</td><td class="num">0.06</td><td>session-sticky <strong>5 · 5 · 5</strong> · round-robin 7 · 7 · 7 · balanced prefix-affinity 10 · not held on 16 · not held</td></tr>
+        <tr><td>64</td><td class="num">2.66</td><td>session-sticky 10 · 12 · 12 · balanced prefix-affinity 11 · 11 · 10 · round-robin 16 · 16 · not held (prefix-affinity with a load weight of 1: 8 · 8 · 8 — a weight found after the tests)</td></tr>
       </tbody>
     </table>
   </div>
   <p class="note"><strong>Scope, before you trust it.</strong> Generated agentic traffic, Qwen3-4B, T4
     timings from a context-aware model that predicted held-out traffic within 1.41× and, after the fact,
-    two live T4s within 1.02–1.79× (C2). <strong>This finding changed on 2026-09-30:</strong> on the
-    first, context-free timing model — 5–222× optimistic on live GPUs — prefix routing won once
-    prompts outgrew one GPU's cache; re-tested on the validated model, that half was falsified. On real
-    traces (run on the first model) session-sticky and prefix-affinity came out within one replica of
-    each other.</p>
+    two live T4s within 1.02–1.79× (C2). The target is on the first token only; time per token is not
+    yet part of it. <strong>This finding changed twice.</strong> On the first, context-free timing
+    model — 5–222× optimistic on live GPUs — prefix routing won once prompts outgrew one GPU's cache.
+    Re-tested on the validated model (2026-09-30, calibration A), that half was falsified. On
+    2026-10-05 the same test was run on two more calibrations of the same T4 (B and C, written by
+    <code>kvsim calibrate</code> on a live engine): it held on both. The three calibrations agree on
+    a GPU count to within one at 96% of points, and that half of the finding was decided by one. The
+    explorer below shows calibration A. On real traces (run on the first model) session-sticky and
+    prefix-affinity came out within one replica of each other.</p>
 
   <h2>The credential — checked against a live vLLM</h2>
   <p>vLLM 0.30.0, Qwen3-4B (fp16), a deliberately small 512-block cache that overflows, three runs of each

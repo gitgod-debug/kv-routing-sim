@@ -6,13 +6,16 @@ Give it your serving log. It returns a routing policy, a replica count, and a co
 prefix-cache model is calibrated against a live vLLM's own Prometheus counters, and **the calibration error
 is published**.
 
-> ## 🚧 Status (2026-09-30): the cache model and the timing model are both checked against a live engine — and the finding was re-tested on them, and changed.
+> ## 🚧 Status (2026-10-05): the cache model, the timing model and `kvsim calibrate` are all checked against a live engine — and the last check measured how far a GPU count can be trusted.
 > The Real-Engine Calibration Report below is filled in from a live vLLM, against predictions committed
 > before the run. On **two live T4s** (Phase 6, run twice) every hit rate matched within 1.4% — but the
 > first timing model was 5–222× optimistic on latency. **C2** (registered) found why — decode and
 > prefill cost grow with context length; CPU contention was ruled out — and fitted a context-aware T4
-> model that predicts held-out traffic within 1.41×. Re-tested on that model, **half of the old
-> headline was falsified** (below). Replica counts are T4 figures on generated traffic. Every number
+> model that predicts held-out traffic within 1.41×. **C3** (registered, 2026-10-05): `kvsim calibrate`
+> ran on a real T4, exact on its cache check, and the profile it wrote predicted three unseen workloads
+> within 1.41×. The same run showed that three calibrations of one T4 agree on a GPU count to within
+> one replica at 96% of points — **and that the test behind half of the headline was decided inside
+> that margin** (below). Replica counts are T4 figures on generated traffic, ± one. Every number
 > still written as `TBD — not yet measured` **is exactly that**; see the honesty gates in
 > [`CHECKPOINTS.md`](CHECKPOINTS.md). Start at [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
 
@@ -20,19 +23,24 @@ is published**.
 
 ## The finding
 
-> **Keep each user on one GPU.** On a T4 timing model checked against the live engine, session-sticky
-> routing needs the fewest GPUs — or ties for them — at 22 of 24 points, from one shared system prompt
-> to 64 tenants' prompts. Routing by prefix raises the hit rate once prompts outgrow the cache, but on
-> this model it did not save a GPU with the registered load weight.
+> **Keep each user on one GPU.** On three calibrations of the same T4, session-sticky routing needs
+> the fewest GPUs — or ties for them — at every load with one shared system prompt and with four, and
+> it never needs more than round-robin or least-loaded anywhere. **Whether routing by prefix then
+> saves GPUs, once tenants' prompts outgrow the cache, is not settled:** the registered test said no
+> on one calibration and yes on the two others. Read every GPU count here as ± one.
 
 Measured on simulated agentic traffic, with the cache model calibrated against a live vLLM (the
-credential, below), the context-aware T4 timing model of C2, a 2-second p95 TTFT target, and the test
-registered before it ran ([`docs/09-hypotheses.md`](docs/09-hypotheses.md), 2026-09-30).
+credential, below), a context-aware T4 timing model, and a 2-second p95 TTFT target. The test was
+registered before it ran, on calibration **A** — C2's fit
+([`docs/09-hypotheses.md`](docs/09-hypotheses.md), 2026-09-30). **B** and **C** are the two profiles
+`kvsim calibrate` wrote on a real T4 in C3 (2026-10-05): B's table was a registered reported item,
+C's was added after seeing it and is post hoc
+([all three, side by side](artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.md)).
 
-| Distinct system prompts (85 blocks each) | Working set ÷ one T4's cache | Fewest T4s that hold the target at 2 sessions/s |
+| Distinct system prompts (85 blocks each) | Working set ÷ one T4's cache | Fewest T4s that hold the target at 2 sessions/s — on A · B · C |
 |---|---:|---|
-| 1 | 0.06 | session-sticky **5** · round-robin 7 · balanced prefix-affinity 10 |
-| 64 | 2.66 | session-sticky **10** · balanced prefix-affinity 11 · round-robin 16 · least-loaded: not held on 16 *(prefix-affinity with a load weight of 1: **8** — found after the test)* |
+| 1 | 0.06 | session-sticky **5 · 5 · 5** · round-robin 7 · 7 · 7 · balanced prefix-affinity 10 · not held on 16 · not held |
+| 64 | 2.66 | session-sticky 10 · 12 · 12 · balanced prefix-affinity 11 · 11 · 10 · round-robin 16 · 16 · not held · least-loaded: not held *(prefix-affinity with a load weight of 1: **8 · 8 · 8** — a weight found after the tests)* |
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/figures/flip-dark.svg">
@@ -41,20 +49,25 @@ registered before it ran ([`docs/09-hypotheses.md`](docs/09-hypotheses.md), 2026
 
 *Drawn by [`scripts/make_figures.py`](scripts/make_figures.py) from
 [`demo_grid_ctx.json`](artifacts/results/demo_grid_ctx.json), which reproduces the registered re-test's
-table exactly; 3 seeds per point, a point counts only if every seed holds the target. T4 figures.*
+table exactly; 3 seeds per point, a point counts only if every seed holds the target. T4 figures,
+**on calibration A only** — on B and C the 64-prompt points move by up to two replicas, as the table
+above shows.*
 
-- **One shared prompt:** session-sticky needs the fewest GPUs at every load, and its saving over
-  round-robin grows with load — equal at 1 session/s, then 5 against 7, 6 against 9, 7 against 12
-  (29–42% fewer at 2–4 sessions/s). *Pure* prefix-affinity still collapses under load: it sends every
-  session to the one replica holding the prompt (H2, falsified).
-- **Many prompts:** prefix routing still gets the better hit rate (0.87 with a small load weight, 0.80
-  for session-sticky, 0.47 for round-robin at 64 prompts), but it no longer turns that into fewer
-  GPUs. With context priced in, decode — which every policy pays in full, cached or not — is a large
-  share of the cost, and concentrating sessions onto the replicas that hold their prompt makes batches
-  uneven; session-sticky's balance is worth more than the extra hits.
-- **The two exceptions, found after the test:** with a load weight of 1, prefix routing saved 2 of 10
-  GPUs at 64 prompts and 2 sessions/s, and 1 of 4 at 16 prompts and 1 session/s. Not a finding until
-  a registered test says so.
+- **One shared prompt, or four — this part holds on all three calibrations:** session-sticky needs
+  the fewest GPUs at every load (12 of 12 points), and its saving over round-robin grows with load —
+  5 against 7 at 2 sessions/s, 6 against 9 at 3, 7 or 8 against 12 at 4. Across all 24 points it
+  never needs more than round-robin or least-loaded. *Pure* prefix-affinity still collapses under
+  load: it sends every session to the one replica holding the prompt (H2, falsified).
+- **Many prompts (64) — this part does not:** prefix routing gets the better hit rate (0.87 with a
+  small load weight, 0.80 for session-sticky, 0.47 for round-robin, on A). Whether that becomes fewer
+  GPUs depends on the calibration. With the registered load weight, session-sticky needs 10 against
+  11 on A, 12 against 11 on B, 12 against 10 on C. The three calibrations differ by a few percent in
+  their coefficients; at this point that is one or two GPUs, and the sign of the answer.
+- **Found after the tests, so not a finding:** with a load weight of 1, prefix routing needs 8 GPUs
+  at 64 prompts and 2 sessions/s on all three calibrations, where session-sticky needs 10 to 12. It
+  is the most consistent hint in the grid, and it has never been a registered test.
+- **How far to trust a GPU count:** of the 144 (prompts, load, policy) cells, 102 need the same number
+  of replicas on all three calibrations and 138 are within one.
 
 **How this finding changed.** Until 2026-09-30 it read *"…until your tenants' system prompts outgrow
 one GPU's KV cache; then route by prefix"* — at 64 prompts, balanced prefix-affinity held the target
@@ -62,8 +75,16 @@ on 5 T4s where session-sticky could not on 8. That was a correct result about th
 timing model, and that model was wrong about the engine: on two live T4s (Phase 6) latency came out
 5–222× its prediction. C2 found the missing term and fitted a model that predicts held-out traffic —
 and, post hoc, Phase 6's two replicas within 1.02–1.79×. Re-tested on it, as registered, the "route
-by prefix" half was **falsified**. Both versions, and why, are in
-[`docs/09-hypotheses.md`](docs/09-hypotheses.md).
+by prefix" half was **falsified**, and from 2026-09-30 the headline said that prefix routing "did
+not save a GPU".
+
+On 2026-10-05, C3 put `kvsim calibrate` on a real T4. As a registered reported item, the same test
+was re-run on the profile the command wrote — a second calibration of the same GPU, a few percent
+different in its coefficients. H2b's rules **held** there; and on the profile from the command's
+second run (post hoc) they held again. The verdict of 2026-09-30 stands as what that registered
+test said on calibration A. But it was decided by one replica at one point, and one replica is
+what two calibrations of the same GPU disagree by. So the headline now claims only what all three
+support. All versions, and why, are in [`docs/09-hypotheses.md`](docs/09-hypotheses.md).
 
 **The live check (Phase 6, registered; run twice on two T4s).** The traffic at 1 session/s, one prompt
 (K1) and 64 (K64), three routers on two live vLLM replicas:
@@ -100,8 +121,13 @@ prefix; and on agent traffic like AgentX the rule is simply *keep each session o
 policy that does* — the same advice as the finding above.
 
 ⚠️ **Scope:** generated traffic, one GPU type (T4), one model (Qwen3-4B). The replica counts are T4
-figures on the context-aware model. H6 (the policy ranking under faster and slower GPUs) was tested
-on the first, context-free model and is not yet re-run. `azrabano23/disagg-sim` published that
+figures on the context-aware model, ± one replica. **The target is on the first token only.** The
+MLPerf rule the 2 seconds come from pairs them with a per-token limit (100 ms for a model of this
+size), and in C3 the live engine took 134–521 ms per token on workloads that met, or nearly met, the
+first-token target — so these are the GPUs needed for a prompt first token, not for an answer that
+streams at a usable speed (not yet tested; [C3's entry](docs/09-hypotheses.md)). H6 (the policy
+ranking under faster and slower GPUs) was tested on the first, context-free model and is not yet
+re-run. `azrabano23/disagg-sim` published that
 locality can lose to load balancing, and llm-d weighs prefix and load scores by hand-set weights; on
 this setup, with timing checked against the engine, balance won.
 
@@ -220,18 +246,27 @@ kvsim replay trace.jsonl --policies all --replicas 1-8 --profile mine.json --cos
 ```
 
 If the cache check misses (by more than 5%, or on any single request's cached tokens), the profile is
-written but **not** marked calibrated, and the command exits 1. **On a real T4 (C1, registered):** its
-cache check came out exact — all 48 requests' cached tokens, 9,840 of 13,776 tokens — and it read the
-engine's 1,537 blocks correctly, in 48 seconds ([report](artifacts/results/c1_kaggle_t4/report.md)).
-That version fitted a straight line with no context term, which C2 then showed is up to 7×
-optimistic; since 2026-09-30 the command fits the context-aware model instead, and recovers known
-context terms from a mock engine (3.97e-6 against 4e-6 s per context token). A check on C2's
-recorded data then showed that timing cold prompts alone would have put a held-out p95 off by
-5.7–7.2×, so since 2026-10-01 it also times new tokens after a cached prefix — the case agentic
-traffic is made of ([pre-check](artifacts/results/c3_prereg/precheck.md), post hoc). ⚠️ That new fit
-has not yet been run on a real GPU — its procedure has (C2, where it predicted held-out traffic
-within 1.41×). Its first real run is registered as **C3** — rules and predictions committed, the
-notebook built ([`configs/c3_calibrate.yaml`](configs/c3_calibrate.yaml)) — and has not happened yet.
+written but **not** marked calibrated, and the command exits 1.
+
+**On a real T4, twice, both registered before they ran.**
+- **C1:** its cache check came out exact — all 48 requests' cached tokens, 9,840 of 13,776 tokens —
+  and it read the engine's 1,537 blocks correctly, in 48 seconds
+  ([report](artifacts/results/c1_kaggle_t4/report.md)). That version fitted a straight line with no
+  context term, which C2 then showed is up to 7× optimistic.
+- **C3 (2026-10-05):** the command as it is now. It fits C2's context-aware model, and — since a
+  check on C2's recorded data showed that timing cold prompts alone would have put a held-out p95
+  off by 5.7–7.2× ([pre-check](artifacts/results/c3_prereg/precheck.md), post hoc) — it also times
+  new tokens after a cached prefix, the case agentic traffic is made of. On the T4 it ran in 160
+  seconds, was exact on the cache check again, and wrote a profile that predicted three workloads it
+  had never seen within **1.41×** on p50 and p95 TTFT — one of them with prompts half as long as
+  anything the model had been tested on. The profile C2 fitted five days earlier, on another software
+  image, predicted the same traffic within 1.38×, from numbers written down before the run
+  ([report](artifacts/results/c3_kaggle_t4/report.md)).
+
+⚠️ **Near saturation, one run of the command is not enough.** A second run on the same engine, 25
+minutes later, came out 3–5% different in its coefficients. For the one workload at the knee of the
+load curve, that put a p95 **4.2×** off; the other five numbers stayed within 1.35×. If the answer you
+need sits at the edge of the target, run the command more than once, and read the GPU count as ± one.
 
 ## ⭐ What transfers to your fleet, and what doesn't
 
@@ -241,8 +276,8 @@ so the honest answer comes in three tiers, and they must not be blended (ADR-010
 | | What you get | What it costs you |
 |---|---|---|
 | **Policy ranking** | *Which* policy wins on your workload shape, and roughly by how much | ⛔ **Not free.** **H6 was tested and FALSIFIED (2026-09-28):** under a 2× faster GPU, or prefill 2× cheaper or dearer, the full order of the seven policies changed (Kendall's τ-b as low as 0.51). What held — noticed after the run, not registered: session-sticky needed the fewest replicas at all 48 points. So read a ranking as a result for *our* T4 unless you calibrate |
-| **Whether prefix routing pays** | Whether prefix-affinity is worth implementing for *your* prompts and load | ⚠️ **On our T4, with timing checked against the engine: mostly not** — session-sticky needs the fewest replicas or ties at 22 of 24 points (2026-09-30). On the first, context-free timing model it paid once prompts outgrew one GPU's cache, and that flip survived four hardware rescalings (H6's crossover half) — but the model itself was wrong about the engine. So the answer depends on the timing model: measure yours |
-| **Absolute ms and ₹** | p95 TTFT and ₹/1k requests for your fleet | **`kvsim calibrate` on your own hardware**, a few minutes. ⛔ Our error bar was measured on our GPU and our model. It does **not** transfer, and this README will never imply that it does. On our own T4 the first, context-free timing model was 5–222× optimistic under load; the context-aware one (C2) predicts held-out traffic within 1.41× |
+| **Whether prefix routing pays** | Whether prefix-affinity is worth implementing for *your* prompts and load | ⚠️ **Not settled, even on our own T4.** With one shared prompt or a few: no — session-sticky needs the fewest replicas or ties on all three calibrations. With 64 prompts, the registered test said no on one calibration (2026-09-30) and yes on two others (2026-10-05): the two policies are one or two replicas apart, which is what calibrations of the same GPU disagree by. On the first, context-free timing model it paid once prompts outgrew one GPU's cache, and that flip survived four hardware rescalings (H6's crossover half) — but that model was wrong about the engine. So the answer depends on the timing model, and on its error bar: measure yours, more than once |
+| **Absolute ms and ₹** | p95 TTFT and ₹/1k requests for your fleet | **`kvsim calibrate` on your own hardware**, a few minutes. ⛔ Our error bar was measured on our GPU and our model. It does **not** transfer, and this README will never imply that it does. On our own T4 the first, context-free timing model was 5–222× optimistic under load; the context-aware one predicts held-out traffic within 1.41× (C2), and again from a profile `kvsim calibrate` wrote itself (C3) — except at the knee of the load curve, where a second run of the command was 4.2× off on one p95 |
 
 > **So: why trust our numbers on your hardware?** You shouldn't. Run `kvsim calibrate` and use your own.
 > That is the same posture as the cost model, which ships every constant in a config with a source and a

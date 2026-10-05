@@ -1,0 +1,450 @@
+{
+ "_what": "Fitted by `kvsim calibrate` against http://127.0.0.1:8000. Timings are figures for Tesla T4 serving Qwen/Qwen3-4B on vLLM 0.30.0; the capacity is what that engine allocated.",
+ "_source": {
+  "tool": "kvsim calibrate (kv-routing-sim 0.1.0)",
+  "date_utc": "2026-10-05T10:09:53+00:00",
+  "engine": {
+   "base": "http://127.0.0.1:8000",
+   "model": "Qwen/Qwen3-4B",
+   "version": "0.30.0",
+   "kv_cache_blocks": 1537,
+   "block_size": 16,
+   "max_num_seqs": 256,
+   "max_model_len": 2048,
+   "notes": [
+    "KV capacity: 1,537 blocks, from vllm:cache_config_info in /metrics"
+   ]
+  },
+  "seed": 1,
+  "max_error": 0.05,
+  "prefill_fit": {
+   "base_s": 0.0018974317335806346,
+   "per_token_s": 0.000310775175270618,
+   "attn_s": 7.789077531732671e-07,
+   "points": 51,
+   "r2": 0.998801535051731
+  },
+  "decode_fit": {
+   "base_s": 0.04249546863100731,
+   "per_seq_s": 0.0,
+   "per_ctx_token_s": 3.730857624604903e-06,
+   "points": 15,
+   "r2": 0.9309105871306737
+  },
+  "decode_cells": [
+   {
+    "batch": 1,
+    "context": 32,
+    "step_s": 0.05671686207272366,
+    "requests_ok": 1,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 2,
+    "context": 32,
+    "step_s": 0.037976975327269846,
+    "requests_ok": 2,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 4,
+    "context": 32,
+    "step_s": 0.039468682372729415,
+    "requests_ok": 4,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 8,
+    "context": 32,
+    "step_s": 0.04191164101817693,
+    "requests_ok": 8,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 16,
+    "context": 32,
+    "step_s": 0.04663826693636524,
+    "requests_ok": 16,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 1,
+    "context": 512,
+    "step_s": 0.0474142943636335,
+    "requests_ok": 1,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 2,
+    "context": 512,
+    "step_s": 0.042338836036362244,
+    "requests_ok": 2,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 4,
+    "context": 512,
+    "step_s": 0.047936725490907606,
+    "requests_ok": 4,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 8,
+    "context": 512,
+    "step_s": 0.05829328786363393,
+    "requests_ok": 8,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 16,
+    "context": 512,
+    "step_s": 0.07860740365454563,
+    "requests_ok": 16,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 1,
+    "context": 1024,
+    "step_s": 0.050601654727275173,
+    "requests_ok": 1,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 2,
+    "context": 1024,
+    "step_s": 0.047663097581818706,
+    "requests_ok": 2,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 4,
+    "context": 1024,
+    "step_s": 0.05666655486363445,
+    "requests_ok": 4,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 8,
+    "context": 1024,
+    "step_s": 0.07331226878182365,
+    "requests_ok": 8,
+    "preemptions": 0.0,
+    "valid": true
+   },
+   {
+    "batch": 16,
+    "context": 1024,
+    "step_s": 0.10572591711818197,
+    "requests_ok": 16,
+    "preemptions": 0.0,
+    "valid": true
+   }
+  ],
+  "prefill_points": [
+   {
+    "prompt_tokens": 64,
+    "uncached_tokens": 64,
+    "ttft_s": 0.06059581799991065
+   },
+   {
+    "prompt_tokens": 128,
+    "uncached_tokens": 128,
+    "ttft_s": 0.0760673750000933
+   },
+   {
+    "prompt_tokens": 256,
+    "uncached_tokens": 256,
+    "ttft_s": 0.1431995860002644
+   },
+   {
+    "prompt_tokens": 512,
+    "uncached_tokens": 512,
+    "ttft_s": 0.28886303499984933
+   },
+   {
+    "prompt_tokens": 768,
+    "uncached_tokens": 768,
+    "ttft_s": 0.5073584629999459
+   },
+   {
+    "prompt_tokens": 1024,
+    "uncached_tokens": 1024,
+    "ttft_s": 0.7420572979999633
+   },
+   {
+    "prompt_tokens": 1536,
+    "uncached_tokens": 1536,
+    "ttft_s": 1.4795554410002296
+   },
+   {
+    "prompt_tokens": 2040,
+    "uncached_tokens": 2040,
+    "ttft_s": 2.2151934329999676
+   },
+   {
+    "prompt_tokens": 320,
+    "uncached_tokens": 64,
+    "ttft_s": 0.08077177099994515
+   },
+   {
+    "prompt_tokens": 512,
+    "uncached_tokens": 256,
+    "ttft_s": 0.19404442699988067
+   },
+   {
+    "prompt_tokens": 960,
+    "uncached_tokens": 704,
+    "ttft_s": 0.615112962999774
+   },
+   {
+    "prompt_tokens": 832,
+    "uncached_tokens": 64,
+    "ttft_s": 0.11768181600018579
+   },
+   {
+    "prompt_tokens": 1024,
+    "uncached_tokens": 256,
+    "ttft_s": 0.297218946999692
+   },
+   {
+    "prompt_tokens": 1472,
+    "uncached_tokens": 704,
+    "ttft_s": 0.886969831999977
+   },
+   {
+    "prompt_tokens": 1344,
+    "uncached_tokens": 64,
+    "ttft_s": 0.1470070340001257
+   },
+   {
+    "prompt_tokens": 1536,
+    "uncached_tokens": 256,
+    "ttft_s": 0.3942999079999936
+   },
+   {
+    "prompt_tokens": 1984,
+    "uncached_tokens": 704,
+    "ttft_s": 1.1707919290001882
+   },
+   {
+    "prompt_tokens": 64,
+    "uncached_tokens": 64,
+    "ttft_s": 0.05860489899987442
+   },
+   {
+    "prompt_tokens": 128,
+    "uncached_tokens": 128,
+    "ttft_s": 0.08111207399997511
+   },
+   {
+    "prompt_tokens": 256,
+    "uncached_tokens": 256,
+    "ttft_s": 0.14867263799987995
+   },
+   {
+    "prompt_tokens": 512,
+    "uncached_tokens": 512,
+    "ttft_s": 0.3036852160003036
+   },
+   {
+    "prompt_tokens": 768,
+    "uncached_tokens": 768,
+    "ttft_s": 0.5348106390001703
+   },
+   {
+    "prompt_tokens": 1024,
+    "uncached_tokens": 1024,
+    "ttft_s": 0.7499046640000415
+   },
+   {
+    "prompt_tokens": 1536,
+    "uncached_tokens": 1536,
+    "ttft_s": 1.4783568230000128
+   },
+   {
+    "prompt_tokens": 2040,
+    "uncached_tokens": 2040,
+    "ttft_s": 2.3242269209999904
+   },
+   {
+    "prompt_tokens": 320,
+    "uncached_tokens": 64,
+    "ttft_s": 0.08452407599997969
+   },
+   {
+    "prompt_tokens": 512,
+    "uncached_tokens": 256,
+    "ttft_s": 0.20282431100031317
+   },
+   {
+    "prompt_tokens": 960,
+    "uncached_tokens": 704,
+    "ttft_s": 0.6372598330003711
+   },
+   {
+    "prompt_tokens": 832,
+    "uncached_tokens": 64,
+    "ttft_s": 0.11360575999970024
+   },
+   {
+    "prompt_tokens": 1024,
+    "uncached_tokens": 256,
+    "ttft_s": 0.2961599049999677
+   },
+   {
+    "prompt_tokens": 1472,
+    "uncached_tokens": 704,
+    "ttft_s": 0.8973066190001191
+   },
+   {
+    "prompt_tokens": 1344,
+    "uncached_tokens": 64,
+    "ttft_s": 0.14596800200024518
+   },
+   {
+    "prompt_tokens": 1536,
+    "uncached_tokens": 256,
+    "ttft_s": 0.39362736300017787
+   },
+   {
+    "prompt_tokens": 1984,
+    "uncached_tokens": 704,
+    "ttft_s": 1.187427333999949
+   },
+   {
+    "prompt_tokens": 64,
+    "uncached_tokens": 64,
+    "ttft_s": 0.058737323000059405
+   },
+   {
+    "prompt_tokens": 128,
+    "uncached_tokens": 128,
+    "ttft_s": 0.08319570899993778
+   },
+   {
+    "prompt_tokens": 256,
+    "uncached_tokens": 256,
+    "ttft_s": 0.15358895800000028
+   },
+   {
+    "prompt_tokens": 512,
+    "uncached_tokens": 512,
+    "ttft_s": 0.3008703890000106
+   },
+   {
+    "prompt_tokens": 768,
+    "uncached_tokens": 768,
+    "ttft_s": 0.5291467069996543
+   },
+   {
+    "prompt_tokens": 1024,
+    "uncached_tokens": 1024,
+    "ttft_s": 0.7476300080002147
+   },
+   {
+    "prompt_tokens": 1536,
+    "uncached_tokens": 1536,
+    "ttft_s": 1.4772914320001291
+   },
+   {
+    "prompt_tokens": 2040,
+    "uncached_tokens": 2040,
+    "ttft_s": 2.3144130400000904
+   },
+   {
+    "prompt_tokens": 320,
+    "uncached_tokens": 64,
+    "ttft_s": 0.0830544660002488
+   },
+   {
+    "prompt_tokens": 512,
+    "uncached_tokens": 256,
+    "ttft_s": 0.20207584500030862
+   },
+   {
+    "prompt_tokens": 960,
+    "uncached_tokens": 704,
+    "ttft_s": 0.6309796389996336
+   },
+   {
+    "prompt_tokens": 832,
+    "uncached_tokens": 64,
+    "ttft_s": 0.11319371499985209
+   },
+   {
+    "prompt_tokens": 1024,
+    "uncached_tokens": 256,
+    "ttft_s": 0.2991353820002587
+   },
+   {
+    "prompt_tokens": 1472,
+    "uncached_tokens": 704,
+    "ttft_s": 0.8880443039997772
+   },
+   {
+    "prompt_tokens": 1344,
+    "uncached_tokens": 64,
+    "ttft_s": 0.1487103350000325
+   },
+   {
+    "prompt_tokens": 1536,
+    "uncached_tokens": 256,
+    "ttft_s": 0.3930276269998103
+   },
+   {
+    "prompt_tokens": 1984,
+    "uncached_tokens": 704,
+    "ttft_s": 1.1665592980002657
+   }
+  ],
+  "check": {
+   "requests": 48,
+   "sessions": 16,
+   "turns": 3,
+   "prefix_cache_reset": true,
+   "measured": {
+    "queries": 13776.0,
+    "hits": 9840.0,
+    "hit_rate": 0.7142857142857143
+   },
+   "predicted": {
+    "queries": 13776,
+    "hits": 9840,
+    "hit_rate": 0.7142857142857143
+   },
+   "relative_error": 0.0,
+   "cached_tokens_compared": 48,
+   "cached_tokens_equal": 48,
+   "requests_that_differ": []
+  },
+  "notes": []
+ },
+ "name": "tesla-t4-qwen3-4b-vllm0.30.0",
+ "prefill_base_s": 0.0018974317335806346,
+ "prefill_per_token_s": 0.000310775175270618,
+ "decode_base_s": 0.04249546863100731,
+ "decode_per_seq_s": 0.0,
+ "kv_cache_blocks": 1537,
+ "block_size": 16,
+ "max_num_seqs": 256,
+ "gpu": "Tesla T4",
+ "model": "Qwen/Qwen3-4B",
+ "engine_version": "0.30.0",
+ "calibrated": true,
+ "calibration_error": 0.0,
+ "prefill_attn_s": 7.789077531732671e-07,
+ "decode_per_ctx_token_s": 3.730857624604903e-06
+}
