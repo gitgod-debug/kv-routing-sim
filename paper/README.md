@@ -8,6 +8,15 @@
 > ([three calibrations](../artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.md),
 > [`docs/09-hypotheses.md`](../docs/09-hypotheses.md), 2026-10-05). The preprint is optional; if it
 > is ever published, its abstract, Table 4 and conclusion need this margin first.
+>
+> ⛔ **And it predates the prior-art check of 2026-10-05, which is the larger problem.** The draft
+> presents *when prefix-aware routing pays* as an open question and its answer as a finding. It was
+> answered first, on real clusters: **LMetric** (OSDI '26, arXiv 2603.15202) and **SMetric** (arXiv
+> 2607.08565). And its related work omits the closest tool, NVIDIA's **AISimulate / DynoSim**, and
+> **LLMServingSim**. As a paper it would now have to be a replication study — an independent check
+> on small hardware, plus the measurements of how far simulator-based sizing can be trusted — with
+> those four cited and compared. See [`docs/04-prior-art.md`](../docs/04-prior-art.md) §2a and §5.
+> **Do not ask for an arXiv endorsement on the strength of this draft.**
 
 **When Does Prefix-Aware Routing Pay? A vLLM-Calibrated, Pre-Registered Study of KV-Cache Routing
 Across Replicas.** Five pages, two columns. Drafted 2026-09-28; due on arXiv by ~Nov 9 (cs.DC).
@@ -56,8 +65,11 @@ dataset card, or the cost model's cited pages.
 - [ ] Author affiliation and e-mail (title footnote), and the repository URL once it is public.
 - [x] **Phase 6:** ran twice (2026-09-28); its result is in §4, Table 2, the abstract and §6.
 - [x] **C2 and the re-test** (2026-09-30): §4's timing paragraph and §5.3; the abstract and conclusion now lead with the reversal.
-- [ ] **Re-audit the prior art** (`docs/04-prior-art.md` §7, due 2026-10-20): Frontier's router list,
-      Vidur's `canary` branch, anything new. Update the "As of" footnote.
+- [x] **Re-audit the prior art** — done early, 2026-10-05 (`docs/04-prior-art.md` §7). Frontier and
+      Vidur are unchanged; ⛔ **it found LMetric, SMetric, AISimulate and LLMServingSim, which the
+      draft neither cites nor accounts for.** See the warning at the top.
+- [ ] **Rewrite the framing, the abstract, §2 (related work) and the conclusion** as a replication,
+      or do not publish.
 - [ ] Check every number against the table above — the author signs for them.
 - [ ] Replace "Draft of \today" with the posting date.
 - [ ] arXiv endorsement for cs.DC (first submission), then upload `main.tex` + `figures/flip.pdf`.

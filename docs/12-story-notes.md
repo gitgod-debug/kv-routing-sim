@@ -129,3 +129,53 @@ token, where the rule we cite allows 100. So I registered two tests and ran them
 | The first attempt did not start; the probe that checked the repair | [`c3_env_failure/`](../artifacts/results/c3_env_failure/) |
 | The missing measurement, found on old data | [`c3_prereg/precheck.md`](../artifacts/results/c3_prereg/precheck.md) — after the fact, and labelled so |
 | 134–521 ms per token; the rule allows 100 | [`09-hypotheses.md`](09-hypotheses.md), entry of 2026-10-05 |
+
+---
+
+## The same day: someone had been here first (2026-10-05)
+
+### What I found
+
+While the GPU run was going, I did the monthly check of other people's work. It was the fourth
+check. The first three had missed the two things that mattered most.
+
+- **A bigger tool already existed.** NVIDIA's Dynamo project has had a simulator for this exact
+  question since March 2026 (today it is called AISimulate). It replays a saved trace on pretend
+  GPUs, compares round-robin with NVIDIA's cache-aware router, and recommends a number of GPUs. Its
+  tutorial uses the same public trace I used.
+- **My finding was already in a paper.** "Keep each user's session on one machine" was published in
+  July 2026 (SMetric), from real traffic on 32 real GPUs. An earlier paper from the same group
+  (LMetric, OSDI '26) explains why a hand-picked weight between "has the prompt" and "is not busy"
+  never has one right value. I had seen the same thing with my own weights.
+
+### Why three checks missed it
+
+- I searched GitHub for *projects*, by name. Findings are in *papers*, and I never searched papers.
+- I had put Dynamo on a list of "systems that route" and never opened its documentation. Its
+  simulator was six months old.
+- The fourth check found it by following one link at the bottom of a competitor's README.
+
+### What I did about it
+
+- **Withdrew the claim the same day.** The README said "an intersection nobody occupies". It now
+  says the finding is not new, names the papers and the tool, and says what they have that this
+  project does not.
+- **Kept the old sentences.** They are struck through in the docs, with the date, so anyone can see
+  what was believed and when.
+- **Wrote down what is still mine.** Three things: a cache model that matched a real engine
+  exactly; tests written down before they ran, with the failures published; and a measurement of
+  how far a simulator's GPU count can be trusted.
+- **Wrote down what the paper saw and I could not.** Real sessions differ a lot in size, and then
+  my winning policy leaves the GPUs unevenly loaded. All my generated sessions were the same size.
+- **Added three rules to the check,** so the next one starts from the papers.
+
+### Where the proof is
+
+| Claim | Proof |
+|---|---|
+| What was missed, what was read, and what was not read | [`04-prior-art.md`](04-prior-art.md) §2a, and the log row of 2026-10-05 in §7 |
+| The withdrawn claim, struck through | [`04-prior-art.md`](04-prior-art.md) §5 · [`01-why-this-project.md`](01-why-this-project.md) §4 |
+| What it changes for each result | [`09-hypotheses.md`](09-hypotheses.md), the entry of 2026-10-05 on the prior-art re-audit |
+| SMetric: follow-ups stay on one instance; routing by session ID alone left the load 2.17× out of balance | arXiv 2607.08565 |
+| LMetric: no weight to tune; *"a statically tuned weight cannot always achieve competitive performance"* | arXiv 2603.15202 (OSDI '26) |
+| Dynamo's offline trace replay since March 2026 | `ai-dynamo/dynamo`, pull requests #7543 and #7553 |

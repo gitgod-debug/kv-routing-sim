@@ -102,7 +102,7 @@ result (ADR-003).
 | `bootstrap.py` | Percentile bootstrap over requests; **paired** bootstrap for policy-vs-policy deltas. |
 | `cost.py` | Reads `configs/cost_model.yaml`. **No constant is defined in Python** (ADR-006). |
 | `pareto.py` | The non-dominated frontier over (hit rate, p95 TTFT, ₹/1k requests) + the plots. |
-| `recommend.py` | Frontier + an SLO → *one* policy, *one* replica count, and the ₹ delta vs round-robin. **This is the output nobody else produces** — see `04-prior-art.md`. |
+| `recommend.py` | Frontier + an SLO → *one* policy, *one* replica count, and the ₹ delta vs round-robin. ~~This is the output nobody else produces~~ — false: `aisimulate recommend` returns a GPU count and a configuration under an SLO. What this one adds is the routing policy; see `04-prior-art.md` §2a. |
 | `rank.py` | Kendall's tau-b with ties handled — the statistic H6 is decided on. |
 | `sweep.py` | policy × replicas × seeds → points, and `crossover_sweep`, the H2 grid with the sharing ratio as its own axis. |
 

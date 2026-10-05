@@ -18,7 +18,9 @@ is published**.
 > that margin** (below). Replica counts are T4 figures on generated traffic, ± one, **and for the
 > first token only: under a target that also limits token speed the simulator needs about twice
 > as many GPUs — a factor its per-token model has not yet earned (T1 and T2, in the scope note
-> below).** Every number
+> below).** ⚠️ **And the routing result is not new:** a prior-art check on 2026-10-05 found it
+> published already (SMetric, LMetric), and found that NVIDIA ships a larger simulator for the same
+> question — see the note under the finding, and the scope section. Every number
 > still written as `TBD — not yet measured` **is exactly that**; see the honesty gates in
 > [`CHECKPOINTS.md`](CHECKPOINTS.md). Start at [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
 
@@ -31,6 +33,17 @@ is published**.
 > it never needs more than round-robin or least-loaded anywhere. **Whether routing by prefix then
 > saves GPUs, once tenants' prompts outgrow the cache, is not settled:** the registered test said no
 > on one calibration and yes on the two others. Read every GPU count here as ± one.
+
+⚠️ **This is not a new result** — found on 2026-10-05 by a prior-art check that three earlier ones
+had failed ([`docs/04-prior-art.md`](docs/04-prior-art.md), §2a). **SMetric** (Wang et al., arXiv
+2607.08565, July 2026) reached the same advice from production traces on 32 real GPUs: send a
+session's follow-up requests to the instance that served it. **LMetric** (Zhang et al., OSDI '26)
+had shown before that why a hand-weighted mix of a cache score and a load score has no right
+weight. What this repo adds is an independent agreement on a small calibrated model, from tests
+registered before they ran. **And SMetric names a weakness these grids cannot show:** real sessions
+differ widely in size, and plain session-sticky routing then leaves the load unbalanced — 2.17× on
+its testbed. Every generated session here has the same number of turns. Neither published policy
+has been run in this simulator yet.
 
 Measured on simulated agentic traffic, with the cache model calibrated against a live vLLM (the
 credential, below), a context-aware T4 timing model, and a 2-second p95 TTFT target. The test was
@@ -154,9 +167,10 @@ run ([T1](artifacts/results/t1_itl/report.md) · [T2](artifacts/results/t2_two_p
 [`docs/09-hypotheses.md`](docs/09-hypotheses.md)).
 
 H6 (the policy ranking under faster and slower GPUs) was tested on the first, context-free model
-and is not yet re-run. `azrabano23/disagg-sim` published that
-locality can lose to load balancing, and llm-d weighs prefix and load scores by hand-set weights; on
-this setup, with timing checked against the engine, balance won.
+and is not yet re-run. That locality can lose to load balancing is published — LMetric and SMetric
+on real clusters, Preble before them, `azrabano23/disagg-sim` in a simulator — and llm-d and Dynamo
+weigh prefix and load scores by hand-set weights. On this setup, with timing checked against the
+engine, balance won too.
 
 ## The credential — the Real-Engine Calibration Report
 
@@ -345,25 +359,39 @@ for free.**
 
 ## What this is not — scope, stated up front rather than defensively later
 
-**This niche is occupied. The claim here is an intersection, not an empty field.**
+**This niche is occupied — by more than this README said before 2026-10-05.** Three prior-art
+checks missed NVIDIA's simulator and the two papers below; the fourth found them. What was missed,
+and why, is in [`docs/04-prior-art.md`](docs/04-prior-art.md).
 
 | Project | What it is, and how this differs |
 |---|---|
-| **`microsoft/vidur`** (676★, MLSys'24) | Capacity and parallelism planning. Its `canary` branch **does** have a block-level prefix cache and three cache-aware routers — but it has sat unmerged for 14 months, so `main` (what you install) cannot answer the routing question. It also replays its own trace format, emits no recommendation, and publishes no calibration of that cache model against a live engine. |
-| **`NetX-lab/Frontier`** (139★, arXiv 2605.21312) | The closest competitor: prefix + hierarchical caching, SLA-aware Pareto search, and **session-sticky** routing. It has no prefix-affinity router — sticky is *session* identity, not *shared-prefix* identity, so cross-user system-prompt sharing is invisible to it — no adapters for real serving logs, and no recommendation. A research instrument you configure, not a tool that reads your log. |
+| **NVIDIA Dynamo's simulator** — `ai-dynamo/aisimulate`, "DynoSim" (and `aiconfigurator` before it, arXiv 2601.06288) | **The closest tool, and the larger one.** Replays a saved trace — its tutorial uses the same Mooncake trace as R1 below, and it reads the AgentX traces of R2 — on simulated vLLM or SGLang workers with a block-level prefix cache; compares round-robin with Dynamo's KV-aware router; and recommends a minimum GPU count under TTFT and TPOT limits. Offline multi-worker replay since March 2026. *What I did not find in it (read, not run, 2026-10-05):* routing policies other than those two; a published check of its cache model against a live engine — its public accuracy page covers TTFT and TPOT on single-node points with prefix caching off; a cost in money. |
+| **LMetric** (Zhang et al., OSDI '26, arXiv 2603.15202) · **SMetric** (Wang et al., arXiv 2607.08565) · **Preble** (Srivatsa et al., ICLR '25) | **The closest findings, measured on real clusters.** LMetric: multiply new prefill tokens by batch size and no weight needs tuning. SMetric: route agents by session, and migrate a session when its instance would miss the SLO. This repo's routing results agree with them; they are not additions to them. Neither policy is implemented here yet. |
+| **`casys-kaist/LLMServingSim`** (416★, ISPASS '26) | A cycle-level simulator that mirrors vLLM's scheduler and ports its block pool, per instance; it reports TTFT and TPOT within 1% of a real vLLM run on one profile. Its router is round-robin, random or least-loaded — no prefix-aware or sticky policy. |
+| **`microsoft/vidur`** (688★, MLSys'24) | Capacity and parallelism planning. Its `canary` branch **does** have a block-level prefix cache and three cache-aware routers — but it has sat unmerged since June 2025, so `main` (what you install) cannot answer the routing question. |
+| **`NetX-lab/Frontier`** (155★, arXiv 2605.21312) | Prefix and hierarchical caching, SLA-aware Pareto search, and **session-sticky** routing. No prefix-affinity router: sticky is *session* identity, not *shared-prefix* identity. |
 | **`azrabano23/disagg-sim`** | Pedagogy: reproducing published scheduling arguments on synthetic workloads. Its own README declines trace fitting and defers to Vidur. |
-| **`jahnavi-yelamanchi/cachetrace`** | A single-path prompt-construction linter. This is multi-replica policy choice *and* sizing. |
+| **`jahnavi-yelamanchi/cachetrace`** | A single-path prompt-construction linter. |
 | **CacheWise** (arXiv 2606.16824) · **`gauravapiscean/agentic-kv-cache`** | Prefix-aware scheduling and eviction for coding agents, and single-node eviction policies replayed on the same AgentX and Mooncake traces (which finds LRU hard to beat). Both work **inside one engine**; neither routes across replicas. |
-| **llm-d's scheduler** | Combines a prefix-cache score and a load score under **hand-set weights**; publishes no boundary for when either should dominate — which is what the finding above measures. |
-| **vLLM · SGLang · LMCache · Dynamo · Mooncake · AIBrix** | Production engines that *implement* a routing policy. This helps you *choose* one before committing infrastructure. |
+| **vLLM · SGLang · LMCache · Mooncake · AIBrix · llm-d** | Production engines, caches and gateways: they *implement* caching and routing rather than compare policies. ⚠️ Dynamo was in this row until 2026-10-05, and it ships a simulator; the others' docs have not been re-read for one. |
 
-**The surviving claim, stated precisely:** trace adapters for real serving logs **+** a calibrated
-prefix-cache model **+** policy choice *and* replica sizing **+** ₹/$ per 1k requests **+** sim-to-real
-validation. Four repos each own one or two. None owns the set.
+**What is claimed, after that check.** Not a niche — three things this repo did and can show:
 
-⚠️ **That is a narrow gap, not a category** — and `Mike-Ew/kv-cache-routing` specified the same six policies
-and the same 2-replica validation in April 2026, then never built it. **The moat is execution quality — the
-published calibration error and honest error bars — not the idea.**
+1. **A measured credential.** The cache model reproduces a live vLLM's prefix-cache counters
+   exactly, and its hit rates held within 1.4% on two live replicas under three routing policies.
+2. **A method.** Every test's design, rules and prediction were committed before it ran; the ones
+   that failed are reported as findings.
+3. **Numbers on how far simulator-based sizing can be trusted** — a second calibration of the same
+   GPU, 5% different, that is 4.17× off at the knee of the load curve; replica counts firm to ± one;
+   a per-token model that is right off the knee and wrong at it.
+
+The routing result itself is an agreement with published work, reached independently on a free
+Kaggle GPU.
+
+⚠️ **The moat is execution quality — the published calibration error and honest error bars — not
+the idea.** That was this section's last line before the check as well. `Mike-Ew/kv-cache-routing`
+specified the same six policies and the same 2-replica validation in April 2026 and never built
+it; NVIDIA built a larger one and did.
 
 ---
 

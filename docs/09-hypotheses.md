@@ -1666,3 +1666,46 @@ unique-prompt controls, the stall cells within 7%, the three workloads' p95 time
 hold, and E and F are decided from the grids. That proves the plumbing — the shared-prefix cell,
 the stall cell, the per-request token times, the histogram reader, the grids — and nothing about
 vLLM.
+
+### 2026-10-05 — Prior-art re-audit, done while C4 ran: the finding is not new, and the "intersection nobody occupies" is withdrawn
+No experiment. A check of other people's work, entered here because it changes how every result
+above should be read. The evidence, the queries, and what was *not* read are in
+[`04-prior-art.md`](04-prior-art.md) (§2a, and the log row in §7).
+
+**What three earlier checks missed.**
+- **NVIDIA's Dynamo ships a simulator for this project's question.** Offline trace replay across
+  simulated workers since March 2026 — today `aisimulate predict` and `recommend` — with a
+  block-level prefix cache, round-robin against its KV-aware router, and a GPU count under TTFT and
+  TPOT limits. Its tutorial replays the Mooncake trace of R1; it reads the AgentX traces of R2.
+- **The routing result was already published, from real clusters.** SMetric (arXiv 2607.08565, July
+  2026): route agents by session, and migrate a session whose instance would miss its SLO. LMetric
+  (OSDI '26, arXiv 2603.15202): multiply the cache indicator by the load indicator, and no weight
+  needs tuning.
+
+**What it changes, result by result.**
+- **H1, H2** — pure prefix-affinity loses under load; no monotone boundary. That crowding is where
+  both papers start. Agreement, not news.
+- **H2b, and "keep each user on one GPU"** — agrees with SMetric's second insight. ⚠️ SMetric also
+  reports what this repo's grids cannot show: with real sessions of very unequal size, routing by
+  session ID alone left the load 2.17× out of balance on its testbed. Every session in H2b's grid
+  has four turns. *"Session-sticky needs the fewest GPUs"* was measured where sticky is at its
+  best. R2 (AgentX, real sessions) found sticky and balanced affinity tied — on the first timing
+  model.
+- **The load weight** — 16 chosen in Phase 5, 1 found better at 64 prompts after the tests, neither
+  right everywhere. That is LMetric's whole case against a weighted sum, reason included: the best
+  weight moves with the load.
+- **C3's second calibration (4.17× at the knee), T1, and "± one replica"** — LMetric says a
+  scheduler built on a simulator *"relies heavily on the accuracy of the simulator"*, and measures
+  what that costs in scheduling. These results measure the same dependence for sizing. They are the
+  part of this repo that is not a repetition.
+- **Phase 3, Phase 6, C1–C3** — the cache model against a live engine. Untouched: they are claims
+  about this simulator, and nobody else's work bears on them.
+
+**What was changed today.** The README's finding now says it is not new; its scope section names
+the closer work and withdraws the intersection claim. `04-prior-art.md` has the detail, three new
+audit rules and six more sentences that must not be written. `00`, `01`, `03`, `05` and `06` carry
+dated corrections, with the old text struck through rather than removed.
+
+**What is not decided.** Neither published policy has been run in this simulator, and no test here
+has used sessions of unequal size. Three ways forward are listed in `04-prior-art.md` §6. Choosing
+among them is still open.

@@ -129,11 +129,19 @@ them specified this exact design first.**
 - `Mike-Ew/kv-cache-routing` wrote down **the identical six policies and the identical 2-replica vLLM
   validation** in April 2026 — and then never built it.
 
-So the honest claim is the **intersection**: real-serving-log trace adapters **+** a calibrated
+~~So the honest claim is the **intersection**: real-serving-log trace adapters **+** a calibrated
 prefix-cache model **+** policy choice *and* replica sizing **+** ₹/$ per 1k requests **+** sim-to-real
-validation. Four repos each own one or two. None owns the set.
+validation. Four repos each own one or two. None owns the set.~~
+
+⛔ **Withdrawn 2026-10-05.** Those four were the wrong four. A fourth prior-art check found that
+NVIDIA's Dynamo has shipped a simulator for this question since March 2026 — trace replay across
+simulated workers, round-robin against its KV-aware router, a GPU count under an SLO — and that the
+routing result this repo reached was already published from real clusters (SMetric, LMetric). What
+is left to claim is not a niche but three things this repo did: a cache model reproduced counter for
+counter on a live engine, tests registered before they ran with the failures reported, and numbers
+on how far a simulator's GPU count can be trusted.
 
 **The moat is execution quality — the published calibration error and honest error bars — not the
-idea.** `Mike-Ew` proves the idea was reachable by anyone; what nobody has is the executed measurement.
-Read [`04-prior-art.md`](04-prior-art.md) for the exact wording, and for the sentences that are
-disqualifying.
+idea.** `Mike-Ew` proves the idea was reachable by anyone; NVIDIA proves a funded team got there
+first. Read [`04-prior-art.md`](04-prior-art.md) for the exact wording, and for the sentences that
+are disqualifying.

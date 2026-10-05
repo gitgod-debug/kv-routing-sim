@@ -145,9 +145,16 @@ Locality and load pull in opposite directions. Sending every request carrying a 
 maximizes hit rate and **concentrates queueing on that replica**. At high offered load the queueing delay
 can exceed the prefill saving, and **least-loaded wins on p95 TTFT despite a worse hit rate.**
 
-`azrabano23/disagg-sim` has already published *that* this counter-result exists. **Nobody has published
+`azrabano23/disagg-sim` has already published *that* this counter-result exists. ~~**Nobody has published
 the boundary** — the sharing ratio × load surface where it flips. That boundary is this project's finding
-(H2), and it falls straight out of a sweep axis, not out of new machinery.
+(H2), and it falls straight out of a sweep axis, not out of new machinery.~~
+
+⛔ **Corrected 2026-10-05.** Two things were wrong with that. H2 was tested and **falsified**
+(2026-09-28): no such boundary appeared. And the trade-off had been taken much further on real
+clusters before this repo began: **LMetric** (OSDI '26) removes the weight between the cache score
+and the load score by multiplying them, and derives when that fails; **SMetric** (arXiv 2607.08565)
+routes agents by session and migrates a session whose instance would miss its SLO. See
+[`04-prior-art.md`](04-prior-art.md) §2a.
 
 ---
 

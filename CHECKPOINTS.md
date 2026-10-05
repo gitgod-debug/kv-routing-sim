@@ -799,8 +799,14 @@ Check every one before anything is published.
       is a result; a quietly re-tuned model that matches is fraud
 - [ ] **No sentence from the ⛔ list** in [`docs/04-prior-art.md`](docs/04-prior-art.md) — especially
       *"0 results"*, *"Vidur has no prefix-cache model"*, *"nothing else validates against a live engine"*,
-      and the nonexistent metric name
-- [ ] **The claim is stated as an intersection**, with the four competitors named
+      and the nonexistent metric name. **Six sentences were added on 2026-10-05** — among them *"the
+      recommendation is the output nobody else produces"* and *"we found that sessions should stay on
+      one GPU"*
+- [ ] ~~**The claim is stated as an intersection**, with the four competitors named~~ — the
+      intersection claim was **withdrawn 2026-10-05** (NVIDIA's simulator occupies it; the routing
+      result was already published). The gate is now: **the README names AISimulate/DynoSim, LMetric
+      and SMetric where it states the finding, and claims only the three things in
+      [`docs/04-prior-art.md`](docs/04-prior-art.md) §5**
 - [ ] **Every artifact in `artifacts/results/` is regenerable** by a script in `scripts/`
 - [ ] **Every cost constant is cited and dated** in a committed config
 - [ ] **No TTFT percentile from the memory-split hardware path**

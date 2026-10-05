@@ -11,8 +11,9 @@ all of it. The other docs have the detail; this one has the story.
 When you run an AI model on several GPUs, every incoming request has to be sent to one of them. The
 way you choose — the **routing policy** — quietly decides how often a GPU can **reuse work it has
 already done** for an earlier, similar request (its "cache"). More reuse means faster answers and fewer
-GPUs, which means a smaller bill. Today people pick a policy by guessing. **kv-routing-sim** is a
-simulator that answers the question properly: give it your traffic, and it tells you which policy to
+GPUs, which means a smaller bill. Many people still pick a policy by guessing. *(Until 5 Oct this
+said "today people pick by guessing", as if no tool existed. One does — see finding 27.)*
+**kv-routing-sim** is a simulator that answers the question: give it your traffic, and it tells you which policy to
 use, how many GPUs you need, and what it costs. What makes it worth trusting is that we **checked it
 against a real engine** (vLLM) and published how wrong it is — which, for the cache, turned out to be
 **not at all**.
@@ -233,6 +234,25 @@ on one GPU* (findings 18 and 19 below).
     for both speeds that policy holds nothing at all: it gets a fast first word by crowding users
     onto the GPUs that hold their prompt, and crowding is what makes the other words slow.
     (Exploratory, not a test.)
+27. **Our main finding was already published, and a bigger tool for the same question exists**
+    (found 5 Oct, by reading other people's work again while a GPU run was going).
+    - *The finding.* A research group at Shanghai Jiao Tong University and Alibaba published
+      "route each user's session to one machine" in July 2026 (the paper is called SMetric), from
+      real traffic on 32 real GPUs. The same group showed earlier (LMetric, at the OSDI '26
+      conference) why mixing "has the prompt" and "is not busy" with a hand-picked weight never has
+      one right weight — which is what we saw with our weights 16 and 1. So our result **agrees**
+      with theirs. It is not a discovery.
+    - *One thing they saw that we cannot.* Real sessions are very different in size. Then "keep
+      each user on one GPU" leaves some GPUs twice as loaded as the average. In our generated
+      traffic every session has four turns, so we measured this policy where it looks its best.
+    - *The tool.* NVIDIA's Dynamo project has had a simulator since March 2026 (now called
+      AISimulate, or DynoSim). It replays a saved trace on pretend GPUs, compares round-robin with
+      NVIDIA's own cache-aware router, and recommends a number of GPUs. Its tutorial uses the same
+      Mooncake trace we used.
+    - *What is still ours.* Three things: our cache model was checked against a real engine and
+      matched exactly; every test was written down before it ran, and the failed ones are
+      published; and we measured how far a simulator's GPU count can be trusted (findings 22–24).
+      The README and the prior-art file now say exactly this, and no more.
 
 ## 5. What we decided, and why
 
@@ -353,6 +373,14 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
   in flight.
 - **A glossary line was wrong for two weeks:** it said routing "barely affects" the speed of
   tokens after the first. It does — it is the half of the target that decides the GPU count.
+- **Three checks of other people's work missed the closest work** (found 5 Oct). They searched
+  GitHub for projects by name, and put NVIDIA's Dynamo on a list of "systems that route, not tools
+  that help you choose" without opening its documentation. Nobody searched research papers at all.
+  So for two weeks the README claimed a gap that NVIDIA had filled in March, and presented as our
+  finding something a paper had published in July. The fourth check found it by following one link
+  in a competitor's README. Three rules were added: search papers by the question; read the
+  documentation of every "production system" for a simulator; follow the references of every close
+  match. The old claims are kept in the docs, struck through, with the date.
 - **The GPU box changed under us** (5 Oct). Kaggle updated its software, and the engine could no
   longer start: one package it needs was built for a different CUDA version, under the same version
   number, so the installer left it in place. C3's first attempt stopped before measuring anything.
@@ -429,6 +457,9 @@ text can become a blog post.
 - every replay is *open-loop* — real agents wait for an answer before sending the next turn, and would
   then reuse the answer's cache blocks, which we cannot measure this way;
 - one GPU type (T4) and one model (Qwen3-4B) so far;
+- every generated session has the same number of turns, so the known weakness of "keep each user
+  on one GPU" — a few very long sessions overloading one GPU — cannot appear in our grids; and the
+  two routing policies from the papers (LMetric, SMetric) have not been run in our simulator;
 - two real trace families, both scaled down to fit a T4: Mooncake (32× smaller, sessions
   inferred) and AgentX (coding-agent sessions, token counts 64× smaller).
 

@@ -78,6 +78,15 @@
     by prefix then saves GPUs with 64 tenants' prompts is <strong>not settled</strong>: the registered
     test said no on one calibration and yes on two others. Read every GPU count as ± one.</div>
 
+  <p class="note"><strong>This is not a new result.</strong> SMetric (Wang et al., arXiv 2607.08565,
+    July 2026) reached the same advice from production traces on 32 real GPUs, and LMetric (Zhang et
+    al., OSDI '26) showed why a hand-set weight between cache and load has no right value. What is
+    here is an independent agreement on a small calibrated model, from tests registered before they
+    ran. SMetric also names a weakness these grids cannot show: real sessions differ widely in size,
+    and plain session-sticky routing then leaves the load unbalanced. Every generated session here has
+    the same number of turns. NVIDIA's Dynamo ships a larger simulator for the same question
+    (AISimulate). The prior-art file in the repository says what an earlier check missed.</p>
+
   <div class="scroll">
     <table aria-label="The finding in numbers">
       <thead><tr><th>Distinct system prompts</th><th class="num">Working set ÷ one T4's cache</th>

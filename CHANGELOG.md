@@ -56,3 +56,12 @@ The first public version: planned for PyPI before 2026-11-20.
   default. Longer prompts are an extrapolation unless you measure there (`--prefill-lengths`,
   `--prefill-cached`, `--decode-contexts`).
 - `--format html` is not built; `md` and `json` are.
+- **Two published routing policies are not among the seven:** LMetric (OSDI '26 — new prefill
+  tokens × batch size, no weight) and SMetric (arXiv 2607.08565 — stick a session's follow-ups,
+  migrate it when its instance would miss the SLO). The balanced-affinity policy here is a
+  hand-weighted sum, the design LMetric argues against.
+- **Generated sessions all have the same number of turns.** Session-sticky routing is known to
+  unbalance the load when sessions differ widely in size (SMetric); traffic from `kvsim generate`
+  cannot show that. Use a real trace to check it.
+- NVIDIA's AISimulate is a larger simulator for the same question, with timing data for many
+  data-centre GPUs. See the README's scope section for how the two differ.

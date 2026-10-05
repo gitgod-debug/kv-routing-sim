@@ -1,7 +1,9 @@
 # 06 — Methodology: how we measure
 
-> The differentiator of this project is **rigor on axes nobody reports** — and, specifically, publishing
-> how wrong the simulator is. That makes measurement methodology the actual product. This file is its
+> The differentiator of this project is **rigor on axes that are seldom reported** — and, specifically,
+> publishing how wrong the simulator is. *(It read "nobody reports" until 2026-10-05. AISimulate
+> publishes an accuracy page and LLMServingSim an error against a real vLLM run; neither covers
+> the prefix cache or routing — [`04-prior-art.md`](04-prior-art.md) §2a.)* That makes measurement methodology the actual product. This file is its
 > specification.
 >
 > §1 and §2 are shared in substance with the sibling project `colpali-lite` (that is deliberate — the two

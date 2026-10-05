@@ -3,6 +3,21 @@
 **Written 2026-09-20**, from `FLAGSHIP_PROJECTS.md` Project 1. Where this file and that one disagree
 about `kv-routing-sim`, **this file wins**.
 
+> ⛔ **Corrected 2026-10-05. Parts of this file were false when they were written.** A fourth
+> prior-art check found what three had missed ([`04-prior-art.md`](04-prior-art.md), §2a):
+> - **§1 says Dynamo only *implements* a policy.** Dynamo ships a simulator — offline trace replay
+>   across simulated workers since March 2026, with a recommender — for exactly the choice this
+>   file says nobody helps with.
+> - **§2's one-sentence claim is not ours alone.** *Your serving log in, a sized recommendation
+>   out* describes NVIDIA's AISimulate too. What it does not have, as far as one reading found, is
+>   routing policies set side by side and a cache model checked against a live engine.
+> - **§3's "finding" was already published** — SMetric (July 2026) and LMetric (OSDI '26), on real
+>   clusters. This repo's result agrees with them. It is not a discovery.
+> - **§4's "accurate claim" is false** and is struck through below.
+>
+> The text below is kept as written, so the record shows what was believed. What can be claimed
+> now is in [`04-prior-art.md`](04-prior-art.md) §5.
+
 ---
 
 ## 1. The problem, and who feels it
@@ -87,10 +102,16 @@ different ways, and each one is checkable in a minute:
 
 ✅ **The accurate claim is narrower and stronger:**
 
-> **the only prefix-cache-aware multi-replica policy comparison whose numbers were checked against a
-> live engine.**
+> ~~**the only prefix-cache-aware multi-replica policy comparison whose numbers were checked against a
+> live engine.**~~
 
-Every qualifier in that sentence is doing work. Drop one and it becomes false.
+~~Every qualifier in that sentence is doing work. Drop one and it becomes false.~~
+
+⛔ **2026-10-05: it was false with every qualifier in place.** LMetric and SMetric compare
+prefix-cache-aware routing policies on real 16- and 32-GPU clusters; they are checked against a
+live engine by being run on one. Write instead, and only about this repo: *a simulator whose
+prefix-cache counters were reproduced exactly on a live vLLM, and whose hit rates held within 1.4%
+on two live replicas.*
 
 ---
 
