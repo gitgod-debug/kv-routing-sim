@@ -210,6 +210,9 @@ calibration cannot cash.
 | **C2** | Timing: decode slows with context (C2a); a busy second GPU slows the first (C2b); a context-aware model predicts held-out traffic within 2× (C2c) | C2 | `[x]` **2026-09-30, all three as predicted** — C2a ✅ 1.92× · C2b ⛔ 1.00× · C2c ✅ within 1.41× |
 | **C3** | The context-aware `kvsim calibrate` on a real GPU: it works (C3a); its profile predicts traffic it never saw within 2× (C3b); C2's profile predicts another day within 2×, from numbers registered before (C3c) | C3 | `[x]` ✅ **2026-10-05, all three as predicted** — C3a exact · C3b within 1.41× · C3c within 1.38× · ⚠️ reported: a second run of the command is 4.17× off on one number at the knee, and a second calibration reverses H2b's verdict |
 
+| **T1** | The simulator's per-token latency matches the engine's: mean inter-token latency within 1.5× on the five held-out runs on disk | T1 | `[~]` **registered 2026-10-05** — `configs/tpot_slo.yaml`; not run yet |
+| **T2** | Under a target with both halves (p95 TTFT ≤ 2 s **and** p95 time per output token ≤ 100 ms), on three calibrations: sticky still best or tied with 1 and 4 prompts (T2a), never worse than round-robin or least-loaded (T2b), and the first-token counts were optimistic by ≥ 1.5× (T2c) | T2 | `[~]` **registered 2026-10-05** — `configs/tpot_slo.yaml`; not run yet |
+
 **Amendments:** *(add dated entries below, never edit above)*
 
 ### 2026-09-22 — H4 is NOT dead. It has not been tested yet, because we used the wrong flag.
@@ -1332,3 +1335,93 @@ not "until the answer streams at a usable speed".
   same GPU move it (over the three: 96% of cells within one, 71% identical).
 - **What would settle the open half:** a registered test over several fresh calibrations, with the
   load weight fixed beforehand — and an SLO that has its per-token half.
+
+### 2026-10-05 — T1 and T2 REGISTERED before they run: the other half of the SLO, time per output token
+Design and rules: [`configs/tpot_slo.yaml`](../configs/tpot_slo.yaml). Procedure:
+`scripts/t1_itl_check.py`, `scripts/run_t2_grid.py`, `scripts/t2_analyze.py`. All committed before
+either part runs. The measurement itself was added to the simulator first, in its own commit
+(`534f5b9`): every run now records each request's time per output token, and no earlier number
+moved.
+
+**Why.** Every replica count in this project answers "how many GPUs until the *first* token is on
+time" — p95 TTFT ≤ 2,000 ms. The MLPerf row that limit was taken from reads *"TTFT/TPOT: 2000
+ms/100 ms"*: it limits the time per output token too, "the average interval between all the tokens
+generated", per request. C3's live engine took 134, 174 and 521 ms per token on three workloads
+that met, or nearly met, the first-token limit. So the counts are optimistic in a way that had not
+been measured, and the fix needs no GPU.
+
+**The target.** First half, as before: p95 TTFT ≤ 2,000 ms. Second half: p95 over requests of
+(last token − first token) ÷ (output tokens − 1) ≤ **100 ms** — the same row's limit for
+Llama3.1-8B, the model nearest in size to ours. p95, like the first half (MLPerf's Server scenario
+uses p99; ours is a little looser on both). A cell meets the target only if every seed meets both
+halves.
+
+**T1 — can the simulator's per-token latency be believed?** Five held-out traffic runs are on
+disk, each on one live T4: C2's part D (2) and C3's part 2 (3). For each, the notebook recorded the
+engine's own mean inter-token latency (Δsum ÷ Δcount of `vllm:inter_token_latency_seconds`). The
+simulator replays each run at the times its requests were really sent — C2c's replay — with the
+shipped profile (A), and reports the same sum ÷ count.
+- **T1 holds only if all five are within 1.5×**, either direction. Tighter than the 2× used for
+  first-token latency, on purpose: a mean has no tail to excuse it, and under a per-token limit
+  the replicas needed grow roughly in proportion to it.
+- ⚠️ **What "registered" means here.** The five measurements were on disk before this was written,
+  and I had read three of them (C3's, quoted above). What had never been computed is the
+  simulator's side: it could not measure time per token until `534f5b9`. The prediction is blind;
+  the data is not fresh.
+- **Predicted: holds, narrowly.** First-token latency came within 1.41× on this traffic. The run
+  at the knee (`K1_half`) is the one that can break it: there the model already sees preemptions
+  the engine did not have.
+
+**T2 — the finding's grid, under the target with both halves.** H2b-C2's grid exactly — the same
+traffic, loads, policies, load weights and seeds, read from its config — on the three calibrations
+of one T4 that C3 left us with (A: C2's fit; B, C: `kvsim calibrate`'s two runs), with the replica
+axis extended from 16 to 32. Every run's p95 TTFT and p95 TPOT is stored, so the count under any
+target comes from the same runs. **Guard:** under the first-token target, on replicas 1–16, each
+calibration must reproduce its committed table exactly, or the analysis stops.
+
+Each rule must hold on **all three** calibrations — C3's lesson, built in:
+- **T2a — "keep each user on one GPU" survives.** At every load with 1 prompt and with 4 (12
+  points), no policy in the grid needs fewer replicas than session-sticky.
+- **T2b — and it is never worse than plain load balancing.** At all 24 points, session-sticky
+  needs no more replicas than round-robin, and no more than least-loaded.
+- **T2c — the first-token counts were optimistic by half or more.** Over the points where
+  session-sticky's count is defined under both targets, the median of R(both halves) ÷ R(first
+  token) is at least 1.5.
+
+T2a and T2b are the two claims that survived three calibrations under the first-token target, with
+their definitions unchanged (a point where no policy holds the target is a tie, and the report
+counts such points). **Predicted: all three hold.** T2c from a back-of-envelope: at a *mean* of 100
+ms per token a T4 carries about 1 request/s of this traffic (a decode step of ~40 ms + ~6 ms per
+running sequence, and every arriving request's prefill, ~0.2 s, stalls everyone decoding), against
+~1.6 under the first-token target — and a p95 is stricter than a mean. T2a is the one I am least
+sure of: ties one replica apart are exactly what a calibration moves.
+
+**Reported, not tested:** every policy's count under both targets on A · B · C; which half binds;
+how far the calibrations agree under the two-part target (first-token: 102 of 144 identical, 138
+within one); the tables with the per-token limit at 150 and 200 ms (200 is the same document's
+limit for Llama2-70b); and H2b's three rules under the two-part target — **exploratory**: the
+64-prompt question gets its own registered test, on fresh calibrations, after this.
+
+**What would be uncomfortable, written down now.**
+- **T1 cannot reach the regime T2 lives in.** C3's three held-out runs are themselves beyond 100
+  ms per token, and C2's two are the same two workloads. T1 checks the model where the engine was
+  loaded more heavily than any configuration T2 will call acceptable; whether it is right *below*
+  the limit is untested on traffic. That
+  needs a GPU run with lighter traffic and per-request token times — the next registration, not
+  this one. So even if T1 holds, T2's counts are the model's answer, not yet a checked one.
+- **If T1 fails,** T2 still runs and is reported — as what a model that missed its own per-token
+  check says. No replica count from it goes into the README as guidance.
+- **If T2c comes out near 2×,** every ₹ figure and every "N T4s" in the README is half of what
+  someone who needs a streaming answer has to pay. That sentence would have to be at the top, not
+  in a scope note.
+- **If T2a or T2b fails,** the surviving half of the headline — *keep each user on one GPU* — is a
+  first-token result only, and the README must say that instead.
+- **100 ms is a datacenter-GPU limit.** One sequence alone on a T4 already takes ~46 ms per token
+  at these prompt lengths, so the limit leaves about 2× of headroom. A reader may fairly say the
+  limit, not the routing, decides everything; hence the 150 and 200 ms tables.
+- **The grid is the same short trace on up to 32 replicas** — 200 sessions, so about six per
+  replica at the top. The p95 is over the fleet's 800 requests; no claim is made per replica.
+
+**What this does not change.** The shipped default target stays the first token alone: every
+registered result so far is defined on it, and a default should not move ahead of its check. The
+simulator now *shows* p95 time per token in every report and says that it is not part of the SLO.

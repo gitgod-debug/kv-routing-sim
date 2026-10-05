@@ -661,6 +661,16 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       102 of 144 identical, 138 within one; sticky best or tied on all three at 19 of 24 points — 12
       of 12 with 1 and 4 prompts. Also found in the data: the SLO has no per-token half.
       **Left:** repeat the decode cells and print a replica range (one run is not enough at the knee)
+- [~] ⭐ **An SLO with its per-token half.** The first-token target was the only one: C3's live
+      engine took 134–521 ms per token on traffic that met, or nearly met, it, and the MLPerf row
+      the 2 s come from also limits the time per output token (100 ms). 🔨 **2026-10-05:** the
+      simulator measures every request's time per output token, `kvsim replay` prints its p95, and
+      a cost model can make it part of the SLO with `slo.tpot_p95_ms` (off by default; no earlier
+      number moved — commit `534f5b9`). **T1 and T2 registered 2026-10-05**
+      ([`configs/tpot_slo.yaml`](configs/tpot_slo.yaml)): T1 — the model's mean inter-token latency
+      within 1.5× of the engine's on the five held-out runs on disk; T2 — the finding's grid under
+      both halves on three calibrations (sticky still best with 1 and 4 prompts / never worse than
+      round-robin or least-loaded / first-token counts optimistic by ≥ 1.5×). Predicted: all hold
 - [ ] **`configs/profiles/`** — committed calibration profiles keyed by
       `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
       from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no

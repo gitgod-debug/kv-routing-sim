@@ -1,0 +1,120 @@
+# T — the other half of the SLO: time per output token.
+# Registered 2026-10-05, BEFORE either part runs, with a dated entry in docs/09-hypotheses.md.
+#
+# Why: every replica count in this project answers "how many GPUs until the FIRST token is on
+# time" (p95 TTFT ≤ 2,000 ms). The MLPerf row that limit is cited from also limits the time per
+# output token, and in C3 the live engine took 134–521 ms per token on traffic that met, or nearly
+# met, the first-token limit. So the counts are optimistic in a way nobody had measured. T1 asks
+# whether the simulator's per-token latency can be believed at all; T2 asks what the finding's grid
+# says when the SLO has both halves. `scripts/t1_itl_check.py`, `scripts/run_t2_grid.py` and
+# `scripts/t2_analyze.py` are the procedure, committed with this file: nothing in them is chosen
+# after a result.
+
+schema_version: 1
+
+# ── The target ──────────────────────────────────────────────────────────────────────────────────
+slo:
+  ttft_p95_ms: 2000        # as in every result so far (configs/cost_model.yaml)
+  tpot_p95_ms: 100         # the same MLPerf row: Llama3.1-8B, "Conversational category:
+                           # TTFT/TPOT: 2000 ms/100 ms"
+  source: https://github.com/mlcommons/inference_policies/blob/master/inference_rules.adoc (commit ff7edba545, 2026-08-20)
+  date: 2026-10-05
+  # Per request: (last token − first token) ÷ (output tokens − 1) — MLPerf's footnote: "time per
+  # output token (TPOT) which measures the average interval between all the tokens generated";
+  # vLLM's `mean_time_per_output_token` (v1/metrics/stats.py:549-562 @ v0.30.0). Over a run: the
+  # p95 of that, by nearest rank — p95 like the first half (MLPerf's Server scenario uses p99, so
+  # this is slightly looser, as the first half is). A cell meets the target only if EVERY seed
+  # meets BOTH halves.
+
+# ── T1 — is the simulator's per-token latency right? On data that is already on disk. ───────────
+# The five held-out traffic runs of C2 (part D) and C3 (part 2), each on one live T4. The notebook
+# recorded the engine's own inter-token latency over each run: Δsum ÷ Δcount of
+# vllm:inter_token_latency_seconds — one observation per token after a request's first
+# (stats.py:498-504). The simulator replays each run at the times its requests were really sent
+# (C2c's replay) and reports the same quantity: Σ inter-token time ÷ Σ gaps, over every request.
+#
+# ⚠️ What "registered" means here. The measurements have been on disk since 2026-09-30 and
+# 2026-10-05, and C3's three were read and quoted (521, 174 and 134 ms) before this file was
+# written. What has NEVER been computed is the simulator's side: until commit 534f5b9 the simulator
+# did not measure time per token at all. So the prediction is blind; the data is not fresh.
+t1:
+  profile: configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json   # A: the shipped, C2-fitted profile
+  runs:
+    - session: c2
+      results: artifacts/results/c2_kaggle_t4/c2.json
+      prereg: artifacts/results/c2_prereg/predictions.json
+      workloads: [K1_half, K64_quarter]
+    - session: c3
+      results: artifacts/results/c3_kaggle_t4/c3.json
+      prereg: artifacts/results/c3_prereg/predictions.json
+      workloads: [K1_half, K64_quarter, T6_K8]
+  # T1 holds only if, for ALL FIVE runs, the predicted mean inter-token latency is within this
+  # factor of the engine's (either direction). Tighter than the 2× used for first-token latency
+  # on purpose: a mean has no tail to excuse it, and under a per-token limit the replicas needed
+  # grow roughly in proportion to it. A run without a measurement leaves T1 UNDECIDED.
+  max_factor: 1.5
+  # Reported, not tested: the same five numbers from the two profiles `kvsim calibrate` wrote in C3
+  # (on C3's three runs); the simulator's p95 of per-request TPOT (no engine measurement of it
+  # exists yet); and each run's first-token factors, for context.
+  reported_profiles:
+    B: artifacts/results/c3_kaggle_t4/calibrated_profile_seed0.json
+    C: artifacts/results/c3_kaggle_t4/calibrated_profile_seed1.json
+
+# ── T2 — the finding's grid under a target with both halves ─────────────────────────────────────
+# H2b-C2's grid, unchanged in traffic, loads, policies, load weights and seeds (read from that
+# config so the two cannot drift apart) — on the three calibrations of the same T4 that C3 left us
+# with, and with the replica axis extended from 16 to 32: a T4's decode step alone is ~46 ms at
+# these prompt lengths, so a 100 ms limit is expected to roughly double the counts, and on 16
+# replicas the top loads would all read "not held".
+t2:
+  h2b_config: configs/h2b_c2.yaml
+  replicas_max: 32
+  calibrations:
+    A: {profile: configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json,
+        first_token_table: artifacts/results/h2b_c2/h2b_c2.json}
+    B: {profile: artifacts/results/c3_kaggle_t4/calibrated_profile_seed0.json,
+        first_token_table: artifacts/results/c3_kaggle_t4/h2b_grid/h2b_c2.json}
+    C: {profile: artifacts/results/c3_kaggle_t4/calibrated_profile_seed1.json,
+        first_token_table: artifacts/results/c3_kaggle_t4/h2b_grid_seed1/h2b_c2.json}
+  # Guard: every run stores its p95 TTFT and p95 TPOT, so the replica count under ANY target is
+  # recomputed from one grid. Under the first-token target alone, on replicas 1–16, each
+  # calibration must reproduce its committed table exactly — or the analysis stops: the code has
+  # drifted, and nothing after it is comparable.
+
+  # R(policy) = the fewest replicas (1–32) whose cell meets the target on every seed; 33 if none.
+  # Each rule must hold on ALL THREE calibrations — C3 showed that a verdict resting on one is
+  # worth little. T2a and T2b are the two claims that survived all three calibrations under the
+  # first-token target (artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.md), with their
+  # definitions unchanged; a point where no policy holds the target counts as a tie, as it did
+  # there, and the report counts such points beside the verdict.
+  rules:
+    # T2a — "keep each user on one GPU" survives: at every load with 1 prompt and with 4 (12
+    # points), no policy in the grid needs fewer replicas than session-sticky.
+    t2a_prompts: [1, 4]
+    # T2b — and it is never worse than plain load balancing: at all 24 (prompts, load) points,
+    # session-sticky needs no more replicas than round-robin, and no more than least-loaded.
+    t2b_versus: [round-robin, least-loaded]
+    # T2c — the first-token counts were optimistic by half or more for the policy the finding
+    # recommends: over the points where session-sticky's count is defined under both targets, the
+    # median of R(both halves) ÷ R(first token) is at least this. Fewer than 12 such points on a
+    # calibration leaves T2c UNDECIDED.
+    t2c_min_median_ratio: 1.5
+    t2c_min_points: 12
+  # Reported, not tested:
+  #   - every policy's R under both targets, on A · B · C, and which half of the target binds;
+  #   - how far the three calibrations agree on a count under the two-part target (under the
+  #     first-token target: 102 of 144 identical, 138 within one);
+  #   - H2b's three rules under the two-part target, per calibration — EXPLORATORY: the 64-prompt
+  #     question gets its own registered test, on fresh calibrations, after this;
+  #   - the same tables with the per-token limit at 150 and at 200 ms (200 is the same document's
+  #     limit for Llama2-70b; 100 is harsh for a T4), recomputed from the stored percentiles.
+  reported_tpot_limits_ms: [150, 200]
+
+# ── The predictions, written before either part runs ───────────────────────────────────────────
+predictions:
+  t1: holds    # narrowly. First-token latency came within 1.41×; the run at the knee (K1_half) is
+               # the one that can break it
+  t2a: holds   # the least sure of the four: ties at one replica apart are what calibrations move
+  t2b: holds
+  t2c: holds   # a back-of-envelope gives ~2×: about 1 request/s per T4 at a mean of 100 ms per
+               # token, against ~1.6 under the first-token target
