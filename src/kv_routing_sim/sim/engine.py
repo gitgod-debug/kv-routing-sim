@@ -27,6 +27,7 @@ from .replica import Replica
 
 _ARRIVAL = 0
 _ITER_DONE = 1
+_NOTIFY = 2  # tell the router about first tokens and finishes, at the time they happen
 
 
 def run(
@@ -56,11 +57,24 @@ def run(
     exactly the differences we are trying to measure (docs/06-methodology.md §1).
     """
     rng = random.Random(seed)
-    router = build_policy(policy, n_replicas, **(policy_kwargs or {}))
+    # Every policy is offered the timing profile; only those that estimate work with it take it.
+    router = build_policy(policy, n_replicas, **{"profile": profile, **(policy_kwargs or {})})
     replicas = [
         Replica(i, profile, cache_model=cache_model, track_block_metrics=track_block_metrics)
         for i in range(n_replicas)
     ]
+    events_on = router.wants_events
+    probe = None
+    if router.wants_cache_view:
+        if cache_model != "vllm":
+            raise ValueError(
+                f"policy {policy!r} routes on the engine's cache events, which only the 'vllm' "
+                f"cache model can answer (got cache_model={cache_model!r})"
+            )
+
+        def probe(i: int, r: NormalizedRequest) -> int:
+            # Read-only: `lookup` touches no counter and no block (cache/block_pool.py).
+            return len(replicas[i].pool.lookup(r.block_hashes, r.prompt_tokens))
     result = RunResult(policy=policy, n_replicas=n_replicas, seed=seed, cache_model=cache_model)
     result.profile = profile.provenance()
     result.trace = dict(trace_info or {})
@@ -95,6 +109,7 @@ def run(
             n_replicas=n_replicas,
             running=[len(r.running) for r in replicas],
             queued=[len(r.queue) for r in replicas],
+            hit_blocks=probe,
         )
 
     def schedule(idx: int, at: float) -> None:
@@ -120,6 +135,14 @@ def run(
             schedule(idx, now)
             continue
 
+        if kind == _NOTIFY:
+            idx, firsts, done = payload
+            for r in firsts:
+                router.on_first_token(idx, r)
+            for r in done:
+                router.on_finish(idx, r)
+            continue
+
         # _ITER_DONE: this replica's iteration boundary. Run the next one from here.
         idx = payload
         scheduled.discard(idx)
@@ -129,6 +152,14 @@ def run(
 
         duration, finished = replica.step(now)
         end = now + duration
+        if events_on:
+            # A sequence admitted in this step is prefilled in it and emits its first token at
+            # its end; the router learns that THEN, not now — it has no way to see into a step.
+            firsts = [s.request for s in finished if s.tokens_emitted == 1]
+            firsts += [s.request for s in replica.running if s.tokens_emitted == 1]
+            if firsts or finished:
+                done = [s.request for s in finished]
+                heapq.heappush(events, (end, next(counter), _NOTIFY, (idx, firsts, done)))
         for seq in finished:
             # Its last token lands at the end of this step, its first landed at `first_token_ts`:
             # everything between is the request's inter-token time, preemption stalls included.
