@@ -5,6 +5,7 @@ from __future__ import annotations
 from .base import RoutingPolicy
 from .consistent_hash_prefix import ConsistentHashPrefix
 from .least_loaded import LeastLoaded
+from .lmetric import LMetric
 from .power_of_two import PowerOfTwo
 from .radix_affinity import RadixAffinity
 from .radix_affinity_balanced import RadixAffinityBalanced
@@ -20,9 +21,22 @@ REGISTRY: dict[str, type[RoutingPolicy]] = {
     RadixAffinity.name: RadixAffinity,
     RadixAffinityBalanced.name: RadixAffinityBalanced,
     SessionSticky.name: SessionSticky,
+    # Published policies, added 2026-10-05 (docs/04-prior-art.md §2a). Asked for by name.
+    LMetric.name: LMetric,
 }
 
-ALL = tuple(REGISTRY)
+# ⚠️ `all` IS THE SEVEN POLICIES OF THE REGISTERED SWEEPS, AND STAYS THAT. Phase 4's design says
+# `policies: all`, and H6 re-runs it against Phase 4's stored table: letting `all` grow would
+# change what a registered experiment means. A policy added later is named explicitly.
+ALL = (
+    RoundRobin.name,
+    LeastLoaded.name,
+    PowerOfTwo.name,
+    ConsistentHashPrefix.name,
+    RadixAffinity.name,
+    RadixAffinityBalanced.name,
+    SessionSticky.name,
+)
 BASELINE = RoundRobin.name  # what every delta is measured against
 
 

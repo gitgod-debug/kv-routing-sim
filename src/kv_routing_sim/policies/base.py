@@ -5,26 +5,35 @@ which concentrates traffic on replica 0 and MANUFACTURES cache locality the real
 have. That is a correctness bug that looks exactly like a result: hit rate goes up, nothing errors,
 and no downstream check catches it. Every policy here takes the rng and uses it.
 
-⭐ A FIDELITY DECISION THAT MATTERS, AND THAT A REVIEWER WILL PROBE: a policy may NOT read the
-replicas' actual caches. `FleetState` exposes load only. A real prefix-aware router (SGLang's
-router, Dynamo) does not have oracle knowledge of what is resident on each worker — it maintains its
-OWN approximate view of what it dispatched, and that view drifts from reality as blocks are evicted
-behind it. Handing the policy the true cache would overstate prefix-affinity's benefit by exactly
-the amount the drift costs, which is the number we would most want to be honest about.
+⭐ WHAT A ROUTER MAY KNOW ABOUT THE CACHES. There are two kinds of prefix-aware router in
+production, and a policy here says which one it is:
 
-⚠️ CORRECTED 2026-10-05: THAT DESCRIBES ONE KIND OF PRODUCTION ROUTER, NOT ALL OF THEM. Dynamo's
-default router keeps "a prefix tree built from worker-reported KV events", vLLM publishes such
-events, and the LMetric authors' router follows the engine's step events: for those the true cache
-is what the router knows, late by an event. Routing from the dispatch record alone is Dynamo's
-*approximate* mode (`--no-router-kv-events`). This simulator models only that dispatch view; a
-policy with the event view is not built (docs/04-prior-art.md §2a). The rule stands for the
-policies here: a dispatch-view policy must not peek.
+  * THE DISPATCH VIEW — the default, and what every policy written before 2026-10-05 uses.
+    `FleetState` exposes load only; the policy keeps its OWN map of what it sent where. That view
+    drifts from reality as blocks are evicted behind it. This is the approximate mode of Dynamo's
+    router (`--no-router-kv-events`) and the tree most small open-source routers keep.
+  * THE EVENT VIEW — `wants_cache_view = True`. The engine tells the router which blocks it stores
+    and removes: vLLM publishes KV events, Dynamo's KvIndexer is "a prefix tree built from
+    worker-reported KV events", and the LMetric authors' router follows the engine's step events.
+    `FleetState.hit_blocks(i, request)` then answers from replica i's cache as it is at the moment
+    of the decision — an event stream with no delay and no loss, the BEST case for such a router.
+
+⚠️ Until 2026-10-05 this docstring said no production router has the second kind, and that reading
+the true cache "would overstate prefix-affinity's benefit". For event-driven routers that was
+wrong (docs/04-prior-art.md §2a). What stays true: a dispatch-view policy must not peek — the two
+views are different routers, and a result names the one it used.
+
+EVENTS. A policy with `wants_events = True` is told when a request it routed emits its first
+token and when it finishes, at the simulated time that happens — what a router sees on the
+response stream it proxies. Policies that keep their own account of the work they have queued
+(LMetric's prefill tokens, SMetric's queued prefill cost) need exactly that.
 """
 
 from __future__ import annotations
 
 import random
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from ..traces.schema import NormalizedRequest
@@ -32,11 +41,14 @@ from ..traces.schema import NormalizedRequest
 
 @dataclass(slots=True)
 class FleetState:
-    """What a router can see. Deliberately load-only — see the module docstring."""
+    """What a router can see: load always, the caches only if it asks — see the module docstring."""
 
     n_replicas: int
     running: list[int]  # sequences currently in each replica's batch
     queued: list[int]  # sequences waiting for a slot
+    # Only for a policy with `wants_cache_view`: (replica, request) -> how many leading blocks of
+    # the request's prompt that replica holds now. None for everyone else.
+    hit_blocks: Callable[[int, NormalizedRequest], int] | None = None
 
     def outstanding(self, i: int) -> int:
         return self.running[i] + self.queued[i]
@@ -49,6 +61,8 @@ class RoutingPolicy(ABC):
     """Pick a replica for each request. Never mutates the fleet; may keep its own state."""
 
     name: str = "base"
+    wants_events: bool = False  # deliver on_first_token / on_finish
+    wants_cache_view: bool = False  # fill FleetState.hit_blocks (the event view)
 
     def __init__(self, n_replicas: int, **kwargs: object) -> None:
         if n_replicas < 1:
@@ -67,11 +81,18 @@ class RoutingPolicy(ABC):
         actually resident. Most policies ignore it.
         """
 
+    def on_first_token(self, replica: int, request: NormalizedRequest) -> None:
+        """A request routed to `replica` has emitted its first token: its prefill is done.
+        Called only when `wants_events` is set."""
+
+    def on_finish(self, replica: int, request: NormalizedRequest) -> None:
+        """A request routed to `replica` has emitted its last token. Only with `wants_events`."""
+
     def __repr__(self) -> str:
         return f"{type(self).__name__}(n_replicas={self.n_replicas})"
 
 
-def argmin_random(values: list[int], rng: random.Random) -> int:
+def argmin_random(values: list[int] | list[float], rng: random.Random) -> int:
     """Index of the minimum, ties broken UNIFORMLY AT RANDOM. See the module docstring."""
     lo = min(values)
     candidates = [i for i, v in enumerate(values) if v == lo]
