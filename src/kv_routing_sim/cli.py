@@ -90,6 +90,18 @@ def _slo_mark(meets: bool | None) -> str:
     return "—" if meets is None else ("✅" if meets else "❌")
 
 
+def _slo_sentence(cost: CostModel | None) -> str | None:
+    """What "meets SLO" was decided on — and, when the per-token half is off, that it is."""
+    if cost is None:
+        return None
+    if cost.tpot_p95_slo_ms is None:
+        return (f"SLO: p95 time to first token ≤ {cost.ttft_p95_slo_ms:,.0f} ms. The time per "
+                "output token is shown but NOT part of it: add `tpot_p95_ms` under `slo:` in the "
+                "cost model to make it so.")
+    return (f"SLO: p95 time to first token ≤ {cost.ttft_p95_slo_ms:,.0f} ms AND p95 time per "
+            f"output token ≤ {cost.tpot_p95_slo_ms:,.0f} ms.")
+
+
 def _markdown(payload: dict[str, Any]) -> str:
     lines: list[str] = []
     rec = payload.get("recommendation") or {}
@@ -119,17 +131,21 @@ def _markdown(payload: dict[str, Any]) -> str:
         lines += [
             "## All configurations",
             "",
-            "| policy | replicas | hit rate | p50 ms | p95 ms | INR/1k | imbalance | meets SLO |",
-            "|---|---:|---:|---:|---:|---:|---:|:---:|",
+            ("| policy | replicas | hit rate | p50 TTFT ms | p95 TTFT ms | p95 ms per token | "
+             "INR/1k | imbalance | meets SLO |"),
+            "|---|---:|---:|---:|---:|---:|---:|---:|:---:|",
         ]
         for p in pts:
             inr = "—" if p["inr_per_1k_requests"] is None else f"{p['inr_per_1k_requests']:.3f}"
+            tpot = "—" if p.get("p95_tpot_ms") is None else f"{p['p95_tpot_ms']:.1f}"
             lines.append(
                 f"| {p['policy']} | {p['n_replicas']} | {p['hit_rate']:.4f} | "
-                f"{p['p50_ttft_ms']:.1f} | {p['p95_ttft_ms']:.1f} | {inr} | "
+                f"{p['p50_ttft_ms']:.1f} | {p['p95_ttft_ms']:.1f} | {tpot} | {inr} | "
                 f"{p['load_imbalance']:.3f} | {_slo_mark(p['meets_slo'])} |"
             )
         lines.append("")
+        if payload.get("slo"):
+            lines += [payload["slo"], ""]
     if payload.get("trace"):
         lines += ["## Trace", "", "```json", json.dumps(payload["trace"], indent=2), "```", ""]
     return "\n".join(lines)
@@ -167,7 +183,7 @@ def cmd_replay(args: argparse.Namespace) -> int:
         cost=cost,
         trace_info=info,
     )
-    rec = recommend(points)
+    rec = recommend(points, **({"slo": cost.slo_label} if cost is not None else {}))
     if not rec.calibrated:
         print(UNCALIBRATED_BANNER, file=sys.stderr)
     _emit(
@@ -176,6 +192,7 @@ def cmd_replay(args: argparse.Namespace) -> int:
             "profile": profile.provenance(),
             "points": [p.as_dict() for p in points],
             "recommendation": rec.as_dict(),
+            "slo": _slo_sentence(cost),
         },
         args.format,
         args.out,

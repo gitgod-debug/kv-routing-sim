@@ -178,3 +178,85 @@ def test_recommendation_reports_ties_on_the_same_replica_count():
     assert rec.tied_with == ("session-sticky",)
     assert rec.as_dict()["tied_with"] == ["session-sticky"]
     assert recommend([rr]).tied_with == ()
+
+
+# ── the SLO's second half: time per output token ─────────────────────────────────────────────
+
+_COST = """
+    fx: {{usd_to_inr: 80.0, source: test, date: 2026-09-20}}
+    compute: {{sku: test, price_per_hour_usd: 2.0, source: test, date: 2026-09-20}}
+    slo: {{ttft_p95_ms: 2000.0{tpot}, source: test, date: 2026-09-20}}
+"""
+
+
+def _cost(tmp_path, tpot: str = "") -> CostModel:
+    p = tmp_path / f"cost{len(tpot)}.yaml"
+    p.write_text(textwrap.dedent(_COST.format(tpot=tpot)))
+    return CostModel.from_yaml(p)
+
+
+def test_the_per_token_half_of_the_slo_is_off_unless_the_cost_model_sets_it(tmp_path):
+    """Every result registered up to 2026-10-05 is on the first-token limit alone. A cost model
+    without `tpot_p95_ms` must keep meaning exactly that — whatever the tokens' speed."""
+    one = _cost(tmp_path)
+    assert one.tpot_p95_slo_ms is None and one.slo_label == "p95 TTFT SLO"
+    assert one.meets_slo(1_999.0, 10_000.0) and not one.meets_slo(2_001.0, 1.0)
+    shipped = CostModel.from_yaml("configs/cost_model.yaml")
+    assert shipped.tpot_p95_slo_ms is None  # the shipped default: first token only
+
+
+def test_with_both_halves_a_configuration_must_meet_both(tmp_path):
+    two = _cost(tmp_path, ", tpot_p95_ms: 100")
+    assert two.tpot_p95_slo_ms == 100.0 and "time per output token" in two.slo_label
+    assert two.meets_slo(1_500.0, 100.0)  # at the limit is within it, as for TTFT
+    assert not two.meets_slo(1_500.0, 100.1)  # a prompt first token does not excuse slow ones
+    assert not two.meets_slo(2_500.0, 50.0)
+    # No request had a second token: there is no per-token latency to miss a limit with.
+    assert two.meets_slo(1_500.0, float("nan"))
+
+
+def test_a_successful_request_meets_every_half_that_is_set():
+    ttft = [100.0, 100.0, 3_000.0, 100.0]
+    tpot = [50.0, 150.0, 50.0, float("nan")]  # the last: one output token, no interval
+    assert successful_requests(ttft, 2_000.0) == 3
+    assert successful_requests(ttft, 2_000.0, tpot, None) == 3  # no limit set: as before
+    assert successful_requests(ttft, 2_000.0, tpot, 100.0) == 2  # 50 ms and the single-token one
+
+
+def test_a_point_carries_the_per_token_p95_and_decides_the_slo_on_it_only_when_asked(tmp_path):
+    from kv_routing_sim.eval.pareto import to_point
+    from kv_routing_sim.eval.sweep import average_points
+    from kv_routing_sim.sim.cost_model import CostProfile
+    from kv_routing_sim.sim.engine import run
+    from kv_routing_sim.traces.schema import NormalizedRequest
+
+    # Decode steps of 150 ms: the first token is prompt, the rest are slow.
+    slow = CostProfile(name="slow-decode", prefill_base_s=0.0, prefill_per_token_s=0.0001,
+                       decode_base_s=0.150, decode_per_seq_s=0.0, kv_cache_blocks=5_000,
+                       block_size=16, max_num_seqs=16)
+    trace = [NormalizedRequest(f"r{i}", float(i), (i * 10 + 1, i * 10 + 2), 32, 5, f"s{i}")
+             for i in range(8)]
+    r = run(trace, policy="round-robin", n_replicas=1, profile=slow)
+    one, two = _cost(tmp_path), _cost(tmp_path, ", tpot_p95_ms: 100")
+    first_only, both = to_point(r, one), to_point(r, two)
+    assert first_only.p95_tpot_ms == both.p95_tpot_ms == pytest.approx(150.0)
+    assert first_only.p95_ttft_ms == pytest.approx(153.2)  # 3.2 ms of prefill + one step
+    assert first_only.meets_slo is True and both.meets_slo is False
+    assert to_point(r, None).meets_slo is None  # no cost model: still "no SLO", not a failure
+    # Every request met the first-token limit and none the per-token one: the cost denominator
+    # follows the SLO, so under both halves nothing here was served successfully.
+    assert first_only.inr_per_1k != float("inf") and both.inr_per_1k == float("inf")
+    assert first_only.as_dict()["p95_tpot_ms"] == 150.0
+    assert average_points([both, both]).p95_tpot_ms == pytest.approx(150.0)
+    # A point built without it (older code, hand-made points) says "not measured", not 0.
+    assert _p("x", 1, 0.5, 10.0, 1.0).as_dict()["p95_tpot_ms"] is None
+
+
+def test_the_recommendations_reason_names_the_slo_it_was_decided_on():
+    ok = [_p("round-robin", 2, 0.7, 40.0, 9.0, meets=True)]
+    assert recommend(ok).reason == "cheapest configuration meeting the p95 TTFT SLO"
+    two = recommend(ok, slo="SLO (p95 TTFT and p95 time per output token)")
+    assert two.reason.endswith("meeting the SLO (p95 TTFT and p95 time per output token)")
+    failed = [_p("round-robin", 2, 0.7, 4000.0, 9.0, meets=False)]
+    assert "NO configuration met the SLO (p95" in recommend(
+        failed, slo="SLO (p95 TTFT and p95 time per output token)").reason

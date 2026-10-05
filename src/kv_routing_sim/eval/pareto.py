@@ -9,6 +9,7 @@ cache but hands you a configuration space rather than an answer.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -30,6 +31,9 @@ class Point:
     load_imbalance: float
     meets_slo: bool | None  # None = no SLO was defined (no cost model)
     calibrated: bool
+    # p95 of the per-request time per output token. Always measured; part of `meets_slo` only when
+    # the cost model sets a limit on it. NaN: no request had more than one output token.
+    p95_tpot_ms: float = float("nan")
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -38,6 +42,7 @@ class Point:
             "hit_rate": round(self.hit_rate, 6),
             "p50_ttft_ms": round(self.p50_ttft_ms, 3),
             "p95_ttft_ms": round(self.p95_ttft_ms, 3),
+            "p95_tpot_ms": None if math.isnan(self.p95_tpot_ms) else round(self.p95_tpot_ms, 3),
             "inr_per_1k_requests": (
                 round(self.inr_per_1k, 4) if self.inr_per_1k != float("inf") else None
             ),
@@ -51,11 +56,13 @@ class Point:
 def to_point(result: RunResult, cost: CostModel | None) -> Point:
     pct = result.ttft_percentiles()
     p95 = pct["p95_ms"]
+    tpot_p95 = result.tpot_percentiles()["p95_ms"]
     # None, not False: "no SLO was defined" is a different statement from "failed the SLO".
-    meets = (p95 <= cost.ttft_p95_slo_ms) if cost is not None else None
+    meets = cost.meets_slo(p95, tpot_p95) if cost is not None else None
     inr = float("inf")
     if cost is not None and result.makespan_s > 0:
-        ok = successful_requests(result.ttft_ms, cost.ttft_p95_slo_ms)
+        ok = successful_requests(result.ttft_ms, cost.ttft_p95_slo_ms, result.tpot_ms,
+                                 cost.tpot_p95_slo_ms)
         per_hour = ok / result.makespan_s * 3600.0
         inr = cost.inr_per_1k_requests(
             n_replicas=result.n_replicas, successful_requests_per_hour=per_hour
@@ -71,6 +78,7 @@ def to_point(result: RunResult, cost: CostModel | None) -> Point:
         load_imbalance=result.load_imbalance(),
         meets_slo=meets,
         calibrated=result.calibrated,
+        p95_tpot_ms=tpot_p95,
     )
 
 

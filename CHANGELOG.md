@@ -23,6 +23,11 @@ The first public version: planned for PyPI before 2026-11-20.
   model against its counters, request by request. Standard library only.
 - **A context-aware timing model** (C2): prefill and decode cost grow with context length. Both
   terms default to zero, so every earlier profile gives the same results as before.
+- **Time per output token.** Every run now also measures each request's time per output token
+  (last token − first token, over the tokens after the first — MLPerf's TPOT, vLLM's
+  `request_time_per_output_token`), and `kvsim replay` prints its p95 beside the first-token
+  latency. A cost model may add `tpot_p95_ms` under `slo:` to make it the second half of the SLO;
+  without that key nothing is enforced on it and every earlier result is unchanged.
 - **`kvsim generate`** (agentic traffic with shared prompts, including many tenants) and
   **`kvsim crossover`** (sharing × load).
 - **Shipped data:** the context-aware T4 profile C2 validated (`--profile

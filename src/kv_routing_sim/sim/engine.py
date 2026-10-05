@@ -130,9 +130,18 @@ def run(
         duration, finished = replica.step(now)
         end = now + duration
         for seq in finished:
+            # Its last token lands at the end of this step, its first landed at `first_token_ts`:
+            # everything between is the request's inter-token time, preemption stalls included.
+            gaps = seq.tokens_emitted - 1
+            decode_s = end - seq.first_token_ts
+            tpot_ms = decode_s / gaps * 1000.0 if gaps > 0 else float("nan")
+            if gaps > 0:
+                result.itl_sum_s += decode_s
+                result.itl_count += gaps
             # Counted only once warm-up is past. `arrival_ts` ordering is the trace's own.
             if seq.request.arrival_ts >= 0 and result.completed + 1 > warmup_requests:
                 result.ttft_ms.append((seq.first_token_ts - seq.arrival_ts) * 1000.0)
+                result.tpot_ms.append(tpot_ms)
             result.completed += 1
             result.makespan_s = max(result.makespan_s, end)
             if record_per_request:
@@ -140,6 +149,7 @@ def run(
                 result.per_request[seq.request.request_id] = {
                     "cached_tokens": seq.matched_blocks * profile.block_size,
                     "ttft_ms": (seq.first_token_ts - seq.arrival_ts) * 1000.0,
+                    "tpot_ms": tpot_ms if gaps > 0 else None,  # None: one token, no interval
                     "preemptions": seq.num_preemptions,
                     "replica": idx,  # which replica served it: a two-replica run compares routing
                 }

@@ -59,9 +59,11 @@ class Recommendation:
 
 
 def recommend(
-    points: list[Point], *, baseline_policy: str = "round-robin"
+    points: list[Point], *, baseline_policy: str = "round-robin", slo: str = "p95 TTFT SLO"
 ) -> Recommendation:
-    """Cheapest configuration that meets the SLO; fall back to the lowest p95 if none does."""
+    """Cheapest configuration that meets the SLO; fall back to the lowest p95 if none does.
+
+    `slo` names the SLO in the reason given — `CostModel.slo_label`, when it has two halves."""
     front = frontier(points)
     calibrated = all(p.calibrated for p in points) and bool(points)
 
@@ -82,7 +84,7 @@ def recommend(
         )
     elif feasible:
         chosen = min(feasible, key=lambda p: (p.inr_per_1k, p.n_replicas, p.p95_ttft_ms))
-        reason = "cheapest configuration meeting the p95 TTFT SLO"
+        reason = f"cheapest configuration meeting the {slo}"
         ties = tuple(sorted({p.policy for p in feasible
                              if p.n_replicas == chosen.n_replicas and p.policy != chosen.policy}))
     else:
@@ -90,7 +92,7 @@ def recommend(
         # the constraint and presenting the result as though it had passed.
         chosen = min(points, key=lambda p: (p.p95_ttft_ms, p.n_replicas))
         reason = (
-            "NO configuration met the p95 TTFT SLO — showing the lowest-p95 option. "
+            f"NO configuration met the {slo} — showing the lowest-p95 option. "
             "Either the SLO is too tight for this workload or the fleet needs more replicas "
             "than were swept."
         )

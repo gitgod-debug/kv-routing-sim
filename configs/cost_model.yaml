@@ -47,6 +47,13 @@ slo:
   # p95), so ours is slightly LOOSER than MLPerf's. Stated, not hidden.
   source: https://github.com/mlcommons/inference_policies/blob/master/inference_rules.adoc (commit ff7edba545, 2026-08-20)
   date: 2026-09-22
+  # ⚠️ THE OTHER HALF. The same MLPerf row reads "TTFT/TPOT: 2000 ms/100 ms": it also limits the
+  # time per output token — "the average interval between all the tokens generated", per request.
+  # It is NOT enforced here: every result registered up to 2026-10-05 is on the first token alone,
+  # and on that target a live T4 took 134–521 ms per token (C3). The simulator measures it for
+  # every run; uncommenting the next line makes it part of the SLO, at p95 like the first half.
+  # What that does to the replica counts: docs/09-hypotheses.md, T1 and T2.
+  # tpot_p95_ms: 100
 
 # What this model deliberately EXCLUDES, recorded so a reader knows it is a choice, not an
 # oversight. Compute is >90% of the bill for this workload, and adding poorly-sourced small terms
