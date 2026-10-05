@@ -9,7 +9,13 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-10-05 (**C3 RAN — all three rules hold, as predicted** — `kvsim calibrate`
+**Last updated:** 2026-10-05 (**T1 and T2 RAN — the per-token half of the SLO.** T1 ⛔ did not
+hold: the simulator's per-token latency is within 7% of the engine off the knee and 1.5–1.7× too
+slow at it. T2 ✅ all three rules on all three calibrations: under a target with both halves
+session-sticky is still best or tied with 1 and 4 prompts, never worse than round-robin or
+least-loaded, and needs 1.93–2.00× the first-token count — the model's answer, unchecked where it
+lives. `kvsim calibrate` now repeats every cell and `kvsim replay` shows how firm a count is.
+Earlier the same day: **C3 RAN — all three rules hold, as predicted** — `kvsim calibrate`
 works on a real T4 and its profile predicts unseen traffic within 1.41×. **And the same run narrowed
 the finding:** three calibrations of the same T4 agree on a GPU count exactly at 102 of 144 cells and
 within one at 138 — and H2b's verdict of 2026-09-30, decided by one replica at one point, reverses on
@@ -21,7 +27,7 @@ context-aware `kvsim calibrate`'s first run on a
 real GPU; before it, a pre-check on C2's data added one measurement to the command. 2026-09-30: C2
 ran — all three predictions true; the finding re-tested on the validated timing model and its "route
 by prefix" half FALSIFIED. Before that: H6, R1 and R2, Phase 6 and C1, the demo, the preprint draft,
-`kvsim calibrate`, a wheel that works outside a clone. 226 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
+`kvsim calibrate`, a wheel that works outside a clone. 269 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
 vLLM under eviction pressure to the token, against predictions committed before the run)
 **Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding — changed 2026-09-30, narrowed
 2026-10-05:** *keep each user on one GPU* holds on three calibrations of the T4 (fewest T4s or tied at
@@ -32,11 +38,11 @@ R1/R2 ran on the first, context-free timing model (not yet re-run) · ✅ **6** 
 T4s within 1.4% (run twice); latency explained by C2 · ✅ **C2** — context, not CPU; the context-aware
 model predicts held-out traffic within 1.41× · 🔨 **7** — demo on the validated grid, 10×/100× done,
 `kvsim calibrate` proven on a real T4 in both its forms (C1, C3); PyPI left · 🔨 **8** — the preprint
-(optional; ⚠️ it predates C3 and states the 30 Sep finding without its margin). ▶ **Next, each
-registered before it runs:** an SLO with its per-token half (the engine took 134–521 ms per token in
-C3; the cited rule allows 100) and the grid under it; the 64-prompt question over several fresh
-calibrations with the load weight fixed first; `kvsim calibrate` repeating its cells and printing a
-replica range; then H6 and R1/R2 on the validated model.
+(optional; ⚠️ it predates C3 and states the 30 Sep finding without its margin). ▶ **Next:** one GPU
+run, registered first (C4): per-request token times on traffic around the per-token limit; decode
+cells that share a prefix; what an arriving request costs those already decoding; `kvsim
+calibrate` with its repeats, three times — and on those fresh calibrations, the 64-prompt question
+under both targets. Then H6 and R1/R2 on the validated model.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -660,7 +666,11 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       ([`posthoc_three_calibrations.md`](artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.md)):
       102 of 144 identical, 138 within one; sticky best or tied on all three at 19 of 24 points — 12
       of 12 with 1 and 4 prompts. Also found in the data: the SLO has no per-token half.
-      **Left:** repeat the decode cells and print a replica range (one run is not enough at the knee)
+      🔨 **2026-10-05, built:** every timing cell is now measured `--reps` times (3) and the
+      profile keeps the fit of each repeat; `kvsim replay` sizes on each and prints the range
+      beside its recommendation ("how firm: 3 to 4 replicas across the calibration's 3 repeats");
+      a profile without repeats says its spread is unknown (commit `5db6a9a`). Mock engine and
+      synthetic repeats only so far. **Left:** its first run on a real GPU (C4)
 - [~] ⭐ **An SLO with its per-token half.** The first-token target was the only one: C3's live
       engine took 134–521 ms per token on traffic that met, or nearly met, it, and the MLPerf row
       the 2 s come from also limits the time per output token (100 ms). 🔨 **2026-10-05:** the
@@ -670,7 +680,24 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       ([`configs/tpot_slo.yaml`](configs/tpot_slo.yaml)): T1 — the model's mean inter-token latency
       within 1.5× of the engine's on the five held-out runs on disk; T2 — the finding's grid under
       both halves on three calibrations (sticky still best with 1 and 4 prompts / never worse than
-      round-robin or least-loaded / first-token counts optimistic by ≥ 1.5×). Predicted: all hold
+      round-robin or least-loaded / first-token counts optimistic by ≥ 1.5×). Predicted: all hold.
+      ⛔ **T1 RAN — DOES NOT HOLD** ([`report.md`](artifacts/results/t1_itl/report.md)): within
+      1.07× on the three runs off the knee, **1.54× and 1.71× too slow** on the two at it (the
+      model has 6 preemptions there, the engine none). Post hoc
+      ([`posthoc_range.md`](artifacts/results/t1_itl/posthoc_range.md)): at the knee 97% of the
+      model's tokens are decoded in batches whose summed context is 8× past the largest any
+      calibration cell measured (20,200 tokens — a cell's prompts are unique, so it cannot exceed
+      the cache; a shared prompt can).
+      ✅ **T2 RAN — all three hold on A, B and C**
+      ([`report.md`](artifacts/results/t2_two_part_slo/report.md)): T2a 12 of 12 points · T2b no
+      exception in 24 · T2c **1.93 · 2.00 · 2.00×**. Per the registration, since T1 failed these
+      are the model's counts, not sizing guidance. Exploratory: the load weight of 1 — the
+      first-token hint at 64 prompts — holds nothing under the two-part target; sticky and
+      balanced affinity are 1–2 replicas apart there, with no steady winner. ⚠️ Grids B and C
+      carry a dirty header (other files were edited while they ran): 720 of 720 sampled cells
+      reproduce from a clean checkout ([`verification.json`](artifacts/results/t2_two_part_slo/verification.json)).
+      **Left:** the GPU check — per-request token times around the limit, shared-prefix decode
+      cells, what an arriving request costs those already decoding
 - [ ] **`configs/profiles/`** — committed calibration profiles keyed by
       `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
       from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no

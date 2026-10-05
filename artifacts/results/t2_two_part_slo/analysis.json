@@ -1,0 +1,3364 @@
+{
+ "script": "scripts/t2_analyze.py",
+ "slo": {
+  "ttft_p95_ms": 2000,
+  "tpot_p95_ms": 100,
+  "source": "https://github.com/mlcommons/inference_policies/blob/master/inference_rules.adoc (commit ff7edba545, 2026-08-20)",
+  "date": "2026-10-05"
+ },
+ "not_met": 33,
+ "calibrations": [
+  "A",
+  "B",
+  "C"
+ ],
+ "guard": {
+  "A": "reproduces the committed first-token table on replicas 1\u201316",
+  "B": "reproduces the committed first-token table on replicas 1\u201316",
+  "C": "reproduces the committed first-token table on replicas 1\u201316"
+ },
+ "required": {
+  "first_token": {
+   "A": {
+    "1": {
+     "0.25": {
+      "session-sticky": 1,
+      "radix-affinity-balanced@16": 1,
+      "radix-affinity-balanced@1": 1,
+      "round-robin": 1,
+      "least-loaded": 1,
+      "radix-affinity": 1
+     },
+     "0.5": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 2,
+      "round-robin": 2,
+      "least-loaded": 2,
+      "radix-affinity": 33
+     },
+     "1": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 3,
+      "least-loaded": 4,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 5,
+      "radix-affinity-balanced@16": 10,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 7,
+      "least-loaded": 11,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 6,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 9,
+      "least-loaded": 14,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 7,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 12,
+      "least-loaded": 17,
+      "radix-affinity": 33
+     }
+    },
+    "4": {
+     "0.25": {
+      "session-sticky": 1,
+      "radix-affinity-balanced@16": 1,
+      "radix-affinity-balanced@1": 1,
+      "round-robin": 1,
+      "least-loaded": 1,
+      "radix-affinity": 1
+     },
+     "0.5": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 2,
+      "round-robin": 2,
+      "least-loaded": 2,
+      "radix-affinity": 2
+     },
+     "1": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 3,
+      "round-robin": 4,
+      "least-loaded": 5,
+      "radix-affinity": 3
+     },
+     "2": {
+      "session-sticky": 5,
+      "radix-affinity-balanced@16": 9,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 7,
+      "least-loaded": 10,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 6,
+      "radix-affinity-balanced@16": 16,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 9,
+      "least-loaded": 15,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 9,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 12,
+      "least-loaded": 22,
+      "radix-affinity": 33
+     }
+    },
+    "16": {
+     "0.25": {
+      "session-sticky": 1,
+      "radix-affinity-balanced@16": 1,
+      "radix-affinity-balanced@1": 1,
+      "round-robin": 1,
+      "least-loaded": 1,
+      "radix-affinity": 1
+     },
+     "0.5": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 3,
+      "radix-affinity-balanced@1": 2,
+      "round-robin": 3,
+      "least-loaded": 4,
+      "radix-affinity": 2
+     },
+     "1": {
+      "session-sticky": 4,
+      "radix-affinity-balanced@16": 5,
+      "radix-affinity-balanced@1": 3,
+      "round-robin": 6,
+      "least-loaded": 9,
+      "radix-affinity": 3
+     },
+     "2": {
+      "session-sticky": 7,
+      "radix-affinity-balanced@16": 9,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 11,
+      "least-loaded": 21,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 12,
+      "radix-affinity-balanced@16": 16,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 16,
+      "least-loaded": 32,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 16,
+      "radix-affinity-balanced@16": 20,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 24,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     }
+    },
+    "64": {
+     "0.25": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 2,
+      "round-robin": 2,
+      "least-loaded": 3,
+      "radix-affinity": 2
+     },
+     "0.5": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 3,
+      "radix-affinity-balanced@1": 3,
+      "round-robin": 4,
+      "least-loaded": 7,
+      "radix-affinity": 3
+     },
+     "1": {
+      "session-sticky": 5,
+      "radix-affinity-balanced@16": 5,
+      "radix-affinity-balanced@1": 5,
+      "round-robin": 9,
+      "least-loaded": 13,
+      "radix-affinity": 5
+     },
+     "2": {
+      "session-sticky": 10,
+      "radix-affinity-balanced@16": 11,
+      "radix-affinity-balanced@1": 8,
+      "round-robin": 16,
+      "least-loaded": 27,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 18,
+      "radix-affinity-balanced@16": 17,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 24,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 26,
+      "radix-affinity-balanced@16": 22,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 31,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     }
+    }
+   },
+   "B": {
+    "1": {
+     "0.25": {
+      "session-sticky": 1,
+      "radix-affinity-balanced@16": 1,
+      "radix-affinity-balanced@1": 1,
+      "round-robin": 1,
+      "least-loaded": 1,
+      "radix-affinity": 1
+     },
+     "0.5": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 2,
+      "round-robin": 2,
+      "least-loaded": 2,
+      "radix-affinity": 33
+     },
+     "1": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 3,
+      "least-loaded": 4,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 5,
+      "radix-affinity-balanced@16": 26,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 7,
+      "least-loaded": 10,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 6,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 9,
+      "least-loaded": 13,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 7,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 12,
+      "least-loaded": 18,
+      "radix-affinity": 33
+     }
+    },
+    "4": {
+     "0.25": {
+      "session-sticky": 1,
+      "radix-affinity-balanced@16": 1,
+      "radix-affinity-balanced@1": 1,
+      "round-robin": 1,
+      "least-loaded": 1,
+      "radix-affinity": 1
+     },
+     "0.5": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 2,
+      "round-robin": 2,
+      "least-loaded": 2,
+      "radix-affinity": 2
+     },
+     "1": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 3,
+      "round-robin": 4,
+      "least-loaded": 6,
+      "radix-affinity": 3
+     },
+     "2": {
+      "session-sticky": 5,
+      "radix-affinity-balanced@16": 9,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 7,
+      "least-loaded": 10,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 6,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 9,
+      "least-loaded": 16,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 8,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 12,
+      "least-loaded": 25,
+      "radix-affinity": 33
+     }
+    },
+    "16": {
+     "0.25": {
+      "session-sticky": 1,
+      "radix-affinity-balanced@16": 1,
+      "radix-affinity-balanced@1": 1,
+      "round-robin": 1,
+      "least-loaded": 1,
+      "radix-affinity": 1
+     },
+     "0.5": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 2,
+      "round-robin": 3,
+      "least-loaded": 5,
+      "radix-affinity": 2
+     },
+     "1": {
+      "session-sticky": 4,
+      "radix-affinity-balanced@16": 5,
+      "radix-affinity-balanced@1": 3,
+      "round-robin": 5,
+      "least-loaded": 10,
+      "radix-affinity": 3
+     },
+     "2": {
+      "session-sticky": 7,
+      "radix-affinity-balanced@16": 9,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 12,
+      "least-loaded": 23,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 12,
+      "radix-affinity-balanced@16": 16,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 16,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 16,
+      "radix-affinity-balanced@16": 21,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 24,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     }
+    },
+    "64": {
+     "0.25": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 2,
+      "round-robin": 2,
+      "least-loaded": 4,
+      "radix-affinity": 2
+     },
+     "0.5": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 3,
+      "radix-affinity-balanced@1": 2,
+      "round-robin": 4,
+      "least-loaded": 7,
+      "radix-affinity": 2
+     },
+     "1": {
+      "session-sticky": 6,
+      "radix-affinity-balanced@16": 6,
+      "radix-affinity-balanced@1": 4,
+      "round-robin": 9,
+      "least-loaded": 14,
+      "radix-affinity": 4
+     },
+     "2": {
+      "session-sticky": 12,
+      "radix-affinity-balanced@16": 11,
+      "radix-affinity-balanced@1": 8,
+      "round-robin": 16,
+      "least-loaded": 28,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 13,
+      "radix-affinity-balanced@16": 18,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 23,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 25,
+      "radix-affinity-balanced@16": 22,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 31,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     }
+    }
+   },
+   "C": {
+    "1": {
+     "0.25": {
+      "session-sticky": 1,
+      "radix-affinity-balanced@16": 1,
+      "radix-affinity-balanced@1": 1,
+      "round-robin": 1,
+      "least-loaded": 1,
+      "radix-affinity": 1
+     },
+     "0.5": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 2,
+      "round-robin": 2,
+      "least-loaded": 2,
+      "radix-affinity": 33
+     },
+     "1": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 4,
+      "least-loaded": 5,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 5,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 7,
+      "least-loaded": 10,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 6,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 9,
+      "least-loaded": 14,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 8,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 12,
+      "least-loaded": 18,
+      "radix-affinity": 33
+     }
+    },
+    "4": {
+     "0.25": {
+      "session-sticky": 1,
+      "radix-affinity-balanced@16": 1,
+      "radix-affinity-balanced@1": 1,
+      "round-robin": 1,
+      "least-loaded": 1,
+      "radix-affinity": 1
+     },
+     "0.5": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 2,
+      "round-robin": 2,
+      "least-loaded": 2,
+      "radix-affinity": 2
+     },
+     "1": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 5,
+      "radix-affinity-balanced@1": 4,
+      "round-robin": 4,
+      "least-loaded": 5,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 5,
+      "radix-affinity-balanced@16": 10,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 7,
+      "least-loaded": 11,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 7,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 9,
+      "least-loaded": 16,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 9,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 13,
+      "least-loaded": 25,
+      "radix-affinity": 33
+     }
+    },
+    "16": {
+     "0.25": {
+      "session-sticky": 1,
+      "radix-affinity-balanced@16": 1,
+      "radix-affinity-balanced@1": 1,
+      "round-robin": 1,
+      "least-loaded": 1,
+      "radix-affinity": 1
+     },
+     "0.5": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 3,
+      "radix-affinity-balanced@1": 2,
+      "round-robin": 3,
+      "least-loaded": 5,
+      "radix-affinity": 2
+     },
+     "1": {
+      "session-sticky": 4,
+      "radix-affinity-balanced@16": 5,
+      "radix-affinity-balanced@1": 4,
+      "round-robin": 6,
+      "least-loaded": 10,
+      "radix-affinity": 3
+     },
+     "2": {
+      "session-sticky": 8,
+      "radix-affinity-balanced@16": 9,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 13,
+      "least-loaded": 24,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 12,
+      "radix-affinity-balanced@16": 17,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 20,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 17,
+      "radix-affinity-balanced@16": 25,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 27,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     }
+    },
+    "64": {
+     "0.25": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 2,
+      "round-robin": 2,
+      "least-loaded": 4,
+      "radix-affinity": 2
+     },
+     "0.5": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 3,
+      "radix-affinity-balanced@1": 3,
+      "round-robin": 5,
+      "least-loaded": 8,
+      "radix-affinity": 3
+     },
+     "1": {
+      "session-sticky": 6,
+      "radix-affinity-balanced@16": 5,
+      "radix-affinity-balanced@1": 4,
+      "round-robin": 9,
+      "least-loaded": 16,
+      "radix-affinity": 4
+     },
+     "2": {
+      "session-sticky": 12,
+      "radix-affinity-balanced@16": 10,
+      "radix-affinity-balanced@1": 8,
+      "round-robin": 21,
+      "least-loaded": 31,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 18,
+      "radix-affinity-balanced@16": 18,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 31,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 27,
+      "radix-affinity-balanced@16": 24,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 33,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     }
+    }
+   }
+  },
+  "two_part": {
+   "A": {
+    "1": {
+     "0.25": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 2,
+      "least-loaded": 2,
+      "radix-affinity": 33
+     },
+     "0.5": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 4,
+      "least-loaded": 4,
+      "radix-affinity": 33
+     },
+     "1": {
+      "session-sticky": 6,
+      "radix-affinity-balanced@16": 6,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 8,
+      "least-loaded": 7,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 10,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 14,
+      "least-loaded": 13,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 15,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 20,
+      "least-loaded": 20,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 19,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 26,
+      "least-loaded": 24,
+      "radix-affinity": 33
+     }
+    },
+    "4": {
+     "0.25": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 3,
+      "round-robin": 2,
+      "least-loaded": 2,
+      "radix-affinity": 3
+     },
+     "0.5": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 4,
+      "least-loaded": 4,
+      "radix-affinity": 33
+     },
+     "1": {
+      "session-sticky": 6,
+      "radix-affinity-balanced@16": 6,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 8,
+      "least-loaded": 7,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 11,
+      "radix-affinity-balanced@16": 12,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 14,
+      "least-loaded": 14,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 16,
+      "radix-affinity-balanced@16": 19,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 21,
+      "least-loaded": 20,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 20,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 28,
+      "least-loaded": 25,
+      "radix-affinity": 33
+     }
+    },
+    "16": {
+     "0.25": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 3,
+      "round-robin": 3,
+      "least-loaded": 3,
+      "radix-affinity": 3
+     },
+     "0.5": {
+      "session-sticky": 4,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 12,
+      "round-robin": 6,
+      "least-loaded": 5,
+      "radix-affinity": 12
+     },
+     "1": {
+      "session-sticky": 7,
+      "radix-affinity-balanced@16": 6,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 10,
+      "least-loaded": 9,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 13,
+      "radix-affinity-balanced@16": 12,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 22,
+      "least-loaded": 21,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 18,
+      "radix-affinity-balanced@16": 17,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 32,
+      "least-loaded": 32,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 25,
+      "radix-affinity-balanced@16": 22,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 33,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     }
+    },
+    "64": {
+     "0.25": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 3,
+      "radix-affinity-balanced@1": 4,
+      "round-robin": 4,
+      "least-loaded": 4,
+      "radix-affinity": 4
+     },
+     "0.5": {
+      "session-sticky": 4,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 6,
+      "round-robin": 7,
+      "least-loaded": 7,
+      "radix-affinity": 6
+     },
+     "1": {
+      "session-sticky": 7,
+      "radix-affinity-balanced@16": 7,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 14,
+      "least-loaded": 13,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 13,
+      "radix-affinity-balanced@16": 13,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 26,
+      "least-loaded": 27,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 19,
+      "radix-affinity-balanced@16": 19,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 33,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 27,
+      "radix-affinity-balanced@16": 24,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 33,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     }
+    }
+   },
+   "B": {
+    "1": {
+     "0.25": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 3,
+      "least-loaded": 3,
+      "radix-affinity": 33
+     },
+     "0.5": {
+      "session-sticky": 4,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 5,
+      "least-loaded": 4,
+      "radix-affinity": 33
+     },
+     "1": {
+      "session-sticky": 6,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 8,
+      "least-loaded": 8,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 12,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 15,
+      "least-loaded": 14,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 16,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 21,
+      "least-loaded": 20,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 21,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 27,
+      "least-loaded": 25,
+      "radix-affinity": 33
+     }
+    },
+    "4": {
+     "0.25": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 3,
+      "round-robin": 3,
+      "least-loaded": 3,
+      "radix-affinity": 3
+     },
+     "0.5": {
+      "session-sticky": 4,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 5,
+      "least-loaded": 4,
+      "radix-affinity": 33
+     },
+     "1": {
+      "session-sticky": 6,
+      "radix-affinity-balanced@16": 7,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 9,
+      "least-loaded": 8,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 12,
+      "radix-affinity-balanced@16": 14,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 15,
+      "least-loaded": 14,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 17,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 23,
+      "least-loaded": 21,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 23,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 31,
+      "least-loaded": 27,
+      "radix-affinity": 33
+     }
+    },
+    "16": {
+     "0.25": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 3,
+      "radix-affinity-balanced@1": 3,
+      "round-robin": 3,
+      "least-loaded": 3,
+      "radix-affinity": 3
+     },
+     "0.5": {
+      "session-sticky": 4,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 6,
+      "least-loaded": 6,
+      "radix-affinity": 33
+     },
+     "1": {
+      "session-sticky": 7,
+      "radix-affinity-balanced@16": 7,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 12,
+      "least-loaded": 10,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 14,
+      "radix-affinity-balanced@16": 14,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 22,
+      "least-loaded": 23,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 19,
+      "radix-affinity-balanced@16": 21,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 33,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 26,
+      "radix-affinity-balanced@16": 23,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 33,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     }
+    },
+    "64": {
+     "0.25": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 3,
+      "radix-affinity-balanced@1": 3,
+      "round-robin": 4,
+      "least-loaded": 4,
+      "radix-affinity": 3
+     },
+     "0.5": {
+      "session-sticky": 5,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 6,
+      "round-robin": 8,
+      "least-loaded": 7,
+      "radix-affinity": 6
+     },
+     "1": {
+      "session-sticky": 8,
+      "radix-affinity-balanced@16": 8,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 14,
+      "least-loaded": 14,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 14,
+      "radix-affinity-balanced@16": 14,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 26,
+      "least-loaded": 28,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 21,
+      "radix-affinity-balanced@16": 22,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 33,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 27,
+      "radix-affinity-balanced@16": 27,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 33,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     }
+    }
+   },
+   "C": {
+    "1": {
+     "0.25": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 3,
+      "least-loaded": 3,
+      "radix-affinity": 33
+     },
+     "0.5": {
+      "session-sticky": 4,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 5,
+      "least-loaded": 4,
+      "radix-affinity": 33
+     },
+     "1": {
+      "session-sticky": 6,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 8,
+      "least-loaded": 8,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 12,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 15,
+      "least-loaded": 14,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 16,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 21,
+      "least-loaded": 20,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 20,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 27,
+      "least-loaded": 25,
+      "radix-affinity": 33
+     }
+    },
+    "4": {
+     "0.25": {
+      "session-sticky": 2,
+      "radix-affinity-balanced@16": 2,
+      "radix-affinity-balanced@1": 3,
+      "round-robin": 3,
+      "least-loaded": 3,
+      "radix-affinity": 3
+     },
+     "0.5": {
+      "session-sticky": 4,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 5,
+      "least-loaded": 4,
+      "radix-affinity": 33
+     },
+     "1": {
+      "session-sticky": 6,
+      "radix-affinity-balanced@16": 7,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 9,
+      "least-loaded": 8,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 12,
+      "radix-affinity-balanced@16": 15,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 15,
+      "least-loaded": 14,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 18,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 24,
+      "least-loaded": 21,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 22,
+      "radix-affinity-balanced@16": 33,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 31,
+      "least-loaded": 27,
+      "radix-affinity": 33
+     }
+    },
+    "16": {
+     "0.25": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 3,
+      "radix-affinity-balanced@1": 3,
+      "round-robin": 3,
+      "least-loaded": 3,
+      "radix-affinity": 3
+     },
+     "0.5": {
+      "session-sticky": 4,
+      "radix-affinity-balanced@16": 4,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 6,
+      "least-loaded": 6,
+      "radix-affinity": 33
+     },
+     "1": {
+      "session-sticky": 7,
+      "radix-affinity-balanced@16": 7,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 12,
+      "least-loaded": 10,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 13,
+      "radix-affinity-balanced@16": 13,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 22,
+      "least-loaded": 24,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 19,
+      "radix-affinity-balanced@16": 20,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 33,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 26,
+      "radix-affinity-balanced@16": 25,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 33,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     }
+    },
+    "64": {
+     "0.25": {
+      "session-sticky": 3,
+      "radix-affinity-balanced@16": 3,
+      "radix-affinity-balanced@1": 3,
+      "round-robin": 4,
+      "least-loaded": 4,
+      "radix-affinity": 3
+     },
+     "0.5": {
+      "session-sticky": 5,
+      "radix-affinity-balanced@16": 5,
+      "radix-affinity-balanced@1": 6,
+      "round-robin": 8,
+      "least-loaded": 8,
+      "radix-affinity": 6
+     },
+     "1": {
+      "session-sticky": 8,
+      "radix-affinity-balanced@16": 7,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 15,
+      "least-loaded": 16,
+      "radix-affinity": 33
+     },
+     "2": {
+      "session-sticky": 14,
+      "radix-affinity-balanced@16": 15,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 26,
+      "least-loaded": 31,
+      "radix-affinity": 33
+     },
+     "3": {
+      "session-sticky": 21,
+      "radix-affinity-balanced@16": 22,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 33,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     },
+     "4": {
+      "session-sticky": 27,
+      "radix-affinity-balanced@16": 29,
+      "radix-affinity-balanced@1": 33,
+      "round-robin": 33,
+      "least-loaded": 33,
+      "radix-affinity": 33
+     }
+    }
+   }
+  }
+ },
+ "t2a": {
+  "prompts": [
+   1,
+   4
+  ],
+  "by_calibration": {
+   "A": {
+    "points": 12,
+    "sticky_best_or_tied": 12,
+    "beaten": [],
+    "none_holds": 0,
+    "holds": true
+   },
+   "B": {
+    "points": 12,
+    "sticky_best_or_tied": 12,
+    "beaten": [],
+    "none_holds": 0,
+    "holds": true
+   },
+   "C": {
+    "points": 12,
+    "sticky_best_or_tied": 12,
+    "beaten": [],
+    "none_holds": 0,
+    "holds": true
+   }
+  },
+  "decided": true,
+  "holds": true
+ },
+ "t2b": {
+  "versus": [
+   "round-robin",
+   "least-loaded"
+  ],
+  "by_calibration": {
+   "A": {
+    "points": 24,
+    "worse": [],
+    "holds": true
+   },
+   "B": {
+    "points": 24,
+    "worse": [],
+    "holds": true
+   },
+   "C": {
+    "points": 24,
+    "worse": [],
+    "holds": true
+   }
+  },
+  "decided": true,
+  "holds": true
+ },
+ "t2c": {
+  "by_calibration": {
+   "A": {
+    "points": 24,
+    "median_ratio": 1.9285714285714286,
+    "ratios": {
+     "1@0.25": 2.0,
+     "1@0.5": 1.5,
+     "1@1": 2.0,
+     "1@2": 2.0,
+     "1@3": 2.5,
+     "1@4": 2.7142857142857144,
+     "4@0.25": 2.0,
+     "4@0.5": 1.5,
+     "4@1": 2.0,
+     "4@2": 2.2,
+     "4@3": 2.6666666666666665,
+     "4@4": 2.2222222222222223,
+     "16@0.25": 3.0,
+     "16@0.5": 2.0,
+     "16@1": 1.75,
+     "16@2": 1.8571428571428572,
+     "16@3": 1.5,
+     "16@4": 1.5625,
+     "64@0.25": 1.5,
+     "64@0.5": 1.3333333333333333,
+     "64@1": 1.4,
+     "64@2": 1.3,
+     "64@3": 1.0555555555555556,
+     "64@4": 1.0384615384615385
+    },
+    "decided": true,
+    "min_ratio": 1.5,
+    "holds": true
+   },
+   "B": {
+    "points": 24,
+    "median_ratio": 2.0,
+    "ratios": {
+     "1@0.25": 2.0,
+     "1@0.5": 2.0,
+     "1@1": 2.0,
+     "1@2": 2.4,
+     "1@3": 2.6666666666666665,
+     "1@4": 3.0,
+     "4@0.25": 2.0,
+     "4@0.5": 2.0,
+     "4@1": 2.0,
+     "4@2": 2.4,
+     "4@3": 2.8333333333333335,
+     "4@4": 2.875,
+     "16@0.25": 3.0,
+     "16@0.5": 2.0,
+     "16@1": 1.75,
+     "16@2": 2.0,
+     "16@3": 1.5833333333333333,
+     "16@4": 1.625,
+     "64@0.25": 1.5,
+     "64@0.5": 1.6666666666666667,
+     "64@1": 1.3333333333333333,
+     "64@2": 1.1666666666666667,
+     "64@3": 1.6153846153846154,
+     "64@4": 1.08
+    },
+    "decided": true,
+    "min_ratio": 1.5,
+    "holds": true
+   },
+   "C": {
+    "points": 24,
+    "median_ratio": 2.0,
+    "ratios": {
+     "1@0.25": 2.0,
+     "1@0.5": 2.0,
+     "1@1": 2.0,
+     "1@2": 2.4,
+     "1@3": 2.6666666666666665,
+     "1@4": 2.5,
+     "4@0.25": 2.0,
+     "4@0.5": 2.0,
+     "4@1": 2.0,
+     "4@2": 2.4,
+     "4@3": 2.5714285714285716,
+     "4@4": 2.4444444444444446,
+     "16@0.25": 3.0,
+     "16@0.5": 1.3333333333333333,
+     "16@1": 1.75,
+     "16@2": 1.625,
+     "16@3": 1.5833333333333333,
+     "16@4": 1.5294117647058822,
+     "64@0.25": 1.5,
+     "64@0.5": 1.6666666666666667,
+     "64@1": 1.3333333333333333,
+     "64@2": 1.1666666666666667,
+     "64@3": 1.1666666666666667,
+     "64@4": 1.0
+    },
+    "decided": true,
+    "min_ratio": 1.5,
+    "holds": true
+   }
+  },
+  "decided": true,
+  "holds": true
+ },
+ "binding": {
+  "cells": 432,
+  "per_token_half_adds_replicas": 309,
+  "same_count_under_both": 20,
+  "held_under_neither": 103
+ },
+ "agreement": {
+  "first_token": {
+   "cells": 144,
+   "identical": 90,
+   "within_one": 126,
+   "disagree_on_whether_held": 5,
+   "largest_spread_where_all_hold": 8,
+   "sticky_best_or_tied": {
+    "A": 20,
+    "B": 19,
+    "C": 19
+   },
+   "points": 24,
+   "sticky_best_or_tied_on_all": 17
+  },
+  "two_part": {
+   "cells": 144,
+   "identical": 81,
+   "within_one": 121,
+   "disagree_on_whether_held": 6,
+   "largest_spread_where_all_hold": 5,
+   "sticky_best_or_tied": {
+    "A": 18,
+    "B": 22,
+    "C": 22
+   },
+   "points": 24,
+   "sticky_best_or_tied_on_all": 16
+  }
+ },
+ "h2b_exploratory": {
+  "two_part": {
+   "A": {
+    "affinity_wins_at_k_min": [],
+    "affinity_wins_at_k_max": [
+     "4"
+    ],
+    "reversals": [],
+    "holds": true
+   },
+   "B": {
+    "affinity_wins_at_k_min": [],
+    "affinity_wins_at_k_max": [
+     "0.5"
+    ],
+    "reversals": [],
+    "holds": true
+   },
+   "C": {
+    "affinity_wins_at_k_min": [],
+    "affinity_wins_at_k_max": [
+     "1"
+    ],
+    "reversals": [
+     [
+      "4",
+      "16",
+      "64"
+     ]
+    ],
+    "holds": false
+   }
+  },
+  "first_token": {
+   "A": {
+    "affinity_wins_at_k_min": [],
+    "affinity_wins_at_k_max": [
+     "3",
+     "4"
+    ],
+    "reversals": [],
+    "holds": true
+   },
+   "B": {
+    "affinity_wins_at_k_min": [],
+    "affinity_wins_at_k_max": [
+     "2",
+     "4"
+    ],
+    "reversals": [],
+    "holds": true
+   },
+   "C": {
+    "affinity_wins_at_k_min": [],
+    "affinity_wins_at_k_max": [
+     "1",
+     "2",
+     "4"
+    ],
+    "reversals": [],
+    "holds": true
+   }
+  }
+ },
+ "other_limits": {
+  "150": {
+   "required": {
+    "A": {
+     "1": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 33
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 3,
+       "least-loaded": 3,
+       "radix-affinity": 33
+      },
+      "1": {
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 6,
+       "least-loaded": 6,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 8,
+       "radix-affinity-balanced@16": 10,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 11,
+       "least-loaded": 11,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 11,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 16,
+       "least-loaded": 16,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 13,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 21,
+       "least-loaded": 20,
+       "radix-affinity": 33
+      }
+     },
+     "4": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 3,
+       "least-loaded": 3,
+       "radix-affinity": 33
+      },
+      "1": {
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 6,
+       "least-loaded": 6,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 8,
+       "radix-affinity-balanced@16": 9,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 11,
+       "least-loaded": 11,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 11,
+       "radix-affinity-balanced@16": 16,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 16,
+       "least-loaded": 16,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 14,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 21,
+       "least-loaded": 22,
+       "radix-affinity": 33
+      }
+     },
+     "16": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 3,
+       "round-robin": 4,
+       "least-loaded": 4,
+       "radix-affinity": 3
+      },
+      "1": {
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 8,
+       "least-loaded": 9,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 9,
+       "radix-affinity-balanced@16": 9,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 16,
+       "least-loaded": 21,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 13,
+       "radix-affinity-balanced@16": 16,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 24,
+       "least-loaded": 32,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 19,
+       "radix-affinity-balanced@16": 20,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 31,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      }
+     },
+     "64": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 3,
+       "least-loaded": 3,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 4,
+       "round-robin": 5,
+       "least-loaded": 7,
+       "radix-affinity": 4
+      },
+      "1": {
+       "session-sticky": 6,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 10,
+       "least-loaded": 13,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 10,
+       "radix-affinity-balanced@16": 11,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 20,
+       "least-loaded": 27,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 18,
+       "radix-affinity-balanced@16": 17,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 28,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 26,
+       "radix-affinity-balanced@16": 22,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 33,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      }
+     }
+    },
+    "B": {
+     "1": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 33
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 4,
+       "least-loaded": 3,
+       "radix-affinity": 33
+      },
+      "1": {
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 6,
+       "least-loaded": 6,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 8,
+       "radix-affinity-balanced@16": 26,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 12,
+       "least-loaded": 11,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 11,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 16,
+       "least-loaded": 16,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 14,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 21,
+       "least-loaded": 20,
+       "radix-affinity": 33
+      }
+     },
+     "4": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 4,
+       "least-loaded": 3,
+       "radix-affinity": 33
+      },
+      "1": {
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 6,
+       "least-loaded": 6,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 8,
+       "radix-affinity-balanced@16": 9,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 12,
+       "least-loaded": 11,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 12,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 17,
+       "least-loaded": 16,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 15,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 22,
+       "least-loaded": 25,
+       "radix-affinity": 33
+      }
+     },
+     "16": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 3,
+       "round-robin": 4,
+       "least-loaded": 5,
+       "radix-affinity": 3
+      },
+      "1": {
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 9,
+       "least-loaded": 10,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 9,
+       "radix-affinity-balanced@16": 9,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 16,
+       "least-loaded": 23,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 14,
+       "radix-affinity-balanced@16": 16,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 24,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 18,
+       "radix-affinity-balanced@16": 21,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 31,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      }
+     },
+     "64": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 3,
+       "least-loaded": 4,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 4,
+       "radix-affinity-balanced@1": 4,
+       "round-robin": 6,
+       "least-loaded": 7,
+       "radix-affinity": 4
+      },
+      "1": {
+       "session-sticky": 6,
+       "radix-affinity-balanced@16": 6,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 10,
+       "least-loaded": 14,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 12,
+       "radix-affinity-balanced@16": 11,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 22,
+       "least-loaded": 28,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 20,
+       "radix-affinity-balanced@16": 18,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 29,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 25,
+       "radix-affinity-balanced@16": 22,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 33,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      }
+     }
+    },
+    "C": {
+     "1": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 33
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 4,
+       "least-loaded": 3,
+       "radix-affinity": 33
+      },
+      "1": {
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 6,
+       "least-loaded": 6,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 8,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 12,
+       "least-loaded": 11,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 12,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 17,
+       "least-loaded": 17,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 14,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 21,
+       "least-loaded": 20,
+       "radix-affinity": 33
+      }
+     },
+     "4": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 4,
+       "least-loaded": 3,
+       "radix-affinity": 33
+      },
+      "1": {
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 6,
+       "least-loaded": 6,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 8,
+       "radix-affinity-balanced@16": 10,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 12,
+       "least-loaded": 11,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 12,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 17,
+       "least-loaded": 16,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 15,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 22,
+       "least-loaded": 25,
+       "radix-affinity": 33
+      }
+     },
+     "16": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 3,
+       "round-robin": 4,
+       "least-loaded": 5,
+       "radix-affinity": 3
+      },
+      "1": {
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 9,
+       "least-loaded": 10,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 10,
+       "radix-affinity-balanced@16": 9,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 16,
+       "least-loaded": 24,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 14,
+       "radix-affinity-balanced@16": 17,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 25,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 18,
+       "radix-affinity-balanced@16": 25,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 32,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      }
+     },
+     "64": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 3,
+       "least-loaded": 4,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 4,
+       "radix-affinity-balanced@1": 4,
+       "round-robin": 6,
+       "least-loaded": 8,
+       "radix-affinity": 4
+      },
+      "1": {
+       "session-sticky": 6,
+       "radix-affinity-balanced@16": 6,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 10,
+       "least-loaded": 16,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 12,
+       "radix-affinity-balanced@16": 10,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 22,
+       "least-loaded": 31,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 18,
+       "radix-affinity-balanced@16": 18,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 31,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 27,
+       "radix-affinity-balanced@16": 24,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 33,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      }
+     }
+    }
+   },
+   "t2c_median_ratio": {
+    "A": 1.5,
+    "B": 1.5192307692307692,
+    "C": 1.5
+   },
+   "sticky_best_or_tied": {
+    "A": 21,
+    "B": 21,
+    "C": 21
+   },
+   "h2b": {
+    "A": true,
+    "B": true,
+    "C": true
+   }
+  },
+  "200": {
+   "required": {
+    "A": {
+     "1": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 33
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 3,
+       "least-loaded": 3,
+       "radix-affinity": 33
+      },
+      "1": {
+       "session-sticky": 4,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 5,
+       "least-loaded": 5,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 7,
+       "radix-affinity-balanced@16": 10,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 10,
+       "least-loaded": 11,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 10,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 14,
+       "least-loaded": 14,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 12,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 18,
+       "least-loaded": 17,
+       "radix-affinity": 33
+      }
+     },
+     "4": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 3,
+       "round-robin": 3,
+       "least-loaded": 3,
+       "radix-affinity": 3
+      },
+      "1": {
+       "session-sticky": 4,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 5,
+       "least-loaded": 5,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 7,
+       "radix-affinity-balanced@16": 9,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 10,
+       "least-loaded": 10,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 10,
+       "radix-affinity-balanced@16": 16,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 14,
+       "least-loaded": 15,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 13,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 19,
+       "least-loaded": 22,
+       "radix-affinity": 33
+      }
+     },
+     "16": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 3,
+       "round-robin": 4,
+       "least-loaded": 4,
+       "radix-affinity": 3
+      },
+      "1": {
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 7,
+       "least-loaded": 9,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 8,
+       "radix-affinity-balanced@16": 9,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 13,
+       "least-loaded": 21,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 12,
+       "radix-affinity-balanced@16": 16,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 19,
+       "least-loaded": 32,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 16,
+       "radix-affinity-balanced@16": 20,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 26,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      }
+     },
+     "64": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 3,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 3,
+       "round-robin": 5,
+       "least-loaded": 7,
+       "radix-affinity": 3
+      },
+      "1": {
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 9,
+       "least-loaded": 13,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 10,
+       "radix-affinity-balanced@16": 11,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 17,
+       "least-loaded": 27,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 18,
+       "radix-affinity-balanced@16": 17,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 25,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 26,
+       "radix-affinity-balanced@16": 22,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 33,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      }
+     }
+    },
+    "B": {
+     "1": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 33
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 3,
+       "least-loaded": 3,
+       "radix-affinity": 33
+      },
+      "1": {
+       "session-sticky": 4,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 5,
+       "least-loaded": 6,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 7,
+       "radix-affinity-balanced@16": 26,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 10,
+       "least-loaded": 10,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 10,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 14,
+       "least-loaded": 14,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 12,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 18,
+       "least-loaded": 18,
+       "radix-affinity": 33
+      }
+     },
+     "4": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 3,
+       "round-robin": 3,
+       "least-loaded": 3,
+       "radix-affinity": 3
+      },
+      "1": {
+       "session-sticky": 4,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 5,
+       "least-loaded": 6,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 8,
+       "radix-affinity-balanced@16": 9,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 10,
+       "least-loaded": 10,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 10,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 15,
+       "least-loaded": 16,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 13,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 19,
+       "least-loaded": 25,
+       "radix-affinity": 33
+      }
+     },
+     "16": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 3,
+       "round-robin": 4,
+       "least-loaded": 5,
+       "radix-affinity": 3
+      },
+      "1": {
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 7,
+       "least-loaded": 10,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 8,
+       "radix-affinity-balanced@16": 9,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 13,
+       "least-loaded": 23,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 12,
+       "radix-affinity-balanced@16": 16,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 20,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 16,
+       "radix-affinity-balanced@16": 21,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 26,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      }
+     },
+     "64": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 4,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 3,
+       "round-robin": 5,
+       "least-loaded": 7,
+       "radix-affinity": 3
+      },
+      "1": {
+       "session-sticky": 6,
+       "radix-affinity-balanced@16": 6,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 9,
+       "least-loaded": 14,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 12,
+       "radix-affinity-balanced@16": 11,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 18,
+       "least-loaded": 28,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 13,
+       "radix-affinity-balanced@16": 18,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 26,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 25,
+       "radix-affinity-balanced@16": 22,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 33,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      }
+     }
+    },
+    "C": {
+     "1": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 33
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 3,
+       "least-loaded": 3,
+       "radix-affinity": 33
+      },
+      "1": {
+       "session-sticky": 4,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 5,
+       "least-loaded": 6,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 7,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 10,
+       "least-loaded": 10,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 10,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 15,
+       "least-loaded": 14,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 12,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 19,
+       "least-loaded": 18,
+       "radix-affinity": 33
+      }
+     },
+     "4": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 3,
+       "round-robin": 3,
+       "least-loaded": 3,
+       "radix-affinity": 3
+      },
+      "1": {
+       "session-sticky": 4,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 5,
+       "least-loaded": 5,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 7,
+       "radix-affinity-balanced@16": 10,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 10,
+       "least-loaded": 11,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 11,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 15,
+       "least-loaded": 16,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 13,
+       "radix-affinity-balanced@16": 33,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 19,
+       "least-loaded": 25,
+       "radix-affinity": 33
+      }
+     },
+     "16": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 2,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 3,
+       "round-robin": 4,
+       "least-loaded": 5,
+       "radix-affinity": 3
+      },
+      "1": {
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 7,
+       "least-loaded": 10,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 8,
+       "radix-affinity-balanced@16": 9,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 13,
+       "least-loaded": 24,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 12,
+       "radix-affinity-balanced@16": 17,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 20,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 17,
+       "radix-affinity-balanced@16": 25,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 31,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      }
+     },
+     "64": {
+      "0.25": {
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2,
+       "round-robin": 2,
+       "least-loaded": 4,
+       "radix-affinity": 2
+      },
+      "0.5": {
+       "session-sticky": 3,
+       "radix-affinity-balanced@16": 3,
+       "radix-affinity-balanced@1": 3,
+       "round-robin": 5,
+       "least-loaded": 8,
+       "radix-affinity": 3
+      },
+      "1": {
+       "session-sticky": 6,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 9,
+       "least-loaded": 16,
+       "radix-affinity": 33
+      },
+      "2": {
+       "session-sticky": 12,
+       "radix-affinity-balanced@16": 10,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 21,
+       "least-loaded": 31,
+       "radix-affinity": 33
+      },
+      "3": {
+       "session-sticky": 18,
+       "radix-affinity-balanced@16": 18,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 31,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      },
+      "4": {
+       "session-sticky": 27,
+       "radix-affinity-balanced@16": 24,
+       "radix-affinity-balanced@1": 33,
+       "round-robin": 33,
+       "least-loaded": 33,
+       "radix-affinity": 33
+      }
+     }
+    }
+   },
+   "t2c_median_ratio": {
+    "A": 1.3666666666666667,
+    "B": 1.3666666666666667,
+    "C": 1.3333333333333333
+   },
+   "sticky_best_or_tied": {
+    "A": 22,
+    "B": 22,
+    "C": 21
+   },
+   "h2b": {
+    "A": true,
+    "B": true,
+    "C": true
+   }
+  }
+ },
+ "hit_rate_at_8": {
+  "A": {
+   "1": {
+    "0.25": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.9105,
+     "radix-affinity-balanced@1": 0.9237,
+     "round-robin": 0.8158,
+     "least-loaded": 0.8154,
+     "radix-affinity": 0.9237
+    },
+    "0.5": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.8987,
+     "radix-affinity-balanced@1": 0.918,
+     "round-robin": 0.8218,
+     "least-loaded": 0.8162,
+     "radix-affinity": 0.9237
+    },
+    "1": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.8844,
+     "radix-affinity-balanced@1": 0.9044,
+     "round-robin": 0.8146,
+     "least-loaded": 0.8175,
+     "radix-affinity": 0.9237
+    },
+    "2": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.8614,
+     "radix-affinity-balanced@1": 0.8703,
+     "round-robin": 0.8144,
+     "least-loaded": 0.8165,
+     "radix-affinity": 0.9237
+    },
+    "3": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.8625,
+     "radix-affinity-balanced@1": 0.8314,
+     "round-robin": 0.818,
+     "least-loaded": 0.8166,
+     "radix-affinity": 0.8565
+    },
+    "4": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.8776,
+     "radix-affinity-balanced@1": 0.8236,
+     "round-robin": 0.815,
+     "least-loaded": 0.8165,
+     "radix-affinity": 0.8168
+    }
+   },
+   "4": {
+    "0.25": {
+     "session-sticky": 0.8927,
+     "radix-affinity-balanced@16": 0.9175,
+     "radix-affinity-balanced@1": 0.9207,
+     "round-robin": 0.7918,
+     "least-loaded": 0.792,
+     "radix-affinity": 0.9207
+    },
+    "0.5": {
+     "session-sticky": 0.8927,
+     "radix-affinity-balanced@16": 0.9141,
+     "radix-affinity-balanced@1": 0.9207,
+     "round-robin": 0.7978,
+     "least-loaded": 0.7913,
+     "radix-affinity": 0.9207
+    },
+    "1": {
+     "session-sticky": 0.8927,
+     "radix-affinity-balanced@16": 0.9023,
+     "radix-affinity-balanced@1": 0.9175,
+     "round-robin": 0.7898,
+     "least-loaded": 0.7938,
+     "radix-affinity": 0.9207
+    },
+    "2": {
+     "session-sticky": 0.893,
+     "radix-affinity-balanced@16": 0.8656,
+     "radix-affinity-balanced@1": 0.9083,
+     "round-robin": 0.7904,
+     "least-loaded": 0.7936,
+     "radix-affinity": 0.9207
+    },
+    "3": {
+     "session-sticky": 0.8927,
+     "radix-affinity-balanced@16": 0.859,
+     "radix-affinity-balanced@1": 0.9031,
+     "round-robin": 0.794,
+     "least-loaded": 0.7928,
+     "radix-affinity": 0.9207
+    },
+    "4": {
+     "session-sticky": 0.8927,
+     "radix-affinity-balanced@16": 0.8735,
+     "radix-affinity-balanced@1": 0.8869,
+     "round-robin": 0.791,
+     "least-loaded": 0.7935,
+     "radix-affinity": 0.9207
+    }
+   },
+   "16": {
+    "0.25": {
+     "session-sticky": 0.8386,
+     "radix-affinity-balanced@16": 0.9087,
+     "radix-affinity-balanced@1": 0.9087,
+     "round-robin": 0.6569,
+     "least-loaded": 0.6621,
+     "radix-affinity": 0.9087
+    },
+    "0.5": {
+     "session-sticky": 0.8406,
+     "radix-affinity-balanced@16": 0.9029,
+     "radix-affinity-balanced@1": 0.9087,
+     "round-robin": 0.6722,
+     "least-loaded": 0.6625,
+     "radix-affinity": 0.9087
+    },
+    "1": {
+     "session-sticky": 0.8434,
+     "radix-affinity-balanced@16": 0.8945,
+     "radix-affinity-balanced@1": 0.9087,
+     "round-robin": 0.6479,
+     "least-loaded": 0.6599,
+     "radix-affinity": 0.9087
+    },
+    "2": {
+     "session-sticky": 0.8448,
+     "radix-affinity-balanced@16": 0.8613,
+     "radix-affinity-balanced@1": 0.903,
+     "round-robin": 0.6478,
+     "least-loaded": 0.6613,
+     "radix-affinity": 0.9087
+    },
+    "3": {
+     "session-sticky": 0.8427,
+     "radix-affinity-balanced@16": 0.8367,
+     "radix-affinity-balanced@1": 0.892,
+     "round-robin": 0.6648,
+     "least-loaded": 0.6591,
+     "radix-affinity": 0.9087
+    },
+    "4": {
+     "session-sticky": 0.8452,
+     "radix-affinity-balanced@16": 0.859,
+     "radix-affinity-balanced@1": 0.8874,
+     "round-robin": 0.6486,
+     "least-loaded": 0.6598,
+     "radix-affinity": 0.9087
+    }
+   },
+   "64": {
+    "0.25": {
+     "session-sticky": 0.7978,
+     "radix-affinity-balanced@16": 0.876,
+     "radix-affinity-balanced@1": 0.876,
+     "round-robin": 0.467,
+     "least-loaded": 0.4927,
+     "radix-affinity": 0.876
+    },
+    "0.5": {
+     "session-sticky": 0.8001,
+     "radix-affinity-balanced@16": 0.8735,
+     "radix-affinity-balanced@1": 0.8767,
+     "round-robin": 0.4949,
+     "least-loaded": 0.4913,
+     "radix-affinity": 0.8767
+    },
+    "1": {
+     "session-sticky": 0.7989,
+     "radix-affinity-balanced@16": 0.863,
+     "radix-affinity-balanced@1": 0.8767,
+     "round-robin": 0.4651,
+     "least-loaded": 0.4801,
+     "radix-affinity": 0.8767
+    },
+    "2": {
+     "session-sticky": 0.8039,
+     "radix-affinity-balanced@16": 0.8257,
+     "radix-affinity-balanced@1": 0.8728,
+     "round-robin": 0.4675,
+     "least-loaded": 0.4859,
+     "radix-affinity": 0.8767
+    },
+    "3": {
+     "session-sticky": 0.8044,
+     "radix-affinity-balanced@16": 0.7991,
+     "radix-affinity-balanced@1": 0.8714,
+     "round-robin": 0.4777,
+     "least-loaded": 0.4745,
+     "radix-affinity": 0.8767
+    },
+    "4": {
+     "session-sticky": 0.7868,
+     "radix-affinity-balanced@16": 0.8169,
+     "radix-affinity-balanced@1": 0.8684,
+     "round-robin": 0.4573,
+     "least-loaded": 0.4686,
+     "radix-affinity": 0.8767
+    }
+   }
+  },
+  "B": {
+   "1": {
+    "0.25": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.9089,
+     "radix-affinity-balanced@1": 0.9237,
+     "round-robin": 0.8158,
+     "least-loaded": 0.8163,
+     "radix-affinity": 0.9237
+    },
+    "0.5": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.8991,
+     "radix-affinity-balanced@1": 0.9185,
+     "round-robin": 0.8218,
+     "least-loaded": 0.8145,
+     "radix-affinity": 0.9237
+    },
+    "1": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.8822,
+     "radix-affinity-balanced@1": 0.9003,
+     "round-robin": 0.8146,
+     "least-loaded": 0.8196,
+     "radix-affinity": 0.9237
+    },
+    "2": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.8562,
+     "radix-affinity-balanced@1": 0.8694,
+     "round-robin": 0.8144,
+     "least-loaded": 0.8168,
+     "radix-affinity": 0.9237
+    },
+    "3": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.8628,
+     "radix-affinity-balanced@1": 0.8323,
+     "round-robin": 0.818,
+     "least-loaded": 0.8178,
+     "radix-affinity": 0.8558
+    },
+    "4": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.8776,
+     "radix-affinity-balanced@1": 0.8238,
+     "round-robin": 0.815,
+     "least-loaded": 0.8181,
+     "radix-affinity": 0.8168
+    }
+   },
+   "4": {
+    "0.25": {
+     "session-sticky": 0.8927,
+     "radix-affinity-balanced@16": 0.9181,
+     "radix-affinity-balanced@1": 0.9207,
+     "round-robin": 0.7918,
+     "least-loaded": 0.7932,
+     "radix-affinity": 0.9207
+    },
+    "0.5": {
+     "session-sticky": 0.8927,
+     "radix-affinity-balanced@16": 0.9145,
+     "radix-affinity-balanced@1": 0.9207,
+     "round-robin": 0.7978,
+     "least-loaded": 0.7905,
+     "radix-affinity": 0.9207
+    },
+    "1": {
+     "session-sticky": 0.893,
+     "radix-affinity-balanced@16": 0.9011,
+     "radix-affinity-balanced@1": 0.9166,
+     "round-robin": 0.7898,
+     "least-loaded": 0.7969,
+     "radix-affinity": 0.9207
+    },
+    "2": {
+     "session-sticky": 0.8927,
+     "radix-affinity-balanced@16": 0.8701,
+     "radix-affinity-balanced@1": 0.9078,
+     "round-robin": 0.7904,
+     "least-loaded": 0.794,
+     "radix-affinity": 0.9207
+    },
+    "3": {
+     "session-sticky": 0.8927,
+     "radix-affinity-balanced@16": 0.8537,
+     "radix-affinity-balanced@1": 0.9029,
+     "round-robin": 0.794,
+     "least-loaded": 0.7932,
+     "radix-affinity": 0.9207
+    },
+    "4": {
+     "session-sticky": 0.8934,
+     "radix-affinity-balanced@16": 0.8785,
+     "radix-affinity-balanced@1": 0.887,
+     "round-robin": 0.791,
+     "least-loaded": 0.7936,
+     "radix-affinity": 0.9207
+    }
+   },
+   "16": {
+    "0.25": {
+     "session-sticky": 0.8445,
+     "radix-affinity-balanced@16": 0.9087,
+     "radix-affinity-balanced@1": 0.9087,
+     "round-robin": 0.6569,
+     "least-loaded": 0.6648,
+     "radix-affinity": 0.9087
+    },
+    "0.5": {
+     "session-sticky": 0.8439,
+     "radix-affinity-balanced@16": 0.9035,
+     "radix-affinity-balanced@1": 0.9087,
+     "round-robin": 0.6723,
+     "least-loaded": 0.6635,
+     "radix-affinity": 0.9087
+    },
+    "1": {
+     "session-sticky": 0.8439,
+     "radix-affinity-balanced@16": 0.8894,
+     "radix-affinity-balanced@1": 0.9087,
+     "round-robin": 0.648,
+     "least-loaded": 0.6678,
+     "radix-affinity": 0.9087
+    },
+    "2": {
+     "session-sticky": 0.8415,
+     "radix-affinity-balanced@16": 0.8551,
+     "radix-affinity-balanced@1": 0.9028,
+     "round-robin": 0.6477,
+     "least-loaded": 0.6565,
+     "radix-affinity": 0.9087
+    },
+    "3": {
+     "session-sticky": 0.843,
+     "radix-affinity-balanced@16": 0.8397,
+     "radix-affinity-balanced@1": 0.8915,
+     "round-robin": 0.6648,
+     "least-loaded": 0.6614,
+     "radix-affinity": 0.9087
+    },
+    "4": {
+     "session-sticky": 0.8427,
+     "radix-affinity-balanced@16": 0.8631,
+     "radix-affinity-balanced@1": 0.8855,
+     "round-robin": 0.6486,
+     "least-loaded": 0.6574,
+     "radix-affinity": 0.9087
+    }
+   },
+   "64": {
+    "0.25": {
+     "session-sticky": 0.8026,
+     "radix-affinity-balanced@16": 0.8767,
+     "radix-affinity-balanced@1": 0.8767,
+     "round-robin": 0.467,
+     "least-loaded": 0.4906,
+     "radix-affinity": 0.8767
+    },
+    "0.5": {
+     "session-sticky": 0.8023,
+     "radix-affinity-balanced@16": 0.8724,
+     "radix-affinity-balanced@1": 0.8767,
+     "round-robin": 0.4949,
+     "least-loaded": 0.4942,
+     "radix-affinity": 0.8767
+    },
+    "1": {
+     "session-sticky": 0.8004,
+     "radix-affinity-balanced@16": 0.8585,
+     "radix-affinity-balanced@1": 0.8767,
+     "round-robin": 0.4651,
+     "least-loaded": 0.4757,
+     "radix-affinity": 0.8767
+    },
+    "2": {
+     "session-sticky": 0.8019,
+     "radix-affinity-balanced@16": 0.8299,
+     "radix-affinity-balanced@1": 0.8722,
+     "round-robin": 0.4675,
+     "least-loaded": 0.4838,
+     "radix-affinity": 0.8767
+    },
+    "3": {
+     "session-sticky": 0.8041,
+     "radix-affinity-balanced@16": 0.802,
+     "radix-affinity-balanced@1": 0.8714,
+     "round-robin": 0.4777,
+     "least-loaded": 0.4669,
+     "radix-affinity": 0.8767
+    },
+    "4": {
+     "session-sticky": 0.799,
+     "radix-affinity-balanced@16": 0.8342,
+     "radix-affinity-balanced@1": 0.8685,
+     "round-robin": 0.4573,
+     "least-loaded": 0.4585,
+     "radix-affinity": 0.8767
+    }
+   }
+  },
+  "C": {
+   "1": {
+    "0.25": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.9077,
+     "radix-affinity-balanced@1": 0.9237,
+     "round-robin": 0.8158,
+     "least-loaded": 0.8168,
+     "radix-affinity": 0.9237
+    },
+    "0.5": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.8978,
+     "radix-affinity-balanced@1": 0.9188,
+     "round-robin": 0.8218,
+     "least-loaded": 0.8145,
+     "radix-affinity": 0.9237
+    },
+    "1": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.881,
+     "radix-affinity-balanced@1": 0.8957,
+     "round-robin": 0.8146,
+     "least-loaded": 0.8189,
+     "radix-affinity": 0.9237
+    },
+    "2": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.8541,
+     "radix-affinity-balanced@1": 0.8633,
+     "round-robin": 0.8144,
+     "least-loaded": 0.8173,
+     "radix-affinity": 0.9237
+    },
+    "3": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.8634,
+     "radix-affinity-balanced@1": 0.8303,
+     "round-robin": 0.818,
+     "least-loaded": 0.8176,
+     "radix-affinity": 0.8568
+    },
+    "4": {
+     "session-sticky": 0.9167,
+     "radix-affinity-balanced@16": 0.8782,
+     "radix-affinity-balanced@1": 0.8216,
+     "round-robin": 0.815,
+     "least-loaded": 0.8174,
+     "radix-affinity": 0.8168
+    }
+   },
+   "4": {
+    "0.25": {
+     "session-sticky": 0.893,
+     "radix-affinity-balanced@16": 0.918,
+     "radix-affinity-balanced@1": 0.9207,
+     "round-robin": 0.7918,
+     "least-loaded": 0.7935,
+     "radix-affinity": 0.9207
+    },
+    "0.5": {
+     "session-sticky": 0.893,
+     "radix-affinity-balanced@16": 0.9131,
+     "radix-affinity-balanced@1": 0.9207,
+     "round-robin": 0.7978,
+     "least-loaded": 0.792,
+     "radix-affinity": 0.9207
+    },
+    "1": {
+     "session-sticky": 0.893,
+     "radix-affinity-balanced@16": 0.9012,
+     "radix-affinity-balanced@1": 0.9168,
+     "round-robin": 0.7898,
+     "least-loaded": 0.7972,
+     "radix-affinity": 0.9207
+    },
+    "2": {
+     "session-sticky": 0.8927,
+     "radix-affinity-balanced@16": 0.8657,
+     "radix-affinity-balanced@1": 0.904,
+     "round-robin": 0.7904,
+     "least-loaded": 0.7928,
+     "radix-affinity": 0.9207
+    },
+    "3": {
+     "session-sticky": 0.893,
+     "radix-affinity-balanced@16": 0.8577,
+     "radix-affinity-balanced@1": 0.9028,
+     "round-robin": 0.794,
+     "least-loaded": 0.7936,
+     "radix-affinity": 0.9207
+    },
+    "4": {
+     "session-sticky": 0.8927,
+     "radix-affinity-balanced@16": 0.8785,
+     "radix-affinity-balanced@1": 0.8877,
+     "round-robin": 0.791,
+     "least-loaded": 0.7943,
+     "radix-affinity": 0.9207
+    }
+   },
+   "16": {
+    "0.25": {
+     "session-sticky": 0.8404,
+     "radix-affinity-balanced@16": 0.9087,
+     "radix-affinity-balanced@1": 0.9087,
+     "round-robin": 0.6569,
+     "least-loaded": 0.6514,
+     "radix-affinity": 0.9087
+    },
+    "0.5": {
+     "session-sticky": 0.843,
+     "radix-affinity-balanced@16": 0.9036,
+     "radix-affinity-balanced@1": 0.9087,
+     "round-robin": 0.6723,
+     "least-loaded": 0.6575,
+     "radix-affinity": 0.9087
+    },
+    "1": {
+     "session-sticky": 0.8401,
+     "radix-affinity-balanced@16": 0.8883,
+     "radix-affinity-balanced@1": 0.9087,
+     "round-robin": 0.648,
+     "least-loaded": 0.669,
+     "radix-affinity": 0.9087
+    },
+    "2": {
+     "session-sticky": 0.84,
+     "radix-affinity-balanced@16": 0.8533,
+     "radix-affinity-balanced@1": 0.9027,
+     "round-robin": 0.6475,
+     "least-loaded": 0.6639,
+     "radix-affinity": 0.9087
+    },
+    "3": {
+     "session-sticky": 0.847,
+     "radix-affinity-balanced@16": 0.8466,
+     "radix-affinity-balanced@1": 0.8915,
+     "round-robin": 0.6648,
+     "least-loaded": 0.6601,
+     "radix-affinity": 0.9087
+    },
+    "4": {
+     "session-sticky": 0.8445,
+     "radix-affinity-balanced@16": 0.8608,
+     "radix-affinity-balanced@1": 0.8854,
+     "round-robin": 0.6486,
+     "least-loaded": 0.66,
+     "radix-affinity": 0.9087
+    }
+   },
+   "64": {
+    "0.25": {
+     "session-sticky": 0.8005,
+     "radix-affinity-balanced@16": 0.8761,
+     "radix-affinity-balanced@1": 0.8761,
+     "round-robin": 0.467,
+     "least-loaded": 0.4969,
+     "radix-affinity": 0.8761
+    },
+    "0.5": {
+     "session-sticky": 0.801,
+     "radix-affinity-balanced@16": 0.8714,
+     "radix-affinity-balanced@1": 0.8767,
+     "round-robin": 0.4949,
+     "least-loaded": 0.494,
+     "radix-affinity": 0.8767
+    },
+    "1": {
+     "session-sticky": 0.8033,
+     "radix-affinity-balanced@16": 0.8635,
+     "radix-affinity-balanced@1": 0.8767,
+     "round-robin": 0.4651,
+     "least-loaded": 0.4796,
+     "radix-affinity": 0.8767
+    },
+    "2": {
+     "session-sticky": 0.8057,
+     "radix-affinity-balanced@16": 0.8235,
+     "radix-affinity-balanced@1": 0.8735,
+     "round-robin": 0.4674,
+     "least-loaded": 0.4776,
+     "radix-affinity": 0.8767
+    },
+    "3": {
+     "session-sticky": 0.8063,
+     "radix-affinity-balanced@16": 0.8107,
+     "radix-affinity-balanced@1": 0.8699,
+     "round-robin": 0.4777,
+     "least-loaded": 0.4726,
+     "radix-affinity": 0.8767
+    },
+    "4": {
+     "session-sticky": 0.7997,
+     "radix-affinity-balanced@16": 0.8234,
+     "radix-affinity-balanced@1": 0.8678,
+     "round-robin": 0.4573,
+     "least-loaded": 0.4665,
+     "radix-affinity": 0.8767
+    }
+   }
+  }
+ },
+ "predicted_outcomes": {
+  "t2a": "holds",
+  "t2b": "holds",
+  "t2c": "holds"
+ }
+}

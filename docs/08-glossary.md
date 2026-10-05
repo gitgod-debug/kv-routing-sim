@@ -13,7 +13,8 @@ this file is for looking one up.
 | **Prefill** | The parallel pass over the whole prompt. **Compute-bound.** The part prefix caching can skip. |
 | **Decode** | Generating one token at a time over the cache. **Memory-bandwidth-bound.** Cannot be skipped. |
 | **TTFT** | Time to first token = queueing + prefill. **The metric routing moves.** |
-| **TBT / ITL** | Time between tokens / inter-token latency. Decode-bound; barely affected by routing. |
+| **TBT / ITL** | Time between tokens / inter-token latency: the gap between two consecutive tokens of one request. ⚠️ This table said "barely affected by routing" until 2026-10-05. Wrong on both counts: the step that prefills an arriving request carries everyone else's next token too, and routing decides how many sequences share a step. Under a target with both halves, the per-token half is the one that binds (T2). |
+| **TPOT** | Time per output token, per request: (last token − first token) ÷ (tokens − 1) — the mean of that request's inter-token gaps. MLPerf's second latency limit, vLLM's `request_time_per_output_token`, and the per-token half of the SLO here (`slo.tpot_p95_ms`). |
 | **PagedAttention** | vLLM's KV cache in fixed-size **blocks** with a per-sequence block table, like virtual memory. Makes blocks shareable. |
 | **Block** | The unit of KV cache allocation and sharing, commonly 16 tokens. Partial blocks are **not** shared. |
 | **APC** | vLLM's **Automatic Prefix Caching** — hash each block, reuse resident matches. |

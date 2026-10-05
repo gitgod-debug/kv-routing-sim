@@ -95,10 +95,34 @@ the README.
   enough (a second run was 4.2× off on one number). And the speed target covers only the first
   token: the engine took 134–521 ms per token, and the rule the target came from allows 100.
 
+### The same evening: the second speed
+
+Until that day the project measured one speed: how long until the *first* word of an answer. The
+live engine had shown the other one — how fast the rest of the words come — at 134 to 521 ms per
+token, where the rule we cite allows 100. So I registered two tests and ran them without a GPU.
+
+- **T1: is the simulator right about the second speed? I predicted yes. It failed.** Within 7% on
+  three real runs; 1.5–1.7× too slow on the two where the GPU was at its limit.
+- **T2: with a target for both speeds, what happens to the finding? I predicted three things, and
+  all three came true, on all three calibrations.** The GPU counts about double (1.9–2.0×). And
+  "keep each user on one GPU" still wins.
+- **How I report a result that rests on a failed check:** the registration said, before either
+  test ran, that if T1 failed, no GPU count from T2 would be offered as sizing advice. So the
+  README gives the factor, says it is the model's answer and not a checked one, and prints no
+  table of those counts.
+- **And my own slip:** I edited code while the long run was going. It could not have changed the
+  result, but two result files say "the folder was not clean". I did not argue; I re-ran 720
+  random cells from a clean copy. All 720 matched. The rule is now written in the contributor
+  guide.
+
 ### Where the proof is
 
 | Claim | Proof |
 |---|---|
+| T1 failed: within 7% on three runs, 1.54× and 1.71× too slow on two | [`t1_itl/report.md`](../artifacts/results/t1_itl/report.md) — rules and the prediction "holds" in [`configs/tpot_slo.yaml`](../configs/tpot_slo.yaml), committed before the run |
+| T2: three rules hold on three calibrations; 1.93–2.00× | [`t2_two_part_slo/report.md`](../artifacts/results/t2_two_part_slo/report.md) — same config |
+| "If T1 fails, no count from T2 goes into the README as guidance" — written before the run | [`09-hypotheses.md`](09-hypotheses.md), the registration entry of 2026-10-05 |
+| 720 of 720 cells match from a clean copy | [`t2_two_part_slo/verification.json`](../artifacts/results/t2_two_part_slo/verification.json) |
 | C3a, C3b, C3c; the second run 4.2× off on one number | [`c3_kaggle_t4/report.md`](../artifacts/results/c3_kaggle_t4/report.md) — rules and predictions in [`configs/c3_calibrate.yaml`](../configs/c3_calibrate.yaml), committed before the run |
 | The test gives the opposite answer on a second calibration (122 of 144 counts equal, 141 within one) | the last section of the same report — a reported item listed in the config before the run |
 | Three calibrations: 102 of 144 equal, 138 within one; what survives all three | [`c3_kaggle_t4/posthoc_three_calibrations.md`](../artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.md) — done after the fact, and labelled so |

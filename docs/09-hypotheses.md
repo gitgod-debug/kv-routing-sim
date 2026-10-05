@@ -210,8 +210,8 @@ calibration cannot cash.
 | **C2** | Timing: decode slows with context (C2a); a busy second GPU slows the first (C2b); a context-aware model predicts held-out traffic within 2× (C2c) | C2 | `[x]` **2026-09-30, all three as predicted** — C2a ✅ 1.92× · C2b ⛔ 1.00× · C2c ✅ within 1.41× |
 | **C3** | The context-aware `kvsim calibrate` on a real GPU: it works (C3a); its profile predicts traffic it never saw within 2× (C3b); C2's profile predicts another day within 2×, from numbers registered before (C3c) | C3 | `[x]` ✅ **2026-10-05, all three as predicted** — C3a exact · C3b within 1.41× · C3c within 1.38× · ⚠️ reported: a second run of the command is 4.17× off on one number at the knee, and a second calibration reverses H2b's verdict |
 
-| **T1** | The simulator's per-token latency matches the engine's: mean inter-token latency within 1.5× on the five held-out runs on disk | T1 | `[~]` **registered 2026-10-05** — `configs/tpot_slo.yaml`; not run yet |
-| **T2** | Under a target with both halves (p95 TTFT ≤ 2 s **and** p95 time per output token ≤ 100 ms), on three calibrations: sticky still best or tied with 1 and 4 prompts (T2a), never worse than round-robin or least-loaded (T2b), and the first-token counts were optimistic by ≥ 1.5× (T2c) | T2 | `[~]` **registered 2026-10-05** — `configs/tpot_slo.yaml`; not run yet |
+| **T1** | The simulator's per-token latency matches the engine's: mean inter-token latency within 1.5× on the five held-out runs on disk | T1 | `[x]` ⛔ **DOES NOT HOLD 2026-10-05** (predicted: holds) — within 1.07× on the three runs off the knee, **1.54× and 1.71× too slow** on the two at it |
+| **T2** | Under a target with both halves (p95 TTFT ≤ 2 s **and** p95 time per output token ≤ 100 ms), on three calibrations: sticky still best or tied with 1 and 4 prompts (T2a), never worse than round-robin or least-loaded (T2b), and the first-token counts were optimistic by ≥ 1.5× (T2c) | T2 | `[x]` ✅ **2026-10-05, all three as predicted, on all three calibrations** — T2a 12 of 12 · T2b no exception · T2c 1.93–2.00× · ⚠️ these are the model's counts, and T1 says its per-token latency is unchecked where they live |
 
 **Amendments:** *(add dated entries below, never edit above)*
 
@@ -1425,3 +1425,137 @@ limit for Llama2-70b); and H2b's three rules under the two-part target — **exp
 **What this does not change.** The shipped default target stays the first token alone: every
 registered result so far is defined on it, and a default should not move ahead of its check. The
 simulator now *shows* p95 time per token in every report and says that it is not part of the SLO.
+
+### 2026-10-05 — ⛔ T1 RAN: DOES NOT HOLD. The per-token model is right off the knee and 1.5–1.7× too slow at it.
+Report: [`artifacts/results/t1_itl/report.md`](../artifacts/results/t1_itl/report.md), generated at
+the registration commit `0be7bec`.
+
+**As registered: does not hold — predicted to hold.** The simulator's mean inter-token latency
+against the engine's own counter, profile A, each run replayed at its real send times:
+
+| run | engine | simulator | factor |
+|---|---:|---:|---:|
+| C2 · `K1_half` | 470 ms | 804 ms | **1.71×** |
+| C2 · `K64_quarter` | 161 ms | 173 ms | 1.07× |
+| C3 · `K1_half` | 521 ms | 804 ms | **1.54×** |
+| C3 · `K64_quarter` | 174 ms | 173 ms | 1.01× |
+| C3 · `T6_K8` | 134 ms | 137 ms | 1.02× |
+
+The limit was 1.5×; two of five are past it. Both are the same workload — the one at the knee of
+the load curve, which the registration named as the one that could break it. The prediction was
+still "holds", and it was wrong.
+
+**Reported, not tested.** The two profiles `kvsim calibrate` wrote in C3 give the same picture on
+that session's traffic: 1.51× and 1.71× at `K1_half`, within 1.08× on the other two. In the
+simulator `K1_half` has 6 preemptions; the engine had none, in either session.
+
+**Read plainly:** off the knee the model's per-token latency is within 7% of a live engine on three
+runs in two sessions (within 8% with the command's two profiles) — closer than its first-token
+latency on the same runs (1.11–1.38×). At the knee it is 1.5–1.7× too **slow**: it has the engine
+falling off a cliff the real engine stayed on top of.
+
+**Post hoc — written after seeing the result, and labelled so**
+([`posthoc_range.md`](../artifacts/results/t1_itl/posthoc_range.md),
+`scripts/t1_posthoc_range.py`). The decode model is `step = d0 + d1·b + d2·S`, with S the batch's
+summed context. A calibration cell is b sequences with *unique* prompts, so S cannot exceed the KV
+cache (24,592 tokens): the largest S any cell ever measured is **20,200** (C2), and 16,960 for
+`kvsim calibrate`. Traffic that shares one system prompt stores it once — so far more sequences
+fit, and each still attends over its whole context. In the simulator's replay of `K1_half`,
+**97% of the tokens** are decoded in steps beyond the fitted range, at a median S of 160,000 —
+eight times past it. On the three runs that came out right, the median is inside the range
+(13,600–17,400), with a tail to 2–3× beyond.
+- So where T1 fails, the model is a straight line drawn eight times past its last data point. That
+  is a description of where the failure is, **not** a demonstrated cause: a small error elsewhere
+  could equally tip the model over the knee, where its own pile-up then feeds itself. Telling
+  those apart needs decode cells with a *shared* prefix, measured on a GPU.
+- One consequence that is arithmetic, not evidence: a configuration that meets a 100 ms per-token
+  limit has steps of at most ~100 ms, which is S ≲ 17,000 — inside the fitted range. T2's answers
+  live where the decode model interpolates. They are still untested on traffic there: all five
+  engine measurements above are themselves beyond 100 ms.
+
+**What it changes, as registered.** T2 runs and is reported — as what a model that missed its own
+per-token check says. No replica count from it goes into the README as guidance. And the next GPU
+run has two more jobs than it had this morning: per-request token times on traffic *below* the
+per-token limit, and decode cells with a shared prefix.
+
+### 2026-10-05 — T2 RAN: all three hold, on all three calibrations. Under a target with both halves the counts double, and "keep each user on one GPU" survives.
+Report: [`artifacts/results/t2_two_part_slo/report.md`](../artifacts/results/t2_two_part_slo/report.md)
+— 41,472 simulator runs, the grids written at the registration commit `0be7bec`. **Guard passed:**
+under the first-token target, on replicas 1–16, each calibration reproduces its committed table
+exactly.
+
+**As registered — predicted holds / holds / holds.** The target: p95 TTFT ≤ 2,000 ms **and** p95
+time per output token ≤ 100 ms. A rule holds only if it holds on calibrations A, B and C.
+- **T2a HOLDS.** With 1 prompt and with 4, no policy needs fewer replicas than session-sticky at
+  any load: 12 of 12 points on each calibration, and at none of them is it a tie at "nothing
+  holds".
+- **T2b HOLDS.** At all 24 points, on all three, session-sticky needs no more replicas than
+  round-robin and no more than least-loaded.
+- **T2c HOLDS.** For session-sticky the two-part count is **1.93×, 2.00× and 2.00×** the
+  first-token count (median over 24 points; needed ≥ 1.5). The back-of-envelope in the
+  registration said about 2×.
+
+In numbers, one shared prompt at 2 sessions/s, on A · B · C: session-sticky needs **10 · 12 · 12**
+T4s where the first-token target said 5 · 5 · 5; round-robin 14 · 15 · 15 (was 7 · 7 · 7);
+least-loaded 13 · 14 · 14.
+
+**⚠️ What these counts are — as the registration said they would be if T1 failed.** T1 failed. So
+they are what a model that missed its own per-token check says, and no replica count from this
+grid goes into the README as sizing guidance. Two things can be said about how far to trust them,
+and neither is a test: T1's failure is at the knee, where the model is too *slow*; and a cell that
+meets a 100 ms limit decodes in batches inside the range the model was fitted on. The check that
+is missing — traffic *below* the limit, timed per request — needs a GPU.
+
+**Reported, not tested.**
+- **The per-token half is the one that binds.** Of 432 (calibration, prompts, load, policy)
+  cells it raises the replica count at 309; 20 need the same number under both targets; 103 are
+  held under neither on 32 replicas.
+- **The calibrations agree a little less than under the first-token target:** 81 of 144 cells
+  identical on all three and 121 within one (first-token, on the same 1–32 axis: 90 and 126). The
+  counts are about twice as large, so ± one is a smaller share of each.
+- **A looser limit shrinks the factor, as it should:** 1.50× at 150 ms, 1.33–1.37× at 200 ms (the
+  same document's limit for Llama2-70b). Session-sticky is best or tied at 21–22 of 24 points
+  under either.
+- **Session-sticky best or tied over all 24 points:** 18 · 22 · 22, and at 16 on all three.
+
+**Exploratory — the 64-prompt question under the two-part target.** Not a test; it gets its own, on
+fresh calibrations.
+- **The load weight of 1 does not survive a per-token limit.** Under the first-token target it
+  was the most consistent hint in the grid: 8 T4s at 64 prompts and 2 sessions/s on all three
+  calibrations, against session-sticky's 10 · 12 · 12. Under the two-part target the same policy
+  holds nothing there on 32 replicas, on any calibration — nor does pure prefix-affinity. They win
+  the first token by crowding sessions onto the replicas that hold their prompt, and crowding is
+  exactly what makes tokens slow.
+- **Session-sticky against balanced affinity (α 16) at 64 prompts: no steady winner.** Loads 0.25
+  to 4 sessions/s, sticky / balanced, on A · B · C: 3·3·3 / 3·3·3 — 4·5·5 / 4·4·5 — 7·8·8 / 7·8·7 —
+  13·14·14 / 13·14·15 — 19·21·21 / 19·22·22 — 27·27·27 / 24·27·29. H2b's own rules give "holds,
+  holds, falsified". One or two replicas apart, in both directions: inside what a calibration
+  moves.
+
+**A process fault, and what was done about it.** The three calibrations ran one after another in
+one process, started on a clean tree. While B and C were computing I edited other files —
+`kvsim calibrate`, the CLI, a new module — so their headers, written as each began, say
+`git_dirty: true` and list those paths. The process had loaded the simulator before the edits, and
+none of those files is imported by a grid run; but that is an argument, and a header cannot show
+it. So 240 random cells of each grid were run again from a clean checkout whose `src/` is
+identical to the registration commit's (`scripts/t2_verify_grid.py`, commit `ae4b483`):
+**720 of 720 identical**
+([`verification.json`](../artifacts/results/t2_two_part_slo/verification.json)). A sample and not
+the whole grid because the full re-run is thirty minutes of every core and the machine was on
+battery. The rule this breaks is simple, and now written down in `CONTRIBUTING.md`: nothing under
+`src/` is edited while a registered run is in flight.
+
+**What it changes.**
+- **The README's counts are first-token counts, and the README must say what that leaves out:**
+  under the model, a target that also limits token speed needs about twice the GPUs. It says so at
+  the top of the scope note, with T1's failure beside it.
+- **The headline stands, and a little more firmly:** *keep each user on one GPU* is best or tied
+  with one prompt and with four, and never worse than round-robin or least-loaded, under either
+  target, on all three calibrations.
+- **The open half moves.** "Does prefix routing save GPUs at 64 prompts?" had one hint in its
+  favour, the load weight of 1. That hint is a first-token effect. Under a target with both halves
+  there is no sign of a saving — exploratory, so the registered test on fresh calibrations asks
+  both: does the first-token saving repeat, and is there still none with both halves?
+- **Next, on a GPU:** per-request token times on traffic around the per-token limit; decode cells
+  that share a prefix; what an arriving request costs the sequences already decoding; and
+  `kvsim calibrate` with its repeats.

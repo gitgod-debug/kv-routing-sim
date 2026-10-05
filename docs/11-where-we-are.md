@@ -64,6 +64,14 @@ vLLM.
 cited prices, and the first full calibrated sweep was designed, registered and run. Its headline:
 the simple "keep each user on one GPU" policy beat the clever cache-seeking ones (§6).
 
+**5 Oct, later — the second speed.** Until today we only measured how long the *first* word of an
+answer takes. We now also measure how fast the *rest* of the words come ("time per token"), and
+tested two things, registered first, with no GPU. **T1** asked: is the simulator right about that
+second speed? Mostly — within 7% on three real runs — but 1.5–1.7× too slow on the two runs where
+the GPU was at its limit. So T1 failed. **T2** asked: if the target covers both speeds, what
+changes? The GPU counts about double, and "keep each user on one GPU" still wins — on all three
+calibrations (findings 24–26).
+
 **5 Oct — the measuring command proven on a real GPU, and the finding narrowed.** C3 ran on
 Kaggle (through its API now; the first attempt did not start because Kaggle had changed its
 software). All three predictions came true: `kvsim calibrate` works on a real T4, the profile it
@@ -204,6 +212,27 @@ on one GPU* (findings 18 and 19 below).
     ms for a model this size — and the live engine took 134–521 ms per token in C3. So the GPU counts
     say when the first token is on time, not when the whole answer streams at a usable speed. Both
     are written down as known limits; neither is fixed yet.
+24. ⛔ **The simulator's second speed is right in the middle and wrong at the edge** (T1, 5 Oct,
+    registered; predicted to hold, and it did not). "Time per token" is how fast an answer streams
+    after its first word. We compared the simulator with the engine's own counter on the five real
+    traffic runs we already had. On three it is within 7%. On the two where the GPU was at its
+    limit it is 1.5–1.7× too slow: the simulator thinks the engine falls over, and the real engine
+    did not. *A likely reason, found afterwards:* our measurements of decode speed could never use
+    more text at once than fits in the GPU's cache (about 20,000 tokens). Traffic that shares one
+    system prompt can — the shared part is stored once — and at the limit the simulator was working
+    8× beyond anything we had measured.
+25. ✅ **With a target for both speeds, the GPU counts about double — and the advice holds** (T2,
+    5 Oct, registered; all three rules true on all three calibrations). The rule our 2-second
+    target comes from also says: no more than 100 ms per token. Under both limits, keeping each
+    user on one GPU is still best or tied with one prompt and with four, it is never worse than
+    round-robin or least-loaded, and it needs 1.9–2.0× the GPUs we had counted. ⚠️ But because of
+    24, this "×2" is what the model says, not a checked number — and no real traffic has been
+    measured below 100 ms per token yet. The README says both things.
+26. **The one hint in favour of prefix routing was about the first word only.** With 64 prompts, a
+    small load weight needed 8 GPUs where keeping users on one GPU needed 10–12. Under a target
+    for both speeds that policy holds nothing at all: it gets a fast first word by crowding users
+    onto the GPUs that hold their prompt, and crowding is what makes the other words slow.
+    (Exploratory, not a test.)
 
 ## 5. What we decided, and why
 
@@ -317,6 +346,13 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
   at code, configs and notebooks.
 - **Our first scale for the real trace was too big for a T4** — every policy failed. We changed it
   before the real run and wrote down why.
+- **I edited code while a registered run was still going** (5 Oct). The run had loaded its code
+  before, so nothing changed — but two of its three result files now say "the folder was not
+  clean". We did not argue it away: 720 random cells were run again from a clean copy, and all 720
+  match. The rule is now in the contributor guide: do not touch the code while a registered run is
+  in flight.
+- **A glossary line was wrong for two weeks:** it said routing "barely affects" the speed of
+  tokens after the first. It does — it is the half of the target that decides the GPU count.
 - **The GPU box changed under us** (5 Oct). Kaggle updated its software, and the engine could no
   longer start: one package it needs was built for a different CUDA version, under the same version
   number, so the installer left it in place. C3's first attempt stopped before measuring anything.
@@ -357,13 +393,14 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 - ✅ done 28 Sep: the AgentX trace (R2 holds), and a contributor guide with three good first issues;
 - ✅ done 1 Oct: `kvsim calibrate` now also times prefill after a cached prefix; C3 is registered;
 - ✅ done 5 Oct: C3 ran (all three rules hold) and is written up, with what it changes;
-- ⭐ **next — two things C3 showed are missing, each to be registered before it is run:**
-  (1) a speed target with both halves, first token *and* time per token, and the grid re-run under
-  it; (2) the open question at 64 prompts, tested over several fresh calibrations with the load
-  weight fixed beforehand (the hint to test: a weight of 1 needed 8 GPUs on all three calibrations
-  where sticky needed 10–12);
-- also: make `kvsim calibrate` repeat its decode cells and print a GPU-count *range*, since one
-  run is not enough near the limit;
+- ✅ done 5 Oct: a speed target with both halves (T1 failed, T2 held — findings 24–26);
+- ✅ done 5 Oct: `kvsim calibrate` repeats every measurement three times, and `kvsim replay` prints
+  how much the GPU count moves between those repeats (tested on the mock engine only so far);
+- ⭐ **next — one GPU run (C4), registered first.** It measures what T1 and T2 could not check from
+  old data: the time per token of every request on light traffic, around the 100 ms limit; decode
+  speed when many requests share a prompt (far beyond the cache); what one arriving request costs
+  the requests already running; and the new repeats on a real engine. On the fresh calibrations it
+  also asks the 64-prompt question again, under both targets;
 - then: re-run H6 and the two real traces (R1, R2) on the validated timing model — they all ran on
   the first one;
 - later: the PyPI release.
@@ -384,8 +421,11 @@ text can become a blog post.
   re-run on the validated one;
 - a GPU count is good to about ± one GPU: three calibrations of the same T4 agree exactly on 71%
   of counts and within one on 96%;
-- the speed target covers the first token only, not the time per token;
-- near the limit of a GPU, one run of `kvsim calibrate` is not enough;
+- every GPU count in the README is for the first token only; with a per-token limit too, the
+  simulator needs about twice as many — and its per-token speed is not yet checked where that
+  answer lives (T1 failed at the limit of a GPU; nothing is measured below 100 ms per token);
+- near the limit of a GPU, one fit is not enough — the tool now shows the spread between its own
+  repeats, but that is a floor, not a full error bar;
 - every replay is *open-loop* — real agents wait for an answer before sending the next turn, and would
   then reuse the answer's cache blocks, which we cannot measure this way;
 - one GPU type (T4) and one model (Qwen3-4B) so far;

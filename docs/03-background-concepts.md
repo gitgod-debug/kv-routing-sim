@@ -28,10 +28,19 @@ that matters.
 
 ### Time-to-first-token vs time-between-tokens
 
-- **TTFT** — arrival to first output token. Queueing delay + prefill. **This is the metric routing moves.**
-- **TBT / ITL** — the gap between subsequent tokens. Decode-bound, barely affected by routing.
+- **TTFT** — arrival to first output token. Queueing delay + prefill. **The metric routing moves
+  most visibly** — and, until 2026-10-05, the only one this project measured.
+- **TBT / ITL** — the gap between subsequent tokens. Decode-bound — and *not* "barely affected by
+  routing", as this line said until 2026-10-05. In a continuous-batching engine every sequence gets
+  one token per step, so a step that prefills a newly arrived request makes everyone already
+  decoding wait for it; and the more sequences a router sends to one replica, the longer every
+  step. On a live T4 the gap was 134–521 ms on traffic whose first token was on time (C3), and
+  under a target with both halves it is this half that sets the replica count (T2).
+- **TPOT** — time per output token, per request: (last token − first token) ÷ (tokens − 1).
 
-A routing policy that improves mean latency but not TTFT has probably improved nothing a user perceives.
+A routing policy that improves mean latency but neither TTFT nor the time per token has probably
+improved nothing a user perceives. One that buys a prompt first token by crowding sequences onto a
+replica has made every token after it slower — which a first-token target cannot see.
 
 ---
 

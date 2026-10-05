@@ -15,7 +15,10 @@ is published**.
 > ran on a real T4, exact on its cache check, and the profile it wrote predicted three unseen workloads
 > within 1.41×. The same run showed that three calibrations of one T4 agree on a GPU count to within
 > one replica at 96% of points — **and that the test behind half of the headline was decided inside
-> that margin** (below). Replica counts are T4 figures on generated traffic, ± one. Every number
+> that margin** (below). Replica counts are T4 figures on generated traffic, ± one, **and for the
+> first token only: under a target that also limits token speed the simulator needs about twice
+> as many GPUs — a factor its per-token model has not yet earned (T1 and T2, in the scope note
+> below).** Every number
 > still written as `TBD — not yet measured` **is exactly that**; see the honesty gates in
 > [`CHECKPOINTS.md`](CHECKPOINTS.md). Start at [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
 
@@ -63,9 +66,11 @@ above shows.*
   GPUs depends on the calibration. With the registered load weight, session-sticky needs 10 against
   11 on A, 12 against 11 on B, 12 against 10 on C. The three calibrations differ by a few percent in
   their coefficients; at this point that is one or two GPUs, and the sign of the answer.
-- **Found after the tests, so not a finding:** with a load weight of 1, prefix routing needs 8 GPUs
-  at 64 prompts and 2 sessions/s on all three calibrations, where session-sticky needs 10 to 12. It
-  is the most consistent hint in the grid, and it has never been a registered test.
+- **Found after the tests, so not a finding — and it is a first-token effect:** with a load weight
+  of 1, prefix routing needs 8 GPUs at 64 prompts and 2 sessions/s on all three calibrations, where
+  session-sticky needs 10 to 12. But under a target that also limits token speed (T2, exploratory)
+  the same policy holds nothing there on 32 replicas: it wins the first token by crowding sessions
+  onto the replicas that hold their prompt, and crowding is what makes tokens slow.
 - **How far to trust a GPU count:** of the 144 (prompts, load, policy) cells, 102 need the same number
   of replicas on all three calibrations and 138 are within one.
 
@@ -121,13 +126,35 @@ prefix; and on agent traffic like AgentX the rule is simply *keep each session o
 policy that does* — the same advice as the finding above.
 
 ⚠️ **Scope:** generated traffic, one GPU type (T4), one model (Qwen3-4B). The replica counts are T4
-figures on the context-aware model, ± one replica. **The target is on the first token only.** The
-MLPerf rule the 2 seconds come from pairs them with a per-token limit (100 ms for a model of this
-size), and in C3 the live engine took 134–521 ms per token on workloads that met, or nearly met, the
-first-token target — so these are the GPUs needed for a prompt first token, not for an answer that
-streams at a usable speed (not yet tested; [C3's entry](docs/09-hypotheses.md)). H6 (the policy
-ranking under faster and slower GPUs) was tested on the first, context-free model and is not yet
-re-run. `azrabano23/disagg-sim` published that
+figures on the context-aware model, ± one replica.
+
+⚠️ **Every count above is for the first token only — and that is about half the story.** The MLPerf
+rule the 2 seconds come from pairs them with a limit on the time per output token (100 ms for a
+model of this size). In C3 the live engine took 134–521 ms per token on workloads that met, or
+nearly met, the first-token target. Two registered tests followed, on 2026-10-05, with no GPU:
+- **T2 — the same grid under a target with both halves** (p95 TTFT ≤ 2 s *and* p95 time per output
+  token ≤ 100 ms), on all three calibrations. All three rules held, as predicted: session-sticky
+  is still best or tied at every load with one prompt and with four; it never needs more than
+  round-robin or least-loaded; and its replica count is **1.93–2.00× the first-token count**
+  (median over 24 points). With the limit at 200 ms the factor is 1.33–1.37×. No table of those
+  counts is printed here, on purpose — see T1.
+- **T1 — is the simulator's per-token latency right? It failed.** Against the live engine's own
+  inter-token counter on five held-out runs, the simulator is within 7% on the three runs off the
+  knee of the load curve, and **1.5–1.7× too slow** on the two at it (limit: 1.5×; predicted to
+  hold). And all five runs are themselves beyond 100 ms per token, so nothing has been measured
+  where T2's answers live.
+
+So read the factor of two as **what the model says, not as a checked number** (the registration
+said beforehand: if T1 fails, no count from T2 is to be offered as sizing guidance) — and read the
+counts in this README as a *lower bound* for anything that has to stream at a usable speed. The
+simulator now prints p95 time per token in every report, and a cost model can make it part of the
+SLO (`slo.tpot_p95_ms`); it is off by default, because a default should not move ahead of its
+check. That check — per-request token times on a live engine, around the limit — is the next GPU
+run ([T1](artifacts/results/t1_itl/report.md) · [T2](artifacts/results/t2_two_part_slo/report.md) ·
+[`docs/09-hypotheses.md`](docs/09-hypotheses.md)).
+
+H6 (the policy ranking under faster and slower GPUs) was tested on the first, context-free model
+and is not yet re-run. `azrabano23/disagg-sim` published that
 locality can lose to load balancing, and llm-d weighs prefix and load scores by hand-set weights; on
 this setup, with timing checked against the engine, balance won.
 
@@ -263,10 +290,24 @@ written but **not** marked calibrated, and the command exits 1.
   image, predicted the same traffic within 1.38×, from numbers written down before the run
   ([report](artifacts/results/c3_kaggle_t4/report.md)).
 
-⚠️ **Near saturation, one run of the command is not enough.** A second run on the same engine, 25
-minutes later, came out 3–5% different in its coefficients. For the one workload at the knee of the
-load curve, that put a p95 **4.2×** off; the other five numbers stayed within 1.35×. If the answer you
-need sits at the edge of the target, run the command more than once, and read the GPU count as ± one.
+⚠️ **Near saturation, one fit is not enough.** A second run on the same engine, 25 minutes later,
+came out 3–5% different in its coefficients. For the one workload at the knee of the load curve,
+that put a p95 **4.2×** off; the other five numbers stayed within 1.35×.
+
+**So the tool now shows how firm its own answer is.** Since 2026-10-05 `kvsim calibrate` measures
+every timing cell three times and keeps, beside the fit on all of it, the fit of each repeat alone.
+`kvsim replay` sizes on each of those too, and prints the result next to its recommendation:
+
+```text
+**session-sticky on 3 replica(s)** — cheapest configuration meeting the p95 TTFT SLO
+⚠️ how firm: 3 to 4 replicas across the calibration's 3 repeats taken alone — size for the larger
+```
+
+That range is what one calibration's own repeats disagree by: a floor on the uncertainty, not a
+confidence interval — it knows nothing about another day or another software image. A profile
+without repeats (the two shipped ones) says that its spread is unknown instead of staying silent.
+⚠️ The repeats have so far met only the mock engine; their first run on a real GPU is the next
+registered experiment.
 
 ## ⭐ What transfers to your fleet, and what doesn't
 
@@ -277,7 +318,7 @@ so the honest answer comes in three tiers, and they must not be blended (ADR-010
 |---|---|---|
 | **Policy ranking** | *Which* policy wins on your workload shape, and roughly by how much | ⛔ **Not free.** **H6 was tested and FALSIFIED (2026-09-28):** under a 2× faster GPU, or prefill 2× cheaper or dearer, the full order of the seven policies changed (Kendall's τ-b as low as 0.51). What held — noticed after the run, not registered: session-sticky needed the fewest replicas at all 48 points. So read a ranking as a result for *our* T4 unless you calibrate |
 | **Whether prefix routing pays** | Whether prefix-affinity is worth implementing for *your* prompts and load | ⚠️ **Not settled, even on our own T4.** With one shared prompt or a few: no — session-sticky needs the fewest replicas or ties on all three calibrations. With 64 prompts, the registered test said no on one calibration (2026-09-30) and yes on two others (2026-10-05): the two policies are one or two replicas apart, which is what calibrations of the same GPU disagree by. On the first, context-free timing model it paid once prompts outgrew one GPU's cache, and that flip survived four hardware rescalings (H6's crossover half) — but that model was wrong about the engine. So the answer depends on the timing model, and on its error bar: measure yours, more than once |
-| **Absolute ms and ₹** | p95 TTFT and ₹/1k requests for your fleet | **`kvsim calibrate` on your own hardware**, a few minutes. ⛔ Our error bar was measured on our GPU and our model. It does **not** transfer, and this README will never imply that it does. On our own T4 the first, context-free timing model was 5–222× optimistic under load; the context-aware one predicts held-out traffic within 1.41× (C2), and again from a profile `kvsim calibrate` wrote itself (C3) — except at the knee of the load curve, where a second run of the command was 4.2× off on one p95 |
+| **Absolute ms and ₹** | p95 TTFT and ₹/1k requests for your fleet | **`kvsim calibrate` on your own hardware**, a few minutes. ⛔ Our error bar was measured on our GPU and our model. It does **not** transfer, and this README will never imply that it does. On our own T4 the first, context-free timing model was 5–222× optimistic under load; the context-aware one predicts held-out traffic within 1.41× (C2), and again from a profile `kvsim calibrate` wrote itself (C3) — except at the knee of the load curve, where a second run of the command was 4.2× off on one p95. ⚠️ All of that is first-token latency: time per token is now measured too, and there the model is within 7% off the knee and 1.5–1.7× too slow at it (T1) |
 
 > **So: why trust our numbers on your hardware?** You shouldn't. Run `kvsim calibrate` and use your own.
 > That is the same posture as the cost model, which ships every constant in a config with a source and a
