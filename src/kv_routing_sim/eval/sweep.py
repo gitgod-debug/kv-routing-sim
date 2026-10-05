@@ -79,6 +79,7 @@ def average_points(pts: list[Point]) -> Point:
             None if any(p.meets_slo is None for p in pts) else all(p.meets_slo for p in pts)
         ),
         calibrated=pts[0].calibrated,
+        p95_tpot_ms=sum(p.p95_tpot_ms for p in pts) / n,
     )
 
 

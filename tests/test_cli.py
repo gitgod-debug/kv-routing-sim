@@ -63,6 +63,7 @@ def test_replay_refuses_an_unfilled_cost_model(tmp_path):
 
 
 PROFILE = "configs/profiles/t4-qwen3-4b-vllm0.30.0.json"
+CTX_PROFILE = "configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json"
 
 
 def test_replay_on_the_calibrated_profile_carries_it_to_the_output(tmp_path):
@@ -158,3 +159,37 @@ def test_crossover_sweep_reports_the_measured_axis_not_the_knob():
         assert row["cross_session_sharing"] != row["requested_sharing"] or True
     # sharing rises with the knob
     assert rows[1]["cross_session_sharing"] > rows[0]["cross_session_sharing"]
+
+
+def test_replay_shows_the_time_per_token_and_says_whether_the_slo_includes_it(tmp_path, capsys):
+    """The report always shows p95 time per output token. Whether it COUNTS is the cost model's
+    choice — and the report says which, so a ✅ on the first token alone cannot pass for both."""
+    trace = tmp_path / "t.jsonl"
+    main(["generate", "--out", str(trace), "--sessions", "30", "--turns", "3", "--rate", "3"])
+    capsys.readouterr()
+    args = ["replay", str(trace), "--policies", "session-sticky", "--replicas", "3-4",
+            "--seeds", "1", "--profile", CTX_PROFILE]
+
+    assert main([*args, "--cost-model", "configs/cost_model.yaml"]) == 0
+    first_only = capsys.readouterr().out
+    assert "p95 ms per token" in first_only
+    assert "shown but NOT part of it" in first_only
+    assert "meeting the p95 TTFT SLO" in first_only
+
+    both = tmp_path / "cost_both.yaml"
+    both.write_text(pathlib.Path("configs/cost_model.yaml").read_text().replace(
+        "  ttft_p95_ms: 2000\n", "  ttft_p95_ms: 2000\n  tpot_p95_ms: 100\n"))
+    out = tmp_path / "r.json"
+    assert main([*args, "--cost-model", str(both), "--format", "json", "--out", str(out)]) == 0
+    payload = json.loads(out.read_text())
+    assert "AND p95 time per output token ≤ 100 ms" in payload["slo"]
+    for p in payload["points"]:
+        assert p["p95_tpot_ms"] > 0
+        # The flag is the conjunction of the two halves — never the first-token half alone.
+        assert p["meets_slo"] == (p["p95_ttft_ms"] <= 2000 and p["p95_tpot_ms"] <= 100)
+    # On this traffic the per-token half is the one that binds: the first token is in time on
+    # both replica counts, the tokens after it are not.
+    assert all(p["p95_ttft_ms"] <= 2000 for p in payload["points"])
+    assert not any(p["meets_slo"] for p in payload["points"])
+    assert "NO configuration met the SLO (p95 TTFT and p95 time per output token)" in \
+        payload["recommendation"]["reason"]

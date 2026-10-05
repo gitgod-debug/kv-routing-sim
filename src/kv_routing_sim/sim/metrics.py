@@ -4,10 +4,17 @@
 in the tail: a routing policy that improves the mean while blowing p99 has made the product worse,
 and averaging is how that gets hidden. `mean_ttft_ms` is deliberately absent rather than merely
 discouraged.
+
+TWO LATENCIES, because a response has two: how long until the first token (TTFT), and how fast the
+rest arrive — TPOT, the time per output token. The MLPerf row this project's 2-second TTFT limit
+comes from sets both (configs/cost_model.yaml). Until 2026-10-05 only the first was measured here;
+C3's live engine then took 134–521 ms per token on traffic that met, or nearly met, the first-token
+limit (docs/09-hypotheses.md).
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -43,12 +50,25 @@ class RunResult:
     preempted_queries: int = 0
     preempted_hits: int = 0
     eviction_events: list[Any] = field(default_factory=list)  # only with track_block_metrics
-    # request_id -> {cached_tokens, ttft_ms, preemptions}; only with record_per_request. The engine
-    # reports the same `cached_tokens` per request (`usage.prompt_tokens_details`), so a calibration
-    # can say WHICH requests diverge, not just whether the total does.
+    # request_id -> {cached_tokens, ttft_ms, tpot_ms, preemptions, replica}; only with
+    # record_per_request. The engine reports the same `cached_tokens` per request
+    # (`usage.prompt_tokens_details`), so a calibration can say WHICH requests diverge, not just
+    # whether the total does.
     per_request: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     ttft_ms: list[float] = field(default_factory=list)
+    # Time per output token, one value per request and ALIGNED with `ttft_ms`:
+    #     (last token − first token) ÷ (output tokens − 1), in ms.
+    # MLPerf's TPOT ("the average interval between all the tokens generated") and vLLM's
+    # `mean_time_per_output_token` (v1/metrics/stats.py:549-562 @ v0.30.0) — a stall while
+    # preempted is inside it, as it is there. NaN for a request with ONE output token: it has no
+    # interval, so it is in no percentile and cannot miss a per-token limit.
+    tpot_ms: list[float] = field(default_factory=list)
+    # The engine's own inter-token counters, as vllm:inter_token_latency_seconds_{sum,count}
+    # accumulate them — one observation per token after a request's first (stats.py:498-504).
+    # Whole-run, like `cache_queries`: an engine does not know about warm-up.
+    itl_sum_s: float = 0.0
+    itl_count: int = 0
     completed: int = 0
     arrived: int = 0
     makespan_s: float = 0.0
@@ -79,6 +99,28 @@ class RunResult:
             "n": len(s),
         }
 
+    def tpot_percentiles(self) -> dict[str, float]:
+        """Percentiles of the per-request time per output token, over requests that have one."""
+        s = sorted(t for t in self.tpot_ms if not math.isnan(t))  # NaN: one token, no interval
+        return {
+            "p50_ms": round(percentile(s, 0.50), 3),
+            "p95_ms": round(percentile(s, 0.95), 3),
+            "p99_ms": round(percentile(s, 0.99), 3),
+            "max_ms": round(s[-1], 3) if s else float("nan"),
+            "n": len(s),
+        }
+
+    def engine_itl_mean_ms(self) -> float:
+        """Σ inter-token gaps ÷ their number — what Δsum ÷ Δcount of
+        `vllm:inter_token_latency_seconds` gives on a live engine.
+
+        ⚠️ For comparing with that counter, and nothing else. It is a mean: no target is set on
+        it and nothing is sized on it — the per-token target is a percentile of per-request TPOT.
+        It exists for the reason `hit_rate` does: the engine publishes two counters, and a model
+        that cannot be compared with them cannot be checked.
+        """
+        return self.itl_sum_s / self.itl_count * 1000.0 if self.itl_count else float("nan")
+
     def load_imbalance(self) -> float:
         """max/mean requests per replica. 1.0 is perfect balance.
 
@@ -105,6 +147,7 @@ class RunResult:
             "evictions": self.evictions,
             "preemptions": self.preemptions,
             "ttft": self.ttft_percentiles(),
+            "tpot": self.tpot_percentiles(),
             "completed": self.completed,
             "arrived": self.arrived,
             "makespan_s": round(self.makespan_s, 4),

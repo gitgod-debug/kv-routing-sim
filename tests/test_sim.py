@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import math
 import pathlib
 import random
 
@@ -299,3 +300,91 @@ def test_long_contexts_cost_more_only_with_the_context_term():
            for t in (short, long_)]
     assert ctx[1] - ctx[0] > flat[1] - flat[0] + 0.01  # the context term adds real time
     assert ctx[0] > flat[0]
+
+
+# ── the second latency: time per output token ────────────────────────────────────────────────
+
+# Round numbers, so every expected value below can be worked out by hand.
+STEPPY = CostProfile(name="steppy", prefill_base_s=0.0, prefill_per_token_s=0.001,
+                     decode_base_s=0.010, decode_per_seq_s=0.002, kv_cache_blocks=5_000,
+                     block_size=16, max_num_seqs=16)
+
+
+def test_a_lone_requests_time_per_token_is_its_decode_step():
+    """32 cold tokens, 5 output tokens, alone: the first token after prefill + one step (44 ms),
+    then four steps of 12 ms each. TPOT is the mean of those four gaps and nothing else."""
+    req = NormalizedRequest("a", 0.0, (1, 2), 32, 5, "s")
+    r = run([req], policy="round-robin", n_replicas=1, profile=STEPPY, record_per_request=True)
+    assert r.ttft_ms == pytest.approx([44.0])
+    assert r.tpot_ms == pytest.approx([12.0])
+    assert r.per_request["a"]["tpot_ms"] == pytest.approx(12.0)
+    assert (r.itl_count, r.itl_sum_s) == (4, pytest.approx(0.048))
+    assert r.engine_itl_mean_ms() == pytest.approx(12.0)
+
+
+def test_another_requests_prefill_stalls_the_tokens_of_everyone_decoding():
+    """THE mechanism a first-token SLO cannot see. B arrives while A decodes; the step that
+    prefills B (48 ms) also carries A's next token, so that gap of A's is 62 ms, not 12.
+
+        A: first token at 44 ms; gaps 12, 62 (B's prefill + a step of two), 14, 14 → 25.5 ms/token
+        B: sent at 50 ms, first token at 118 ms (TTFT 68); gaps 14, 14 → 14 ms/token
+    """
+    a = NormalizedRequest("a", 0.0, (1, 2), 32, 5, "sa")
+    b = NormalizedRequest("b", 0.050, (7, 8, 9), 48, 3, "sb")
+    r = run([a, b], policy="round-robin", n_replicas=1, profile=STEPPY, record_per_request=True)
+    assert r.per_request["a"]["ttft_ms"] == pytest.approx(44.0)
+    assert r.per_request["b"]["ttft_ms"] == pytest.approx(68.0)
+    assert r.per_request["a"]["tpot_ms"] == pytest.approx(25.5)
+    assert r.per_request["b"]["tpot_ms"] == pytest.approx(14.0)
+    # The engine-style counters: one observation per token after a request's first.
+    assert r.itl_count == 4 + 2
+    assert r.engine_itl_mean_ms() == pytest.approx((102.0 + 28.0) / 6)
+    pct = r.tpot_percentiles()
+    assert set(pct) == {"p50_ms", "p95_ms", "p99_ms", "max_ms", "n"} and pct["n"] == 2
+    assert r.summary()["tpot"] == pct
+
+
+def test_a_single_token_request_has_no_time_per_token():
+    """One output token is one point in time: no interval. It is in no percentile, it adds
+    nothing to the engine-style counters, and its place in the list keeps TPOT aligned with TTFT.
+    """
+    one = NormalizedRequest("one", 0.0, (1, 2), 32, 1, "s1")
+    five = NormalizedRequest("five", 1.0, (5, 6), 32, 5, "s5")
+    r = run([one, five], policy="round-robin", n_replicas=1, profile=STEPPY,
+            record_per_request=True)
+    assert len(r.tpot_ms) == len(r.ttft_ms) == 2
+    assert math.isnan(r.tpot_ms[0])
+    assert r.per_request["one"]["tpot_ms"] is None
+    assert r.tpot_percentiles()["n"] == 1 and r.itl_count == 4
+    alone = run([one], policy="round-robin", n_replicas=1, profile=STEPPY)
+    assert alone.itl_count == 0 and math.isnan(alone.engine_itl_mean_ms())
+    assert alone.tpot_percentiles()["n"] == 0
+
+
+def test_a_stall_while_preempted_is_inside_the_time_per_token():
+    """vLLM's decode interval runs "from first NEW_TOKEN to last NEW_TOKEN. Any preemptions during
+    decode are included" (stats.py:549-551). Same here: on a pool too small for six long outputs,
+    the requests that were preempted waited between two of their tokens — and it shows."""
+    reqs = [NormalizedRequest(f"r{i}", 0.0, tuple(range(i * 10, i * 10 + 2)), 40, 90, f"s{i}")
+            for i in range(6)]
+    r = run(reqs, policy="round-robin", n_replicas=1, profile=TINY, record_per_request=True)
+    assert r.preemptions > 0 and r.completed == 6
+    hit = [v["tpot_ms"] for v in r.per_request.values() if v["preemptions"]]
+    spared = [v["tpot_ms"] for v in r.per_request.values() if not v["preemptions"]]
+    assert hit and spared
+    # No single step here is longer than one full recomputation plus a step of six (~4 ms); a
+    # preempted request's MEAN gap is still above every unpreempted one's.
+    assert min(hit) > max(spared)
+    # Two accountings of the same time agree: Σ per-request (TPOT × gaps) = the counters' sum.
+    total = sum(v["tpot_ms"] * 89 for v in r.per_request.values()) / 1000.0
+    assert total == pytest.approx(r.itl_sum_s) and r.itl_count == 6 * 89
+
+
+def test_time_per_token_respects_warm_up_and_ttft_does_not_move():
+    """TPOT is a new measurement, not a change to an old one: TTFT, hit rate and the makespan of a
+    run are exactly what they were. And the warm-up rule that hides early requests' TTFT hides
+    their TPOT too, while the engine-style counters — like the cache's — count the whole run."""
+    trace = _trace()
+    r = run(trace, policy="session-sticky", n_replicas=2, profile=SMALL, warmup_requests=25)
+    assert len(r.tpot_ms) == len(r.ttft_ms) == len(trace) - 25
+    assert r.itl_count == sum(q.output_tokens - 1 for q in trace)

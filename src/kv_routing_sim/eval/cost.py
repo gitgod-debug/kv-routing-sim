@@ -10,6 +10,10 @@ than no number, because it looks like an answer.
 
 The denominator is SUCCESSFUL requests — ones that met the SLO. A configuration that serves more
 traffic by blowing p95 has not become cheaper; it has changed the product.
+
+THE SLO HAS TWO POSSIBLE HALVES. `slo.ttft_p95_ms` — the first token — is required. The optional
+`slo.tpot_p95_ms` adds the time per output token; the MLPerf row the first limit is cited from sets
+both. Left out, nothing is enforced on it and every result is what it was before the key existed.
 """
 
 from __future__ import annotations
@@ -34,6 +38,9 @@ class CostModel:
     sku: str
     ttft_p95_slo_ms: float
     provenance: dict[str, Any]
+    # The per-token half of the SLO. None = not part of it (the default: every result registered
+    # up to 2026-10-05 is on the first-token limit alone).
+    tpot_p95_slo_ms: float | None = None
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> CostModel:
@@ -59,7 +66,23 @@ class CostModel:
             sku=str(raw["compute"]["sku"]),
             ttft_p95_slo_ms=float(raw["slo"]["ttft_p95_ms"]),
             provenance=raw,
+            tpot_p95_slo_ms=(None if raw["slo"].get("tpot_p95_ms") is None
+                             else float(raw["slo"]["tpot_p95_ms"])),
         )
+
+    @property
+    def slo_label(self) -> str:
+        """What "the SLO" means under this cost model, for a sentence."""
+        if self.tpot_p95_slo_ms is None:
+            return "p95 TTFT SLO"
+        return "SLO (p95 TTFT and p95 time per output token)"
+
+    def meets_slo(self, p95_ttft_ms: float, p95_tpot_ms: float) -> bool:
+        """Both halves, when there are two. A run with no multi-token request has no per-token
+        latency (NaN), and cannot miss a limit on it."""
+        if not p95_ttft_ms <= self.ttft_p95_slo_ms:
+            return False
+        return self.tpot_p95_slo_ms is None or not p95_tpot_ms > self.tpot_p95_slo_ms
 
     def inr_per_1k_requests(self, *, n_replicas: int, successful_requests_per_hour: float) -> float:
         if successful_requests_per_hour <= 0:
@@ -81,6 +104,14 @@ def _find_tbd(node: Any, path: str = "") -> list[str]:
     return out
 
 
-def successful_requests(ttft_ms: list[float], slo_p95_ms: float) -> int:
-    """Requests that met the SLO. The cost denominator."""
-    return sum(1 for t in ttft_ms if t <= slo_p95_ms)
+def successful_requests(ttft_ms: list[float], slo_p95_ms: float,
+                        tpot_ms: list[float] | None = None,
+                        tpot_slo_ms: float | None = None) -> int:
+    """Requests that met the SLO. The cost denominator.
+
+    With a per-token limit, a request must meet both: `tpot_ms` is aligned with `ttft_ms`, and a
+    NaN in it (a single-token request: no interval) cannot miss the limit."""
+    if tpot_slo_ms is None or tpot_ms is None:
+        return sum(1 for t in ttft_ms if t <= slo_p95_ms)
+    return sum(1 for t, g in zip(ttft_ms, tpot_ms, strict=True)
+               if t <= slo_p95_ms and not g > tpot_slo_ms)
