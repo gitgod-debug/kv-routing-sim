@@ -68,6 +68,16 @@ def _smoke(work: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path]:
     return nb, prereg
 
 
+def _fake_torch(pkg: pathlib.Path) -> None:
+    """What the pre-flight asks of torch, for the fresh interpreters it starts: a version, a CUDA
+    build and a GPU. This environment has no torch, and needs none."""
+    (pkg / "torch").mkdir(parents=True, exist_ok=True)
+    (pkg / "torch" / "__init__.py").write_text(
+        '__version__ = "0.0.0+dryrun"\n\n\nclass version:\n    cuda = "0.0"\n\n\n'
+        "class cuda:\n    @staticmethod\n    def is_available():\n        return True\n\n"
+        '    @staticmethod\n    def get_device_name(i):\n        return "Tesla T4 (dry-run)"\n')
+
+
 def _cells(nb: pathlib.Path) -> list[str]:
     out = []
     for c in json.loads(nb.read_text())["cells"]:
@@ -91,6 +101,7 @@ def main() -> int:
     nb, prereg = _smoke(work)
     cells = _cells(nb)
     _fake_vllm(work / "pkg", None, _needles(cells))
+    _fake_torch(work / "pkg")
     _shim(work / "bin")
     smi = work / "bin" / "nvidia-smi"
     smi.write_text("#!/bin/sh\necho '0, Tesla T4, 15360 MiB, 7.5, 580.00'\n"
@@ -99,6 +110,9 @@ def main() -> int:
 
     saved_env, saved_cwd, saved_path = dict(os.environ), os.getcwd(), list(sys.path)
     os.environ["PATH"] = f"{work / 'bin'}{os.pathsep}{os.environ['PATH']}"
+    # The pre-flight probes run in fresh interpreters: they find the fakes through PYTHONPATH.
+    os.environ["PYTHONPATH"] = os.pathsep.join(
+        x for x in (str(work / "pkg"), os.environ.get("PYTHONPATH")) if x)
     os.environ["MOCK_DECODE_PER_CTX_TOKEN_S"] = str(MOCK_DECODE_PER_CTX_TOKEN_S)
     os.environ["MOCK_PREFILL_ATTN_S"] = str(MOCK_PREFILL_ATTN_S)
     sys.path.insert(0, str(work / "pkg"))
@@ -135,12 +149,17 @@ def main() -> int:
         for c in data.get("calibrate", []):
             if not c["prediction_matches_registration"]:
                 problems.append(f"seed {c['seed']}: the check's prediction is not the registered")
+        pre = data.get("preflight") or {}
+        if (pre.get("vllm_cli") or {}).get("returncode") != 0 or not pre.get("torch"):
+            problems.append(f"the pre-flight record is missing or failed: {pre.get('vllm_cli')}")
+        if pre.get("repairs"):
+            problems.append(f"the pre-flight repaired something here: {pre['repairs']}")
     if not (work / "c3_results.zip").exists():
         problems.append("c3_results.zip was not written")
     else:
         names = zipfile.ZipFile(work / "c3_results.zip").namelist()
         for want in ("c3_results/c3.json", "c3_results/calibrated_profile_seed0.json",
-                     "c3_results/server_0.log"):
+                     "c3_results/server_0.log", "c3_results/preflight.json"):
             if want not in names:
                 problems.append(f"{want} is missing from the zip")
     analysis = None

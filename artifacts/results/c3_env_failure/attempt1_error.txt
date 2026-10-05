@@ -1,0 +1,56 @@
+launched replica 0: GPU 0, port 8000
+  !! replica 0 EXITED (returncode 1). Log tail:
+Traceback (most recent call last):
+  File "/usr/local/bin/vllm", line 8, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/usr/local/lib/python3.13/dist-packages/vllm/entrypoints/cli/main.py", line 43, in main
+    import vllm.entrypoints.cli.benchmark.main
+  File "/usr/local/lib/python3.13/dist-packages/vllm/entrypoints/cli/benchmark/main.py", line 12, in <module>
+    from vllm.entrypoints.serve.utils.api_utils import VLLM_SUBCMD_PARSER_EPILOG
+  File "/usr/local/lib/python3.13/dist-packages/vllm/entrypoints/serve/utils/api_utils.py", line 19, in <module>
+    from vllm.engine.arg_utils import EngineArgs
+  File "/usr/local/lib/python3.13/dist-packages/vllm/engine/arg_utils.py", line 36, in <module>
+    from vllm.config import (
+    ...<33 lines>...
+    )
+  File "/usr/local/lib/python3.13/dist-packages/vllm/config/__init__.py", line 24, in <module>
+    from vllm.config.model import (
+    ...<4 lines>...
+    )
+  File "/usr/local/lib/python3.13/dist-packages/vllm/config/model.py", line 31, in <module>
+    from vllm.transformers_utils.config import (
+    ...<14 lines>...
+    )
+  File "/usr/local/lib/python3.13/dist-packages/vllm/transformers_utils/config.py", line 21, in <module>
+    from transformers.models.auto.image_processing_auto import get_image_processor_config
+  File "/usr/local/lib/python3.13/dist-packages/transformers/models/auto/image_processing_auto.py", line 24, in <module>
+    from ...image_processing_utils import ImageProcessingMixin
+  File "/usr/local/lib/python3.13/dist-packages/transformers/image_processing_utils.py", line 34, in <module>
+    from .processing_utils import ImagesKwargs, Unpack
+  File "/usr/local/lib/python3.13/dist-packages/transformers/processing_utils.py", line 38, in <module>
+    from .audio_utils import AudioInput, load_audio, make_list_of_audio
+  File "/usr/local/lib/python3.13/dist-packages/transformers/audio_utils.py", line 58, in <module>
+    import torchaudio
+  File "/usr/local/lib/python3.13/dist-packages/torchaudio/__init__.py", line 7, in <module>
+    from . import _extension  # noqa  # usort: skip
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/torchaudio/_extension/__init__.py", line 36, in <module>
+    _check_cuda_version()
+    ~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.13/dist-packages/torchaudio/_extension/utils.py", line 124, in _check_cuda_version
+    raise RuntimeError(
+    ...<3 lines>...
+    )
+RuntimeError: Detected that PyTorch and TorchAudio were compiled with different CUDA versions. PyTorch has CUDA version 13.0 whereas TorchAudio has CUDA version 12.8. Please install the TorchAudio version that matches your PyTorch version.
+
+---------------------------------------------------------------------------
+Stop                                      Traceback (most recent call last)
+/tmp/ipykernel_48/1648027763.py in <cell line: 0>()
+      3     start_server(_i)
+      4     if not wait_ready(_i):
+----> 5         raise Stop(f"⛔ replica {_i} did not start — the log tail is above. Download the zip.")
+      6     _log = log_text(_i)
+      7     _m = re.search(r"KV cache size: ([\d,]+) tokens", _log)
+
+Stop: ⛔ replica 0 did not start — the log tail is above. Download the zip.

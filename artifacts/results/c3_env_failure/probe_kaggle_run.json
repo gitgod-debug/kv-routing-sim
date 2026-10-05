@@ -1,0 +1,13 @@
+{
+ "kernel": "<account>/kvsim-c3-preflight-probe",
+ "status": "KernelWorkerStatus.COMPLETE",
+ "failure_message": "",
+ "notebook": "built by scripts/c3_probe.py",
+ "accelerator": "NvidiaTeslaT4",
+ "files": [
+  "c3_results.zip",
+  "preflight.json",
+  "kvsim-c3-preflight-probe.log",
+  "kaggle_execution.log"
+ ]
+}
