@@ -21,7 +21,17 @@ below is kept as the record of how it was run.
 
 ---
 
-## ▶ Run next — C3: `c3_calibrate_t4.ipynb` (about 50 minutes)
+## ✅ C3 — ran on 2026-10-05: all three registered rules hold
+
+`kvsim calibrate` works on a real T4 (its cache check exact, 48 of 48 requests, in 160 seconds); the
+profile it wrote predicts three unseen workloads within 1.41×; and C2's profile predicts the same
+traffic within 1.38×, from numbers registered before the run.
+[Report](../artifacts/results/c3_kaggle_t4/report.md). ⚠️ Reported in the same run: a second run of
+the command was 4.17× off on one number at the knee, and the finding's grid on the command's profile
+reverses H2b's verdict ([three calibrations, side by side](../artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.md),
+post hoc). Nothing here needs running now; the section below is kept as the record of how it was run.
+
+## How C3 was run — `c3_calibrate_t4.ipynb` (about 40 minutes)
 
 **What it tests:** `kvsim calibrate` in its new form — the one that fits C2's context-aware timing
 model — on a real GPU for the first time. The notebook starts one vLLM server on a T4, runs the

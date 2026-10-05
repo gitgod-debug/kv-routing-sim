@@ -9,7 +9,11 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-10-05 (**C3's first attempt did not start** — Kaggle's software image
+**Last updated:** 2026-10-05 (**C3 RAN — all three rules hold, as predicted** — `kvsim calibrate`
+works on a real T4 and its profile predicts unseen traffic within 1.41×. **And the same run narrowed
+the finding:** three calibrations of the same T4 agree on a GPU count exactly at 102 of 144 cells and
+within one at 138 — and H2b's verdict of 2026-09-30, decided by one replica at one point, reverses on
+the other two. Earlier the same day **C3's first attempt did not start** — Kaggle's software image
 changed and vLLM could not be imported; nothing was measured. The notebook is amended with a
 pre-flight that repairs it, checked on Kaggle's image with a probe; nothing registered changed. GPU
 runs now go through Kaggle's API, `scripts/kaggle_run.py`. 2026-10-01: **C3 registered** — the
@@ -17,18 +21,22 @@ context-aware `kvsim calibrate`'s first run on a
 real GPU; before it, a pre-check on C2's data added one measurement to the command. 2026-09-30: C2
 ran — all three predictions true; the finding re-tested on the validated timing model and its "route
 by prefix" half FALSIFIED. Before that: H6, R1 and R2, Phase 6 and C1, the demo, the preprint draft,
-`kvsim calibrate`, a wheel that works outside a clone. 221 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
+`kvsim calibrate`, a wheel that works outside a clone. 226 tests green. Phase 3 PASSED on 2026-09-22 — the block-pool model reproduced a live
 vLLM under eviction pressure to the token, against predictions committed before the run)
-**Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding — changed 2026-09-30:** *keep each
-user on one GPU*; on the validated timing model session-sticky needs the fewest T4s or ties at 22 of 24
-points, and the old second half (*then route by prefix*) was falsified on re-test · 🔨 **4** — H6 and
+**Current phase:** ✅ **0** · ✅ **2b** · ✅ **3** · ✅ **5, the finding — changed 2026-09-30, narrowed
+2026-10-05:** *keep each user on one GPU* holds on three calibrations of the T4 (fewest T4s or tied at
+every load with 1 and 4 prompts; never more than round-robin or least-loaded); the second half
+(*then route by prefix*) was falsified on calibration A and holds on B and C — **not settled**; every
+count ± one · 🔨 **4** — H6 and
 R1/R2 ran on the first, context-free timing model (not yet re-run) · ✅ **6** — hit rates on two live
 T4s within 1.4% (run twice); latency explained by C2 · ✅ **C2** — context, not CPU; the context-aware
 model predicts held-out traffic within 1.41× · 🔨 **7** — demo on the validated grid, 10×/100× done,
-`kvsim calibrate` proven on a real T4 (C1); PyPI left · 🔨 **8** — the preprint rewritten around the
-reversal (optional: the project does not need it). ▶ **Next:** run C3 on Kaggle through the API —
-[`notebooks/c3_calibrate_t4.ipynb`](notebooks/c3_calibrate_t4.ipynb), registered 2026-10-01, amended
-2026-10-05, ~50 minutes; then re-run H6 and R1/R2 on the validated model.
+`kvsim calibrate` proven on a real T4 in both its forms (C1, C3); PyPI left · 🔨 **8** — the preprint
+(optional; ⚠️ it predates C3 and states the 30 Sep finding without its margin). ▶ **Next, each
+registered before it runs:** an SLO with its per-token half (the engine took 134–521 ms per token in
+C3; the cited rule allows 100) and the grid under it; the 64-prompt question over several fresh
+calibrations with the load weight fixed first; `kvsim calibrate` repeating its cells and printing a
+replica range; then H6 and R1/R2 on the validated model.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -641,7 +649,18 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       pre-flight cell repairs it, refuses a GPU that is not a T4 and checks `vllm serve --help` in
       the first minute; every early stop leaves a zip. Checked on Kaggle's own image with a probe
       notebook that starts no engine. The same wheel, traffic, predictions and rules.
-      **Left: the run itself** — now through Kaggle's API (`scripts/kaggle_run.py`)
+      ✅ **C3 RAN 2026-10-05 — all three hold, as predicted**
+      ([`report.md`](artifacts/results/c3_kaggle_t4/report.md)), through Kaggle's API
+      (`scripts/kaggle_run.py`), 2,320 s: C3a exact (exit 0 in 160 s; 9,840 of 13,776 tokens; 48 of
+      48; 1,537 blocks); C3b within 1.41× on three unseen workloads; C3c within 1.38× from numbers
+      registered four days before. ⚠️ Reported: the command's second run is 4.17× off on `K1_half`'s
+      p95 (3–5% different coefficients, at the knee); and H2b-C2's grid on the command's profile
+      matches the committed table at 122 of 144 cells, 141 within one — **but reverses H2b's
+      verdict**. Post hoc, three calibrations
+      ([`posthoc_three_calibrations.md`](artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.md)):
+      102 of 144 identical, 138 within one; sticky best or tied on all three at 19 of 24 points — 12
+      of 12 with 1 and 4 prompts. Also found in the data: the SLO has no per-token half.
+      **Left:** repeat the decode cells and print a replica range (one run is not enough at the knee)
 - [ ] **`configs/profiles/`** — committed calibration profiles keyed by
       `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
       from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no

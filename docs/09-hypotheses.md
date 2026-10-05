@@ -197,7 +197,7 @@ calibration cannot cash.
 |---|---|---|---|
 | **H1** | Prefix-affinity dominates hit rate under high sharing | Phase 4 | `[x]` ⛔ **FALSIFIED 2026-09-22 — by load.** Holds exactly at 1–2 sessions/s; gone or reversed from 3/s, where concentration forces preemption |
 | **H2** | ⭐ The crossover boundary exists and is monotonic | Phase 5 | `[x]` ⛔ **FALSIFIED 2026-09-28** — pure affinity loses at every sharing > 0 (the opposite direction); the balanced policy has no monotone boundary |
-| **H2b** | ⭐ Prefix-affinity pays once the tenants' prompts outgrow one replica's cache | Phase 5, then re-tested on C2's timing model | `[x]` ✅ held 2026-09-28 **on the first, context-free timing model** — sticky wins at K = 1; affinity holds the SLO at K = 64 where sticky cannot on 8 · ⛔ **FALSIFIED 2026-09-30 on the validated model**: at K = 64 affinity wins at no load (ties at 0.25–1 session/s, 11 T4s against sticky's 10 at 2) |
+| **H2b** | ⭐ Prefix-affinity pays once the tenants' prompts outgrow one replica's cache | Phase 5, then re-tested on C2's timing model | `[x]` ✅ held 2026-09-28 **on the first, context-free timing model** — sticky wins at K = 1; affinity holds the SLO at K = 64 where sticky cannot on 8 · ⛔ **FALSIFIED 2026-09-30 on the validated model**: at K = 64 affinity wins at no load (ties at 0.25–1 session/s, 11 T4s against sticky's 10 at 2) · ⚠️ **2026-10-05: that verdict does not survive a second calibration** — the same rules HOLD on two further calibrations of the same T4 (reported and post hoc, C3): the deciding point moves by 1–2 replicas |
 | **H3** | Single-digit-% calibration error on ≥2 shapes | Phase 3 | `[x]` ✅ **PASSED 2026-09-22** — **zero** error on 2 sequential shapes under eviction pressure (3 runs each, every counter and all 120 requests' cached tokens); **+0.3%** on the concurrent shape |
 | **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[x]` ✅ **supported, in its second amendment's form (2026-09-22):** plain LRU's residual on a live engine is **capacity** skew (−11.9 pts when requests hold decode blocks, 0.17 without); histogram counts exact, W2 distributions identical |
 | **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[~]` **holds only for balanced affinity at LOW sharing** (1–3 fewer T4s); falsified elsewhere. Session-sticky (untested) needs the fewest everywhere |
@@ -208,7 +208,7 @@ calibration cannot cash.
 | **Phase 6** | The simulator's hit rates hold on two live replicas: each within 10%, policies in the predicted order | Phase 6 | `[x]` ✅ **HOLDS 2026-09-28**, run twice — every hit rate within 1.4% · ⚠️ latency came out 5–222× the prediction (not a registered rule; explained by C2) |
 | **C1** | `kvsim calibrate` works on a real GPU: its cache check exact, the capacity it reads equal to the engine's | C1 | `[x]` ✅ **HOLDS 2026-09-28** — 48 of 48 requests; its straight-line timing fit is rough |
 | **C2** | Timing: decode slows with context (C2a); a busy second GPU slows the first (C2b); a context-aware model predicts held-out traffic within 2× (C2c) | C2 | `[x]` **2026-09-30, all three as predicted** — C2a ✅ 1.92× · C2b ⛔ 1.00× · C2c ✅ within 1.41× |
-| **C3** | The context-aware `kvsim calibrate` on a real GPU: it works (C3a); its profile predicts traffic it never saw within 2× (C3b); C2's profile predicts another day within 2×, from numbers registered before (C3c) | C3 | `[~]` **registered 2026-10-01** — `configs/c3_calibrate.yaml`; not run yet |
+| **C3** | The context-aware `kvsim calibrate` on a real GPU: it works (C3a); its profile predicts traffic it never saw within 2× (C3b); C2's profile predicts another day within 2×, from numbers registered before (C3c) | C3 | `[x]` ✅ **2026-10-05, all three as predicted** — C3a exact · C3b within 1.41× · C3c within 1.38× · ⚠️ reported: a second run of the command is 4.17× off on one number at the knee, and a second calibration reverses H2b's verdict |
 
 **Amendments:** *(add dated entries below, never edit above)*
 
@@ -1251,3 +1251,84 @@ move; the CPU's share might. **If C3c fails and C3b holds, the image is a suspec
 profile**, and the write-up must say so instead of choosing one.
 
 **"Run it once" still stands.** The attempt produced no data, so the next run is the first.
+
+### 2026-10-05 — C3 RAN: all three hold, as predicted. And a second calibration of the same GPU reverses H2b's verdict.
+Report: [`artifacts/results/c3_kaggle_t4/report.md`](../artifacts/results/c3_kaggle_t4/report.md).
+One run, started through Kaggle's API from the amended notebook at `1598673`, 2,320 s. The analysis
+refuses a run whose predictions, traces or wheel are not the registered ones; these are. The
+pre-flight repaired `torchaudio` before anything was measured.
+
+**As registered — predicted holds / holds / holds.**
+- **C3a HOLDS.** The command exits 0 in 160 s and marks the profile calibrated; its check measured
+  9,840 of 13,776 tokens, the registered prediction; all 48 requests' cached tokens equal the
+  model's; it read 1,537 blocks and the engine's log says 24,592 tokens.
+- **C3b HOLDS.** The profile it wrote predicts every held-out workload within **1.41×**: `K1_half`
+  1.04× · 1.08× (p50 · p95), `K64_quarter` 1.32× · 1.20×, and `T6_K8` — the one no design decision
+  had seen, with prompts half as long — 1.41× · 1.21×.
+- **C3c HOLDS.** C2's profile, from the numbers registered on 2026-10-01: `K1_half` 1.01× · 1.25×,
+  `K64_quarter` 1.35× · 1.21×, `T6_K8` 1.38× · 1.18× — on another day and another software image.
+- Every hit rate equals its registered prediction to four decimals (0.9230, 0.8304, 0.8517).
+
+**Reported, not tested — and two things the registration called uncomfortable happened.**
+
+1. **The two runs of the command disagree at the knee.** The second run (part 3, 25 minutes later
+   on the same engine) is exact on the check again, and its coefficients are within 5.3% of the
+   first run's (decode per context token +3.6%, prefill per token +5.3%, decode base −2.7%). Its
+   profile predicts five of the six numbers within 1.35× — and `K1_half`'s p95 at 10.9 s against
+   2.6 s measured: **4.17×**. On that 3–5% change the model goes from 4 preemptions to 30; the
+   engine had none. C3b holds as registered, on the registered run. On the other run's profile it
+   would not have. One run of the command does not promise 2× for a workload at the knee.
+2. **A second calibration does not give the same verdict on H2b** (`c3_analyze.py --grid`, the
+   registered reported item). H2b-C2's grid on the command's first profile, against the committed
+   table: **122 of 144** (K, load, policy) cells need the same number of replicas and 141 are within
+   one — but H2b's rules, unchanged, now **hold**: at 64 prompts and 2 sessions/s session-sticky
+   needs 12 T4s against balanced affinity's 11, where C2's profile gave 10 against 11.
+
+Also reported: the command's per-sequence decode term came out 0 in both runs (C2: 0.34 ms), and
+its decode fit is looser — R² 0.87 and 0.93 from 15 cells measured once, against C2's 0.98 from 56.
+C2's profile replayed at the real send times gives the same factors as its registered numbers
+(send lag ≤ 5 ms). This session was slower than C2's own on the two shared workloads: `K1_half`
+1,431 · 2,615 ms against 1,316 · 2,325 (+9%, +12%), `K64_quarter` 566 · 2,295 against 551 · 2,091
+(+3%, +10%) — another image, and the cause is not separated from ordinary session-to-session
+difference. All three profiles under-predict the two lighter workloads' p50 by 1.3–1.4×: the
+model's known weak spot, a lone sequence decoding slower than the fitted line.
+
+**Post hoc — added after seeing item 2, and labelled so.** The same grid on the command's second
+profile too ([`posthoc_three_calibrations.md`](../artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.md),
+`scripts/c3_posthoc_grid.py`). Three calibrations of one T4 — **A** C2's fit, **B** and **C** the
+command's two runs:
+- **H2b: FALSIFIED on A, HOLDS on B and on C.** The deciding comparison, session-sticky against
+  balanced affinity at 64 prompts: 5 v 5, 6 v 6, 6 v 5 replicas at 1 session/s; 10 v 11, 12 v 11,
+  12 v 10 at 2.
+- **102 of 144** cells need the same number of replicas on all three; **138** are within one; at 8
+  the calibrations disagree on whether the SLO can be held on 16 replicas at all.
+- **What survives all three.** Session-sticky needs the fewest replicas, or ties, at every load
+  with 1 prompt and with 4 (12 of 12 points); and it never needs more than round-robin or
+  least-loaded, at any of the 24 points. Over all prompts it is best or tied at 22, 20 and 20 of 24
+  points — at 19 on all three.
+- **What does not:** whether prefix routing saves a GPU at 64 prompts, with the registered weight.
+- With a load weight of 1 — Phase 5's post-hoc weight — prefix routing needs **8** T4s at 64
+  prompts and 2 sessions/s on all three, where session-sticky needs 10, 12 and 12. Post hoc twice
+  over, so not a finding.
+
+**Found while reading the data — post hoc — and a limit on every replica count in this project.**
+The SLO here is on the first token only. The engine's own inter-token latency over the three
+held-out runs was **521, 174 and 134 ms** per token. The MLPerf rule the 2-second limit was taken
+from pairs it with a per-token limit — 2,000 ms / **100 ms** for Llama3.1-8B, "Conversational" —
+and under that pair even `T6_K8`, whose p95 TTFT of 774 ms is far inside our SLO, would fail. Not
+tested here. It means the replica counts answer "how many GPUs until the first token is on time",
+not "until the answer streams at a usable speed".
+
+**What it changes.**
+- **`kvsim calibrate`** is proven on a real GPU in its context-aware form. The README says so —
+  with the caveat that near saturation one run of it is not enough.
+- **The finding.** The verdict of 2026-09-30 stays in this log as what that registered test said.
+  But "prefix routing did not save a GPU" was a statement about one calibration of our T4, and two
+  more disagree with it. What all three support is narrower and firmer: *keep each user on one GPU*
+  — best or tied at every load with one prompt and with four, and never worse than round-robin or
+  least-loaded anywhere. With 64 prompts, session-sticky and prefix routing are closer than this
+  simulator can tell apart.
+- **Every replica count** is to be read as ± one replica: that is how much calibrations of the
+  same GPU move it (over the three: 96% of cells within one, 71% identical).
+- **What would settle the open half:** a registered test over several fresh calibrations, with the
+  load weight fixed beforehand — and an SLO that has its per-token half.

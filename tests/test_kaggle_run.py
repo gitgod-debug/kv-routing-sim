@@ -111,6 +111,24 @@ def test_the_readable_log_keeps_what_was_printed_and_drops_only_progress_bars():
     assert kr.readable_log("plain text, not JSON") == "plain text, not JSON"
 
 
+def test_the_runs_own_log_is_read_not_a_log_the_notebook_wrote(tmp_path):
+    """C3's notebook writes the engine's log into its results folder. The first download took
+    THAT for the run's log, because it was the first file ending in .log (2026-10-05)."""
+    rows = [{"stream_name": "stdout", "time": 1.0, "data": "what the notebook printed\n"}]
+
+    class Api(_Api):
+        def kernels_output(self, ref, path, force=False, quiet=True):
+            out = pathlib.Path(path)
+            (out / "results").mkdir()
+            (out / "results" / "server_0.log").write_text("the ENGINE's log\n")
+            (out / "x.log").write_text(json.dumps(rows))
+            return [str(out / "results" / "server_0.log"), str(out / "x.log")], ""
+
+    files = kr.fetch(Api(), "someone/x", tmp_path)
+    assert (tmp_path / "notebook_stdout.txt").read_text() == "what the notebook printed\n"
+    assert files[-1].endswith("notebook_stdout.txt")
+
+
 def test_no_kaggle_token_is_in_the_repository():
     """A token gives full access to someone's Kaggle account. It lives where the Kaggle tool looks
     for it (~/.kaggle), never in a tracked file — and the runner neither reads nor prints one."""

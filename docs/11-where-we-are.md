@@ -1,6 +1,6 @@
 # 11 — Where we are, in plain words
 
-**Written 2026-09-22; brought up to date 2026-10-01.** Everything this project has done so far, what it found, what was decided and
+**Written 2026-09-22; brought up to date 2026-10-05.** Everything this project has done so far, what it found, what was decided and
 why, what went wrong along the way, and what is left — in plain words, for someone who has forgotten
 all of it. The other docs have the detail; this one has the story.
 
@@ -63,6 +63,15 @@ vLLM.
 **Tonight — Phase 4 started.** The measured T4 speeds now drive the simulator, costs come from real
 cited prices, and the first full calibrated sweep was designed, registered and run. Its headline:
 the simple "keep each user on one GPU" policy beat the clever cache-seeking ones (§6).
+
+**5 Oct — the measuring command proven on a real GPU, and the finding narrowed.** C3 ran on
+Kaggle (through its API now; the first attempt did not start because Kaggle had changed its
+software). All three predictions came true: `kvsim calibrate` works on a real T4, the profile it
+writes predicts traffic it never saw within 1.4×, and so does the older profile from C2. But the
+same run measured something we had not measured before: **how much the GPU counts move when the
+same GPU is calibrated again.** Mostly by nothing or by one GPU — and the test that had changed the
+headline on 30 Sep had been decided by exactly one GPU at one point. On two more calibrations it
+gave the opposite answer. So the headline now claims only what all three support (findings 21–23).
 
 **30 Sep — the timing model fixed, and the finding changed.** C2 ran on Kaggle: all three
 predictions came true — context length slows decode and prefill, CPU contention does not, and a new
@@ -151,7 +160,7 @@ on one GPU* (findings 18 and 19 below).
 17. **`kvsim calibrate` works on a real GPU** (C1): its cache check was exact on a T4 and it read the
     engine's capacity correctly. Its prefill measurements also show why a straight line is not
     enough: 0.71 ms per token up to 1,024 tokens, 1.12 ms at 2,040.
-18. ⭐ **The finding now: keep each user on one GPU.** C2 (30 Sep, registered) found why the timing
+18. ⭐ **The finding on 30 Sep — narrowed on 5 Oct, see 22: keep each user on one GPU.** C2 (30 Sep, registered) found why the timing
     model was wrong: decode and prefill get slower as the context grows, and a busy second GPU did
     *not* slow the first. A new model with a context term predicted traffic it had never seen within
     1.4×, and — checked afterwards — Phase 6's two live GPUs within 1.8×. We then re-ran the finding's
@@ -161,7 +170,7 @@ on one GPU* (findings 18 and 19 below).
     routing 11, round-robin 16). *Why it matters:* the cache model was exact from the start, and it
     was not enough — the routing answer changed with the timing model. We predicted the old finding
     would hold, and wrote down that it did not.
-19. **Prefix routing still gets the better hit rate with many prompts** (0.87 against 0.80), but it no
+19. *(On calibration A only — see 22.)* **Prefix routing still gets the better hit rate with many prompts** (0.87 against 0.80), but it no
     longer saves GPUs: every policy pays the full decode cost of the context, cached or not, and
     crowding sessions onto the GPUs that hold their prompt makes the work uneven. With a small load
     weight it saved 2 of 10 GPUs at one point — found after the test, so not a finding.
@@ -172,6 +181,29 @@ on one GPU* (findings 18 and 19 below).
     a long cached prefix plus a few new tokens, and cold prompts never measure that case. The
     command now measures it too, and the same check comes out within 1.36×. This was done after
     the fact, on old data, and is labelled so; the real test is C3, on a GPU.
+21. **`kvsim calibrate` works on a real GPU in its final form** (C3, 5 Oct, registered; all three
+    predictions true). It ran in 160 seconds on a T4, its cache check was exact again, and the
+    profile it wrote predicted three kinds of traffic it had never seen within 1.41× — one of them
+    with prompts half as long as anything tested before. C2's older profile predicted the same
+    traffic within 1.38×, from numbers written down four days earlier.
+22. ⭐ **A GPU count from this tool is good to about ± one GPU — and one of our verdicts was inside
+    that margin.** We ran the finding's grid on three calibrations of the same T4 (C2's, and the
+    command's two runs). Of 144 GPU counts, 102 are the same on all three and 138 are within one.
+    That is a good result for the tool. But the test that changed the headline on 30 Sep ("prefix
+    routing does not save a GPU at 64 prompts") was decided by 10 against 11 GPUs at one point — and
+    on the other two calibrations that point reads 12 against 11 and 12 against 10, so the same test
+    says the opposite. *What survives all three:* keep each user on one GPU — it needs the fewest
+    GPUs or ties at every load with one prompt and with four, and it is never worse than round-robin
+    or least-loaded anywhere. *What does not:* which of sticky and prefix routing wins with 64
+    prompts. *Why it matters:* a result is only as sharp as the ruler, and we had not measured the
+    ruler. Now it is measured, and the README says "± one".
+23. **Two more limits, both found in C3's data.** (a) Near the limit of a GPU, one run of the
+    measuring command is not enough: a second run 25 minutes later was 3–5% different, and that
+    made one prediction 4.2× wrong (the other five stayed within 1.35×). (b) Our speed target only
+    covers the *first* token. The rule we took it from (MLPerf) also limits the time per token — 100
+    ms for a model this size — and the live engine took 134–521 ms per token in C3. So the GPU counts
+    say when the first token is on time, not when the whole answer streams at a usable speed. Both
+    are written down as known limits; neither is fixed yet.
 
 ## 5. What we decided, and why
 
@@ -301,9 +333,9 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 | 2b | Cache model rebuilt to follow vLLM's real rules | ✅ done |
 | 3 | **The calibration** — model vs real engine, pre-registered | ✅ **done: exact** |
 | 4 | Calibrated sweep; H1, H5, H6; the load weight; real traces | ✅ mostly — H6's ranking half ⛔, its crossover half ✅; Mooncake (R1) ⛔; AgentX (R2) ✅ |
-| 5 | **The finding** — when prefix-aware routing pays | ✅ **done, and changed** — H2 ⛔; H2b ✅ on the first timing model, ⛔ on the validated one: *keep each user on one GPU* |
+| 5 | **The finding** — when prefix-aware routing pays | ✅ **done, changed, then narrowed** — H2 ⛔; H2b ✅ on the first timing model, ⛔ on calibration A of the validated one, ✅ on two more calibrations of the same T4: *keep each user on one GPU* holds on all three; the prefix-routing half is not settled |
 | 6 | Two-GPU real-engine check under pressure | ✅ **holds**, run twice — hit rates within 1.4%; ⚠️ latency 5–222× the prediction |
-| 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | 🔨 demo, figure, 10×/100× done; `kvsim calibrate` works on a real T4 (C1); its new timing fit is registered for its first real run (C3); PyPI left |
+| 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | 🔨 demo, figure, 10×/100× done; `kvsim calibrate` works on a real T4 in both its forms (C1, C3); PyPI left |
 | 8 | Write-up, launch, the upstream pull request | 🔨 the guidellm fix is ready; the preprint is drafted (`paper/`) |
 
 ## 9. What is left
@@ -324,7 +356,14 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
   on it — which changed the finding;
 - ✅ done 28 Sep: the AgentX trace (R2 holds), and a contributor guide with three good first issues;
 - ✅ done 1 Oct: `kvsim calibrate` now also times prefill after a cached prefix; C3 is registered;
-- ⭐ **next, after C3's zip comes back:** its write-up, whatever it says;
+- ✅ done 5 Oct: C3 ran (all three rules hold) and is written up, with what it changes;
+- ⭐ **next — two things C3 showed are missing, each to be registered before it is run:**
+  (1) a speed target with both halves, first token *and* time per token, and the grid re-run under
+  it; (2) the open question at 64 prompts, tested over several fresh calibrations with the load
+  weight fixed beforehand (the hint to test: a weight of 1 needed 8 GPUs on all three calibrations
+  where sticky needed 10–12);
+- also: make `kvsim calibrate` repeat its decode cells and print a GPU-count *range*, since one
+  run is not enough near the limit;
 - then: re-run H6 and the two real traces (R1, R2) on the validated timing model — they all ran on
   the first one;
 - later: the PyPI release.
@@ -343,6 +382,10 @@ text can become a blog post.
   (p95) by a lot;
 - H6 and both real-trace results (R1, R2) were run on the first timing model and have not been
   re-run on the validated one;
+- a GPU count is good to about ± one GPU: three calibrations of the same T4 agree exactly on 71%
+  of counts and within one on 96%;
+- the speed target covers the first token only, not the time per token;
+- near the limit of a GPU, one run of `kvsim calibrate` is not enough;
 - every replay is *open-loop* — real agents wait for an answer before sending the next turn, and would
   then reuse the answer's cache blocks, which we cannot measure this way;
 - one GPU type (T4) and one model (Qwen3-4B) so far;

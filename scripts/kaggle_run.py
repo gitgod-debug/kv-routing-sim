@@ -111,18 +111,19 @@ def fetch(api, ref: str, out: pathlib.Path) -> list[str]:
     """Download every output file of the latest run, and its log."""
     out.mkdir(parents=True, exist_ok=True)
     files, _ = api.kernels_output(ref, str(out), force=True, quiet=True)
-    if not any(f.endswith(".log") for f in files):  # the output listing normally carries it
+    # The run's own log is <slug>.log at the top of the output — NOT any file that ends in .log:
+    # the notebook may have written logs of its own (an engine's, say) into a folder.
+    log = out / f"{ref.split('/')[-1]}.log"
+    if not log.exists():
         try:
-            log = api.kernels_logs(ref)
+            text = api.kernels_logs(ref)
         except Exception as e:  # noqa: BLE001 - the files matter more than the log
-            log = f"(the log could not be fetched: {type(e).__name__}: {e})"
-        (out / "kaggle_execution.log").write_text(log if isinstance(log, str) else json.dumps(log))
-        files = [*files, str(out / "kaggle_execution.log")]
-    log = next((pathlib.Path(f) for f in files if f.endswith(".log")), None)
-    if log is not None and log.exists():
-        (out / "notebook_stdout.txt").write_text(readable_log(log.read_text(errors="replace")))
-        files = [*files, str(out / "notebook_stdout.txt")]
-    return files
+            text = f"(the log could not be fetched: {type(e).__name__}: {e})"
+        log = out / "kaggle_execution.log"
+        log.write_text(text if isinstance(text, str) else json.dumps(text))
+        files = [*files, str(log)]
+    (out / "notebook_stdout.txt").write_text(readable_log(log.read_text(errors="replace")))
+    return [*files, str(out / "notebook_stdout.txt")]
 
 
 def main() -> int:
@@ -148,7 +149,9 @@ def main() -> int:
     for f in files:
         print("  ", f)
     (args.out / "kaggle_run.json").write_text(json.dumps(
-        {"kernel": ref, "status": status, "failure_message": why, "notebook": str(args.notebook),
+        # The notebook's name only: whose Kaggle account ran it is not the repository's business.
+        {"kernel": ref.split("/")[-1], "status": status, "failure_message": why,
+         "notebook": str(args.notebook),
          "accelerator": args.accelerator, "files": [pathlib.Path(f).name for f in files]},
         indent=1) + "\n")
     return 0 if "COMPLETE" in status.upper() else 1

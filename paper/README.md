@@ -1,5 +1,14 @@
 # The preprint — draft
 
+> ⚠️ **This draft predates C3 (2026-10-05) and must not be published as it is.** It states the
+> finding of 2026-09-30 — session-sticky best or tied at 22 of 24 points; prefix routing saves no
+> GPU at 64 prompts — as a result about the T4. C3 showed that this is a result about *one
+> calibration* of it: on two more calibrations of the same GPU the registered test gives the
+> opposite verdict, and replica counts differ at 29% of the grid's cells, mostly by one
+> ([three calibrations](../artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.md),
+> [`docs/09-hypotheses.md`](../docs/09-hypotheses.md), 2026-10-05). The preprint is optional; if it
+> is ever published, its abstract, Table 4 and conclusion need this margin first.
+
 **When Does Prefix-Aware Routing Pay? A vLLM-Calibrated, Pre-Registered Study of KV-Cache Routing
 Across Replicas.** Five pages, two columns. Drafted 2026-09-28; due on arXiv by ~Nov 9 (cs.DC).
 

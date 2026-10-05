@@ -37,12 +37,16 @@ of claim:
 
 And separately from both, the thing a reader should be able to repeat without opening the repo:
 
-3. **The finding** *(changed 2026-09-30)* — **keep each user on one GPU.** On a T4 timing model checked
-   against the live engine, session-sticky routing needs the fewest GPUs, or ties for them, at 22 of 24
-   points, from one shared prompt to 64 tenants' prompts. *(It read "…until your tenants' prompts
-   outgrow one GPU's cache; then route by prefix" on the first, context-free timing model; re-tested
-   on the validated one, that half was falsified. Before that, a sharing-ratio × load framing — H2 —
-   was falsified too. The dated record of all of it is in [`09-hypotheses.md`](09-hypotheses.md).)*
+3. **The finding** *(changed 2026-09-30, narrowed 2026-10-05)* — **keep each user on one GPU.** On
+   three calibrations of the same T4, session-sticky routing needs the fewest GPUs, or ties for them,
+   at every load with one shared prompt and with four, and never needs more than round-robin or
+   least-loaded. **Whether routing by prefix then saves GPUs with 64 tenants' prompts is not
+   settled**, and every GPU count is ± one. *(It read "…until your tenants' prompts outgrow one
+   GPU's cache; then route by prefix" on the first, context-free timing model. Re-tested on the
+   validated one — calibration A — that half was falsified. Re-run on two more calibrations of the
+   same GPU in C3, the same test held: the three agree on a GPU count to within one, and that half
+   was decided by one. Before all that, a sharing-ratio × load framing — H2 — was falsified too. The
+   dated record of all of it is in [`09-hypotheses.md`](09-hypotheses.md).)*
 
 ---
 

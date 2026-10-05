@@ -34,9 +34,15 @@ The first public version: planned for PyPI before 2026-11-20.
 ### Known limits
 - Every millisecond, rupee and replica count from the shipped profiles is a **T4 figure**. Run
   `kvsim calibrate` for your own numbers.
-- `kvsim calibrate`'s cache check and capacity reading were proven on a real T4 (C1); its
-  context-aware timing fit so far only against the mock engine, though the same procedure predicted
-  held-out traffic on a real T4 (C2). Its first real-GPU run is registered (C3) and not yet run.
+- `kvsim calibrate` was proven on a real T4 in both its forms: the cache check and capacity reading
+  (C1), and the context-aware timing fit, whose profile predicted three unseen workloads within
+  1.41× (C3). **Near saturation one run is not enough:** a second run on the same engine differed by
+  3–5% in its coefficients, and that put one p95 4.2× off. Run it more than once if your answer sits
+  at the edge of the target.
+- A replica count is good to about ± one: three calibrations of the same T4 agree exactly on 71% of
+  the counts in the finding's grid and within one on 96%.
+- The latency target is on the first token only (p95 TTFT). Time per output token is not yet part of
+  it.
 - `kvsim calibrate` times prompts of up to 2,048 tokens and decode contexts of up to 1,024 by
   default. Longer prompts are an extrapolation unless you measure there (`--prefill-lengths`,
   `--prefill-cached`, `--decode-contexts`).
