@@ -22,6 +22,11 @@ No GPU is needed for anything except calibrating against a live engine.
 2. **Experiments are registered before they run.** A new hypothesis gets its design in `configs/`
    and a dated entry in [`docs/09-hypotheses.md`](docs/09-hypotheses.md), committed *before* the run;
    the result is a new dated entry, falsified or not. Earlier entries are never edited.
+   **And the tree stays still while a registered run is in flight:** nothing under `src/`,
+   `scripts/` or `configs/` is edited until it has finished — a results file records whether the
+   tree was clean when it started, and "the edit could not have mattered" is an argument, not a
+   record. (Learned on 2026-10-05: T2's grids B and C carry a dirty header for exactly this
+   reason, and 720 of their cells had to be run again to show it did not matter.)
 3. **No prompt text, ever.** Traces enter as chains of block hashes. An adapter hashes at its
    boundary and never writes text anywhere.
 4. **No uncited constants.** Every cost constant lives in `configs/cost_model.yaml` with a source and

@@ -11,6 +11,7 @@ import dataclasses
 import importlib.util
 import json
 import pathlib
+import subprocess
 import sys
 
 import pytest
@@ -33,7 +34,6 @@ def _load(name: str):
 
 t1 = _load("t1_itl_check")
 t2 = _load("t2_analyze")
-grid_runner = _load("run_t2_grid")
 
 # ── T1: the engine is a known profile, so a correct check must say "factor 1" ────────────────
 
@@ -250,7 +250,11 @@ def test_the_grid_runner_writes_what_the_analysis_reads(tmp_path):
     (tmp_path / "h2b.yaml").write_text(yaml.safe_dump(h2b))
     cfg = {"t2": {"h2b_config": str(tmp_path / "h2b.yaml"), "replicas_max": 3,
                   "calibrations": {"X": {"profile": str(tmp_path / "toy.json")}}}}
-    grid_runner.run_calibration("X", cfg, tmp_path / "out", workers=2)
+    (tmp_path / "t.yaml").write_text(yaml.safe_dump(cfg))
+    # As it is really run — its own process — so its worker pool is not forked from pytest's.
+    subprocess.run([sys.executable, str(REPO / "scripts" / "run_t2_grid.py"), "--config",
+                    str(tmp_path / "t.yaml"), "--out", str(tmp_path / "out"), "--workers", "2"],
+                   check=True, capture_output=True, cwd=REPO)
     grid = json.loads((tmp_path / "out" / "grid_X.json").read_text())
     assert grid["axes"] == {"prompts": [1, 2], "loads": [0.5, 2], "replicas": [1, 2, 3],
                             "seeds": [0, 1], "policies": ["session-sticky",

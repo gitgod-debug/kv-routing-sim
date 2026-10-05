@@ -1,0 +1,90 @@
+{
+ "script": "scripts/t1_posthoc_range.py",
+ "fitted": {
+  "A": {
+   "max_summed_context": 20200.0,
+   "cells": 56
+  },
+  "B": {
+   "max_summed_context": 16960.0,
+   "cells": 15
+  },
+  "C": {
+   "max_summed_context": 16960.0,
+   "cells": 15
+  }
+ },
+ "kv_cache_tokens": 24592,
+ "runs": [
+  {
+   "session": "c2",
+   "workload": "K1_half",
+   "factor": 1.7119246110667765,
+   "measured_itl_ms": 469.60943046320955,
+   "predicted_itl_ms": 803.9359415990205,
+   "decode_steps": 649,
+   "median_batch": 32,
+   "max_batch": 128,
+   "summed_context_median": 160092.0,
+   "summed_context_p95": 217906,
+   "summed_context_max": 221871,
+   "share_of_tokens_beyond_fitted_range": 0.9724609375
+  },
+  {
+   "session": "c2",
+   "workload": "K64_quarter",
+   "factor": 1.0729203073989089,
+   "measured_itl_ms": 161.02975587217333,
+   "predicted_itl_ms": 172.77209517074346,
+   "decode_steps": 4988,
+   "median_batch": 4.0,
+   "max_batch": 35,
+   "summed_context_median": 17355.0,
+   "summed_context_p95": 48522,
+   "summed_context_max": 61360,
+   "share_of_tokens_beyond_fitted_range": 0.46331380208333334
+  },
+  {
+   "session": "c3",
+   "workload": "K1_half",
+   "factor": 1.543962024965909,
+   "measured_itl_ms": 520.696706654279,
+   "predicted_itl_ms": 803.9359415990205,
+   "decode_steps": 649,
+   "median_batch": 32,
+   "max_batch": 128,
+   "summed_context_median": 160092.0,
+   "summed_context_p95": 217906,
+   "summed_context_max": 221871,
+   "share_of_tokens_beyond_fitted_range": 0.9724609375
+  },
+  {
+   "session": "c3",
+   "workload": "K64_quarter",
+   "factor": 1.0068023375473742,
+   "measured_itl_ms": 173.9436987079992,
+   "predicted_itl_ms": 172.7684692625323,
+   "decode_steps": 4988,
+   "median_batch": 4.0,
+   "max_batch": 35,
+   "summed_context_median": 17355.0,
+   "summed_context_p95": 48522,
+   "summed_context_max": 61360,
+   "share_of_tokens_beyond_fitted_range": 0.46331380208333334
+  },
+  {
+   "session": "c3",
+   "workload": "T6_K8",
+   "factor": 1.022759086300265,
+   "measured_itl_ms": 133.90805050702033,
+   "predicted_itl_ms": 136.95567538480984,
+   "decode_steps": 4266,
+   "median_batch": 8.0,
+   "max_batch": 53,
+   "summed_context_median": 13601.0,
+   "summed_context_p95": 42811,
+   "summed_context_max": 50460,
+   "share_of_tokens_beyond_fitted_range": 0.3275607638888889
+  }
+ ]
+}

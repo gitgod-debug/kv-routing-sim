@@ -1,0 +1,390 @@
+{
+ "script": "scripts/t1_itl_check.py",
+ "date_utc": "2026-10-05T11:12:53+00:00",
+ "git_sha": "0be7bec",
+ "git_dirty": false,
+ "seed": 0,
+ "hardware_path": "cpu-only",
+ "hardware": {
+  "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+  "python": "3.13.12",
+  "usable_cpus": 12,
+  "gpus": [
+   "NVIDIA GeForce GTX 1650, 4096 MiB, 7.5, 595.71.05"
+  ],
+  "gpu_name": "NVIDIA GeForce GTX 1650",
+  "gpu_memory_total": "4096 MiB",
+  "compute_capability": "7.5",
+  "driver_version": "595.71.05",
+  "mig_enabled": false,
+  "mig_mode_current": [
+   "[N/A]"
+  ]
+ },
+ "packages": {
+  "vllm": "not installed",
+  "torch": "not installed",
+  "numpy": "2.5.3",
+  "pydantic": "2.13.5",
+  "httpx": "not installed",
+  "prometheus-client": "not installed",
+  "matplotlib": "3.11.2"
+ },
+ "config": {
+  "slo": {
+   "ttft_p95_ms": 2000,
+   "tpot_p95_ms": 100,
+   "source": "https://github.com/mlcommons/inference_policies/blob/master/inference_rules.adoc (commit ff7edba545, 2026-08-20)",
+   "date": "2026-10-05"
+  },
+  "t1": {
+   "profile": "configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json",
+   "runs": [
+    {
+     "session": "c2",
+     "results": "artifacts/results/c2_kaggle_t4/c2.json",
+     "prereg": "artifacts/results/c2_prereg/predictions.json",
+     "workloads": [
+      "K1_half",
+      "K64_quarter"
+     ]
+    },
+    {
+     "session": "c3",
+     "results": "artifacts/results/c3_kaggle_t4/c3.json",
+     "prereg": "artifacts/results/c3_prereg/predictions.json",
+     "workloads": [
+      "K1_half",
+      "K64_quarter",
+      "T6_K8"
+     ]
+    }
+   ],
+   "max_factor": 1.5,
+   "reported_profiles": {
+    "B": "artifacts/results/c3_kaggle_t4/calibrated_profile_seed0.json",
+    "C": "artifacts/results/c3_kaggle_t4/calibrated_profile_seed1.json"
+   }
+  },
+  "predictions": {
+   "t1": "holds",
+   "t2a": "holds",
+   "t2b": "holds",
+   "t2c": "holds"
+  }
+ },
+ "max_factor": 1.5,
+ "runs": [
+  {
+   "session": "c2",
+   "workload": "K1_half",
+   "A": {
+    "measured_itl_ms": 469.60943046320955,
+    "predicted_itl_ms": 803.9359415990205,
+    "factor": 1.7119246110667765,
+    "predicted_tpot_p50_ms": 897.75,
+    "predicted_tpot_p95_ms": 1176.249,
+    "gaps": 30240,
+    "preemptions": {
+     "measured": 0,
+     "predicted": 6
+    },
+    "ttft": {
+     "measured": {
+      "ttft_p50_ms": 1316.1282230003053,
+      "ttft_p95_ms": 2324.7621290001916
+     },
+     "predicted": {
+      "ttft_p50_ms": 1445.3983010601235,
+      "ttft_p95_ms": 3277.289840630232
+     },
+     "factor": {
+      "p50": 1.098219972644556,
+      "p95": 1.409731257984529
+     }
+    }
+   }
+  },
+  {
+   "session": "c2",
+   "workload": "K64_quarter",
+   "A": {
+    "measured_itl_ms": 161.02975587217333,
+    "predicted_itl_ms": 172.77209517074346,
+    "factor": 1.0729203073989089,
+    "predicted_tpot_p50_ms": 152.438,
+    "predicted_tpot_p95_ms": 325.981,
+    "gaps": 30240,
+    "preemptions": {
+     "measured": 0,
+     "predicted": 0
+    },
+    "ttft": {
+     "measured": {
+      "ttft_p50_ms": 551.0856240002795,
+      "ttft_p95_ms": 2090.831961999811
+     },
+     "predicted": {
+      "ttft_p50_ms": 419.9102691840437,
+      "ttft_p95_ms": 1891.8353083004577
+     },
+     "factor": {
+      "p50": 1.3123890136603031,
+      "p95": 1.1051870915117465
+     }
+    }
+   }
+  },
+  {
+   "session": "c3",
+   "workload": "K1_half",
+   "A": {
+    "measured_itl_ms": 520.696706654279,
+    "predicted_itl_ms": 803.9359415990205,
+    "factor": 1.543962024965909,
+    "predicted_tpot_p50_ms": 897.75,
+    "predicted_tpot_p95_ms": 1176.249,
+    "gaps": 30240,
+    "preemptions": {
+     "measured": 0,
+     "predicted": 6
+    },
+    "ttft": {
+     "measured": {
+      "ttft_p50_ms": 1431.2249239999346,
+      "ttft_p95_ms": 2615.0768079999125
+     },
+     "predicted": {
+      "ttft_p50_ms": 1445.215640060411,
+      "ttft_p95_ms": 3277.565402630188
+     },
+     "factor": {
+      "p50": 1.0097753440607893,
+      "p95": 1.2533342778321552
+     }
+    }
+   },
+   "B": {
+    "measured_itl_ms": 520.696706654279,
+    "predicted_itl_ms": 784.9163185191352,
+    "factor": 1.5074347667043861,
+    "predicted_tpot_p50_ms": 880.087,
+    "predicted_tpot_p95_ms": 1154.287,
+    "gaps": 30240,
+    "preemptions": {
+     "measured": 0,
+     "predicted": 4
+    },
+    "ttft": {
+     "measured": {
+      "ttft_p50_ms": 1431.2249239999346,
+      "ttft_p95_ms": 2615.0768079999125
+     },
+     "predicted": {
+      "ttft_p50_ms": 1373.1756074929676,
+      "ttft_p95_ms": 2834.353125562302
+     },
+     "factor": {
+      "p50": 1.0422737748837154,
+      "p95": 1.0838508134413454
+     }
+    }
+   },
+   "C": {
+    "measured_itl_ms": 520.696706654279,
+    "predicted_itl_ms": 891.4019854018112,
+    "factor": 1.7119408938256742,
+    "predicted_tpot_p50_ms": 1009.922,
+    "predicted_tpot_p95_ms": 1283.749,
+    "gaps": 30240,
+    "preemptions": {
+     "measured": 0,
+     "predicted": 30
+    },
+    "ttft": {
+     "measured": {
+      "ttft_p50_ms": 1431.2249239999346,
+      "ttft_p95_ms": 2615.0768079999125
+     },
+     "predicted": {
+      "ttft_p50_ms": 1746.593718818076,
+      "ttft_p95_ms": 10894.903719134134
+     },
+     "factor": {
+      "p50": 1.2203488700691156,
+      "p95": 4.166188804017147
+     }
+    }
+   }
+  },
+  {
+   "session": "c3",
+   "workload": "K64_quarter",
+   "A": {
+    "measured_itl_ms": 173.9436987079992,
+    "predicted_itl_ms": 172.7684692625323,
+    "factor": 1.0068023375473742,
+    "predicted_tpot_p50_ms": 152.338,
+    "predicted_tpot_p95_ms": 325.981,
+    "gaps": 30240,
+    "preemptions": {
+     "measured": 0,
+     "predicted": 0
+    },
+    "ttft": {
+     "measured": {
+      "ttft_p50_ms": 566.2996439998551,
+      "ttft_p95_ms": 2295.4967070002112
+     },
+     "predicted": {
+      "ttft_p50_ms": 420.1770131836895,
+      "ttft_p95_ms": 1891.6719843000892
+     },
+     "factor": {
+      "p50": 1.347764456958251,
+      "p95": 1.2134750242386951
+     }
+    }
+   },
+   "B": {
+    "measured_itl_ms": 173.9436987079992,
+    "predicted_itl_ms": 178.5570639847307,
+    "factor": 1.026522175341781,
+    "predicted_tpot_p50_ms": 157.883,
+    "predicted_tpot_p95_ms": 331.468,
+    "gaps": 30240,
+    "preemptions": {
+     "measured": 0,
+     "predicted": 0
+    },
+    "ttft": {
+     "measured": {
+      "ttft_p50_ms": 566.2996439998551,
+      "ttft_p95_ms": 2295.4967070002112
+     },
+     "predicted": {
+      "ttft_p50_ms": 427.60904844928405,
+      "ttft_p95_ms": 1908.6066510366209
+     },
+     "factor": {
+      "p50": 1.3243397118314728,
+      "p95": 1.2027081147147103
+     }
+    }
+   },
+   "C": {
+    "measured_itl_ms": 173.9436987079992,
+    "predicted_itl_ms": 187.79848757524354,
+    "factor": 1.0796509960990452,
+    "predicted_tpot_p50_ms": 167.325,
+    "predicted_tpot_p95_ms": 351.868,
+    "gaps": 30240,
+    "preemptions": {
+     "measured": 0,
+     "predicted": 0
+    },
+    "ttft": {
+     "measured": {
+      "ttft_p50_ms": 566.2996439998551,
+      "ttft_p95_ms": 2295.4967070002112
+     },
+     "predicted": {
+      "ttft_p50_ms": 442.5287197818193,
+      "ttft_p95_ms": 1962.9611566197696
+     },
+     "factor": {
+      "p50": 1.2796901504586162,
+      "p95": 1.1694050589126632
+     }
+    }
+   }
+  },
+  {
+   "session": "c3",
+   "workload": "T6_K8",
+   "A": {
+    "measured_itl_ms": 133.90805050702033,
+    "predicted_itl_ms": 136.95567538480984,
+    "factor": 1.022759086300265,
+    "predicted_tpot_p50_ms": 125.689,
+    "predicted_tpot_p95_ms": 273.956,
+    "gaps": 45360,
+    "preemptions": {
+     "measured": 0,
+     "predicted": 0
+    },
+    "ttft": {
+     "measured": {
+      "ttft_p50_ms": 420.2701049998723,
+      "ttft_p95_ms": 774.0924709999035
+     },
+     "predicted": {
+      "ttft_p50_ms": 303.4974662184595,
+      "ttft_p95_ms": 658.6208667199571
+     },
+     "factor": {
+      "p50": 1.3847565524562206,
+      "p95": 1.1753233310918532
+     }
+    }
+   },
+   "B": {
+    "measured_itl_ms": 133.90805050702033,
+    "predicted_itl_ms": 134.97809671761863,
+    "factor": 1.0079909027616094,
+    "predicted_tpot_p50_ms": 123.903,
+    "predicted_tpot_p95_ms": 262.818,
+    "gaps": 45360,
+    "preemptions": {
+     "measured": 0,
+     "predicted": 0
+    },
+    "ttft": {
+     "measured": {
+      "ttft_p50_ms": 420.2701049998723,
+      "ttft_p95_ms": 774.0924709999035
+     },
+     "predicted": {
+      "ttft_p50_ms": 298.815551017924,
+      "ttft_p95_ms": 642.2138040116181
+     },
+     "factor": {
+      "p50": 1.406453257095254,
+      "p95": 1.205350097061912
+     }
+    }
+   },
+   "C": {
+    "measured_itl_ms": 133.90805050702033,
+    "predicted_itl_ms": 139.7048730174762,
+    "factor": 1.0432895743647015,
+    "predicted_tpot_p50_ms": 128.646,
+    "predicted_tpot_p95_ms": 274.176,
+    "gaps": 45360,
+    "preemptions": {
+     "measured": 0,
+     "predicted": 0
+    },
+    "ttft": {
+     "measured": {
+      "ttft_p50_ms": 420.2701049998723,
+      "ttft_p95_ms": 774.0924709999035
+     },
+     "predicted": {
+      "ttft_p50_ms": 311.05369247930525,
+      "ttft_p95_ms": 671.8172322186291
+     },
+     "factor": {
+      "p50": 1.3511175567473237,
+      "p95": 1.1522367005137955
+     }
+    }
+   }
+  }
+ ],
+ "worst_factor": 1.7119246110667765,
+ "decided": true,
+ "holds": false,
+ "predicted_outcome": "holds",
+ "tpot_limit_ms": 100
+}
