@@ -88,6 +88,11 @@ class RoutingPolicy(ABC):
     def on_finish(self, replica: int, request: NormalizedRequest) -> None:
         """A request routed to `replica` has emitted its last token. Only with `wants_events`."""
 
+    def stats(self) -> dict[str, object]:
+        """What the policy can say about its own decisions (how often it stuck, moved a session,
+        ...). Goes into the run's result as `router`; empty for a policy with nothing to add."""
+        return {}
+
     def __repr__(self) -> str:
         return f"{type(self).__name__}(n_replicas={self.n_replicas})"
 
