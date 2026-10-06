@@ -86,8 +86,13 @@ The first public version: planned for PyPI before 2026-11-20.
   `smetric-local` has no global cache tier — a session that moves recomputes its history — and
   the paper says its lead depends on one. It also leaves out the paper's filter on token speed.
   The balanced-affinity policy here is a hand-weighted sum, the design LMetric argues against.
+  On the one public trace they were run on (R3, first hour of the Qwen-Bailian coder trace,
+  scaled 1/16), neither needed more replicas than session-sticky under a first-token target, and
+  LMetric needed fewer on one calibration of four; with a limit on token speed as well, both
+  needed two to three fewer at the highest load — a reported number, not a tested rule.
 - **Generated sessions all have the same number of turns.** Session-sticky routing is known to
   unbalance the load when sessions differ widely in size (SMetric); traffic from `kvsim generate`
-  cannot show that. Use a real trace to check it.
+  cannot show that. Use a real trace to check it. The Qwen-Bailian hour run in R3 did not show it
+  either (the busiest replica got at most 1.14× its share): its sessions are short.
 - NVIDIA's AISimulate is a larger simulator for the same question, with timing data for many
   data-centre GPUs. See the README's scope section for how the two differ.

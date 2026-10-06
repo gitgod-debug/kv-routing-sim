@@ -53,7 +53,9 @@ And separately from both, the thing a reader should be able to repeat without op
 
    ⚠️ **It is not a new result.** SMetric (arXiv 2607.08565, July 2026) published "route agents by
    session" from production traces on 32 real GPUs, and names a weakness these grids cannot show —
-   real sessions differ widely in size. What this repo has is an independent agreement on a small
+   real sessions differ widely in size. (Its policy and LMetric's were later ported and run here
+   on a public production trace — R3: neither needed more GPUs than session-sticky under a
+   first-token target.) What this repo has is an independent agreement on a small
    calibrated model, and numbers on how far such a model's GPU count can be trusted: ± one, and
    one calibration's own spread covers the next one's count in 82% of cases, not 90 (C4).
 

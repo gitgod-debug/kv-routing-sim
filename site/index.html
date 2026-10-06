@@ -82,7 +82,9 @@
     July 2026) reached the same advice from production traces on 32 real GPUs, and LMetric (Zhang et
     al., OSDI '26) showed why a hand-set weight between cache and load has no right value. What is
     here is an independent agreement on a small calibrated model, from tests registered before they
-    ran. SMetric also names a weakness these grids cannot show: real sessions differ widely in size,
+    ran. Both published policies were then ported and run here on a public production trace: under
+    a first-token target neither needed more GPUs than session-sticky, and neither clearly fewer.
+    SMetric also names a weakness these grids cannot show: real sessions differ widely in size,
     and plain session-sticky routing then leaves the load unbalanced. Every generated session here has
     the same number of turns. NVIDIA's Dynamo ships a larger simulator for the same question
     (AISimulate). The prior-art file in the repository says what an earlier check missed.</p>

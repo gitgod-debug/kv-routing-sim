@@ -9,7 +9,9 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-10-06 (**C4 RAN on a live T4 — seven of nine rules hold.** The per-token
+**Last updated:** 2026-10-07 (**R3 ran — two of four rules hold**: the two published routing
+policies, ported and run on a public production trace; see the status lines below. Before it:
+**C4 RAN on a live T4 — seven of nine rules hold.** The per-token
 model is within 7% of the engine around the 100 ms limit, and T1's failure at the knee has its
 cause: the fitted line is 12–15% too slow at very large batches. ⛔ Two predictions failed: one
 calibration's own spread covers the next one's GPU count in 82% of cases, not 90; and with both
@@ -54,10 +56,14 @@ limit; ⛔ one calibration's spread covers the next one's count in 82% of cases,
 ships a simulator for the question; the "intersection" claim is withdrawn.
 ✅ R1 and R2 re-run on the validated model (6 Oct): R1 falsified again, within one replica;
 R2 untestable as designed; H6 not re-run, by decision.
-▶ **Now:** R3, registered 2026-10-06 (outside the plan; agreed 2026-10-06) — the two published
-policies and real sessions of unequal size, on a public production trace
-([`configs/r3_bailian.yaml`](configs/r3_bailian.yaml)). Then: the two-part target as the default;
-a warning when a workload is at the knee.
+✅ **R3 ran** (6 Oct; outside the plan, agreed 2026-10-06) — the two published policies, ported,
+and real sessions of unequal size, on a public production trace
+([`configs/r3_bailian.yaml`](configs/r3_bailian.yaml)): **two of four rules hold.** ⛔ LMetric never
+needs more replicas than session-sticky but fewer on one calibration only; ⛔ pure prefix-affinity
+does not fail on that trace; ✅ SMetric's rule within one of LMetric; ✅ balanced prefix-affinity and
+session-sticky the same everywhere. Reported: with a limit on token speed too, the published
+policies need two to three replicas fewer at the highest load.
+▶ **Now:** the two-part target as the default; a warning when a workload is at the knee.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a

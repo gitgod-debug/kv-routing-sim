@@ -215,7 +215,7 @@ calibration cannot cash.
 
 | **C4** | On a real T4: `kvsim calibrate` with its repeats (C4a); decode of batches that share a prefix — free by itself (D1a), still a straight line past the cache (D1b); an arriving request's stall = its prefill (D2); per-request token times on traffic around the limit (T3a, T3b); one run's spread covers another's count (E); the 64-prompt question on fresh fits (F1, F2) | C4 | `[x]` **2026-10-05/06 — 7 of 9 hold; predicted: all nine** — ✅ C4a · ✅ D1a (−3%, −4%) · ✅ D1b (+3% to +15%) · ✅ D2 (1.03–1.19×) · ✅ T3a (1.00×, 1.00×, 1.07×) · ✅ T3b · ⛔ **E** (82.4% covered; 90% needed; 94.9% within one more replica) · ✅ F1 (8·7·8 against 9·10·10) · ⛔ **F2** (under both halves balanced affinity is one replica below sticky at 3 and 4 of 6 loads on two of three fits) |
 | **R1, R2 again** | The two real-traffic tests on the validated timing model, on two calibrations: R1's own rules (predicted: falsified again), R1w — balanced affinity and session-sticky within one replica on Mooncake (holds), R2's own rules (holds) | R1/R2 | `[x]` **2026-10-06** — ⛔ **R1 falsified again**, on both calibrations (predicted) · ✅ **R1w holds** (predicted): the two are within one replica at every speed · ⚠️ **R2 untestable as designed**: round-robin holds the target on 8 replicas at no probe speed (predicted: holds — could not be checked) |
-| **R3** | ⚠️ *Outside the plan; agreed 2026-10-06.* The two published policies — LMetric, and SMetric's rule without its global tier — beside the seven, on Alibaba's public coder trace, on four calibrations: LMetric needs no more replicas than session-sticky and fewer somewhere (R3a); SMetric-local within one of LMetric (R3b); balanced affinity within one of session-sticky (R3c); pure prefix-affinity fails (R3d) | R3 | `[~]` **registered 2026-10-06** — `configs/r3_bailian.yaml`; not run yet |
+| **R3** | *Outside the plan; agreed 2026-10-06.* The two published policies — LMetric, and SMetric's rule without its global tier — beside the seven, on Alibaba's public coder trace, on four calibrations: LMetric needs no more replicas than session-sticky and fewer somewhere (R3a); SMetric-local within one of LMetric (R3b); balanced affinity within one of session-sticky (R3c); pure prefix-affinity fails (R3d) | R3 | `[x]` **2026-10-06 — 2 of 4 hold; predicted: all four** — ⛔ **R3a**: LMetric never needs more, but fewer on one calibration only (6 against 7 at 4×) · ✅ **R3b** · ✅ **R3c** (the same count everywhere) · ⛔ **R3d**: pure prefix-affinity needs no more than round-robin anywhere, and fewer at 4× · *reported: with a limit on token speed too, LMetric and SMetric-local need two to three replicas fewer than session-sticky at 4×* |
 
 **Amendments:** *(add dated entries below, never edit above)*
 
@@ -2103,3 +2103,118 @@ replicas — p95 TTFT 694 ms for LMetric against 813 for session-sticky; 64 prom
 - **The cache is small against this trace:** one T4 holds under 1% of the hour's distinct
   blocks. A follow-up arrives a median two minutes after its parent, and may find its history
   evicted whatever the router did. The trace's own cluster was far larger than 16 T4s.
+
+### 2026-10-06 — R3 RAN: two of four hold. LMetric never needs more replicas than session-sticky, but under the registered target it needs fewer on one calibration only; and pure prefix-affinity does not fail on this trace.
+Registered in the entry above. Runner: `scripts/run_r3.py` →
+[`grid.json`](../artifacts/results/r3_bailian/grid.json) — 5,184 runs from `d189b1a` (the commit
+that fixed the speeds), a clean tree, 3,700 s; every run completed every request. Analysis:
+`scripts/r3_analyze.py`, committed before the run →
+[`report.md`](../artifacts/results/r3_bailian/report.md), `analysis.json`.
+
+**The speeds.** By the registered rule, from the probe that ran round-robin alone (calibration A,
+one seed, before any other policy had run on this trace): round-robin holds the first-token
+target on 1, 1, 2, 4 and 8 replicas at 0.25×, 0.5×, 1×, 2× and 4× the recorded pace. The highest
+speed it holds at is 4×, so the speeds are 1×, 2× and 4×.
+
+**The registered target: p95 TTFT ≤ 2 s. Each rule on all four calibrations.**
+
+| Rule | Predicted | Result |
+|---|---|---|
+| **R3a** — LMetric needs no more replicas than session-sticky, and fewer somewhere | holds | ⛔ **does not hold** |
+| **R3b** — SMetric's rule without a global tier is within one replica of LMetric | holds | ✅ **holds** |
+| **R3c** — balanced prefix-affinity (α 16) is within one replica of session-sticky | holds | ✅ **holds** |
+| **R3d** — pure prefix-affinity fails | holds | ⛔ **does not hold** |
+
+Replicas needed. At 1× and 2× the count is the same on every calibration; at 4× it is given as
+A · s0 · s1 · s2.
+
+| Policy | 1× | 2× | 4× |
+|---|---:|---:|---|
+| round-robin | 2 | 4 | 8 · 8 · 8 · 8 |
+| least-loaded | 2 | 4 | 8 · 7 · 7 · 7 |
+| session-sticky | 2 | 4 | 7 · 7 · 7 · 7 |
+| balanced prefix-affinity, α 16 | 2 | 4 | 7 · 7 · 7 · 7 |
+| balanced prefix-affinity, α 1 | 2 | 4 | 6 · 6 · 6 · 6 |
+| pure prefix-affinity | 2 | 4 | 7 · 6 · 6 · 6 |
+| LMetric | 2 | 4 | 7 · 6 · 7 · 7 |
+| SMetric's rule, local | 2 | 4 | 6 · 6 · 6 · 6 |
+| LMetric on the dispatch record | 2 | 4 | 7 · 7 · 7 · 7 |
+
+- **R3a ⛔ — for want of a strict win.** LMetric needs more replicas than session-sticky nowhere.
+  It needs fewer at one speed on one calibration (s0 at 4×: 6 against 7). On A, s1 and s2 the two
+  need the same count at every speed, and the rule asked for "fewer somewhere" on each
+  calibration. This is the second of the two failures written down beforehand: at loads a small
+  fleet can hold, the choice among the sensible policies is worth nothing here either. The strict
+  half was the part of the prediction I had called least sure.
+- **R3b ✅.** 6 against 7 at 4× on three calibrations, 6 against 6 on the fourth, the same count at
+  1× and 2×. At the counts where the target holds the rule moved no session — at most 0.7 of
+  20,054 requests per run, at the count where session-sticky first holds it. What separates it
+  from LMetric there is that it kept 7%, 12% and 17% of the requests with the replica that held
+  their history (1,428, 2,398 and 3,509 at the three speeds, on A), and that it weighs load in
+  seconds of prefill, not in tokens.
+- **R3c ✅.** The same count at every speed on every calibration.
+- **R3d ⛔ — my prediction was wrong.** Pure prefix-affinity holds the target on as few replicas
+  as round-robin at 1× and 2×, and on fewer at 4× (7 · 6 · 6 · 6 against 8). I had predicted that
+  it would fail, because 17% of the requests start with one prefix. Its busiest replica did get
+  1.13×, 1.40× and 1.87× the mean number of requests (A, on 2, 4 and 7 replicas) — crowded, but
+  not past a 2-second first token. The crowding costs where it did in C4 (F1): in token speed,
+  below.
+
+**Reported, not tested — the same rules with p95 time per output token ≤ 100 ms as well.**
+
+| Policy | 1× | 2× | 4× |
+|---|---|---|---|
+| round-robin | 4 · 4 · 4 · 4 | 7 · 7 · 7 · 7 | 14 · 13 · 14 · 14 |
+| least-loaded | 4 · 4 · 4 · 4 | 7 · 7 · 8 · 7 | 14 · 13 · 14 · 14 |
+| session-sticky | 4 · 4 · 4 · 4 | 7 · 7 · 7 · 7 | 13 · 12 · 13 · 13 |
+| balanced prefix-affinity, α 16 | 4 · 4 · 4 · 4 | 7 · 6 · 7 · 7 | 12 · 11 · 11 · 12 |
+| balanced prefix-affinity, α 1 | 4 · 4 · 4 · 4 | 7 · 6 · 7 · 7 | 12 · 11 · 12 · 12 |
+| pure prefix-affinity | 4 · 4 · 4 · 4 | 8 · 8 · 7 · 7 | 16 · 14 · not held · not held |
+| LMetric | 4 · 3 · 4 · 4 | 6 · 6 · 6 · 6 | 11 · 10 · 11 · 11 |
+| SMetric's rule, local | 4 · 3 · 4 · 4 | 6 · 6 · 6 · 6 | 10 · 10 · 10 · 10 |
+| LMetric on the dispatch record | 4 · 4 · 4 · 4 | 6 · 6 · 6 · 6 | 11 · 10 · 11 · 11 |
+
+Under that target R3a would hold: LMetric needs 6 against 7 at 2× and 11 · 10 · 11 · 11 against
+13 · 12 · 13 · 13 at 4× — two replicas fewer on every calibration, and never more. R3b would hold
+(10 against 11 · 10 · 11 · 11 at 4×). R3c would not: balanced affinity needs 11 against 13 on s1
+at 4× — two apart; one apart on the other three. R3d would not: pure prefix-affinity needs more
+than round-robin at 4× everywhere and at 2× on A and s0, but the same at 1× everywhere and at 2×
+on s1 and s2.
+⚠️ **These are reported items.** No rule was registered on this target; the counts are the
+model's; and a fleet's per-token latency has never been measured (C4 checked one replica). They
+say what a registered test should ask next. They are not a result of this one.
+
+**Other reported items** (calibration A, at the count where session-sticky first holds the
+registered target: 2, 4 and 7 replicas).
+- **Hit rate:** round-robin 0.304, 0.285, 0.232 · session-sticky 0.338, 0.359, 0.384 · LMetric
+  0.353, 0.392, 0.425 · SMetric's rule 0.362, 0.411, 0.461 · pure prefix-affinity 0.378, 0.434,
+  0.488.
+- **p95 TTFT:** session-sticky 1,042, 950 and 999 ms; LMetric 777, 612 and 601 ms — a quarter to
+  two fifths lower at the same count. The replica count does not show it: both are far inside
+  2 s at the count where they first hold it, and both miss it one replica lower.
+- **The weakness SMetric names in session-sticky routing did not appear.** Its busiest replica
+  received at most 1.14× the mean number of requests in any cell with two or more replicas
+  (1.02–1.06× at its own counts). The sessions of this hour are short — median 1 request, 99th
+  percentile 8, most 28 — so this trace, at this scale, does not put that weakness to the test.
+  It is still untested here.
+- **LMetric on the router's own dispatch record** instead of the engine's cache events: counts
+  within one (7 · 7 · 7 · 7 against 7 · 6 · 7 · 7 at 4×), p95 TTFT 901, 714 and 685 ms against
+  777, 612 and 601. The drift costs about 15% of latency here and at most one replica.
+- **SMetric's rule did move sessions where the fleet was too small:** up to 574 per run (s1, 4×,
+  on 5 replicas) — below every count that holds the target.
+
+**What this says, and what it does not.**
+- **These are my ports, in this simulator.** Nothing here is a result about LMetric or SMetric as
+  systems: the trace is scaled 1/16, one T4's cache is under 1% of the hour's distinct blocks,
+  and SMetric's rule runs without the global cache tier its paper says its lead depends on.
+- **Reuse inside a session is under-counted, for every policy.** A follow-up's prompt contains
+  its parent's answer, and the simulator cannot know what an answer's blocks will hash to: a
+  follow-up hits its parent's prompt and recomputes the answer
+  (`traces/adapters/bailian.py`). That works against every policy that keeps a session in place.
+- **Under the registered target the nine policies are at most two replicas of eight apart, and
+  not apart at all at 1× and 2×.** One replica is what two calibrations of this GPU disagree by.
+- **"Keep each user on one GPU" was found among seven policies.** On this trace the two published
+  ones need no more replicas than session-sticky at any speed, on any calibration, under either
+  target; with a limit on token speed too they need two to three fewer at the highest load. The
+  README now says this beside the finding.
+- **Two of my four predictions failed.** R3a for want of a strict win; R3d outright.

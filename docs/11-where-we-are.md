@@ -302,6 +302,35 @@ on one GPU* (findings 18 and 19 below).
       the prompts are longer than the engine allows, and one cache miss on a normal prompt costs
       1.6 seconds. We changed nothing to rescue the test. Its old result ("the two tie exactly")
       is from the first timing model and stays labelled that way.
+32. **The two routing policies from the papers, run here for the first time — and two of my four
+    predictions failed** (R3, 6 Oct, registered first; no GPU needed).
+    - *What we did.* We wrote our own versions of the two published policies (LMetric, and
+      SMetric's rule without its shared cache store) and ran them beside our own on one hour of
+      real traffic from Alibaba's Qwen service: 20,054 requests in 12,647 sessions of very
+      different sizes. Nine policies, 1 to 16 GPUs, three speeds, four calibrations of the T4:
+      5,184 simulated runs.
+    - *With a target for the first word only, almost nothing separates the policies.* At the
+      recorded pace and at twice that pace, all nine need the same number of GPUs (2 and 4). At
+      four times the pace they need 6 to 8.
+    - *Prediction 1 failed.* I wrote that LMetric would need fewer GPUs than keep-on-one-GPU
+      somewhere. It never needs more — but it needs fewer on one calibration of four only (6
+      against 7). On the other three the two tie everywhere.
+    - *Prediction 4 failed.* I wrote that "send it to the GPU that has the prompt" would fail on
+      this trace, as it did before. It did not: it needs no more GPUs than round-robin, and fewer
+      at the highest pace. It does crowd one GPU (up to 1.87 times its share), and that shows only
+      when token speed is limited too — there it is the worst policy.
+    - *The two that held:* SMetric's rule is within one GPU of LMetric, and balanced prefix routing
+      needs exactly as many GPUs as keep-on-one-GPU, at every pace.
+    - *Not a tested rule, but worth knowing:* with a target for both speeds, the published
+      policies need 2 to 3 GPUs fewer than keep-on-one-GPU at the highest pace (11 and 10 against
+      13). That is more than the ± one GPU we can trust, so it is the next thing worth a
+      registered test.
+    - *The known weakness of keep-on-one-GPU did not show.* Its busiest GPU got at most 1.14 times
+      its share. Sessions in that hour are short (most are one request), so this trace does not
+      really test it.
+    - *What it does not say:* these are our versions of the two policies, on a trace made 16 times
+      smaller, with a cache far smaller than the real cluster's. It says nothing about the two
+      real systems.
 
 ## 5. What we decided, and why
 
@@ -484,18 +513,14 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 - ✅ done 5–6 Oct: **C4**, one GPU run, registered first (findings 28–30): seven of nine rules
   held;
 - ✅ done 5 Oct: the check of other people's work (finding 27), and the README corrected;
-- ⭐ **next — R3, registered first, no GPU needed.** The two routing policies from the papers
-  (LMetric and SMetric's rule) are now built into the simulator. R3 runs them, and our own
-  policies, on a public trace from Alibaba's Qwen service: real sessions of very different sizes —
-  the case our generated traffic cannot show;
+- ✅ done 6 Oct: **R3** (finding 32) — the two routing policies from the papers, and our own, on
+  a public trace from Alibaba's Qwen service. Two of four rules held;
 - ✅ done 6 Oct: the two older real traces (R1, R2) re-run on the checked timing model
   (finding 31);
 - then: make the target with both speeds the default (its check has passed);
 - ✅ decided 6 Oct: H6 is **not** re-run. It was tested on the first timing model only and is
   labelled so. What followed from it ("calibrate your own GPU") is built, and C3 and C4 measured
   the same thing more directly;
-- ⭐ **now — R3** (agreed on 6 Oct): the two routing policies from the papers, and our own,
-  on a public trace from Alibaba's Qwen service. Registered first; no GPU;
 - then: a warning in the tool when a workload is at the edge of a GPU (finding 28 says a number
   there cannot be trusted), and a few shared-prompt cells in `kvsim calibrate`;
 - later: the PyPI release.
@@ -529,10 +554,14 @@ text can become a blog post.
   then reuse the answer's cache blocks, which we cannot measure this way;
 - one GPU type (T4) and one model (Qwen3-4B) so far;
 - every generated session has the same number of turns, so the known weakness of "keep each user
-  on one GPU" — a few very long sessions overloading one GPU — cannot appear in our grids; and the
-  two routing policies from the papers (LMetric, SMetric) have not been run in our simulator;
-- two real trace families, both scaled down to fit a T4: Mooncake (32× smaller, sessions
-  inferred) and AgentX (coding-agent sessions, token counts 64× smaller).
+  on one GPU" — a few very long sessions overloading one GPU — cannot appear in our grids. The one
+  real trace with real sessions that we ran (finding 32) has short sessions and did not show it
+  either: it is still untested;
+- the two routing policies from the papers were run once, as our own versions, on one trace
+  (finding 32) — not on generated traffic, and not as the real systems;
+- three real trace families, all scaled down to fit a T4: Mooncake (32× smaller, sessions
+  inferred), AgentX (coding-agent sessions, token counts 64× smaller) and Qwen-Bailian (16×
+  smaller, real sessions).
 
 ## 10. Where to find things
 

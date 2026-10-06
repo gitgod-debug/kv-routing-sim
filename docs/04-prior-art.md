@@ -270,8 +270,11 @@ And the question itself is older still: **Preble** (Srivatsa et al., UC San Dieg
 that targets and optimizes for prompt sharing"*, with a scheduler that *"co-optimizes KV state reuse
 and computation load-balancing"* — in mid-2024.
 
-**The finding stands as an independent agreement on small hardware, not as a discovery.** Neither
-published policy has been run in this simulator.
+**The finding stands as an independent agreement on small hardware, not as a discovery.** Until
+2026-10-06 neither published policy had been run in this simulator. Both were then ported and run
+on a public production trace (R3, [`09-hypotheses.md`](09-hypotheses.md)): under a first-token
+target neither needs more replicas than session-sticky at any load, and LMetric needs fewer on one
+calibration of four. Those are results about this repo's ports, not about the two systems.
 
 ### `casys-kaist/LLMServingSim` — 416★ · IISWC'24, CAL'25, ISPASS'26
 
@@ -401,7 +404,8 @@ this pass it is the only ground left, and it holds only while every sentence abo
 > ⛔ **2026-10-05: it had already closed — from a side this section was not watching.** Not Vidur's
 > merge and not Frontier's next router: Dynamo's offline replay, in March 2026. Mitigation 3 below
 > reads correctly with the names changed — *pivot to being a layer on top of them.* Three ways to do
-> that, **none chosen yet:**
+> that. **The first was taken on 2026-10-06 (R3: two of its four registered rules held); the other
+> two are open:**
 >
 > 1. **Replicate the published schedulers here.** Add LMetric and an SMetric-style policy to the
 >    seven, and register a test on the public Qwen-Bailian traces — real sessions of unequal size,
