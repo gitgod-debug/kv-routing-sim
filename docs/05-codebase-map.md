@@ -152,6 +152,19 @@ Two classes, and the distinction is enforced:
   and applies its H1/H5 rules → `artifacts/results/phase4_sweep_t4/`. Deterministic: a re-run
   reproduces every cell.
 
+- **Later experiments, each with its config in `configs/` and its dated entries in
+  [`09-hypotheses.md`](09-hypotheses.md)** — the same three steps every time: a `*_prepare.py` (or
+  the config alone, for CPU-only tests) that is committed with its predictions *before* the run, a
+  runner, and an analysis that was committed before the run too:
+
+  | Experiment | Scripts | Results |
+  |---|---|---|
+  | Phase 5 (H2, H2b), H6 | `run_phase5.py`, `run_h6.py`, `run_h6_crossover.py` | `phase5_crossover/`, `h6_*/` |
+  | Real traces R1, R2 — and again on the validated timing model | `run_realtrace.py`; `run_realtrace_ctx.py` (derives one config per calibration, runs the first unchanged) | `realtrace_mooncake/`, `realtrace_agentx/`, `realtrace_ctx/` |
+  | Phase 6, C1–C4 (GPU, Kaggle) | `phase6_*.py`, `c1_*.py` … `c4_*.py` — `prepare` builds the notebook with the wheel inside, `dryrun` runs it against the mock engine, `analyze` is the registered analysis; `kaggle_run.py` pushes a notebook and fetches its output | `phase6_kaggle_t4/`, `c1_…` … `c4_kaggle_t4/` |
+  | H2b on the validated model; T1, T2 (the per-token half) | `run_h2b_c2.py`; `t1_itl_check.py`, `run_t2_grid.py`, `t2_analyze.py`, `t2_verify_grid.py` | `h2b_c2/`, `t1_itl/`, `t2_two_part_slo/` |
+  | Post hoc, and named so | `*_posthoc*.py` — each says in its first lines that it was written after a result | beside the result it explains |
+
 `_spike_common.py` holds the shared header/results helpers, adapted from the sibling project
 (`colpali-economics`) so both repos' artifacts are readable the same way.
 
