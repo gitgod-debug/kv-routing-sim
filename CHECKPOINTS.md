@@ -806,13 +806,21 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       `least-tokens` policy that tests the open least-loaded question, `--format html`, and per-cell
       bootstrap CIs by session. The adapter issue waits until AgentX's format is checked. Open them
       once the repo is public; then review the PRs properly
-- [ ] README **numbers-first**, with **the credential and the finding in separate sections**
-- [ ] Write the README against the **three readers** in
+- [x] README **numbers-first**, with **the credential and the finding in separate sections** —
+      2026-10-06: the first screen is one table (engine and version, the flag, the two counters, the
+      GPU; cache error, timing errors; the finding and that it is not new; the upstream fix), then a
+      short status box. The finding and the Real-Engine Calibration Report stay separate sections
+- [~] *(2026-10-06: the 30-second reader's words and the 2-minute reader's four lines are on the first screen —
+      the fourth, the merged PR, reads "not yet submitted" until it is; the engineer's path is
+      the ADRs, the residual, 10×/100× and `04-prior-art.md`.)*
+      Write the README against the **three readers** in
       the deployment notes: the 30-second reader (needs the
       grep targets *visible* — engine, version, metric names, GPU), the 2-minute reader (needs four
       lines), and the 30–60-minute engineer who asks *"isn't this just Vidur?"* (needs the ADRs and the
       residual)
-- [ ] Scope discipline in the README from day one: vs `cachetrace` (multi-replica policy choice, not
+- [x] *(2026-10-06: the scope section now starts with what is closest — NVIDIA's simulator, and
+      LMetric, SMetric and Preble — before Vidur, Frontier and `cachetrace`.)*
+      Scope discipline in the README from day one: vs `cachetrace` (multi-replica policy choice, not
       single-path linting) · vs **Vidur** (cache-aware *policy* choice, not parallelism/capacity planning) ·
       vs **Frontier** (reads *your* log and *recommends*, rather than being configured by hand)
 - [ ] Show HN + X thread, with the engine and version
@@ -842,7 +850,8 @@ Check every one before anything is published.
       *"0 results"*, *"Vidur has no prefix-cache model"*, *"nothing else validates against a live engine"*,
       and the nonexistent metric name. **Six sentences were added on 2026-10-05** — among them *"the
       recommendation is the output nobody else produces"* and *"we found that sessions should stay on
-      one GPU"*
+      one GPU"*. *(Searched on 2026-10-06 in the README, the demo page, CONTRIBUTING, the changelog
+      and `src/`: none left. Search again on the day of publishing.)*
 - [ ] ~~**The claim is stated as an intersection**, with the four competitors named~~ — the
       intersection claim was **withdrawn 2026-10-05** (NVIDIA's simulator occupies it; the routing
       result was already published). The gate is now: **the README names AISimulate/DynoSim, LMetric
