@@ -3,18 +3,20 @@
 ⭐ THE FIDELITY DECISION, AND IT IS THE MOST IMPORTANT ONE IN THE POLICY LAYER.
 
 This router does NOT read the replicas' caches. It keeps its OWN map of block -> replica, built
-only from what it has dispatched — the approximate mode of Dynamo's router, and the tree most small
-open-source routers keep. (Until 2026-10-05 this said "exactly as SGLang's router and Dynamo's
-KV-aware router do". Dynamo's default is the opposite: its tree is built from the engines' own
-cache events — policies/base.py, docs/04-prior-art.md §2a.) Two consequences, both deliberate:
+only from what it has dispatched — the DISPATCH VIEW of policies/base.py: the approximate mode of
+Dynamo's router, and the tree most small open-source routers keep. Two consequences, both
+deliberate:
 
   * Its view DRIFTS. When a replica evicts a block, this router does not find out. It keeps routing
     to a replica that no longer has the prefix, and the hit it predicted does not happen. That drift
-    is real, it is what production routers actually suffer, and it is part of what the calibration
-    has to reproduce.
-  * ⛔ A variant of THIS policy that queried the true caches would score higher, and its number
-    would then be another router's — one fed by the engine's cache events. Publishing it as this
-    policy's benefit would overstate the case for the policy this project started out arguing for.
+    is real for a router of this kind, and it is part of what the calibration has to reproduce.
+  * ⛔ This policy must not peek at the true caches: its numbers would then be another router's.
+
+⚠️ CORRECTED 2026-10-05. This docstring said the dispatch view is "exactly as SGLang's router and
+Dynamo's KV-aware router do", and that a view of the true caches "would be pure fiction". Dynamo's
+default is the opposite — its KvIndexer is "a prefix tree built from worker-reported KV events" —
+and so is the LMetric authors' router. For those the true view is the real one, late by an event
+(docs/04-prior-art.md §2a). `policies/lmetric.py` can use either; this policy uses only its own.
 
 ⭐ AND A BLOCK LIVES ON MANY REPLICAS AT ONCE. The map is block -> SET of replicas, not
 block -> one replica. Each replica that serves a prefix caches its OWN copy, so after a shared
