@@ -1,0 +1,172 @@
+date_utc   2026-10-05T16:48:57+00:00
+platform   Linux-6.18.48+-x86_64-with-glibc2.39
+python     3.13.15
+cpu_count  4
+gpus       0, Tesla T4, 15360 MiB, 7.5, 580.178.04
+1, Tesla T4, 15360 MiB, 7.5, 580.178.04
+kaggle     True
+[?25h[31mERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+bigframes 2.48.0 requires google-cloud-bigquery-storage<3.0.0,>=2.30.0, which is not installed.
+grpcio-tools 1.71.2 requires protobuf<6.0dev,>=5.26.1, but you have protobuf 7.36.2 which is incompatible.
+google-cloud-aiplatform 2.3.0 requires protobuf!=4.21.0,!=4.21.1,!=4.21.2,!=4.21.3,!=4.21.4,!=4.21.5,<7.0.0,>=3.20.2, but you have protobuf 7.36.2 which is incompatible.
+ydata-profiling 4.18.4 requires numba<0.63,>=0.60, but you have numba 0.65.0 which is incompatible.
+dask-cuda 26.2.0 requires cuda-core==0.3.*, but you have cuda-core 1.2.1 which is incompatible.
+pylibcudf-cu12 26.2.1 requires cuda-python<13.0,>=12.9.2, but you have cuda-python 13.4.1 which is incompatible.
+numba-cuda 0.22.2 requires cuda-core<1.0.0,>=0.3.2, but you have cuda-core 1.2.1 which is incompatible.
+libcuml-cu12 26.2.0 requires cuda-toolkit[cublas,cufft,curand,cusolver,cusparse]==12.*, but you have cuda-toolkit 13.0.3.0 which is incompatible.
+rmm-cu12 26.2.0 requires cuda-python<13.0,>=12.9.2, but you have cuda-python 13.4.1 which is incompatible.
+cuml-cu12 26.2.0 requires cuda-python<13.0,>=12.9.2, but you have cuda-python 13.4.1 which is incompatible.
+cuml-cu12 26.2.0 requires cuda-toolkit[cublas,cufft,curand,cusolver,cusparse]==12.*, but you have cuda-toolkit 13.0.3.0 which is incompatible.
+cuml-cu12 26.2.0 requires numba<0.62.0,>=0.60.0, but you have numba 0.65.0 which is incompatible.
+pylibraft-cu12 26.2.0 requires cuda-python<13.0,>=12.9.2, but you have cuda-python 13.4.1 which is incompatible.
+cuvs-cu12 26.2.0 requires cuda-python<13.0,>=12.9.2, but you have cuda-python 13.4.1 which is incompatible.
+google-ai-generativelanguage 0.6.15 requires protobuf!=4.21.0,!=4.21.1,!=4.21.2,!=4.21.3,!=4.21.4,!=4.21.5,<6.0.0dev,>=3.20.2, but you have protobuf 7.36.2 which is incompatible.
+ydf 0.15.0 requires protobuf<7.0.0,>=5.29.1, but you have protobuf 7.36.2 which is incompatible.
+cudf-cu12 26.2.1 requires cuda-python<13.0,>=12.9.2, but you have cuda-python 13.4.1 which is incompatible.
+cudf-cu12 26.2.1 requires cuda-toolkit[nvcc,nvrtc]==12.*, but you have cuda-toolkit 13.0.3.0 which is incompatible.
+cudf-cu12 26.2.1 requires numba<0.62.0,>=0.60.0, but you have numba 0.65.0 which is incompatible.
+libcuvs-cu12 26.2.0 requires cuda-toolkit[cublas,curand,cusolver,cusparse]==12.*, but you have cuda-toolkit 13.0.3.0 which is incompatible.
+libraft-cu12 26.2.0 requires cuda-toolkit[cublas,curand,cusolver,cusparse]==12.*, but you have cuda-toolkit 13.0.3.0 which is incompatible.
+grpcio-status 1.71.2 requires protobuf<6.0dev,>=5.26.1, but you have protobuf 7.36.2 which is incompatible.
+google-adk 2.7.1 requires opentelemetry-api<=1.42.1,>=1.39, but you have opentelemetry-api 1.45.0 which is incompatible.
+google-adk 2.7.1 requires opentelemetry-sdk<=1.42.1,>=1.39, but you have opentelemetry-sdk 1.45.0 which is incompatible.[0m[31m
+[0mtorch       {'version': '2.13.0+cu130', 'cuda_build': '13.0', 'cuda_available': True, 'device': 'Tesla T4'}
+torchaudio  {'installed': True, 'version': '2.11.0', 'ok': True}
+torchvision {'installed': True, 'version': '0.28.0', 'ok': True}
+torchcodec  {'installed': True, 'version': '0.17.0', 'ok': True}
+  repaired torchaudio: was 2.11.0+cu128 — RuntimeError: Detected that PyTorch and TorchAudio were compiled with different CUDA versions. PyTorch has CUDA version 
+    did: pip install -q --no-deps --force-reinstall --index-url https://pypi.org/simple torchaudio==2.11.0
+    now: {'installed': True, 'version': '2.11.0', 'ok': True}
+vllm        its command line starts ✓ · 1 repair step(s) · pre-flight saved
+installed
+usage: kvsim calibrate [-h] [--engine ENGINE] --out OUT [--model MODEL]
+packages: {'vllm': '0.30.0', 'torch': '2.13.0', 'transformers': '5.16.1', 'triton': '3.7.1'}
+
+vllm 0.30.0: 2,681 source files read
+── the simulator cites
+  OK  null block reserved at start-up              v1/core/block_pool.py
+  OK  uncached blocks reused first (prepend)       v1/core/block_pool.py
+  OK  finished requests freed tail-first           v1/core/single_type_kv_cache_manager.py
+  OK  lookup capped at prompt_length - 1           v1/core/kv_cache_manager.py
+  OK  queries counted at admission only            v1/core/sched/scheduler.py
+  OK  eviction event fired before hash check       v1/core/block_pool.py
+  OK  block access history bounded to 4            v1/core/kv_cache_metrics.py
+  OK  reset also clears block metrics              v1/core/block_pool.py
+  OK  async scheduler caches on each output        v1/core/sched/async_scheduler.py
+  OK  full-prompt admission check, default on      config/scheduler.py
+  OK  admission watermark, default 0               config/scheduler.py
+── this notebook uses
+  OK  metric vllm:prefix_cache_queries             v1/metrics/loggers.py
+  OK  metric vllm:prefix_cache_hits                v1/metrics/loggers.py
+  OK  metric vllm:prompt_tokens_by_source          v1/metrics/loggers.py
+  OK  metric vllm:num_preemptions                  v1/metrics/loggers.py
+  OK  metric vllm:kv_block_lifetime_seconds        v1/metrics/loggers.py
+  OK  metric vllm:kv_block_idle_before_evict_seconds v1/metrics/loggers.py
+  OK  metric vllm:kv_block_reuse_gap_seconds       v1/metrics/loggers.py
+  OK  metric vllm:num_requests_running             v1/metrics/loggers.py
+  OK  flag --num-gpu-blocks-override               engine/arg_utils.py
+  OK  flag --enable-prompt-tokens-details          entrypoints/.../serving.py
+  OK  request field ignore_eos                     sampling_params.py
+  OK  POST /reset_prefix_cache                     entrypoints/serve/dev/cache/api_router.py
+  OK  GET /server_info                             entrypoints/serve/instrumentator/metrics.py
+  OK  vllm:prefix_cache_hit_rate does not exist (ADR-008)
+long_below ✓  240 requests · prompts 1550–1850 tokens · fingerprint df97e84362d824b9…
+short_at ✓  384 requests · prompts 630–1130 tokens · fingerprint 620bf0f6c911bc26…
+long_above ✓  384 requests · prompts 1550–1850 tokens · fingerprint 4ae26ad8396f1369…
+predictions ✓ 818e2c9522231f9e…
+
+Registered for profile A, one replica (hit rate; the rest is in PRED):
+  long_above profile A 0.9226
+  long_below profile A 0.9214
+  short_at profile A 0.8465
+server helpers ready
+launched replica 0: GPU 0, port 8000
+    ...30s  (APIServer pid=247) Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to 
+    ...60s  (EngineCore pid=316) ERROR 10-05 16:56:38 [fa_utils.py:212] Cannot use FA version 2 is not supported due to FA
+    ...90s  (EngineCore pid=316) Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to
+    ...120s  (EngineCore pid=316) INFO 10-05 16:57:33 [utils.py:320] Using LBNHC KV cache layout.
+    ...150s  (EngineCore pid=316) INFO 10-05 16:58:11 [backends.py:393] Compiling a graph for compile range (1, 8192) takes
+    ...180s  (EngineCore pid=316) INFO 10-05 16:58:36 [kernel_warmup.py:185] JIT kernel warmup finished in 0.00s.
+    ...210s  (EngineCore pid=316) INFO 10-05 16:59:13 [gpu_worker.py:888] Free memory on device (14.46/14.56 GiB) on startu
+  replica 0 ready in 220s
+  replica 0: {'kv_cache_size_tokens_logged': 24592, 'expected_tokens': 24592, 'override_logged': True}
+client, the command, the decode cells, the held-out run and saving ready
+warm-up done: both replicas report cached_tokens, exact lengths and every counter
+one chunk per token ✓ · engine-side inter-token latency ✓
+vllm:request_time_per_output_token_seconds: 19 bounds, one at 0.1 s ✓
+$ /usr/bin/python3 -m kv_routing_sim.cli calibrate --engine http://127.0.0.1:8000 --model Qwen/Qwen3-4B --out c4_results/calibrated_profile_seed0.json --seed 0 --check-sessions 16 --check-turns 3 --max-error 0.05 --token-range 1000,30000
+engine   http://127.0.0.1:8000 · vLLM 0.30.0 · Qwen/Qwen3-4B · GPU Tesla T4
+         KV capacity: 1,537 blocks, from vllm:cache_config_info in /metrics
+decode   39.9 ms + 0.12 ms × batch + 3.83 ms per 1K context tokens  (R² 0.98, 45 measurements of 15 cells: contexts 32 512 1024)
+prefill  0.285 ms per new token + 0.759 ms per new token per 1K attended + 0.0 ms  (R² 1.00, 51 requests, 27 after a cached prefix)
+repeats  the same fit on each of the 3 repeats alone: decode 38.1–40.8 ms + 0.07–0.19 × batch + 3.79–3.91 per 1K context; prefill 0.259–0.306 per token + 0.743–0.773 per 1K attended
+check    hit rate: engine 0.7143, model 0.7143 → error 0.00% over 48 requests
+         per-request cached tokens: 48 of 48 equal
+wrote c4_results/calibrated_profile_seed0.json — calibrated. Use it: kvsim replay <trace> --profile c4_results/calibrated_profile_seed0.json
+
+
+exit code 0 · 358.8 s · calibrated True · check requests equal 48/48 (registered 48) · blocks read 1537
+saved c4_results.zip
+  control rep 0  unique prompts  L  1408  b   8  step    83.5 ms  ✓
+  control rep 0  unique prompts  L  1408  b  12  step   107.6 ms  ✓
+  shared  rep 0  prefix 1360 + 48  b   8  step    81.5 ms  preemptions 0  cached ['1360']  ✓
+  shared  rep 0  prefix 1360 + 48  b  12  step   102.7 ms  preemptions 0  cached ['1360']  ✓
+  shared  rep 0  prefix 1360 + 48  b  16  step   122.0 ms  preemptions 0  cached ['1360']  ✓
+  shared  rep 0  prefix 1360 + 48  b  32  step   206.7 ms  preemptions 0  cached ['1360']  ✓
+  shared  rep 0  prefix 1360 + 48  b  64  step   342.1 ms  preemptions 0  cached ['1360']  ✓
+  shared  rep 0  prefix 1360 + 48  b  96  step   494.3 ms  preemptions 0  cached ['1360']  ✓
+  shared  rep 0  prefix 1360 + 48  b 128  step   636.2 ms  preemptions 0  cached ['1360']  ✓
+saved c4_results.zip
+  control rep 1  unique prompts  L  1408  b   8  step    83.3 ms  ✓
+  control rep 1  unique prompts  L  1408  b  12  step   106.8 ms  ✓
+  shared  rep 1  prefix 1360 + 48  b   8  step    81.2 ms  preemptions 0  cached ['1360']  ✓
+  shared  rep 1  prefix 1360 + 48  b  12  step   102.7 ms  preemptions 0  cached ['1360']  ✓
+  shared  rep 1  prefix 1360 + 48  b  16  step   122.4 ms  preemptions 0  cached ['1360']  ✓
+  shared  rep 1  prefix 1360 + 48  b  32  step   207.3 ms  preemptions 0  cached ['1360']  ✓
+  shared  rep 1  prefix 1360 + 48  b  64  step   342.4 ms  preemptions 0  cached ['1360']  ✓
+  shared  rep 1  prefix 1360 + 48  b  96  step   493.8 ms  preemptions 0  cached ['1360']  ✓
+  shared  rep 1  prefix 1360 + 48  b 128  step   632.1 ms  preemptions 0  cached ['1360']  ✓
+saved c4_results.zip
+  stall rep 0  b   8  + 128 new tokens after 2.0 s:  gap   260.4 ms against the usual   81.3 ms  at token [20, 21]  late TTFT  402.8 ms  ✓
+  stall rep 0  b  32  + 128 new tokens after 5.0 s:  gap   364.9 ms against the usual  208.9 ms  at token [16, 17]  late TTFT  734.7 ms  ✓
+  stall rep 0  b  64  + 128 new tokens after 9.5 s:  gap   517.0 ms against the usual  347.5 ms  at token [17, 19]  late TTFT 1180.1 ms  ✓
+  stall rep 1  b   8  + 128 new tokens after 2.0 s:  gap   260.7 ms against the usual   81.3 ms  at token [20, 21]  late TTFT  402.4 ms  ✓
+  stall rep 1  b  32  + 128 new tokens after 5.0 s:  gap   361.3 ms against the usual  208.4 ms  at token [16, 18]  late TTFT  737.2 ms  ✓
+  stall rep 1  b  64  + 128 new tokens after 9.5 s:  gap   521.6 ms against the usual  347.8 ms  at token [16, 18]  late TTFT  917.7 ms  ✓
+saved c4_results.zip
+  long_below hit 0.9214 (0.9214) · TTFT p95 507 ms (400) · ms per token p50 63.1, p95 82.6 (82.9) · at or under 100 ms: client 100.0%, engine 100.0% (100.0%) · preemptions 0 · 0 invalid · send lag ≤ 1 ms     [in brackets: registered for profile A]
+saved c4_results.zip
+  short_at   hit 0.8465 (0.8465) · TTFT p95 471 ms (382) · ms per token p50 62.7, p95 104.2 (104.3) · at or under 100 ms: client 90.6%, engine 90.6% (91.4%) · preemptions 0 · 0 invalid · send lag ≤ 2 ms     [in brackets: registered for profile A]
+saved c4_results.zip
+  long_above hit 0.9226 (0.9226) · TTFT p95 954 ms (736) · ms per token p50 107.5, p95 279.7 (298.5) · at or under 100 ms: client 47.7%, engine 47.7% (46.1%) · preemptions 0 · 0 invalid · send lag ≤ 1 ms     [in brackets: registered for profile A]
+saved c4_results.zip
+$ /usr/bin/python3 -m kv_routing_sim.cli calibrate --engine http://127.0.0.1:8000 --model Qwen/Qwen3-4B --out c4_results/calibrated_profile_seed1.json --seed 1 --check-sessions 16 --check-turns 3 --max-error 0.05 --token-range 1000,30000
+engine   http://127.0.0.1:8000 · vLLM 0.30.0 · Qwen/Qwen3-4B · GPU Tesla T4
+         KV capacity: 1,537 blocks, from vllm:cache_config_info in /metrics
+decode   40.9 ms + 0.09 ms × batch + 3.76 ms per 1K context tokens  (R² 0.97, 45 measurements of 15 cells: contexts 32 512 1024)
+prefill  0.301 ms per new token + 0.767 ms per new token per 1K attended + 5.5 ms  (R² 1.00, 51 requests, 27 after a cached prefix)
+repeats  the same fit on each of the 3 repeats alone: decode 40.9–41.1 ms + 0.08–0.09 × batch + 3.75–3.77 per 1K context; prefill 0.299–0.303 per token + 0.760–0.775 per 1K attended
+check    hit rate: engine 0.7143, model 0.7143 → error 0.00% over 48 requests
+         per-request cached tokens: 48 of 48 equal
+wrote c4_results/calibrated_profile_seed1.json — calibrated. Use it: kvsim replay <trace> --profile c4_results/calibrated_profile_seed1.json
+
+
+exit code 0 · 358.3 s · calibrated True · check requests equal 48/48 (registered 48) · blocks read 1537
+saved c4_results.zip
+$ /usr/bin/python3 -m kv_routing_sim.cli calibrate --engine http://127.0.0.1:8000 --model Qwen/Qwen3-4B --out c4_results/calibrated_profile_seed2.json --seed 2 --check-sessions 16 --check-turns 3 --max-error 0.05 --token-range 1000,30000
+engine   http://127.0.0.1:8000 · vLLM 0.30.0 · Qwen/Qwen3-4B · GPU Tesla T4
+         KV capacity: 1,537 blocks, from vllm:cache_config_info in /metrics
+decode   40.9 ms + 0.09 ms × batch + 3.76 ms per 1K context tokens  (R² 0.97, 45 measurements of 15 cells: contexts 32 512 1024)
+prefill  0.310 ms per new token + 0.763 ms per new token per 1K attended + 4.6 ms  (R² 1.00, 51 requests, 27 after a cached prefix)
+repeats  the same fit on each of the 3 repeats alone: decode 40.8–40.9 ms + 0.09–0.10 × batch + 3.76–3.76 per 1K context; prefill 0.307–0.315 per token + 0.757–0.774 per 1K attended
+check    hit rate: engine 0.7143, model 0.7143 → error 0.00% over 48 requests
+         per-request cached tokens: 48 of 48 equal
+wrote c4_results/calibrated_profile_seed2.json — calibrated. Use it: kvsim replay <trace> --profile c4_results/calibrated_profile_seed2.json
+
+
+exit code 0 · 358.3 s · calibrated True · check requests equal 48/48 (registered 48) · blocks read 1537
+saved c4_results.zip
+
+saved c4_results.zip (0.1 MB)
+⭐ c4_results.zip is complete — then the clean-up cell.
+pid, used_gpu_memory [MiB]

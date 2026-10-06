@@ -1,0 +1,24 @@
+{
+ "kernel": "kvsim-c4-per-token-t4",
+ "status": "KernelWorkerStatus.COMPLETE",
+ "failure_message": "",
+ "notebook": "notebooks/c4_per_token_t4.ipynb",
+ "accelerator": "NvidiaTeslaT4",
+ "files": [
+  "c4_results.zip",
+  "c4.json",
+  "calibrate_seed0_stderr.txt",
+  "calibrate_seed0_stdout.txt",
+  "calibrate_seed1_stderr.txt",
+  "calibrate_seed1_stdout.txt",
+  "calibrate_seed2_stderr.txt",
+  "calibrate_seed2_stdout.txt",
+  "calibrated_profile_seed0.json",
+  "calibrated_profile_seed1.json",
+  "calibrated_profile_seed2.json",
+  "preflight.json",
+  "server_0.log",
+  "kvsim-c4-per-token-t4.log",
+  "notebook_stdout.txt"
+ ]
+}

@@ -99,8 +99,10 @@
   </div>
   <p class="note"><strong>Scope, before you trust it.</strong> Generated agentic traffic, Qwen3-4B, T4
     timings from a context-aware model that predicted held-out traffic within 1.41× and, after the fact,
-    two live T4s within 1.02–1.79× (C2). The target is on the first token only; time per token is not
-    yet part of it. <strong>This finding changed twice.</strong> On the first, context-free timing
+    two live T4s within 1.02–1.79× (C2). The target is on the first token only. With a limit on the
+    time per token as well (100 ms), the simulator needs about twice as many GPUs; its per-token
+    model was checked on a live T4 on 2026-10-05 (C4: within 7% on three workloads around the
+    limit, on one replica). <strong>This finding changed twice.</strong> On the first, context-free timing
     model — 5–222× optimistic on live GPUs — prefix routing won once prompts outgrew one GPU's cache.
     Re-tested on the validated model (2026-09-30, calibration A), that half was falsified. On
     2026-10-05 the same test was run on two more calibrations of the same T4 (B and C, written by

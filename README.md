@@ -6,7 +6,7 @@ Give it your serving log. It returns a routing policy, a replica count, and a co
 prefix-cache model is calibrated against a live vLLM's own Prometheus counters, and **the calibration error
 is published**.
 
-> ## 🚧 Status (2026-10-05): the cache model, the timing model and `kvsim calibrate` are all checked against a live engine — and the last check measured how far a GPU count can be trusted.
+> ## 🚧 Status (2026-10-06): the cache model, both halves of the timing model and `kvsim calibrate` are checked against a live engine — and the checks measured how far a GPU count can be trusted.
 > The Real-Engine Calibration Report below is filled in from a live vLLM, against predictions committed
 > before the run. On **two live T4s** (Phase 6, run twice) every hit rate matched within 1.4% — but the
 > first timing model was 5–222× optimistic on latency. **C2** (registered) found why — decode and
@@ -17,8 +17,11 @@ is published**.
 > one replica at 96% of points — **and that the test behind half of the headline was decided inside
 > that margin** (below). Replica counts are T4 figures on generated traffic, ± one, **and for the
 > first token only: under a target that also limits token speed the simulator needs about twice
-> as many GPUs — a factor its per-token model has not yet earned (T1 and T2, in the scope note
-> below).** ⚠️ **And the routing result is not new:** a prior-art check on 2026-10-05 found it
+> as many GPUs.** **C4** (registered, run 2026-10-05; 7 of its 9 rules hold) checked the model
+> behind that factor on a live T4: its p95 time per token is within 7% of the engine's on three
+> workloads around the limit. It also found that one calibration's own repeats do **not** cover
+> the next calibration's GPU count often enough — 82% of cases, 90% was the rule (the scope note
+> and the calibration section, below). ⚠️ **And the routing result is not new:** a prior-art check on 2026-10-05 found it
 > published already (SMetric, LMetric), and found that NVIDIA ships a larger simulator for the same
 > question — see the note under the finding, and the scope section. Every number
 > still written as `TBD — not yet measured` **is exactly that**; see the honesty gates in
@@ -79,11 +82,17 @@ above shows.*
   GPUs depends on the calibration. With the registered load weight, session-sticky needs 10 against
   11 on A, 12 against 11 on B, 12 against 10 on C. The three calibrations differ by a few percent in
   their coefficients; at this point that is one or two GPUs, and the sign of the answer.
-- **Found after the tests, so not a finding — and it is a first-token effect:** with a load weight
-  of 1, prefix routing needs 8 GPUs at 64 prompts and 2 sessions/s on all three calibrations, where
-  session-sticky needs 10 to 12. But under a target that also limits token speed (T2, exploratory)
-  the same policy holds nothing there on 32 replicas: it wins the first token by crowding sessions
-  onto the replicas that hold their prompt, and crowding is what makes tokens slow.
+- **Found after the tests, then tested (C4, F1 — holds) — and it is a first-token effect:** with a
+  load weight of 1, prefix routing needs 8 GPUs at 64 prompts and 2 sessions/s on calibrations A, B
+  and C, where session-sticky needs 10 to 12; on three fresh calibrations, registered beforehand,
+  8 · 7 · 8 against 9 · 10 · 10. But under a target that also limits token speed the same policy
+  holds nothing there on 32 replicas, on any of the six: it wins the first token by crowding
+  sessions onto the replicas that hold their prompt, and crowding is what makes tokens slow.
+- **With both halves of the target, the two are one GPU apart at most (C4, F2 — my prediction
+  failed):** I had registered that balanced prefix-affinity would need fewer GPUs than
+  session-sticky at no more than two of six loads. On two of the three fresh calibrations it
+  needed one fewer at three and at four. One GPU of 4 to 27 is inside what two calibrations
+  disagree by, so this is not a result for prefix routing — but it is not "no saving" either.
 - **How far to trust a GPU count:** of the 144 (prompts, load, policy) cells, 102 need the same number
   of replicas on all three calibrations and 138 are within one.
 
@@ -144,7 +153,8 @@ figures on the context-aware model, ± one replica.
 ⚠️ **Every count above is for the first token only — and that is about half the story.** The MLPerf
 rule the 2 seconds come from pairs them with a limit on the time per output token (100 ms for a
 model of this size). In C3 the live engine took 134–521 ms per token on workloads that met, or
-nearly met, the first-token target. Two registered tests followed, on 2026-10-05, with no GPU:
+nearly met, the first-token target. Three registered tests followed — two with no GPU, then one
+on a live T4:
 - **T2 — the same grid under a target with both halves** (p95 TTFT ≤ 2 s *and* p95 time per output
   token ≤ 100 ms), on all three calibrations. All three rules held, as predicted: session-sticky
   is still best or tied at every load with one prompt and with four; it never needs more than
@@ -154,17 +164,35 @@ nearly met, the first-token target. Two registered tests followed, on 2026-10-05
 - **T1 — is the simulator's per-token latency right? It failed.** Against the live engine's own
   inter-token counter on five held-out runs, the simulator is within 7% on the three runs off the
   knee of the load curve, and **1.5–1.7× too slow** on the two at it (limit: 1.5×; predicted to
-  hold). And all five runs are themselves beyond 100 ms per token, so nothing has been measured
+  hold). And all five runs are themselves beyond 100 ms per token, so nothing had been measured
   where T2's answers live.
+- **C4 — is it right where the limit is? Yes** (a live T4, 2026-10-05; nine rules registered,
+  seven hold). On three workloads chosen to sit under, on and over 100 ms per token, every
+  request's token times kept:
 
-So read the factor of two as **what the model says, not as a checked number** (the registration
-said beforehand: if T1 fails, no count from T2 is to be offered as sizing guidance) — and read the
-counts in this README as a *lower bound* for anything that has to stream at a usable speed. The
-simulator now prints p95 time per token in every report, and a cost model can make it part of the
-SLO (`slo.tpot_p95_ms`); it is off by default, because a default should not move ahead of its
-check. That check — per-request token times on a live engine, around the limit — is the next GPU
-run ([T1](artifacts/results/t1_itl/report.md) · [T2](artifacts/results/t2_two_part_slo/report.md) ·
-[`docs/09-hypotheses.md`](docs/09-hypotheses.md)).
+  | workload | p95 time per token: live · registered | share of requests within 100 ms: the engine's own histogram · registered |
+  |---|---|---|
+  | under the limit | 82.6 · 82.9 ms | 100.0% · 100.0% |
+  | on it | 104.2 · 104.3 ms | 90.6% · 91.4% |
+  | over it | 279.7 · 298.5 ms | 47.7% · 46.1% |
+
+  And it found why T1 failed. Batches that share a prompt follow the fitted line within 3% up to
+  twice the range any calibration had measured, and run **12–15% faster** than the line at five to
+  nine times that range. At the knee a slower step keeps more sequences in the batch, which slows
+  the next step: there, 15% per step became 1.5–1.7×.
+
+So the factor of two now rests on a per-token model that was checked where it lives — **on one
+replica and three workloads; a fleet has not been measured.** The counts in this README are still
+first-token counts: read them as a *lower bound* for anything that has to stream at a usable
+speed. The simulator prints p95 time per token in every report, and a cost model can make it part
+of the SLO (`slo.tpot_p95_ms`). It is still off by default: the check it was waiting for has
+passed, and switching the default is the next change, not this one
+([T1](artifacts/results/t1_itl/report.md) · [T2](artifacts/results/t2_two_part_slo/report.md) ·
+[C4](artifacts/results/c4_kaggle_t4/report.md) · [`docs/09-hypotheses.md`](docs/09-hypotheses.md)).
+
+⚠️ **The first token is now the less accurate half.** On the same three workloads the live p95
+time to first token was 1.23–1.30× the registered number — inside the 2× that C2 and C3 tested,
+and the model too fast every time.
 
 H6 (the policy ranking under faster and slower GPUs) was tested on the first, context-free model
 and is not yet re-run. That locality can lose to load balancing is published — LMetric and SMetric
@@ -320,8 +348,15 @@ every timing cell three times and keeps, beside the fit on all of it, the fit of
 That range is what one calibration's own repeats disagree by: a floor on the uncertainty, not a
 confidence interval — it knows nothing about another day or another software image. A profile
 without repeats (the two shipped ones) says that its spread is unknown instead of staying silent.
-⚠️ The repeats have so far met only the mock engine; their first run on a real GPU is the next
-registered experiment.
+
+⛔ **How low a floor — measured, and the registered test of it failed (C4, rule E).** The command
+ran three times on one live T4 in one session, three repeats each. Across 18 sizing questions and
+both targets, another run's GPU count was inside a run's own range in **82% of cases**; the rule
+asked for 90%. Widened by one GPU each way, 95%. The two runs taken back to back agree with each
+other (97%); the one taken an hour earlier does not agree with them (75%) — and no run's repeats,
+six minutes apart, can know that. So: **size for the top of the range, plus one.** The command
+itself works on a real engine with its repeats — exact on its cache check all three times, six
+minutes a run ([report](artifacts/results/c4_kaggle_t4/report.md)).
 
 ## ⭐ What transfers to your fleet, and what doesn't
 
