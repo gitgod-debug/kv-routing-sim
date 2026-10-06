@@ -1,4 +1,16 @@
 % When Does Prefix-Aware Routing Pay? -- preprint draft.
+%
+% !! SUPERSEDED DRAFT (text of 2026-09-30). DO NOT PUBLISH OR CITE IT AS IT IS. !!
+% It predates two things, both of 2026-10-05, recorded in paper/README.md:
+%   1. C3: the replica counts below are a result about ONE calibration of the T4. On two more
+%      calibrations of the same GPU the registered test gives the opposite verdict, and counts
+%      differ at 29% of the grid's cells (docs/09-hypotheses.md).
+%   2. A prior-art check: the question this draft calls open was answered first, on real clusters,
+%      by LMetric (OSDI '26, arXiv 2603.15202) and SMetric (arXiv 2607.08565), and the related work
+%      omits NVIDIA's AISimulate/DynoSim and LLMServingSim (docs/04-prior-art.md, sections 2a, 5).
+% The text is kept unchanged below as a record of what the draft said on that date; only the date
+% line was changed, so that a build shows this warning on its first page.
+%
 % Every number here comes from a committed results file; paper/README.md maps each table and figure
 % to its source. Build: `tectonic main.tex` (or pdflatex on Overleaf/arXiv). ASCII-only on purpose,
 % so pdfLaTeX (arXiv's default) and XeTeX both compile it.
@@ -26,7 +38,10 @@
 \large A vLLM-Calibrated, Pre-Registered Study of KV-Cache Routing Across Replicas}
 \author{Harshit\thanks{Independent researcher. \todo{affiliation and e-mail}. Code, configurations,
 results and the dated registration log: \url{https://github.com/TODO/kv-routing-sim}.}}
-\date{Draft of \today}
+\date{Draft of 30 September 2026\\[4pt]
+\textcolor{red}{\textbf{Superseded --- do not cite or publish as it is.}}\\[2pt]
+\textcolor{red}{\small It predates a second calibration of the same GPU and a prior-art check,
+both of 5 October 2026: see \texttt{paper/README.md}.}}
 
 \begin{document}
 \maketitle

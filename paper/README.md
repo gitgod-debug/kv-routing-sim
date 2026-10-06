@@ -17,6 +17,11 @@
 > on small hardware, plus the measurements of how far simulator-based sizing can be trusted — with
 > those four cited and compared. See [`docs/04-prior-art.md`](../docs/04-prior-art.md) §2a and §5.
 > **Do not ask for an arXiv endorsement on the strength of this draft.**
+>
+> *2026-10-06:* `main.tex` now says the same at its top and, in red, under the title, and its date
+> line is fixed at the day the text was last changed (30 September) instead of the day of the
+> build. Nothing else in it was touched. ⚠️ That edit has not been built: no TeX tool is installed
+> on the machine it was made on.
 
 **When Does Prefix-Aware Routing Pay? A vLLM-Calibrated, Pre-Registered Study of KV-Cache Routing
 Across Replicas.** Five pages, two columns. Drafted 2026-09-28; due on arXiv by ~Nov 9 (cs.DC).
