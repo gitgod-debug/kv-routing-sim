@@ -272,8 +272,8 @@ def main() -> int:
         return 0
     print(
         "\n⛔ Neither path worked. Phase 6 takes its documented fallback: a single-replica\n"
-        "   calibration plus a reproducible account of why 2 replicas failed. Log the cause in\n"
-        "   the upstream log — such a write-up is itself a legitimate upstream-PR premise.",
+        "   calibration plus a reproducible account of why 2 replicas failed. Write the cause\n"
+        "   down: such an account may be worth reporting upstream.",
         flush=True,
     )
     return 1

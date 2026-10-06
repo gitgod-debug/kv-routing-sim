@@ -375,7 +375,7 @@ def main() -> int:
     if not gate["PHASE_0_METRIC_GATE"]:
         print(
             "\n⛔ PHASE 0 GATE FAILED. Do not start simulator code. Fix or document the cause, "
-            "and log the friction in the upstream log — it may be worth reporting upstream.",
+            "and write the friction down — it may be worth reporting upstream.",
             flush=True,
         )
         return 1
