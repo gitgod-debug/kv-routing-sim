@@ -611,7 +611,11 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       ([`report.md`](artifacts/results/h2b_c2/report.md)): at 64 prompts balanced affinity ties
       sticky at 0.25–1/s and loses at 2 (11 against 10). Post hoc: sticky best or tied at 22 of 24
       points; the exceptions are prefix routing with a small weight (8 against 10 at K=64, 2/s)
-- [ ] Re-run H6 and R1/R2 on the validated model — they ran on the context-free profile
+- [~] Re-run H6 and R1/R2 on the validated model — they ran on the context-free profile.
+      🔨 **R1 and R2: registered 2026-10-06** ([`configs/realtrace_ctx.yaml`](configs/realtrace_ctx.yaml)):
+      the same traces, adapters, policies, seeds and rules, on two calibrations (A and C4's
+      s0); speeds re-chosen by R2's rule from a round-robin-only probe. Predicted: R1
+      falsified again, R1w (within one replica) holds, R2 holds. **Left:** the run; then H6
 - [x] **Restore the four registered notebooks** deleted from disk on 2026-09-30 (Phase 0, 3, 6,
       C1) — restored from git on 2026-10-01; their tests pass again (189 green)
 - [x] ⛔ **TTFT percentiles only from separate GPUs** — the notebook runs one server per physical GPU.

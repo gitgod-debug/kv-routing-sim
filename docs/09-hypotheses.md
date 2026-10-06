@@ -214,6 +214,7 @@ calibration cannot cash.
 | **T2** | Under a target with both halves (p95 TTFT ≤ 2 s **and** p95 time per output token ≤ 100 ms), on three calibrations: sticky still best or tied with 1 and 4 prompts (T2a), never worse than round-robin or least-loaded (T2b), and the first-token counts were optimistic by ≥ 1.5× (T2c) | T2 | `[x]` ✅ **2026-10-05, all three as predicted, on all three calibrations** — T2a 12 of 12 · T2b no exception · T2c 1.93–2.00× · ⚠️ these are the model's counts, and T1 says its per-token latency is unchecked where they live · *2026-10-06: C4 checked it there, on one replica — p95 time per token within 7% on three workloads around the limit* |
 
 | **C4** | On a real T4: `kvsim calibrate` with its repeats (C4a); decode of batches that share a prefix — free by itself (D1a), still a straight line past the cache (D1b); an arriving request's stall = its prefill (D2); per-request token times on traffic around the limit (T3a, T3b); one run's spread covers another's count (E); the 64-prompt question on fresh fits (F1, F2) | C4 | `[x]` **2026-10-05/06 — 7 of 9 hold; predicted: all nine** — ✅ C4a · ✅ D1a (−3%, −4%) · ✅ D1b (+3% to +15%) · ✅ D2 (1.03–1.19×) · ✅ T3a (1.00×, 1.00×, 1.07×) · ✅ T3b · ⛔ **E** (82.4% covered; 90% needed; 94.9% within one more replica) · ✅ F1 (8·7·8 against 9·10·10) · ⛔ **F2** (under both halves balanced affinity is one replica below sticky at 3 and 4 of 6 loads on two of three fits) |
+| **R1, R2 again** | The two real-traffic tests on the validated timing model, on two calibrations: R1's own rules (predicted: falsified again), R1w — balanced affinity and session-sticky within one replica on Mooncake (holds), R2's own rules (holds) | R1/R2 | `[~]` **registered 2026-10-06** — `configs/realtrace_ctx.yaml`; not run yet |
 
 **Amendments:** *(add dated entries below, never edit above)*
 
@@ -1848,3 +1849,52 @@ batches, the steeper it draws it.
 gives; they span what the same six minutes give. F2: I read T2's exploratory table as "no steady
 winner" and wrote a rule that allowed prefix routing two loads out of six; on two of three fresh
 calibrations it took three and four.
+
+### 2026-10-06 — R1 and R2 on the validated timing model, REGISTERED before they run
+Design and rules: [`configs/realtrace_ctx.yaml`](../configs/realtrace_ctx.yaml). Procedure:
+`scripts/run_realtrace_ctx.py`, which derives one config per (test, calibration) from the
+registered ones and runs `scripts/run_realtrace.py` — R1's and R2's own script, unchanged — on
+each. A pipeline check ran first, on a made-up 600-request trace outside the design.
+
+**Why.** R1 and R2 are this project's only tests on real traffic, and both ran on the first,
+context-free timing model, which Phase 6 showed to be 5–222× optimistic. H2b was re-tested on the
+validated model on 2026-09-30, and its verdict changed. These two were not, and `CHECKPOINTS.md`
+has listed the re-run as open since.
+
+**The setup — what is the same.** The traces (Mooncake's tool-agent and conversation hours; AgentX
+replayed 48 sessions at a time for three hours), the adapters and their scales (1/32 and 1/64),
+windows and warm-ups, sessions (inferred for Mooncake, real for AgentX), the eight policy columns,
+three seeds, replicas 1–8, the 2 s p95 TTFT target — and the rules.
+
+**What changes.** The timing profile: each test runs on calibration **A** (the shipped C2 fit) and
+on **s0** (the pooled fit `kvsim calibrate` wrote in C4's tested run, five days later on another
+software image). And the speeds, because each T4 is slower on this model: re-chosen by the rule R2
+registered, from a probe that runs **round-robin alone** on calibration A — the highest probe speed
+at which round-robin still holds the target on 8 or fewer replicas on every trace of the test,
+and the two probe speeds below it. If it holds at none, the test is untestable as designed on this
+model; that is reported, and nothing else is changed to rescue it.
+
+**How it is decided.** R1's and R2's own rules, by their own script, on each calibration. A test
+holds if its rules hold on both, is falsified if they fail on both, and is calibration-dependent
+otherwise — which is not holding. One rule is added, **R1w**: on both Mooncake traces, balanced
+affinity (α 16) and session-sticky need replicas within one of each other at every testable speed,
+on both calibrations. The README has said this about R1 since R1 was falsified; it was an
+observation then, never a registered claim.
+
+**Predicted.** R1: **falsified again** — its rules name a winner on each trace (affinity on
+tool-agent, never affinity on conversation), and on the first model there was none. R1w:
+**holds**. R2: **holds** — no block is shared across AgentX sessions, so prefix routing has nothing
+to add and nothing to pile up.
+
+**What would be uncomfortable, written down now.**
+- **If R1's own rules now hold,** the README's "on real traffic the difference is small" was a
+  product of the wrong timing model.
+- **If R1w fails,** the two policies are further apart on real traffic than any table so far
+  showed.
+- **If R2 fails,** session-sticky and prefix-affinity differ where nothing is shared: load, not
+  the cache, would be separating them on this model.
+- **If round-robin holds the target at no probe speed on 8 replicas,** the registered design can
+  test nothing on the validated model, and the real-traffic half of the README rests on the first
+  model alone.
+- Mooncake's sessions are inferred by the adapter. Every session-sticky number there rests on
+  that inference, as before.

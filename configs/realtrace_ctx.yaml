@@ -1,0 +1,57 @@
+# R1 and R2 again — the two tests on real traffic, on the validated timing model.
+# Registered 2026-10-06, BEFORE it runs, with a dated entry in docs/09-hypotheses.md.
+#
+# Why: R1 (Mooncake) and R2 (AgentX) both ran on the first, context-free timing model, which two
+# live T4s then showed to be 5–222× optimistic on latency (Phase 6). The README has said so beside
+# their table since 2026-09-30, and CHECKPOINTS.md lists this re-run as open. Here: the same
+# traces, adapters, windows, policies, load weights, seeds and RULES — only the timing profile
+# changes.
+# `scripts/run_realtrace_ctx.py` derives one config per (test, calibration) from the registered
+# ones and runs `scripts/run_realtrace.py` — R1's and R2's own procedure, unchanged — on each.
+
+schema_version: 1
+results_dir: artifacts/results/realtrace_ctx
+
+tests:
+  R1: configs/realtrace_mooncake.yaml
+  R2: configs/realtrace_agentx.yaml
+
+# Every verdict is taken on EACH calibration (C3: a verdict resting on one is not a verdict).
+# A is the shipped, C2-fitted profile; s0 is the pooled fit of `kvsim calibrate`'s tested run in
+# C4, five days later and on another software image.
+calibrations:
+  A: configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json
+  s0: artifacts/results/c4_kaggle_t4/calibrated_profile_seed0.json
+
+# ── What may change besides the profile, and by which rule — fixed BEFORE any probe ─────────────
+# Each T4 is slower on the validated model, so the registered speeds may no longer be holdable.
+# They are re-chosen by the rule R2 registered, from a probe that runs ROUND-ROBIN ALONE, on
+# calibration A (`--probe`): the highest probe speed at which round-robin still holds the SLO on 8
+# or fewer replicas on every trace of the test, and the two probe speeds below it (fewer, if fewer
+# exist). If round-robin holds it at no probe speed, the test is UNTESTABLE as designed on this
+# model: that is reported, and nothing else in its design is changed to rescue it.
+# Scale, window, warm-up, sessions, policies, load weights, seeds, replicas 1–8: as registered.
+speeds:
+  R1: []     # by the rule, after the probe and before the comparison
+  R2: []
+
+# ── The rules ───────────────────────────────────────────────────────────────────────────────────
+# R1's and R2's own rules, unchanged, decided by their own script on each calibration. A test
+# HOLDS if its rules hold on every calibration, is FALSIFIED if they fail on every one, and is
+# CALIBRATION-DEPENDENT otherwise — which does not count as holding.
+# One rule is added, because R1 was falsified on the first model and what replaced it in the
+# README ("within one replica") was an observation, never a registered claim:
+#   R1w — on both Mooncake traces, balanced affinity (α 16) and session-sticky need replicas within
+#         `r1w_within` of each other at every testable speed (one where either holds the SLO on 8),
+#         on every calibration. With no testable speed it is undecided, and does not hold.
+rules:
+  r1w_within: 1
+
+# Reported, not tested: every policy's count and hit rate on each calibration, beside the first
+# model's; pure prefix-affinity; the load weight of 1.
+
+# ── The predictions, written before the run ────────────────────────────────────────────────────
+predictions:
+  R1: falsified   # as on the first model: its rules name a winner on each trace, and there was none
+  R1w: holds
+  R2: holds
