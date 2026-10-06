@@ -1,0 +1,106 @@
+# ⛔ DRAFT — NOT REGISTERED, NOT RUN. Kept on the branch `r3-prep` so the work is not lost.
+# This experiment is outside the plan of record (FLAGSHIP_PROJECTS.md) and waits for a
+# decision. If it goes ahead, it is registered on the main branch — this file, with its speeds filled
+# in by the probe, and a dated entry in docs/09-hypotheses.md — before any policy is compared.
+#
+# R3 — the two published routing policies, and real sessions of unequal size, on a public
+# production trace.
+#
+# Why: the prior-art re-audit of 2026-10-05 (docs/04-prior-art.md §2a) found that
+#   - this project's routing result was already published from real clusters — LMetric (OSDI '26)
+#     and SMetric (arXiv 2607.08565) — and neither policy had been run in this simulator;
+#   - SMetric names a weakness of session-sticky routing that generated traffic cannot show: every
+#     generated session has the same number of turns, and real ones do not;
+#   - a public trace with real sessions and 16-token block hashes exists, and it is the one
+#     LMetric was evaluated on.
+# `scripts/run_r3.py` runs the grid and decides nothing; `scripts/r3_analyze.py` is the whole
+# analysis. Both are committed before the run: nothing below is chosen after a result.
+
+schema_version: 1
+name: R3
+results_dir: artifacts/results/r3_bailian
+
+# ── The traffic ─────────────────────────────────────────────────────────────────────────────────
+source: https://github.com/alibaba-edu/qwen-bailian-usagetraces-anon   # Apache-2.0, fetched 2026-10-05
+trace: artifacts/traces/bailian/qwen_coder_blksz_16.jsonl             # 43,011 requests, two hours; not committed
+trace_sha256: 3d74974cebb7bccb69b1ca6ea210a44d9a3033443c0271ed015327284dea1aff
+adapter_name: bailian
+# Scale, by a rule fixed before any policy ran: the least shrinking of 1/2, 1/4, 1/8, … at which
+# no more than 0.1% of requests would pass the engine's 2,048-token limit (prompt + answer).
+# Counted from the trace alone: 1/8 leaves 1.22% over it, 1/16 leaves 0.03% (13 requests, whose
+# answers are cut to fit, as the engine would stop them). One 16-token block of the replay is 16
+# trace blocks: sharing is seen at 256 real tokens, and nothing finer.
+adapter: {token_scale: 0.0625, max_total_tokens: 2048}
+window_s: 3600      # the first hour
+warmup_s: 300       # its first 5 minutes warm the caches; their latencies are not counted (as R1)
+
+# ── The engine model ────────────────────────────────────────────────────────────────────────────
+cache_model: vllm
+# Every rule must hold on EVERY calibration (C3: a verdict resting on one is not a verdict).
+# A is the shipped C2 fit; the other three are the pooled fits `kvsim calibrate` wrote in C4.
+calibrations:
+  A: configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json
+  s0: artifacts/results/c4_kaggle_t4/calibrated_profile_seed0.json
+  s1: artifacts/results/c4_kaggle_t4/calibrated_profile_seed1.json
+  s2: artifacts/results/c4_kaggle_t4/calibrated_profile_seed2.json
+slo:
+  ttft_p95_ms: 2000
+  tpot_p95_ms: 100
+replicas_max: 16
+seeds: [0, 1, 2]
+
+# ── The policies ────────────────────────────────────────────────────────────────────────────────
+policies:
+  - {label: round-robin, policy: round-robin}
+  - {label: least-loaded, policy: least-loaded}
+  - {label: session-sticky, policy: session-sticky}                    # = llm-d routing by session id
+  - {label: radix-affinity-balanced@16, policy: radix-affinity-balanced, kwargs: {load_penalty: 16}}
+  - {label: radix-affinity-balanced@1, policy: radix-affinity-balanced, kwargs: {load_penalty: 1}}
+  - {label: radix-affinity, policy: radix-affinity}                    # pure
+  # The two published ones. Both route on the engine's cache events, as their routers do.
+  - {label: lmetric, policy: lmetric}
+  - {label: smetric-local, policy: smetric-local, kwargs: {ttft_slo_s: 2.0}}   # slack 1.0, hit ratio 0.5: this repo's choices
+  # Reported: LMetric on this router's own dispatch record instead — what the drift costs.
+  - {label: lmetric@dispatch, policy: lmetric, kwargs: {index: dispatch}}
+
+# ── How the speeds are chosen, fixed BEFORE the probe runs ───────────────────────────────────────
+# `run_r3.py --probe` runs round-robin alone, on calibration A, one seed — which says nothing
+# about any other policy. Speeds are multiples of the recorded arrival rate: the highest probe
+# speed at which round-robin still holds the registered target on 16 or fewer replicas, and the two
+# probe speeds below it (R2's rule).
+probe_speeds: [0.25, 0.5, 1, 2, 4]
+speeds: []          # filled in by the rule, after the probe and before the grid
+
+# ── The decision rules, fixed before the run ────────────────────────────────────────────────────
+# R(policy) = the fewest replicas (1–16) whose cell meets the target on every seed; a policy that
+# holds it on none counts as 17. A speed is TESTABLE on a calibration if some policy holds the
+# target there. A rule with no testable speed on some calibration is UNDECIDED, and an undecided
+# rule does not hold.
+rules:
+  target: first_token      # p95 TTFT <= 2 s — the target of R1, R2 and every registered grid.
+  within: 1
+  roles: {sticky: session-sticky, lmetric: lmetric, smetric: smetric-local,
+          balanced: radix-affinity-balanced@16, pure: radix-affinity, baseline: round-robin}
+  # R3a — the published product needs no more GPUs than keeping sessions in place:
+  #        R(lmetric) <= R(session-sticky) at every testable speed, and fewer at one or more.
+  # R3b — moving sessions adds nothing without a shared cache store:
+  #        R(smetric-local) within one of R(lmetric) at every testable speed.
+  # R3c — the old finding's two policies tie on real traffic, as they did on Mooncake and AgentX:
+  #        R(balanced affinity, weight 16) within one of R(session-sticky) at every testable speed.
+  # R3d — pure prefix-affinity fails: at every testable speed it needs more replicas than
+  #        round-robin, or holds the target on none.
+
+# Reported, not tested:
+#   - the same four rules under the two-part target (and p95 time per output token <= 100 ms);
+#   - every policy's count on every calibration, under both targets;
+#   - hit rates, the busiest replica's share, and each new policy's own account of its decisions
+#     (stuck, migrated, balanced), at the replica count where session-sticky first holds;
+#   - LMetric on the dispatch record against LMetric on the engine's events;
+#   - least-loaded, and balanced affinity with a load weight of 1.
+
+# ── The predictions, written before the run ────────────────────────────────────────────────────
+predictions:
+  r3a: holds
+  r3b: holds
+  r3c: holds
+  r3d: holds
