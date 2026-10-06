@@ -162,3 +162,127 @@ def test_structure_separates_a_sessions_own_reuse_from_reuse_across_sessions():
     assert (s["blocks"], s["distinct_blocks"], s["sessions"]) == (20, 10, 2)
     assert s["reusable_from_any_earlier_request"] == round(10 / 20, 4)
     assert s["reusable_from_the_same_session"] == round(6 / 20, 4)
+
+
+# ── the analysis, on grids written by hand ──────────────────────────────────────────────────────
+
+an = _load("r3_analyze")
+
+ROLES = {"sticky": "session-sticky", "lmetric": "lmetric", "smetric": "smetric-local",
+         "balanced": "radix-affinity-balanced@16", "pure": "radix-affinity",
+         "baseline": "round-robin"}
+SLO = {"ttft_p95_ms": 2000, "tpot_p95_ms": 100}
+REPS = [1, 2, 3, 4]
+
+
+def _cell(first: int | None, both: int | None = None) -> dict:
+    """A cell that meets the first-token target from `first` replicas on, and both halves from
+    `both` on (None: never), on both of its seeds."""
+    def row(n, limit, ok, bad):
+        return [ok, ok] if limit is not None and n >= limit else [ok, bad]
+    return {"ttft_p95_ms": [row(n, first, 900.0, 5000.0) for n in REPS],
+            "tpot_p95_ms": [row(n, both, 60.0, 400.0) for n in REPS],
+            "hit_rate": [0.5] * 4, "busiest_over_mean": [1.2] * 4, "preemptions": [0.0] * 4,
+            "all_completed": True}
+
+
+def _grid(by_cal: dict) -> dict:
+    """{calibration: {speed: {role: first-token count or (first, both)}}} -> a grid file."""
+    cells = {}
+    for cal, by_speed in by_cal.items():
+        for speed, by_role in by_speed.items():
+            for role, v in by_role.items():
+                first, both = v if isinstance(v, tuple) else (v, v)
+                cells.setdefault(cal, {}).setdefault(speed, {})[ROLES[role]] = _cell(first, both)
+    return {"axes": {"calibrations": list(by_cal), "speeds": list(next(iter(by_cal.values()))),
+                     "policies": list(ROLES.values()), "replicas": REPS, "seeds": [0, 1]},
+            "cells": cells}
+
+
+def _decide(by_cal, target="first_token"):
+    tabs = an.tables(_grid(by_cal), SLO)
+    return an.decide(tabs[target], ROLES, 1, 5)
+
+
+ALL_HOLD = {"sticky": 3, "lmetric": 2, "smetric": 3, "balanced": 4, "pure": None, "baseline": 3}
+
+
+def test_a_count_is_the_fewest_replicas_on_which_every_seed_meets_the_target():
+    tabs = an.tables(_grid({"A": {"1": {**ALL_HOLD, "sticky": (2, 4)}}}), SLO)
+    assert tabs["first_token"]["A"]["1"]["session-sticky"] == 2
+    assert tabs["two_part"]["A"]["1"]["session-sticky"] == 4
+    assert tabs["first_token"]["A"]["1"]["radix-affinity"] == 5  # held on none: one past the axis
+
+
+def test_the_four_rules_where_all_hold():
+    d = _decide({"A": {"1": ALL_HOLD, "2": {**ALL_HOLD, "lmetric": 3}}, "B": {"1": ALL_HOLD}})
+    assert all(d[k]["decided"] and d[k]["holds"] for k in ("r3a", "r3b", "r3c", "r3d"))
+    assert d["r3a"]["by_calibration"]["A"]["fewer_at"] == ["1"]  # tied at 2×, fewer at 1×
+
+
+def test_r3a_needs_lmetric_never_above_sticky_and_below_it_somewhere():
+    tie = _decide({"A": {"1": {**ALL_HOLD, "lmetric": 3}}})
+    assert tie["r3a"]["decided"] and not tie["r3a"]["holds"]  # no more, but nowhere fewer
+    worse = _decide({"A": {"1": ALL_HOLD, "2": {**ALL_HOLD, "lmetric": 4}}})
+    assert not worse["r3a"]["holds"] and worse["r3a"]["by_calibration"]["A"]["more_at"] == ["2"]
+
+
+def test_one_calibration_is_enough_to_fail_a_rule():
+    d = _decide({"A": {"1": ALL_HOLD}, "B": {"1": {**ALL_HOLD, "smetric": 4}}})
+    assert d["r3b"]["by_calibration"]["A"]["holds"]
+    assert not d["r3b"]["by_calibration"]["B"]["holds"] and not d["r3b"]["holds"]  # 4 against 2
+    assert d["r3a"]["holds"]
+
+
+def test_within_one_counts_a_policy_that_never_holds_as_one_past_the_axis():
+    near = _decide({"A": {"1": {**ALL_HOLD, "balanced": None, "sticky": 4}}})
+    assert near["r3c"]["holds"]  # 5 against 4
+    far = _decide({"A": {"1": {**ALL_HOLD, "balanced": None, "sticky": 3}}})
+    assert not far["r3c"]["holds"] and far["r3c"]["by_calibration"]["A"]["apart_at"] == ["1"]
+
+
+def test_pure_affinity_fails_if_it_needs_more_than_round_robin_or_never_holds():
+    assert _decide({"A": {"1": {**ALL_HOLD, "pure": 4}}})["r3d"]["holds"]      # 4 against 3
+    assert _decide({"A": {"1": ALL_HOLD}})["r3d"]["holds"]                      # held on none
+    tied = _decide({"A": {"1": {**ALL_HOLD, "pure": 3}}})
+    assert not tied["r3d"]["holds"]
+    assert tied["r3d"]["by_calibration"]["A"]["not_worse_at"] == ["1"]
+
+
+def test_a_speed_nobody_holds_is_not_testable_and_no_testable_speed_is_undecided():
+    nobody = dict.fromkeys(ROLES)
+    d = _decide({"A": {"1": ALL_HOLD, "4": nobody}})
+    assert d["r3a"]["by_calibration"]["A"]["testable"] == ["1"] and d["r3a"]["holds"]
+    none = _decide({"A": {"1": ALL_HOLD}, "B": {"1": nobody}})
+    assert not none["r3a"]["decided"] and not none["r3a"]["holds"]
+
+
+def test_the_other_target_is_decided_from_the_same_runs():
+    by_cal = {"A": {"1": {**ALL_HOLD, "lmetric": (2, 4), "sticky": (3, 3)}}}
+    assert _decide(by_cal)["r3a"]["holds"]
+    assert not _decide(by_cal, "two_part")["r3a"]["holds"]  # 4 against 3 with both halves
+
+
+def test_the_analysis_refuses_a_grid_from_another_design_and_writes_a_report(design):
+    tmp_path, cfg, _ = design
+    cfg.update({"trace_sha256": None, "predictions": dict.fromkeys(("r3a", "r3b", "r3c", "r3d"),
+                                                                 "holds"),
+                "rules": {"target": "first_token", "within": 1, "roles": ROLES}})
+    cfg["policies"].append({"label": "radix-affinity", "policy": "radix-affinity"})
+    (tmp_path / "r3.yaml").write_text(yaml.safe_dump(cfg))
+    _run(tmp_path)
+    out = subprocess.run([sys.executable, str(REPO / "scripts" / "r3_analyze.py"), "--config",
+                          str(tmp_path / "r3.yaml")], check=True, capture_output=True,
+                         text=True, cwd=REPO).stdout
+    a = json.loads((tmp_path / "out" / "analysis.json").read_text())
+    assert a["all_completed"] and set(a["tables"]) == {"first_token", "two_part"}
+    assert all(isinstance(a[k]["holds"], bool) for k in ("r3a", "r3b", "r3c", "r3d"))
+    assert "| rule | registered prediction | result |" in out
+    assert "## Replicas needed" in out and "own account" in out
+    # A grid run with other rules is not this design's grid.
+    cfg["speeds"] = [1]
+    (tmp_path / "other.yaml").write_text(yaml.safe_dump(cfg))
+    bad = subprocess.run([sys.executable, str(REPO / "scripts" / "r3_analyze.py"), "--config",
+                          str(tmp_path / "other.yaml")], capture_output=True, text=True,
+                         cwd=REPO, check=False)
+    assert bad.returncode != 0 and "different `speeds`" in bad.stderr
