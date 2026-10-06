@@ -2,9 +2,10 @@
 
 The frontier is the honest output: there is no single best configuration, only a set where nothing
 is better on every axis at once. The RECOMMENDATION is what turns that into something actionable —
-apply the SLO as a hard constraint, then minimise cost among what is left. That step is the thing no
-competitor produces (docs/04-prior-art.md): Vidur sizes without seeing the cache, Frontier sees the
-cache but hands you a configuration space rather than an answer.
+apply the SLO as a hard constraint, then minimise cost among what is left. Vidur sizes without
+seeing the cache; Frontier sees the cache but hands you a configuration space rather than an answer.
+(Until 2026-10-05 this said no competitor produces that step. NVIDIA's `aisimulate recommend` does,
+for Dynamo's router — docs/04-prior-art.md §2a.)
 """
 
 from __future__ import annotations

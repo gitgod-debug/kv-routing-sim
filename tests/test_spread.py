@@ -99,12 +99,18 @@ def test_replay_shows_how_firm_its_recommendation_is(tmp_path, capsys):
     assert "⚠️ how firm: 3 to 4 replicas across the calibration's 3 repeats" in out
     assert "| session-sticky | 3 | 3 · 4 · 3 |" in out and "| round-robin | 5 | 5 · 7 · 5 |" in out
     assert "a floor on the uncertainty, not a confidence interval" in out
+    # C4's rule E failed: a run's own range covers another run's count in 82% of cases, not 90.
+    # The tool therefore says to add one, and says where that comes from.
+    assert "size for the larger, plus one" in out
+    assert "outside a run's own range in 18% of cases" in out and "plus one." in out
 
-    # Repeats that agree say so, in one line, without a warning sign.
+    # Repeats that agree say so, in one line, without a warning sign — and still allow one more:
+    # in C4, 24 of the 38 misses were of a range that was a single count.
     agree = _with_repeats(tmp_path, scales=(1.0, 1.0))
     assert main([*args, "--profile", str(agree)]) == 0
     out = capsys.readouterr().out
     assert "how firm: the same count on each of the calibration's 2 repeats" in out
+    assert "still allow one more" in out
     assert "⚠️ how firm" not in out
 
     # A profile with no repeats: the report says the spread is unknown, it does not stay silent.

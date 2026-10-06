@@ -12,12 +12,18 @@ for every subsequent request, forever. Measured on a 900-request trace across 4 
 It buys a better hit rate (0.89 vs 0.74) and pays 450x in tail latency. That is a real property of
 pure locality and worth keeping in the grid as the extreme — but it is NOT what anyone ships.
 
-⛔ AND SHIPPING IT AS "THE PREFIX-AWARE POLICY" WOULD BE A STRAWMAN. SGLang's router balances.
-Dynamo scores `matched_blocks - alpha * prefill_backlog`. `azrabano23/disagg-sim`'s `kv_aware` —
-the closest published comparator — is explicitly that Dynamo-style blend (docs/04-prior-art.md). If
-we compared our blend against their blend but published pure affinity as the prefix-aware number,
-the comparison would be rigged in a direction that flatters the argument we are making. That is the
-most damaging error available here.
+⛔ AND SHIPPING IT AS "THE PREFIX-AWARE POLICY" WOULD BE A STRAWMAN. Production routers balance:
+`azrabano23/disagg-sim`'s `kv_aware` scores `matched_blocks − α · prefill_backlog`, and Alibaba's
+earlier scheduler a weighted sum of load and cache miss (docs/04-prior-art.md). If we compared our
+blend against their blend but published pure affinity as the prefix-aware number, the comparison
+would be rigged in a direction that flatters the argument we are making. That is the most damaging
+error available here.
+
+⚠️ CORRECTED 2026-10-05. This said "Dynamo scores `matched_blocks - alpha * prefill_backlog`". Its
+design doc gives a different sum: the new prefill blocks left after an overlap credit, plus the
+blocks its active requests will decode. And the weighted sum itself has a published critique,
+which this project then ran into: LMetric (OSDI '26, arXiv 2603.15202) shows that no fixed weight
+is right at every load, and multiplies the two terms instead. That policy is not built here.
 
 So: `radix-affinity` stays pure and honest about what it is; this is the realistic one.
 
