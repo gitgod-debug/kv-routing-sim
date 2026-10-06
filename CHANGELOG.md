@@ -12,11 +12,23 @@ The first public version: planned for PyPI before 2026-11-20.
   requests out, with ties on the replica count reported rather than hidden. Seven policies:
   round-robin, least-loaded, power-of-two, consistent-hash-prefix, radix-affinity,
   radix-affinity-balanced (with a load weight) and session-sticky.
+- **Two published routing policies, as ports, asked for by name** (`--policies
+  lmetric,smetric-local`; `all` stays the seven above). `lmetric` — LMetric (Zhang et al.,
+  OSDI '26), from its authors' router: the replica with the smallest (prefill tokens queued there
+  + this request's own after its cache hit) × (running and queued requests + 1); no weight to
+  tune. `smetric-local` — SMetric's session rule (Wang et al., arXiv 2607.08565, its Figure 27)
+  **without its global cache tier**: a follow-up stays on the replica that holds its history
+  unless that replica would miss the first-token target; everything else is placed by a load
+  score. Both read what each replica's cache holds from the engine, as the routers they come from
+  do. They are this project's ports: a result from them is not a result about the authors'
+  systems, and each file lists where it departs from its source.
 - **The cache model** follows vLLM 0.30.0's block pool; plain LRU is kept as an ablation
   (`cache_model="lru"`). Checked against a live vLLM on a Tesla T4: exact on two sequential workloads
   under eviction pressure, +0.3% on a concurrent one.
-- **Trace adapters:** `vllm-jsonl`, `openai-log`, and `mooncake` (the FAST'25 traces: 512-token
-  block hashes, sessions inferred). Prompts enter as block hashes only; no text is ever read.
+- **Trace adapters:** `vllm-jsonl`, `openai-log`, `mooncake` (the FAST'25 traces: 512-token
+  block hashes, sessions inferred) and `bailian` (Alibaba's public Qwen-Bailian usage traces:
+  16-token block hashes, and real sessions from each request's parent). Prompts enter as block
+  hashes only; no text is ever read.
 - **`kvsim calibrate`** — fit the context-aware timing model to your own running vLLM (decode cells
   over context length × batch, `--decode-contexts`; prefill over prompt length, cold and after a
   cached prefix, `--prefill-cached` and `--prefill-new`), read its KV capacity, and check the cache
@@ -69,10 +81,11 @@ The first public version: planned for PyPI before 2026-11-20.
   balanced prefix-affinity within one replica, on two calibrations). AgentX could not be: at the
   scale it was registered with, 28% of its prompts are longer than the engine's 2,048-token limit,
   and round-robin never holds the target. Its earlier result is from the first timing model.
-- **Two published routing policies are not among the seven:** LMetric (OSDI '26 — new prefill
-  tokens × batch size, no weight) and SMetric (arXiv 2607.08565 — stick a session's follow-ups,
-  migrate it when its instance would miss the SLO). The balanced-affinity policy here is a
-  hand-weighted sum, the design LMetric argues against.
+- **The two published policies are ports, and nobody else has reviewed them.** `lmetric` was
+  written from its authors' router and `smetric-local` from the paper's pseudocode.
+  `smetric-local` has no global cache tier — a session that moves recomputes its history — and
+  the paper says its lead depends on one. It also leaves out the paper's filter on token speed.
+  The balanced-affinity policy here is a hand-weighted sum, the design LMetric argues against.
 - **Generated sessions all have the same number of turns.** Session-sticky routing is known to
   unbalance the load when sessions differ widely in size (SMetric); traffic from `kvsim generate`
   cannot show that. Use a real trace to check it.

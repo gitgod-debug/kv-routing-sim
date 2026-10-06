@@ -280,10 +280,14 @@ charges a full decode step on top of every prefill, over-estimating an idle repl
    line — reference counts, tail-first freeing, cached decode blocks, admission by free memory, and
    preemption. A plain LRU model is kept beside it as the ablation. *This is table stakes, not the
    contribution — the contribution is its measured fidelity.*
-3. **Seven routing policies** — round-robin · least-loaded · power-of-two-choices ·
-   consistent-hashing-on-prefix · radix-prefix-affinity · radix-prefix-affinity-balanced (affinity with
-   a load term, the way production routers do it) · session-sticky. One file each; a new policy is a
-   new file.
+3. **Nine routing policies** — seven standard ones: round-robin · least-loaded ·
+   power-of-two-choices · consistent-hashing-on-prefix · radix-prefix-affinity ·
+   radix-prefix-affinity-balanced (affinity with a load term, the way production routers do it) ·
+   session-sticky — and ports of two published ones, asked for by name: `lmetric` (LMetric,
+   OSDI '26: new prefill tokens × batch size, with no weight to tune) and `smetric-local` (SMetric's
+   session rule, arXiv 2607.08565, **without its global cache tier**). The ports are this repo's:
+   a result from them is not a result about the authors' systems. One file each; a new policy is a
+   new file. `--policies all` means the first seven, as in every registered sweep.
 4. **The sweep + recommendation** — policy × replica count (1–8) → Pareto curves over
    hit-rate / p95 TTFT / **₹ per 1k successful requests**, and one recommended configuration with a
    quantified delta against the naive baseline.

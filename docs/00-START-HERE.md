@@ -101,7 +101,7 @@ kv-routing-sim/
 ├── src/kv_routing_sim/
 │   ├── traces/             ← trace adapters + the normalized request schema + the agentic generator
 │   ├── cache/              ← the block-level prefix cache model (ours, testable)
-│   ├── policies/           ← the seven routing policies, one file each
+│   ├── policies/           ← the routing policies, one file each: seven standard, two published ports
 │   ├── sim/                ← the replica fleet, the queueing model, the metrics collector
 │   ├── eval/               ← bootstrap CIs, the cost model, Pareto curves, the recommender
 │   ├── calib/              ← `kvsim calibrate`: fit a profile to YOUR engine, check the cache model
