@@ -1,0 +1,55 @@
+{
+ "calibration": "A",
+ "policy": "round-robin",
+ "tests": {
+  "R1": {
+   "probe_speeds": [
+    0.25,
+    0.5,
+    1,
+    2,
+    4
+   ],
+   "needs": {
+    "toolagent": {
+     "0.25": 5,
+     "0.5": 5,
+     "1": 6,
+     "2": null,
+     "4": null
+    },
+    "conversation": {
+     "0.25": 6,
+     "0.5": 6,
+     "1": 7,
+     "2": null,
+     "4": null
+    }
+   },
+   "speeds_by_the_rule": [
+    0.25,
+    0.5,
+    1
+   ]
+  },
+  "R2": {
+   "probe_speeds": [
+    0.25,
+    0.5,
+    1,
+    2,
+    4
+   ],
+   "needs": {
+    "agentx": {
+     "0.25": null,
+     "0.5": null,
+     "1": null,
+     "2": null,
+     "4": null
+    }
+   },
+   "speeds_by_the_rule": []
+  }
+ }
+}

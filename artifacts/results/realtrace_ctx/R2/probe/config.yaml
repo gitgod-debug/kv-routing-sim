@@ -1,0 +1,60 @@
+schema_version: 1
+name: R2
+title: "R2 \u2014 real traffic: SemiAnalysis's AgentX traces (coding-agent sessions)\
+  \ \u2014 on the validated timing model, calibration A"
+sessions_note: real sessions (one per trace), hashes session-local
+results_dir: artifacts/results/realtrace_ctx/R2/probe
+source: https://huggingface.co/datasets/semianalysisai/cc-traces-weka-042026
+adapter_name: agentx
+traces:
+  agentx: artifacts/traces/agentx/traces.jsonl
+adapter:
+  token_scale: 0.015625
+  concurrency: 48
+  window_s: 10800
+  stagger_s: 600
+  seed: 0
+  models: main
+window_s: 10800
+warmup_s: 1800
+profile: configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json
+cost_model: configs/cost_model.yaml
+cache_model: vllm
+replicas:
+- 1
+- 2
+- 3
+- 4
+- 5
+- 6
+- 7
+- 8
+seeds:
+- 0
+- 1
+- 2
+probe_speeds:
+- 0.25
+- 0.5
+- 1
+- 2
+- 4
+speeds:
+- 0.5
+- 1
+- 2
+policies:
+- round-robin
+- least-loaded
+- power-of-two
+- consistent-hash-prefix
+- radix-affinity
+- session-sticky
+alphas:
+- 16
+- 1
+alpha_star: 16
+rules:
+  agentx:
+  - tie_within_one
+  - pure_affinity_ties_sticky
