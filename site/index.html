@@ -108,8 +108,9 @@
     2026-10-05 the same test was run on two more calibrations of the same T4 (B and C, written by
     <code>kvsim calibrate</code> on a live engine): it held on both. The three calibrations agree on
     a GPU count to within one at 96% of points, and that half of the finding was decided by one. The
-    explorer below shows calibration A. On real traces (run on the first model) session-sticky and
-    prefix-affinity came out within one replica of each other.</p>
+    explorer below shows calibration A. On Mooncake's real traces, re-run on the validated model on
+    two calibrations (2026-10-06), session-sticky and prefix-affinity are within one replica of
+    each other at every speed.</p>
 
   <h2>The credential — checked against a live vLLM</h2>
   <p>vLLM 0.30.0, Qwen3-4B (fp16), a deliberately small 512-block cache that overflows, three runs of each
