@@ -21,8 +21,8 @@ routing them all to one replica would be an artifact of the model rather than of
 placed once, when nothing is known about how long it will get. Real sessions differ widely in
 size, and a replica that happens to receive several long ones overloads. SMetric (arXiv
 2607.08565) measures a load 2.17× out of balance for routing by session id on production traces,
-and adds a rule that moves a session whose replica would miss its deadline. Every session
-`kvsim generate` makes has the same number of turns.
+and adds a rule that moves a session whose replica would miss its deadline —
+`policies/smetric_local.py`. Every session `kvsim generate` makes has the same number of turns.
 """
 
 from __future__ import annotations
