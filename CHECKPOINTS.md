@@ -52,9 +52,12 @@ model predicts held-out traffic within 1.41× · 🔨 **7** — demo on the vali
 limit; ⛔ one calibration's spread covers the next one's count in 82% of cases, not 90 ·
 ⛔ **prior art** (5 Oct) — the routing result was published first (SMetric, LMetric) and NVIDIA
 ships a simulator for the question; the "intersection" claim is withdrawn.
-▶ **Next:** R3, registered first — the two published policies and real sessions of unequal size,
-on a public production trace. Then H6 and R1/R2 on the validated model; the two-part target as
-the default; a warning when a workload is at the knee.
+✅ R1 and R2 re-run on the validated model (6 Oct): R1 falsified again, within one replica;
+R2 untestable as designed; H6 not re-run, by decision.
+▶ **Now:** R3, registered 2026-10-06 (outside the plan; agreed 2026-10-06) — the two published
+policies and real sessions of unequal size, on a public production trace
+([`configs/r3_bailian.yaml`](configs/r3_bailian.yaml)). Then: the two-part target as the default;
+a warning when a workload is at the knee.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a

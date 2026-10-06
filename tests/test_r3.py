@@ -286,3 +286,55 @@ def test_the_analysis_refuses_a_grid_from_another_design_and_writes_a_report(des
                           str(tmp_path / "other.yaml")], capture_output=True, text=True,
                          cwd=REPO, check=False)
     assert bad.returncode != 0 and "different `speeds`" in bad.stderr
+
+
+# ── the registered design (configs/r3_bailian.yaml) ─────────────────────────────────────────────
+
+R3_CFG = yaml.safe_load((REPO / "configs" / "r3_bailian.yaml").read_text())
+
+
+def test_the_registered_design_names_real_policies_calibrations_and_rules():
+    from kv_routing_sim import policies
+    from kv_routing_sim.sim.cost_model import load_profile
+    from kv_routing_sim.traces import adapters
+
+    labels = [p["label"] for p in R3_CFG["policies"]]
+    assert len(labels) == len(set(labels)) == 9
+    for spec in R3_CFG["policies"]:
+        assert spec["policy"] in policies.REGISTRY
+    # Every role a rule names is a policy of the grid.
+    roles = R3_CFG["rules"]["roles"]
+    assert set(roles) == {"sticky", "lmetric", "smetric", "balanced", "pure", "baseline"}
+    assert set(roles.values()) <= set(labels)
+    assert R3_CFG["rules"]["target"] == "first_token" and R3_CFG["rules"]["within"] == 1
+    assert R3_CFG["predictions"] == dict.fromkeys(("r3a", "r3b", "r3c", "r3d"), "holds")
+    # Four calibrations, each a measured, context-aware profile that is in the repository.
+    assert list(R3_CFG["calibrations"]) == ["A", "s0", "s1", "s2"]
+    for path in R3_CFG["calibrations"].values():
+        profile = load_profile(REPO / path)
+        assert profile.calibrated and profile.context_aware and profile.block_size == 16
+    assert R3_CFG["adapter_name"] in adapters.REGISTRY
+    assert R3_CFG["adapter"] == {"token_scale": 0.0625, "max_total_tokens": 2048}
+    assert (R3_CFG["window_s"], R3_CFG["warmup_s"], R3_CFG["replicas_max"]) == (3600, 300, 16)
+    assert R3_CFG["seeds"] == [0, 1, 2] and R3_CFG["probe_speeds"] == [0.25, 0.5, 1, 2, 4]
+    assert len(R3_CFG["trace_sha256"]) == 64
+    # The trace is other people's data: its path is under the ignored folder.
+    assert R3_CFG["trace"].startswith("artifacts/traces/")
+
+
+def test_the_new_policies_are_built_as_registered():
+    """The two published policies, built the way the grid builds them, are the documented ports."""
+    from kv_routing_sim import policies
+    from kv_routing_sim.sim.cost_model import load_profile
+
+    profile = load_profile(REPO / R3_CFG["calibrations"]["A"])
+    by_label = {p["label"]: p for p in R3_CFG["policies"]}
+    lm = policies.build("lmetric", 4, profile=profile, **(by_label["lmetric"].get("kwargs") or {}))
+    assert lm.index == "events" and lm.wants_cache_view and lm.wants_events
+    assert lm.block_size == 16
+    sm = policies.build("smetric-local", 4, profile=profile,
+                        **by_label["smetric-local"]["kwargs"])
+    assert (sm.ttft_slo_s, sm.slack, sm.hit_ratio, sm.index) == (2.0, 1.0, 0.5, "events")
+    assert sm.ttft_slo_s * 1000 == R3_CFG["slo"]["ttft_p95_ms"]  # the rule's deadline is the SLO
+    disp = policies.build("lmetric", 4, profile=profile, **by_label["lmetric@dispatch"]["kwargs"])
+    assert disp.index == "dispatch" and not disp.wants_cache_view

@@ -1,10 +1,8 @@
-# ⛔ DRAFT — NOT REGISTERED, NOT RUN. Kept on the branch `r3-prep` so the work is not lost.
-# This experiment is outside the plan of record (FLAGSHIP_PROJECTS.md) and waits for a
-# decision. If it goes ahead, it is registered on the main branch — this file, with its speeds filled
-# in by the probe, and a dated entry in docs/09-hypotheses.md — before any policy is compared.
-#
 # R3 — the two published routing policies, and real sessions of unequal size, on a public
 # production trace.
+# Registered 2026-10-06, BEFORE it runs, with a dated entry in docs/09-hypotheses.md.
+# ⚠️ Outside the plan of record (FLAGSHIP_PROJECTS.md). Agreed on 2026-10-06:
+# the README has to say that neither published policy has been run here.
 #
 # Why: the prior-art re-audit of 2026-10-05 (docs/04-prior-art.md §2a) found that
 #   - this project's routing result was already published from real clusters — LMetric (OSDI '26)
@@ -15,6 +13,15 @@
 #     LMetric was evaluated on.
 # `scripts/run_r3.py` runs the grid and decides nothing; `scripts/r3_analyze.py` is the whole
 # analysis. Both are committed before the run: nothing below is chosen after a result.
+#
+# What had been seen when this was written — all of it:
+#   - the trace's structure (sizes, sessions, sharing), computed with no routing policy;
+#   - R1's re-run of the same day: on Mooncake, at holdable loads, no policy with a load term was
+#     more than one replica from round-robin;
+#   - two smoke runs of the new policies on GENERATED traffic while they were being written
+#     (calibration A, seed 0): one prompt at 2 sessions/s on 6 replicas — p95 TTFT 694 ms for
+#     lmetric, 813 for session-sticky; 64 prompts on 10 replicas — 1,494 against 1,843.
+#   No policy, not even round-robin, had been run on this trace.
 
 schema_version: 1
 name: R3

@@ -215,6 +215,7 @@ calibration cannot cash.
 
 | **C4** | On a real T4: `kvsim calibrate` with its repeats (C4a); decode of batches that share a prefix — free by itself (D1a), still a straight line past the cache (D1b); an arriving request's stall = its prefill (D2); per-request token times on traffic around the limit (T3a, T3b); one run's spread covers another's count (E); the 64-prompt question on fresh fits (F1, F2) | C4 | `[x]` **2026-10-05/06 — 7 of 9 hold; predicted: all nine** — ✅ C4a · ✅ D1a (−3%, −4%) · ✅ D1b (+3% to +15%) · ✅ D2 (1.03–1.19×) · ✅ T3a (1.00×, 1.00×, 1.07×) · ✅ T3b · ⛔ **E** (82.4% covered; 90% needed; 94.9% within one more replica) · ✅ F1 (8·7·8 against 9·10·10) · ⛔ **F2** (under both halves balanced affinity is one replica below sticky at 3 and 4 of 6 loads on two of three fits) |
 | **R1, R2 again** | The two real-traffic tests on the validated timing model, on two calibrations: R1's own rules (predicted: falsified again), R1w — balanced affinity and session-sticky within one replica on Mooncake (holds), R2's own rules (holds) | R1/R2 | `[x]` **2026-10-06** — ⛔ **R1 falsified again**, on both calibrations (predicted) · ✅ **R1w holds** (predicted): the two are within one replica at every speed · ⚠️ **R2 untestable as designed**: round-robin holds the target on 8 replicas at no probe speed (predicted: holds — could not be checked) |
+| **R3** | ⚠️ *Outside the plan; agreed 2026-10-06.* The two published policies — LMetric, and SMetric's rule without its global tier — beside the seven, on Alibaba's public coder trace, on four calibrations: LMetric needs no more replicas than session-sticky and fewer somewhere (R3a); SMetric-local within one of LMetric (R3b); balanced affinity within one of session-sticky (R3c); pure prefix-affinity fails (R3d) | R3 | `[~]` **registered 2026-10-06** — `configs/r3_bailian.yaml`; not run yet |
 
 **Amendments:** *(add dated entries below, never edit above)*
 
@@ -2015,3 +2016,90 @@ closed without one, for three reasons:
 H6's result stays in the record as what it is — a first-model result — and every place that
 quotes it says so. A re-run could at most have falsified the ranking half a second time; had it
 held, a simulator-only result would still not have been allowed to relax ADR-010.
+
+### 2026-10-06 — R3 REGISTERED before it runs: the two published policies, and real sessions of unequal size, on a public production trace
+Design and rules: [`configs/r3_bailian.yaml`](../configs/r3_bailian.yaml). Runner:
+`scripts/run_r3.py`, which decides nothing. Analysis: `scripts/r3_analyze.py`. The two policies:
+`policies/lmetric.py`, `policies/smetric_local.py`. The trace reader:
+`traces/adapters/bailian.py`. All committed before the run.
+⚠️ **This is outside the plan of record** (`FLAGSHIP_PROJECTS.md`). It was agreed on
+2026-10-06.
+
+**Why.** The prior-art re-audit of 2026-10-05 left the README saying three things it should not
+have to say for long: that the routing result was published first by LMetric and SMetric, that
+neither policy has been run in this simulator, and that the generated grids cannot show the
+weakness SMetric names in session-sticky routing — every generated session has the same number of
+turns. A public trace with real sessions exists, and it is the one LMetric was evaluated on.
+
+**The setup.**
+- **Traffic:** the coder trace of `alibaba-edu/qwen-bailian-usagetraces-anon` (Apache-2.0), its
+  first hour: **20,054 requests in 12,647 sessions** — requests per session: median 1, 99th
+  percentile 8, most 28; a fifth of the requests are in sessions of five or more. Token counts
+  × 1/16, by a rule fixed beforehand: the least shrinking scale at which no more than 0.1% of
+  requests pass the engine's 2,048-token limit (13 answers in the whole file are cut to fit).
+  Prompts are 293 tokens at the median and 1,611 at most — none takes 2 s to prefill cold, so
+  unlike AgentX at its scale this replay has a slope. With an unbounded cache **64.8%** of prompt
+  blocks could be reused, **29.7%** from the request's own session: more than half of the reuse
+  is *across* sessions. The window's distinct blocks come to 102 times one T4's cache.
+- **Engine model:** four calibrations — A, and the three pooled fits `kvsim calibrate` wrote in
+  C4. Every rule must hold on each.
+- **Policies:** the seven's relevant ones (round-robin, least-loaded, session-sticky, balanced
+  affinity at α 16 and 1, pure affinity) and the two published ones.
+- Replicas 1–16, three seeds, speeds by R2's rule from a probe that runs round-robin alone.
+- **Target:** p95 TTFT ≤ 2 s, as in R1, R2 and every registered grid. Reported: the same rules
+  with p95 time per output token ≤ 100 ms as well.
+
+**The two new policies are ports, and the ports are mine.**
+- **LMetric** from its authors' router (`blitz-serving/blitz-router`): the smallest
+  (prefill tokens queued at a replica + this request's own after its cache hit) × (its running
+  and queued requests + 1). It routes on the engine's cache events, as theirs does — in this
+  simulator an event stream with no delay.
+- **SMetric's rule** from the paper's Figure 27, with four departures named in the file: **no
+  global tier** (the paper reports that its lead does not hold without one — and this simulator
+  has none), no TPOT filter, the turn taken from the session id, LMetric's "+ 1". So a result
+  here is a result about these ports in this simulator, not about the two systems.
+
+**The rules.** R(policy) is the fewest replicas (1–16) that hold the target on every seed; 17 if
+none. A speed is testable on a calibration if some policy holds the target there.
+- **R3a — the published product needs no more GPUs than keeping sessions in place:**
+  R(LMetric) ≤ R(session-sticky) at every testable speed, and fewer at one or more.
+- **R3b — moving sessions adds nothing without a shared cache store:** R(SMetric-local) within
+  one of R(LMetric) at every testable speed.
+- **R3c — the old finding's two policies tie on real traffic:** R(balanced affinity, α 16) within
+  one of R(session-sticky) at every testable speed — as on Mooncake (R1w).
+- **R3d — pure prefix-affinity fails:** at every testable speed it needs more replicas than
+  round-robin, or holds the target on none.
+
+**Predicted: all four hold.** R3a: more than half of this trace's reuse is across sessions, and
+61% of its requests are first turns, which session-sticky places by load alone — LMetric can
+place them where their prefix is. The strict half ("fewer somewhere") is the part I am least sure
+of: on Mooncake today nothing was more than one replica from round-robin. R3b: without a global
+tier a moved session recomputes its history, so moving can only rarely pay; and in its balance
+branch the rule *is* LMetric's score. R3c: it held on Mooncake on two calibrations. R3d: 17% of
+the requests start with one prefix.
+
+**What had been seen when this was written — all of it.** The trace's structure, computed with
+no routing policy. R1's re-run of the same day. Two smoke runs of the new policies on *generated*
+traffic while they were being written (calibration A, seed 0): one prompt at 2 sessions/s on 6
+replicas — p95 TTFT 694 ms for LMetric against 813 for session-sticky; 64 prompts on 10 replicas
+— 1,494 against 1,843. No policy, not even round-robin, had been run on this trace.
+
+**What would be uncomfortable, written down now.**
+- **If LMetric needs more replicas than session-sticky somewhere** (R3a fails the hard way), then
+  in this simulator the published product does worse than the simple policy — which SMetric
+  itself reports for agentic traffic without a global store (LMetric 36% below a cache-heavy
+  weighted sum). It would not be a refutation of LMetric: its own evaluation is on real clusters.
+- **If R3a fails only for want of a strict win,** then on real traffic, at loads a small fleet
+  can hold, the choice among the sensible policies is worth nothing here either — which is what
+  Mooncake said.
+- **If R3b fails,** moving sessions matters without a global tier, one way or the other.
+- **If R3c fails,** balanced affinity and session-sticky are more than one replica apart on a
+  real trace for the first time.
+- **If R3d fails,** pure prefix-affinity survives a trace in which one prefix starts a sixth of
+  the requests.
+- **A mistake in my port would be reported as a result about someone else's policy.** The files
+  cite their sources term by term, the departures are listed, and tests pin the formula — but
+  nobody else has reviewed them.
+- **The cache is small against this trace:** one T4 holds under 1% of the hour's distinct
+  blocks. A follow-up arrives a median two minutes after its parent, and may find its history
+  evicted whatever the router did. The trace's own cluster was far larger than 16 T4s.
