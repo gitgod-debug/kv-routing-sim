@@ -31,8 +31,15 @@ calibrations:
 # exist). If round-robin holds it at no probe speed, the test is UNTESTABLE as designed on this
 # model: that is reported, and nothing else in its design is changed to rescue it.
 # Scale, window, warm-up, sessions, policies, load weights, seeds, replicas 1–8: as registered.
+# ⭐ Filled in on 2026-10-06, after the probe and before any comparison ran
+# (artifacts/results/realtrace_ctx/probe.json — round-robin alone, calibration A):
+#   R1  tool-agent    needs 5, 5, 6 replicas at 0.25×, 0.5×, 1× and holds the SLO on 8 at neither 2× nor 4×
+#       conversation  needs 6, 6, 7, and holds at neither 2× nor 4×     -> 0.25×, 0.5×, 1×
+#       (on the first model round-robin needed 4, 5, 8 and 5, 5, 8 at 1×, 2×, 4×)
+#   R2  AgentX        holds the SLO on 8 replicas at NO probe speed, 0.25× included
+#                                                                     -> untestable as designed
 speeds:
-  R1: []     # by the rule, after the probe and before the comparison
+  R1: [0.25, 0.5, 1]
   R2: []
 
 # ── The rules ───────────────────────────────────────────────────────────────────────────────────
