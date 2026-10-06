@@ -460,7 +460,9 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 ## 9. What is left
 
 **Manual steps (they need an account):**
-- File the vLLM issue (the draft is the upstream log #1).
+- ~~File the vLLM issue~~ — **do not**: checked on 6 Oct, the bug is already reported with a fix
+  (vLLM pull request #47715, open since July). Optional: add one comment there with our
+  measurement from a real GPU. See the upstream log.
 - Open the guidellm issue, then the pull request (the patch is in `docs/upstream/`, the text in
   the upstream log #7–8).
 - *Optional:* ask someone for an arXiv endorsement, by mid-October — only if the preprint is to be
@@ -489,9 +491,11 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 - ✅ done 6 Oct: the two older real traces (R1, R2) re-run on the checked timing model
   (finding 31);
 - then: make the target with both speeds the default (its check has passed);
-- **your decision:** H6 was tested on the first timing model only. I recommend not re-running it:
-  what followed from it ("calibrate your own GPU") is built, and C3 and C4 measured the same thing
-  more directly;
+- ✅ decided 6 Oct: H6 is **not** re-run. It was tested on the first timing model only and is
+  labelled so. What followed from it ("calibrate your own GPU") is built, and C3 and C4 measured
+  the same thing more directly;
+- ⭐ **now — R3** (agreed on 6 Oct): the two routing policies from the papers, and our own,
+  on a public trace from Alibaba's Qwen service. Registered first; no GPU;
 - then: a warning in the tool when a workload is at the edge of a GPU (finding 28 says a number
   there cannot be trusted), and a few shared-prompt cells in `kvsim calibrate`;
 - later: the PyPI release.

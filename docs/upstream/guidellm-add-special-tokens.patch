@@ -1,8 +1,8 @@
 diff --git a/src/guidellm/data/deserializers/trace_common.py b/src/guidellm/data/deserializers/trace_common.py
-index c89e876..a72987d 100644
+index acb4ae6..b1ce87b 100644
 --- a/src/guidellm/data/deserializers/trace_common.py
 +++ b/src/guidellm/data/deserializers/trace_common.py
-@@ -83,7 +83,10 @@ def generate_token_ids(
+@@ -85,7 +85,10 @@ def generate_token_ids(
          # The Faker.text() can only generate text of at least 5 characters.
          num_chars = max(token_count * margin_of_safety * attempt, 5)
          text = faker.text(num_chars)
@@ -28,10 +28,10 @@ index 1cc2819..0a8a56e 100644
          f"tok{i}" for i, _ in enumerate(tokens)
      )
 diff --git a/tests/unit/data/deserializers/test_trace_common.py b/tests/unit/data/deserializers/test_trace_common.py
-index 16ac17d..c3e964e 100644
+index 8d097e8..662f2a0 100644
 --- a/tests/unit/data/deserializers/test_trace_common.py
 +++ b/tests/unit/data/deserializers/test_trace_common.py
-@@ -32,7 +32,7 @@ from tests.unit.data.deserializers.trace_test_utils import trace_file_source
+@@ -38,7 +38,7 @@ from tests.unit.data.deserializers.trace_test_utils import trace_file_source
  def mock_processor() -> Mock:
      """Tokenizer where each whitespace-delimited word is one token."""
      proc = Mock()
@@ -40,7 +40,7 @@ index 16ac17d..c3e964e 100644
      proc.decode.side_effect = lambda tokens, skip_special_tokens=False: " ".join(
          f"tok{t}" for t in tokens
      )
-@@ -70,6 +70,21 @@ def test_generate_token_ids(token_count, expected):
+@@ -76,6 +76,21 @@ def test_generate_token_ids(token_count, expected):
      assert res == expected
  
  
@@ -98,10 +98,10 @@ index 8a94d05..81a3076 100644
      ]
      proc.decode.side_effect = lambda tokens, skip_special_tokens=False: " ".join(
 diff --git a/tests/unit/data/deserializers/test_trace_weka.py b/tests/unit/data/deserializers/test_trace_weka.py
-index 79abd54..ad16ceb 100644
+index f195dab..9ee5132 100644
 --- a/tests/unit/data/deserializers/test_trace_weka.py
 +++ b/tests/unit/data/deserializers/test_trace_weka.py
-@@ -28,7 +28,7 @@ def ascending_processor() -> Mock:
+@@ -30,7 +30,7 @@ def ascending_processor() -> Mock:
      traces as there is no way to generate distinct token blocks for sibling
      nodes."""
      proc = Mock()
@@ -110,7 +110,7 @@ index 79abd54..ad16ceb 100644
      proc.decode.side_effect = lambda tokens, skip_special_tokens=False: " ".join(
          f"tok{i}" for i, _ in enumerate(tokens)
      )
-@@ -42,7 +42,7 @@ def compatible_processor() -> Mock:
+@@ -44,7 +44,7 @@ def compatible_processor() -> Mock:
      sibling nodes."""
      random.seed(0)
      proc = Mock()

@@ -202,7 +202,7 @@ calibration cannot cash.
 | **H4** | The residual is eviction-order skew (histogram-checkable) | Phase 3 | `[x]` ✅ **supported, in its second amendment's form (2026-09-22):** plain LRU's residual on a live engine is **capacity** skew (−11.9 pts when requests hold decode blocks, 0.17 without); histogram counts exact, W2 distributions identical |
 | **H5** | Cost win = one fewer replica at fixed SLO | Phase 4 | `[~]` **holds only for balanced affinity at LOW sharing** (1–3 fewer T4s); falsified elsewhere. Session-sticky (untested) needs the fewest everywhere |
 | **R1** | Real traffic (Mooncake): affinity beats sticky on tool-agent, never on conversation | R1 | `[x]` ⛔ **FALSIFIED 2026-09-28** — both directions wrong; sticky and balanced affinity within one replica; pure affinity fails everywhere |
-| **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 + 5 (CPU-only re-runs) | `[x]` ⛔ ranking half **FALSIFIED** — τ-b down to 0.51 · ✅ crossover half **HOLDS** — H2b's flip shifts but never inverts in all four regimes (both 2026-09-28) |
+| **H6** | ⭐ Policy ranking is hardware-invariant (τ > 0.8 under cost rescale) | Phase 4 + 5 (CPU-only re-runs) | `[x]` ⛔ ranking half **FALSIFIED** — τ-b down to 0.51 · ✅ crossover half **HOLDS** — H2b's flip shifts but never inverts in all four regimes (both 2026-09-28) · *first timing model only; not re-run on the validated one, by decision of 2026-10-06 — see that entry* |
 
 | **R2** | Real traffic (AgentX): with nothing shared across users, sticky and balanced affinity tie, and pure affinity does not collapse | R2 | `[x]` ✅ **HOLDS 2026-09-28** (on the context-free timing model) |
 | **Phase 6** | The simulator's hit rates hold on two live replicas: each within 10%, policies in the predicted order | Phase 6 | `[x]` ✅ **HOLDS 2026-09-28**, run twice — every hit rate within 1.4% · ⚠️ latency came out 5–222× the prediction (not a registered rule; explained by C2) |
@@ -1992,3 +1992,26 @@ rescaling can: two calibrations of one GPU, a few percent apart, move counts by 
 registered verdict (C3, C4, and the conversation rule above). Its other half was about a flip
 that is unsettled on the validated model. Whether a re-run is still worth its hour is
 undecided; this log's recommendation is to leave H6 as a first-model result and say so.
+
+### 2026-10-06 — H6 will not be re-run on the validated timing model: the decision, and why
+Decided on the recommendation written in the entry above. No experiment.
+
+H6 was tested on the first, context-free timing model (2026-09-28): its ranking half was
+falsified (Kendall's τ-b down to 0.51 under rescaled timing) and its crossover half held (H2b's
+flip shifted but never inverted). `CHECKPOINTS.md` listed a re-run on the validated model. It is
+closed without one, for three reasons:
+
+1. **What followed from the failed half has been built and measured.** The consequence was: a
+   ranking is a result for one calibration, so a user must calibrate their own GPU. That is
+   `kvsim calibrate` (C1, C3, C4).
+2. **The same question has been answered more directly.** H6 rescaled the timing by 2× and 4×.
+   C3 and C4 compared real calibrations of one GPU, a few percent apart: replica counts differ
+   at 29% of the cells of the finding's grid (at 4% by more than one), and a registered verdict
+   reverses (H2b on A against B and C; the conversation rule of R1 on A against s0). A 2× rescale
+   cannot move them less.
+3. **The other half has lost its subject.** It asked whether H2b's flip survives other hardware.
+   On the validated model that flip is not settled on our own GPU.
+
+H6's result stays in the record as what it is — a first-model result — and every place that
+quotes it says so. A re-run could at most have falsified the ranking half a second time; had it
+held, a simulator-only result would still not have been allowed to relax ADR-010.
