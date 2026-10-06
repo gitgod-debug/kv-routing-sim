@@ -210,7 +210,9 @@ time to first token was 1.23–1.30× the registered number — inside the 2× t
 and the model too fast every time.
 
 H6 (the policy ranking under faster and slower GPUs) was tested on the first, context-free model
-only, and has not been re-run on the validated one. That locality can lose to load balancing is published — LMetric and SMetric
+only, and will not be re-run on the validated one: what followed from it — a ranking is a result
+for one calibration, so calibrate your own GPU — was built, and C3 and C4 then measured the same
+thing more directly. That locality can lose to load balancing is published — LMetric and SMetric
 on real clusters, Preble before them, `azrabano23/disagg-sim` in a simulator — and llm-d and Dynamo
 weigh prefix and load scores by hand-set weights. On this setup, with timing checked against the
 engine, balance won too.
