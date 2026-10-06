@@ -11,6 +11,7 @@ from .radix_affinity import RadixAffinity
 from .radix_affinity_balanced import RadixAffinityBalanced
 from .round_robin import RoundRobin
 from .session_sticky import SessionSticky
+from .smetric_local import SMetricLocal
 
 # Ordered cheapest-to-most-sophisticated, which is also the order results tables read best in.
 REGISTRY: dict[str, type[RoutingPolicy]] = {
@@ -23,6 +24,7 @@ REGISTRY: dict[str, type[RoutingPolicy]] = {
     SessionSticky.name: SessionSticky,
     # Published policies, added 2026-10-05 (docs/04-prior-art.md §2a). Asked for by name.
     LMetric.name: LMetric,
+    SMetricLocal.name: SMetricLocal,
 }
 
 # ⚠️ `all` IS THE SEVEN POLICIES OF THE REGISTERED SWEEPS, AND STAYS THAT. Phase 4's design says

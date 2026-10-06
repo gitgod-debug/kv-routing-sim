@@ -204,4 +204,5 @@ def run(
         result.iterations += r.iterations
         result.per_replica_hit_rate.append(round(c.hit_rate, 6))
     result.per_replica_requests = per_replica_requests
+    result.router = dict(router.stats())
     return result

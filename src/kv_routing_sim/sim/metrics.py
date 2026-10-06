@@ -77,6 +77,8 @@ class RunResult:
     iterations: int = 0
     profile: dict[str, Any] = field(default_factory=dict)
     trace: dict[str, Any] = field(default_factory=dict)
+    # The policy's own account of its decisions (RoutingPolicy.stats()); {} for most policies.
+    router: dict[str, Any] = field(default_factory=dict)
 
     @property
     def hit_rate(self) -> float:
