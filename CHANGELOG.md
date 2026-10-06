@@ -65,6 +65,10 @@ The first public version: planned for PyPI before 2026-11-20.
   default. Longer prompts are an extrapolation unless you measure there (`--prefill-lengths`,
   `--prefill-cached`, `--decode-contexts`).
 - `--format html` is not built; `md` and `json` are.
+- **Real traces on the validated timing model:** Mooncake was re-run (session-sticky and
+  balanced prefix-affinity within one replica, on two calibrations). AgentX could not be: at the
+  scale it was registered with, 28% of its prompts are longer than the engine's 2,048-token limit,
+  and round-robin never holds the target. Its earlier result is from the first timing model.
 - **Two published routing policies are not among the seven:** LMetric (OSDI '26 — new prefill
   tokens × batch size, no weight) and SMetric (arXiv 2607.08565 — stick a session's follow-ups,
   migrate it when its instance would miss the SLO). The balanced-affinity policy here is a

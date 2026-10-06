@@ -214,7 +214,7 @@ calibration cannot cash.
 | **T2** | Under a target with both halves (p95 TTFT ≤ 2 s **and** p95 time per output token ≤ 100 ms), on three calibrations: sticky still best or tied with 1 and 4 prompts (T2a), never worse than round-robin or least-loaded (T2b), and the first-token counts were optimistic by ≥ 1.5× (T2c) | T2 | `[x]` ✅ **2026-10-05, all three as predicted, on all three calibrations** — T2a 12 of 12 · T2b no exception · T2c 1.93–2.00× · ⚠️ these are the model's counts, and T1 says its per-token latency is unchecked where they live · *2026-10-06: C4 checked it there, on one replica — p95 time per token within 7% on three workloads around the limit* |
 
 | **C4** | On a real T4: `kvsim calibrate` with its repeats (C4a); decode of batches that share a prefix — free by itself (D1a), still a straight line past the cache (D1b); an arriving request's stall = its prefill (D2); per-request token times on traffic around the limit (T3a, T3b); one run's spread covers another's count (E); the 64-prompt question on fresh fits (F1, F2) | C4 | `[x]` **2026-10-05/06 — 7 of 9 hold; predicted: all nine** — ✅ C4a · ✅ D1a (−3%, −4%) · ✅ D1b (+3% to +15%) · ✅ D2 (1.03–1.19×) · ✅ T3a (1.00×, 1.00×, 1.07×) · ✅ T3b · ⛔ **E** (82.4% covered; 90% needed; 94.9% within one more replica) · ✅ F1 (8·7·8 against 9·10·10) · ⛔ **F2** (under both halves balanced affinity is one replica below sticky at 3 and 4 of 6 loads on two of three fits) |
-| **R1, R2 again** | The two real-traffic tests on the validated timing model, on two calibrations: R1's own rules (predicted: falsified again), R1w — balanced affinity and session-sticky within one replica on Mooncake (holds), R2's own rules (holds) | R1/R2 | `[~]` **registered 2026-10-06** — `configs/realtrace_ctx.yaml`; not run yet |
+| **R1, R2 again** | The two real-traffic tests on the validated timing model, on two calibrations: R1's own rules (predicted: falsified again), R1w — balanced affinity and session-sticky within one replica on Mooncake (holds), R2's own rules (holds) | R1/R2 | `[x]` **2026-10-06** — ⛔ **R1 falsified again**, on both calibrations (predicted) · ✅ **R1w holds** (predicted): the two are within one replica at every speed · ⚠️ **R2 untestable as designed**: round-robin holds the target on 8 replicas at no probe speed (predicted: holds — could not be checked) |
 
 **Amendments:** *(add dated entries below, never edit above)*
 
@@ -1898,3 +1898,97 @@ to add and nothing to pile up.
   model alone.
 - Mooncake's sessions are inferred by the adapter. Every session-sticky number there rests on
   that inference, as before.
+
+### 2026-10-06 — R1 and R2 on the validated timing model RAN: R1 falsified again, the two policies within one replica; R2 cannot be tested as designed
+Report: [`artifacts/results/realtrace_ctx/report.md`](../artifacts/results/realtrace_ctx/report.md);
+the probe: `probe.json`; each calibration's own run and the config it was derived with:
+`R1/A/`, `R1/s0/`. 2,304 runs, from a clean tree at `3fd95df` — the commit that fixed the speeds.
+The same trace files as R1's first run (their sha256s are compared in the tests).
+
+**The probe (round-robin alone, calibration A), and the speeds by the registered rule.**
+
+| test | trace | round-robin needs, at 0.25× · 0.5× · 1× · 2× · 4× | speeds by the rule |
+|---|---|---|---|
+| R1 | tool-agent | 5 · 5 · 6 · not on 8 · not on 8 | **0.25×, 0.5×, 1×** |
+| R1 | conversation | 6 · 6 · 7 · not on 8 · not on 8 | |
+| R2 | AgentX | not on 8 at any speed | **none — untestable as designed** |
+
+On the first model R1's speeds were 1×, 2× and 4×. On this one, round-robin cannot hold the target
+on 8 T4s above the recorded pace.
+
+**As registered — predicted: R1 falsified again, R1w holds, R2 holds.**
+
+- ⛔ **R1: FALSIFIED again, on both calibrations** (as predicted). *Tool-agent:* its rule asked for
+  balanced affinity to win at one speed or more. It ties session-sticky at every speed on A and on
+  s0 — 5 · 5 · 5 against 5 · 5 · 5. *Conversation:* its rule asked that affinity never win. On A it
+  wins once (6 against 7 at 1×); on s0 it never does (6 · 6 · 6 both). So the conversation rule
+  fails on A and holds on s0 — one replica, at one speed, between two calibrations again — and R1,
+  which needs both rules, fails on both.
+- ✅ **R1w: HOLDS, on both calibrations** (as predicted). At all 6 testable (trace, speed) points
+  on each calibration, balanced affinity (α 16) and session-sticky need replicas within one of
+  each other. What the README has said about Mooncake since 2026-09-28 is now a registered result,
+  on the validated model.
+- ⚠️ **R2: UNTESTABLE as designed** (predicted: holds — the prediction could not be checked). By
+  the rule fixed before the probe, nothing was changed to rescue it, and no comparison was run.
+
+**Replicas needed on Mooncake, at 0.25× · 0.5× · 1× (A, then s0; — = not on 8).**
+
+| policy | tool-agent, A | tool-agent, s0 | conversation, A | conversation, s0 |
+|---|---|---|---|---|
+| round-robin | 5 · 5 · 6 | 5 · 5 · 6 | 6 · 6 · 7 | 6 · 6 · 7 |
+| least-loaded | 5 · 5 · 6 | 5 · 5 · 6 | 7 · 6 · 7 | 6 · 6 · 7 |
+| session-sticky | **5 · 5 · 5** | **5 · 5 · 5** | 6 · 6 · 7 | 6 · 6 · 6 |
+| balanced affinity, α 16 | **5 · 5 · 5** | **5 · 5 · 5** | 6 · 6 · 6 | 6 · 6 · 6 |
+| balanced affinity, α 1 | 5 · 5 · 5 | 5 · 5 · 5 | 6 · 6 · 7 | 6 · 6 · 6 |
+| consistent-hash on the prefix | 7 · 7 · 7 | 6 · 6 · 7 | — · — · — | 8 · 8 · — |
+| pure prefix-affinity | — · — · — | — · — · — | — · — · — | — · — · — |
+
+**Reported, not tested.**
+- **At these loads, on this model, routing barely matters on Mooncake.** No policy with any
+  balance in it is more than one replica from round-robin; session-sticky saves one replica over
+  round-robin at one point of six on A (tool-agent at 1×: 5 against 6) and at two on s0. On the
+  first model, at four times the pace, it saved two (6 against 8). The hit rates are what they were — 0.42 against
+  0.37 on tool-agent, 0.14 against 0.07 on conversation, at 4 replicas — so the cache works as
+  before; what changed is what a T4 can carry.
+- **The counts hardly move with the load:** 5 · 5 · 5 from a quarter of the pace to all of it. That
+  is not a throughput limit. About 1–2% of these prompts are longer than 2,048 tokens and take
+  more than 2 s to prefill cold; while one of them prefills, every request admitted with it waits.
+  More replicas mean fewer such collisions. (Traffic and timing only, on A: tool-agent 0.8% of
+  prompts over 2,048 tokens, 1.0% over 2 s cold; conversation 2.0% and 2.3%.)
+- **At the one speed the two models share (1×),** the validated model needs one or two replicas
+  more: tool-agent 5–6 where the first model said 4; conversation 6–7 where it said 4–5.
+- **Pure prefix-affinity** holds the target on no replica count, on either trace, on either
+  calibration — as on the first model.
+- **The two calibrations differ at 9 of the 48 (trace, speed, policy) cells** — power-of-two is
+  the eighth policy, not in the table above — and never by more than one replica.
+
+**R2 — why it cannot be tested, from the traffic and the timing model alone (no policy involved).**
+In R2's window 27.8% of the prompts are longer than 2,048 tokens — the limit of the engine every
+calibration here was measured on — and the median prompt (1,677 tokens) takes 1.6 s to prefill
+cold on calibration A; the 95th percentile takes 11 s. So 35.6% of its requests cannot meet 2 s
+without a cache hit. With a session's whole history cached, 99.3% prefill within 2 s (p95
+0.24 s). On this model R2's replay has no slope: a request finds its history, or it misses the
+target outright. Round-robin misses too often at any pace, and the registered speed rule is
+round-robin's.
+The first model's R2 result — "identical: 2 T4s at every speed" — was computed with a prefill
+cost that did not grow with context, on prompts mostly outside what any calibration measured. It
+stays on record as a first-model result. It is neither confirmed nor contradicted here.
+
+**What it means.**
+1. **The real-traffic half of the README now rests on the validated model for Mooncake, and on
+   nothing for AgentX.** "Within one replica" is a registered result. "Identical on AgentX" is a
+   first-model result the validated model cannot test at that scale.
+2. **On real traffic at holdable loads, the choice between the sensible policies is worth at most
+   one replica** — which is also what two calibrations of the same GPU disagree by (C3, C4).
+   The large savings in the generated grids come from loads and prompt mixes these traces do not
+   have at this scale.
+3. **A design that could test AgentX here** needs a speed rule that does not hinge on round-robin,
+   and a scale at which the prompts fit the engine's length limit. Not registered, not run.
+
+**What is still open in this checkbox: H6.** It was tested on the first model only. Its ranking
+half failed there, and what followed from that — a ranking is a result for one calibration, so
+calibrate your own GPU — was built (`kvsim calibrate`) and then measured more directly than a
+rescaling can: two calibrations of one GPU, a few percent apart, move counts by one and reverse a
+registered verdict (C3, C4, and the conversation rule above). Its other half was about a flip
+that is unsettled on the validated model. Whether a re-run is still worth its hour is
+undecided; this log's recommendation is to leave H6 as a first-model result and say so.

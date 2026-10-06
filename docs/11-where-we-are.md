@@ -287,6 +287,21 @@ on one GPU* (findings 18 and 19 below).
       needed one GPU fewer at 3 and at 4 loads. (F2 failed.) Every difference is exactly one GPU,
       and one GPU is what two calibrations disagree by (finding 29). So it is not a result for
       prefix routing. But "there is no saving" was wrong as a prediction.
+31. **The two real-traffic tests, run again on the checked timing model** (6 Oct, registered
+    first; the open box from 30 Sep).
+    - *Mooncake (R1):* as predicted, no winner. Keep-on-one-GPU and balanced prefix routing need
+      the same number of GPUs on the tool-agent trace (5, 5, 5) and are within one on the
+      conversation trace, on two calibrations. So "within one GPU" is now a registered result on
+      the checked model. Round-robin is also within one GPU of them at these loads.
+    - *The loads are lower than before.* On the first model we tested at 1×, 2× and 4× the
+      recorded pace. On the checked model round-robin cannot hold the target above 1× on 8 GPUs,
+      so the test ran at 0.25×, 0.5× and 1×. At 1× the checked model needs 1–2 GPUs more than
+      the first model said.
+    - *AgentX (R2) could not be tested.* The rule for choosing speeds, written down before,
+      needs round-robin to hold the target at some speed. It holds at none: at that scale 28% of
+      the prompts are longer than the engine allows, and one cache miss on a normal prompt costs
+      1.6 seconds. We changed nothing to rescue the test. Its old result ("the two tie exactly")
+      is from the first timing model and stays labelled that way.
 
 ## 5. What we decided, and why
 
@@ -436,7 +451,7 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 | 1–2 | Traffic, cache model, policies, simulator | ✅ done |
 | 2b | Cache model rebuilt to follow vLLM's real rules | ✅ done |
 | 3 | **The calibration** — model vs real engine, pre-registered | ✅ **done: exact** |
-| 4 | Calibrated sweep; H1, H5, H6; the load weight; real traces | ✅ mostly — H6's ranking half ⛔, its crossover half ✅; Mooncake (R1) ⛔; AgentX (R2) ✅ |
+| 4 | Calibrated sweep; H1, H5, H6; the load weight; real traces | ✅ mostly — H6's ranking half ⛔, its crossover half ✅ (first timing model only); Mooncake (R1) ⛔ on both timing models, "within one GPU" ✅ on the checked one; AgentX (R2) ✅ on the first model, not testable on the checked one |
 | 5 | **The finding** — when prefix-aware routing pays | ✅ **done, changed, then narrowed** — H2 ⛔; H2b ✅ on the first timing model, ⛔ on calibration A of the validated one, ✅ on two more calibrations of the same T4: *keep each user on one GPU* holds on all three; the prefix-routing half is not settled |
 | 6 | Two-GPU real-engine check under pressure | ✅ **holds**, run twice — hit rates within 1.4%; ⚠️ latency 5–222× the prediction |
 | 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | 🔨 demo, figure, 10×/100× done; `kvsim calibrate` works on a real T4 in all its forms (C1, C3, and with its repeats in C4); the per-token model checked on a real T4 (C4); PyPI left |
@@ -471,8 +486,12 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
   (LMetric and SMetric's rule) are now built into the simulator. R3 runs them, and our own
   policies, on a public trace from Alibaba's Qwen service: real sessions of very different sizes —
   the case our generated traffic cannot show;
-- then: make the target with both speeds the default (its check has passed), and re-run H6 and the
-  two older real traces (R1, R2) on the validated timing model — they all ran on the first one;
+- ✅ done 6 Oct: the two older real traces (R1, R2) re-run on the checked timing model
+  (finding 31);
+- then: make the target with both speeds the default (its check has passed);
+- **your decision:** H6 was tested on the first timing model only. I recommend not re-running it:
+  what followed from it ("calibrate your own GPU") is built, and C3 and C4 measured the same thing
+  more directly;
 - then: a warning in the tool when a workload is at the edge of a GPU (finding 28 says a number
   there cannot be trusted), and a few shared-prompt cells in `kvsim calibrate`;
 - later: the PyPI release.
@@ -489,8 +508,8 @@ text can become a blog post.
   (C2) predicts held-out traffic within 1.41× — but it still cannot express the slow
   single-sequence decode, and close to saturation a few percent of error in it moves the slow end
   (p95) by a lot;
-- H6 and both real-trace results (R1, R2) were run on the first timing model and have not been
-  re-run on the validated one;
+- H6 was run on the first timing model only. The AgentX result (R2) is also from the first model:
+  on the checked one its test cannot run at the registered scale (finding 31);
 - a GPU count is good to about ± one GPU: three calibrations of the same T4 agree exactly on 71%
   of counts and within one on 96%;
 - every GPU count in the README is for the first token only; with a per-token limit too, the

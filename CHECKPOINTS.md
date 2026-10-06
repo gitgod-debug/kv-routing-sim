@@ -615,7 +615,16 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       🔨 **R1 and R2: registered 2026-10-06** ([`configs/realtrace_ctx.yaml`](configs/realtrace_ctx.yaml)):
       the same traces, adapters, policies, seeds and rules, on two calibrations (A and C4's
       s0); speeds re-chosen by R2's rule from a round-robin-only probe. Predicted: R1
-      falsified again, R1w (within one replica) holds, R2 holds. **Left:** the run; then H6
+      falsified again, R1w (within one replica) holds, R2 holds.
+      ✅ **RAN 2026-10-06** ([`report.md`](artifacts/results/realtrace_ctx/report.md)): ⛔ R1
+      falsified again on both calibrations and ✅ R1w holds on both — on Mooncake, session-sticky
+      and balanced affinity tie at 5 · 5 · 5 (tool-agent) and are within one on conversation; no
+      policy with a load term is more than one replica from round-robin. ⚠️ **R2 is untestable as
+      designed** on the validated model: round-robin holds the target on 8 replicas at no probe
+      speed (28% of AgentX's prompts at that scale are longer than the engine's limit; a miss on
+      the median prompt costs 1.6 s). Its first-model result stays a first-model result.
+      **Left: H6** — recommended: leave it as a first-model result and say so (its consequence,
+      "calibrate your own GPU", was built and then measured directly in C3 and C4). Not decided yet
 - [x] **Restore the four registered notebooks** deleted from disk on 2026-09-30 (Phase 0, 3, 6,
       C1) — restored from git on 2026-10-01; their tests pass again (189 green)
 - [x] ⛔ **TTFT percentiles only from separate GPUs** — the notebook runs one server per physical GPU.

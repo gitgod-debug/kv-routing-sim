@@ -23,8 +23,10 @@ they nearly always do, because the same system prompt is re-sent on every turn �
 skip recomputing that prefix entirely, *if it lands on the replica that already has it cached.*
 
 So the routing decision silently controls your cache hit rate, which controls your time-to-first-token,
-which controls how many GPUs you need, which controls your bill. Today that choice is made by
-**guessing, then deploying, then hoping.**
+which controls how many GPUs you need, which controls your bill. Often that choice is still made by
+**guessing, then deploying, then hoping.** *(This said "today that choice is made by guessing"
+until 2026-10-05, as if no tool existed. One does: NVIDIA's Dynamo ships a simulator for it —
+[`04-prior-art.md`](04-prior-art.md) §2a.)*
 
 Two deliverables, and the README keeps them in **separate sections** because they are different kinds
 of claim:
@@ -33,7 +35,8 @@ of claim:
    curves out, with a recommended configuration and a ₹/$ delta against the naive baseline.
 2. **The Real-Engine Calibration Report** *(the credential)* — the simulator's cache model measured
    against a live vLLM's own Prometheus counters, with the error published and the **residual
-   explained**. Anyone can write a cache model. Almost nobody publishes how wrong theirs is.
+   explained**. Anyone can write a cache model. Few publish how wrong theirs is — and, as far as
+   one reading of the others found, none for the prefix cache itself.
 
 And separately from both, the thing a reader should be able to repeat without opening the repo:
 
@@ -47,6 +50,12 @@ And separately from both, the thing a reader should be able to repeat without op
    same GPU in C3, the same test held: the three agree on a GPU count to within one, and that half
    was decided by one. Before all that, a sharing-ratio × load framing — H2 — was falsified too. The
    dated record of all of it is in [`09-hypotheses.md`](09-hypotheses.md).)*
+
+   ⚠️ **It is not a new result.** SMetric (arXiv 2607.08565, July 2026) published "route agents by
+   session" from production traces on 32 real GPUs, and names a weakness these grids cannot show —
+   real sessions differ widely in size. What this repo has is an independent agreement on a small
+   calibrated model, and numbers on how far such a model's GPU count can be trusted: ± one, and
+   one calibration's own spread covers the next one's count in 82% of cases, not 90 (C4).
 
 ---
 
