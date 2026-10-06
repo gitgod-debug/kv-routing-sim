@@ -76,7 +76,11 @@ policies:
 # speed at which round-robin still holds the registered target on 16 or fewer replicas, and the two
 # probe speeds below it (R2's rule).
 probe_speeds: [0.25, 0.5, 1, 2, 4]
-speeds: []          # filled in by the rule, after the probe and before the grid
+# ⭐ Filled in on 2026-10-06, after the probe and before any other policy ran
+# (artifacts/results/r3_bailian/probe.json — round-robin alone, calibration A, seed 0):
+#   round-robin holds the registered target on 1, 1, 2, 4 and 8 replicas at 0.25×, 0.5×, 1×, 2×, 4×
+#   (with the per-token limit as well: 2, 2, 4, 7, 14). The highest it holds at is 4×.
+speeds: [1, 2, 4]
 
 # ── The decision rules, fixed before the run ────────────────────────────────────────────────────
 # R(policy) = the fewest replicas (1–16) whose cell meets the target on every seed; a policy that
