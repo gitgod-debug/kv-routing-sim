@@ -363,7 +363,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     r = sub.add_parser("replay", help="replay a trace through routing policies")
     r.add_argument("trace")
-    r.add_argument("--policies", default="all")
+    r.add_argument("--policies", default="all",
+                   help="comma-separated names, or 'all' for the seven standard policies; the two "
+                        "ported published ones are asked for by name: lmetric, smetric-local")
     r.add_argument("--replicas", default="1-8")
     r.add_argument("--seeds", type=int, default=5)
     r.add_argument("--block-size", type=int, default=16)

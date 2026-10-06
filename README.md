@@ -12,7 +12,7 @@ repo was written down before it ran — the ones that failed too.
 | **Checked against** | a live **vLLM 0.30.0** (`--enable-prefix-caching`) serving `Qwen/Qwen3-4B` on **2× Tesla T4** — its own `vllm:prefix_cache_hits` ÷ `vllm:prefix_cache_queries`, and each request's cached tokens |
 | **The cache model** | **exact** on two workloads under eviction pressure: every counter and every request, three runs each · hit rates within **1.4%** on two live replicas under three routing policies |
 | **The timing model** | p95 TTFT within **1.4×** on traffic it never saw · p95 time per output token within **7%** around a 100 ms limit · ⛔ 1.5–1.7× off when a GPU is at the knee of its load curve |
-| **What it found** | On a T4: keep each session on one GPU. ⚠️ **Not a new result** — SMetric (2026) reached it on production traces; this is an independent agreement. And a simulator's GPU count is good to **± one**: measured, across calibrations of one GPU |
+| **What it found** | On a T4, among seven standard policies: keep each session on one GPU. ⚠️ **Not a new result** — SMetric (2026) reached it on production traces; this is an independent agreement. On a public production trace the two published policies, ported here, never needed more GPUs than that. And a simulator's GPU count is good to **± one**: measured, across calibrations of one GPU |
 | **How** | every test's design, rules and prediction committed before it ran; the failed ones are in [the log](docs/09-hypotheses.md), dated |
 | **Upstream** | a bug in `vllm-project/guidellm`'s trace replay, found while calibrating (one token lost per block with tokenizers that add a start token) — fix and test ready in [`docs/upstream/`](docs/upstream/), **not yet submitted** |
 
@@ -52,10 +52,19 @@ missed it ([`docs/04-prior-art.md`](docs/04-prior-art.md), §2a). **SMetric** (W
 session's follow-up requests to the instance that served it. **LMetric** (Zhang et al., OSDI '26)
 had shown before that why a hand-weighted mix of a cache score and a load score has no right
 weight. What this repo adds is an independent agreement on a small calibrated model, from tests
-registered before they ran. **And SMetric names a weakness these grids cannot show:** real sessions
-differ widely in size, and plain session-sticky routing then leaves the load unbalanced — 2.17× on
-its testbed. Every generated session here has the same number of turns. Neither published policy
-has been run in this simulator yet.
+registered before they ran.
+
+**Both published policies have since been run here — as ports, on a public production trace** (R3,
+registered first; two of its four rules held, two of my predictions failed). Under the first-token
+target neither needs more GPUs than session-sticky at any load, and neither clearly fewer: LMetric
+ties it on three calibrations of four. With a limit on token speed as well, both need two to three
+GPUs fewer at the highest load — a reported number, not a tested rule. The ports are this repo's;
+none of this is a result about the two systems.
+
+**SMetric also names a weakness of session-sticky routing:** real sessions differ widely in size,
+and the load then goes out of balance — 2.17× on its testbed. It did not show on that trace (1.14×
+at most: its sessions are short), and every generated session here has the same number of turns.
+That weakness is still untested in this repo.
 
 Measured on simulated agentic traffic, with the cache model calibrated against a live vLLM (the
 credential, below), a context-aware T4 timing model, and a 2-second p95 TTFT target. The test was
@@ -144,23 +153,33 @@ rebuilt by [`scripts/build_grid.py`](scripts/build_grid.py) only if it reproduce
 exactly. To open it from a clone: `python -m http.server` in the repo root, then
 `http://localhost:8000/site/`.
 
-**On real traffic** — two trace families, each test registered before it ran. Both ran first on the
-first timing model (2026-09-28) and were re-run on the validated one, on two calibrations
-(2026-10-06, [report](artifacts/results/realtrace_ctx/report.md)):
+**On real traffic** — three trace families, each test registered before it ran. The first two ran
+on the first timing model (2026-09-28) and were re-run on the validated one, on two calibrations
+(2026-10-06, [report](artifacts/results/realtrace_ctx/report.md)); the third ran on the validated
+model only, on four ([report](artifacts/results/r3_bailian/report.md)):
 
 | Real trace | What is shared | Session-sticky vs prefix-affinity, validated model | Pure prefix-affinity | Round-robin |
 |---|---|---|---|---|
 | **Mooncake** FAST'25 (R1, scale 1/32, sessions inferred) | prompts across users | **within one replica at every speed, on both calibrations** (registered, holds): 5 · 5 · 5 against 5 · 5 · 5 on tool-agent. R1's own rules, which predicted a winner on each trace: **falsified again** | holds the target on no replica count | 5 · 5 · 6 on tool-agent: one replica more, at one speed of three |
 | **AgentX**, coding-agent sessions (R2, scale 1/64, real sessions) | nothing across users | ⚠️ **cannot be tested as designed**: on the validated model round-robin holds the 2 s target on 8 T4s at no speed, so the registered design has no speeds. 28% of its prompts are longer than the engine's 2,048-token limit, and a cache miss on a median prompt costs 1.6 s | — | — |
+| **Qwen-Bailian**, Alibaba's coder traffic (R3, scale 1/16, real sessions) | prompts across users: 65% of prompt blocks could be reused, 30% from the request's own session | **the same count at every speed, on four calibrations** (registered, holds): 2 · 4 · 7 against 2 · 4 · 7 | ⛔ **does not fail** (predicted: fails) — as few as round-robin at two speeds, fewer at the third (7 · 6 · 6 · 6 against 8). With a limit on token speed too, it is the worst policy | 2 · 4 · 8: one replica more, at one speed of three |
 
 On the first timing model AgentX gave *identical* counts for session-sticky and prefix-affinity
 (2 T4s at every speed) and no collapse of pure prefix-affinity. That is a first-model result: its
 prefill cost did not grow with context, and most of those prompts are outside what any calibration
 measured. It is neither confirmed nor contradicted by the re-run.
 
-So, on real traffic at loads a small fleet can hold, the choice between the sensible policies is
-worth **at most one replica** — which is also what two calibrations of the same GPU disagree by.
-Pure prefix-affinity fails wherever prompts are shared across users.
+On the Bailian trace the two published policies were run as well: LMetric needs 2 · 4 · 7 (6 on
+one calibration of four) and SMetric's rule without a global tier 2 · 4 · 6. The registered rule
+that LMetric would need *fewer* GPUs than session-sticky somewhere failed: it never needs more,
+and fewer on one calibration only.
+
+So, on real traffic at loads a small fleet can hold, session-sticky and the other sensible
+policies are **one replica apart at most** under a first-token target — which is also what two
+calibrations of the same GPU disagree by. Pure prefix-affinity fails on Mooncake and not on the
+Bailian trace. ⚠️ Reported, not tested: with a limit on token speed as well, the Bailian counts
+spread out — round-robin 14, session-sticky 13, LMetric 11, SMetric's rule 10 at the highest load
+(13 · 12 · 10 · 10 on one calibration) — the first sign here of a difference larger than ± one.
 
 ⚠️ **Scope:** generated traffic, one GPU type (T4), one model (Qwen3-4B). The replica counts are T4
 figures on the context-aware model, ± one replica.
@@ -426,7 +445,7 @@ and why, is in [`docs/04-prior-art.md`](docs/04-prior-art.md).
 | Project | What it is, and how this differs |
 |---|---|
 | **NVIDIA Dynamo's simulator** — `ai-dynamo/aisimulate`, "DynoSim" (and `aiconfigurator` before it, arXiv 2601.06288) | **The closest tool, and the larger one.** Replays a saved trace — its tutorial uses the same Mooncake trace as R1 below, and it reads the AgentX traces of R2 — on simulated vLLM or SGLang workers with a block-level prefix cache; compares round-robin with Dynamo's KV-aware router; and recommends a minimum GPU count under TTFT and TPOT limits. Offline multi-worker replay since March 2026. *What I did not find in it (read, not run, 2026-10-05):* routing policies other than those two; a published check of its cache model against a live engine — its public accuracy page covers TTFT and TPOT on single-node points with prefix caching off; a cost in money. |
-| **LMetric** (Zhang et al., OSDI '26, arXiv 2603.15202) · **SMetric** (Wang et al., arXiv 2607.08565) · **Preble** (Srivatsa et al., ICLR '25) | **The closest findings, measured on real clusters.** LMetric: multiply new prefill tokens by batch size and no weight needs tuning. SMetric: route agents by session, and migrate a session when its instance would miss the SLO. This repo's routing results agree with them; they are not additions to them. Neither policy is implemented here yet. |
+| **LMetric** (Zhang et al., OSDI '26, arXiv 2603.15202) · **SMetric** (Wang et al., arXiv 2607.08565) · **Preble** (Srivatsa et al., ICLR '25) | **The closest findings, measured on real clusters.** LMetric: multiply new prefill tokens by batch size and no weight needs tuning. SMetric: route agents by session, and migrate a session when its instance would miss the SLO. This repo's routing results agree with them; they are not additions to them. Both are ported here (`lmetric`; `smetric-local`, SMetric's rule without its global cache tier) and were run on a public production trace (R3, above) — ports, not the authors' systems. |
 | **`casys-kaist/LLMServingSim`** (416★, ISPASS '26) | A cycle-level simulator that mirrors vLLM's scheduler and ports its block pool, per instance; it reports TTFT and TPOT within 1% of a real vLLM run on one profile. Its router is round-robin, random or least-loaded — no prefix-aware or sticky policy. |
 | **`microsoft/vidur`** (688★, MLSys'24) | Capacity and parallelism planning. Its `canary` branch **does** have a block-level prefix cache and three cache-aware routers — but it has sat unmerged since June 2025, so `main` (what you install) cannot answer the routing question. |
 | **`NetX-lab/Frontier`** (155★, arXiv 2605.21312) | Prefix and hierarchical caching, SLA-aware Pareto search, and **session-sticky** routing. No prefix-affinity router: sticky is *session* identity, not *shared-prefix* identity. |
