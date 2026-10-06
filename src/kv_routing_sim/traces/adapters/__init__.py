@@ -6,11 +6,11 @@ replay their own trace formats; NVIDIA's AISimulate reads Mooncake and AgentX tr
 an honest good-first-issue.
 """
 
-from . import agentx, mooncake, openai_log, vllm_jsonl
+from . import agentx, bailian, mooncake, openai_log, vllm_jsonl
 
 # name -> module, so the CLI has ONE source of truth for "which formats do we read?"
 REGISTRY = {"vllm-jsonl": vllm_jsonl, "openai-log": openai_log, "mooncake": mooncake,
-            "agentx": agentx}
+            "agentx": agentx, "bailian": bailian}
 
 
 def get(name: str):

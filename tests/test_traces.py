@@ -310,3 +310,73 @@ def test_agentx_window_and_malformed_requests(tmp_path):
     assert stats.skip_reasons == {"block_count_mismatch": 1}  # 2100 tokens need 32 ids, not 31
     with pytest.raises(ValueError, match="does not divide"):
         list(adapters.get("agentx").read(_agentx(tmp_path), token_scale=1 / 3))
+
+
+def _bailian(tmp_path, rows):
+    p = tmp_path / "b.jsonl"
+    p.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return p
+
+
+def _brow(chat, parent, ts, n_in, n_out, ids, turn=1):
+    return {"chat_id": chat, "parent_chat_id": parent, "timestamp": ts, "input_length": n_in,
+            "output_length": n_out, "type": "coder", "turn": turn, "hash_ids": ids}
+
+
+def test_bailian_sessions_are_the_traces_own_and_prefixes_are_chained(tmp_path):
+    """A request joins the session at the root of its parent chain. Blocks are shared only as a
+    run from the start of the prompt: the trace hashes each block alone, the replay chains them."""
+    p = _bailian(tmp_path, [
+        _brow(0, -1, 0.0, 64, 8, [5, 6, 7, 8]),
+        _brow(1, -1, 1.5, 64, 8, [5, 6, 9, 8]),           # same first two blocks, then differs
+        _brow(2, 0, 4.0, 100, 8, [5, 6, 7, 8, 3, 4, 2], turn=2),   # follows chat 0
+        _brow(3, 2, 9.0, 120, 8, [5, 6, 7, 8, 3, 4, 1, 1], turn=3),  # follows chat 2
+        _brow(4, 77, 9.5, 32, 8, [5, 6]),                 # its parent is not in the file
+    ])
+    a, b, c, d, e = adapters.get("bailian").read(p)
+    assert [r.session_id for r in (a, b, c, d, e)] == ["b0", "b1", "b0", "b0", "b4"]
+    assert a.block_hashes[:2] == b.block_hashes[:2]
+    assert a.block_hashes[2] != b.block_hashes[2]
+    # Block 8 is at position 3 in both, after DIFFERENT prefixes: it is not shared.
+    assert a.block_hashes[3] != b.block_hashes[3]
+    assert c.block_hashes[:4] == a.block_hashes and len(c.block_hashes) == 6  # 100 // 16
+    assert d.block_hashes[:6] == c.block_hashes and len(d.block_hashes) == 7  # 120 // 16
+    assert (b.arrival_ts, c.prompt_tokens, c.output_tokens) == (1.5, 100, 8)
+    assert a.request_id == "b0" and e.block_hashes == a.block_hashes[:2]
+
+
+def test_bailian_token_scale_groups_blocks_and_shrinks_sizes(tmp_path):
+    """At 1/4, one block of the replay stands for four trace blocks in a row, and is shared only
+    if all four are."""
+    p = _bailian(tmp_path, [
+        _brow(0, -1, 0.0, 16 * 9, 40, [1, 2, 3, 4, 5, 6, 7, 8, 9]),
+        _brow(1, -1, 1.0, 16 * 9, 40, [1, 2, 3, 4, 5, 6, 7, 0, 9]),  # differs inside group two
+    ])
+    a, b = adapters.get("bailian").read(p, token_scale=1 / 4)
+    assert (a.prompt_tokens, a.output_tokens, len(a.block_hashes)) == (36, 10, 2)
+    assert a.block_hashes[0] == b.block_hashes[0] and a.block_hashes[1] != b.block_hashes[1]
+    (c, _) = adapters.get("bailian").read(p, token_scale=1 / 3)  # any whole k groups cleanly
+    assert (c.prompt_tokens, len(c.block_hashes)) == (48, 3)
+    for bad in (0.3, 2.0, 0.0):
+        with pytest.raises(ValueError, match="1/k"):
+            list(adapters.get("bailian").read(p, token_scale=bad))
+    with pytest.raises(ValueError, match="16-token blocks"):
+        list(adapters.get("bailian").read(p, block_size=32))
+
+
+def test_bailian_applies_the_engines_length_limit_and_counts_it(tmp_path):
+    from kv_routing_sim.traces.adapters.bailian import outputs_capped
+
+    p = _bailian(tmp_path, [
+        _brow(0, -1, 0.0, 160, 30, list(range(10))),
+        _brow(1, -1, 1.0, 160, 500, list(range(10))),     # output cut to fit
+        _brow(2, -1, 2.0, 320, 5, list(range(20))),       # the prompt alone reaches the limit
+        _brow(3, -1, 3.0, 160, 5, list(range(9))),        # 160 tokens need 10 ids, not 9
+    ])
+    st = TraceStats()
+    out = list(adapters.get("bailian").read(p, max_total_tokens=320, stats=st))
+    assert [(r.prompt_tokens, r.output_tokens) for r in out] == [(160, 30), (160, 160)]
+    assert outputs_capped(st) == 1 and st.requests == 2
+    assert st.skipped_lines == 2  # a cut output is counted, but it is not a skipped line
+    assert {k: v for k, v in st.skip_reasons.items() if k != "output_capped"} == {
+        "prompt_too_long": 1, "block_count_mismatch": 1}
