@@ -130,7 +130,7 @@ on one GPU* (findings 18 and 19 below).
    because vLLM reserves memory for other things too. For the small model it was only 7–12% off.
 6. **vLLM's eviction statistics count more than evictions.** Its code records an "eviction" whenever a
    block is reused, even if the block held nothing reusable. Reproduced exactly by our model, and logged
-   as an upstream bug candidate (the upstream log #1).
+   as an upstream bug — which turned out to be reported already ([`upstream/`](upstream/README.md)).
 7. **vLLM 0.30.0 runs its "async" scheduler by default, and nothing in its log says so.** Our
    simulator models the older, synchronous one. We showed from the source that the difference cannot
    change one-at-a-time results, and flagged it for concurrent ones.
@@ -152,7 +152,7 @@ on one GPU* (findings 18 and 19 below).
     against 8 on the tool-agent trace at 4× speed). The many-prompt effect is not yet shown on real
     traffic.
 13. **guidellm's trace replay drops one token per block** with tokenizers that add a start token — an
-    upstream bug with a ready fix (the upstream log #7).
+    upstream bug with a ready fix ([`upstream/`](upstream/README.md)).
 14. **At 100× the trace size, memory for the block hashes runs out first:** 537 MiB for 80,000 requests
     before the simulation starts. The simulation itself stays linear.
 15. **On real coding-agent sessions (AgentX), keep-on-one-GPU and prefix routing tie exactly** — 2 T4s
@@ -489,11 +489,10 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 ## 9. What is left
 
 **Manual steps (they need an account):**
-- ~~File the vLLM issue~~ — **do not**: checked on 6 Oct, the bug is already reported with a fix
-  (vLLM pull request #47715, open since July). Optional: add one comment there with our
-  measurement from a real GPU. See the upstream log.
-- Open the guidellm issue, then the pull request (the patch is in `docs/upstream/`, the text in
-  the upstream log #7–8).
+- ~~File the vLLM issue~~ — **not needed**: checked on 6 Oct, the bug is already reported with a
+  fix (vLLM pull request #47715, open since July). See [`upstream/`](upstream/README.md).
+- Open the guidellm issue, then the pull request (the patch and a description of the bug are in
+  [`upstream/`](upstream/README.md)).
 - *Optional:* ask someone for an arXiv endorsement, by mid-October — only if the preprint is to be
   published. The project does not need it (see below).
 - Create the GitHub repository, push, and turn on Pages (Settings → Pages → Source: *GitHub Actions*).
@@ -573,7 +572,7 @@ text can become a blog post.
 | Why each design choice was made | [`02-architecture-decisions.md`](02-architecture-decisions.md) (ADR-001 to ADR-012) |
 | How to run the GPU notebooks | [`../notebooks/README.md`](../notebooks/README.md) |
 | The measured T4 profile and the cost numbers | [`../configs/profiles/`](../configs/profiles/), [`../configs/cost_model.yaml`](../configs/cost_model.yaml) |
-| Upstream bugs and friction we hit | the upstream log |
+| Upstream bugs we hit | [`upstream/README.md`](upstream/README.md) |
 | The finding, its figure and the demo | The README's first section; [`../site/index.html`](../site/index.html); [`figures/`](figures/) |
 | Every experiment's report | `../artifacts/results/*/report.md` — `phase5_crossover`, `h6_ranking`, `h6_crossover`, `realtrace_mooncake`, `scale` |
 | The two-GPU notebook | [`../notebooks/phase6_sim2real.ipynb`](../notebooks/phase6_sim2real.ipynb) |

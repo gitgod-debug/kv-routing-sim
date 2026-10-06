@@ -299,7 +299,8 @@ class VllmBlockPool:
         Line 739 records the metrics event BEFORE line 741 checks whether the block held a hash, so
         recycling a block that never held a cached prefix is still reported as an "eviction". We do
         the same, deliberately: H4 compares our events against the engine's histograms, and that is
-        only fair if both sides count by the same rule. (Logged upstream: the upstream log #1.)
+        only fair if both sides count by the same rule. (Already reported upstream, with a fix:
+        vLLM pull request #47715 — see docs/upstream/README.md.)
         """
         m = self._metrics.pop(b, None)
         if m is not None:

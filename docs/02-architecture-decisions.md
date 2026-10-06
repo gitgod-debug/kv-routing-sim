@@ -535,7 +535,7 @@ that caching does not help — the real figure is **513x less prefill**).
 still absent, and the counters reproduced v1's exactly across the version change. ⚠️ And the three
 `kv_block_*` histograms — now enabled with `--kv-cache-metrics` — record every **recycled** tracked block,
 not only real evictions: `on_block_evicted` runs before the hash check (`block_pool.py:739` vs `741`).
-See the H4 amendment and the upstream log #1.
+See the H4 amendment and [`upstream/README.md`](upstream/README.md).
 
 **4. ✅ Our KV-size arithmetic matches the engine.** vLLM reported *"4.38 GiB KV cache is needed"* for
 40,960 tokens = 114,819 B/token; `cache/capacity.py` computes 114,688. The 0.11% gap is vLLM's own
@@ -699,7 +699,7 @@ recommendation flip* — works identically against a grid.
 
 The cost was never the deciding argument. Three things are:
 
-1. **It fixes the defect we had already identified and could not solve.** the deployment notes
+1. **It fixes the defect we had already identified and could not solve.** The deployment notes
    flagged that a sleeping Space makes a cold visitor wait 30–60 s — "3–6× longer than their attention
    lasts" — and the mitigation was a hedge (put the images in the README too). A static page **never
    sleeps**. The problem disappears rather than being worked around. Note that PRO would *not* have

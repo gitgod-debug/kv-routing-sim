@@ -145,7 +145,7 @@ policies need two to three replicas fewer at the highest load.
    MVP under compression = trace ingestion + cache model + **3** policies (round-robin, session-sticky,
    prefix-affinity) + the calibration report.
 2. **The upstream PR runs alongside Phases 1–4, not after them.** Its old slot was too late.
-   the upstream log starts **today**, seeded by Phase-0/3 calibration
+   The log of upstream friction starts **today**, seeded by Phase-0/3 calibration
    friction — that friction *is* the spike, it is already on the critical path, and it lands inside
    `vllm-project/guidellm`'s own surface (benchmark harness, metrics parsing, report output, scenario
    config).
@@ -170,7 +170,7 @@ Phase-0 equivalent until now.
       12 cores / 14 GB RAM / 726 GB free / Python 3.13.12 ([`docs/07-environment.md`](docs/07-environment.md))
 - [x] Port the prior-art audit into the repo, including the ⛔ **sentences that must never be written**
       ([`docs/04-prior-art.md`](docs/04-prior-art.md))
-- [x] Create the upstream log with the target decided (`vllm-project/guidellm`)
+- [x] Start the log of upstream friction, with the target decided (`vllm-project/guidellm`)
 - [x] Write `scripts/spike_vllm_metrics.py` + `scripts/spike_two_servers.py` — **written, not run**
 - [x] Record the two owed decisions with a date, here and in the project plan
 
@@ -196,7 +196,7 @@ Phase-0 equivalent until now.
 - [ ] **Confirm two servers can coexist**: MIG if available (record the profile), else the memory-split
       fallback. **Record which path**, because it decides which numbers may be reported (ADR-005)
 - [ ] Record GPU, driver, CUDA, MIG availability into `docs/07-environment.md`
-- [ ] Log every friction point hit along the way into the upstream log — **this is
+- [ ] Log every friction point hit along the way — **this is
       the upstream PR's seed and it is free, because the friction happens anyway**
 
 > ### ⭐ HOW to run it — the box is a Jupyter environment, so use the notebook
@@ -253,7 +253,8 @@ path."
 >    pressure. Read from vLLM's source, not guessed. **ADR-002 amendment.**
 > 2. ⚠️ **The eviction histograms over-count.** `on_block_evicted` fires before the hash check, so the 64
 >    samples v2 recorded are recycled tail blocks, not evictions. **H4 amended**; logged upstream as
->    **upstream finding #1** — our first real friction entry, with a repro.
+>    **Upstream finding #1** ([`docs/upstream/`](docs/upstream/README.md)) — our first real
+>    friction entry, with a repro.
 > 3. **Capacity must be read per run.** `capacity.py` overestimates by 7–12.5%, and two launches with
 >    identical flags differed by 4.8% (94,496 vs 99,024 tokens).
 >
@@ -769,8 +770,8 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       × loads 1–8 × replicas 1–8 × 6 policies × 3 seeds = **3,456 runs in 149 s**, stdlib
       `ProcessPoolExecutor` like the other scripts (no joblib). **34 KiB raw, 12 KiB gzipped.** A guard
       stops the build unless it reproduces Phase 5's H2b table exactly — it does
-- [x] **The static demo page** — [`site/index.html`](site/index.html), 2026-09-28 — the one-screen design in
-      the deployment notes: finding + crossover curve +
+- [x] **The static demo page** — [`site/index.html`](site/index.html), 2026-09-28 — the one-screen design:
+      finding + crossover curve +
       calibration table above the fold, then three sliders that **look up** the grid (no server, no
       wait) and whose payoff is watching the recommendation **flip**.
       ⛔ **Bundled + generated traces only, no upload box** — a serving log is someone's users' prompts
@@ -826,8 +827,8 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 - [~] *(2026-10-06: the 30-second reader's words and the 2-minute reader's four lines are on the first screen —
       the fourth, the merged PR, reads "not yet submitted" until it is; the engineer's path is
       the ADRs, the residual, 10×/100× and `04-prior-art.md`.)*
-      Write the README against the **three readers** in
-      the deployment notes: the 30-second reader (needs the
+      Write the README against **three readers**:
+      the 30-second reader (needs the
       grep targets *visible* — engine, version, metric names, GPU), the 2-minute reader (needs four
       lines), and the 30–60-minute engineer who asks *"isn't this just Vidur?"* (needs the ADRs and the
       residual)
@@ -838,7 +839,7 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       vs **Frontier** (reads *your* log and *recommends*, rather than being configured by hand)
 - [ ] Show HN + X thread, with the engine and version
       **in** the title
-- [ ] ⭐ **The `guidellm` PR merged** — see the upstream log
+- [ ] ⭐ **The `guidellm` PR merged** — see [`docs/upstream/`](docs/upstream/README.md)
 - [~] 📄 **The preprint — OPTIONAL** (the project is complete without it; the plan calls arXiv
       "optional upside", useful only for research-heavy teams; if wanted, due ~Nov 9, cs.DC) —
       [`paper/main.tex`](paper/main.tex), drafted 2026-09-28, rewritten 2026-09-30 around the

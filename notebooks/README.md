@@ -272,7 +272,7 @@ the JSON** — the JSON is a parse, the scrape is the thing parsed.
 | No `kv_block_*` histograms | **H4 is untestable as written.** Amend `docs/09-hypotheses.md` with a date — do not keep the narrative |
 | Two servers won't coexist | Phase 6 takes its documented fallback: single-replica calibration plus a reproducible account of why |
 
-⚠️ **Log every snag in the upstream log as it happens.** That log is the `guidellm` PR's seed, and
-it is free because the friction happens anyway. It is also unrecoverable afterwards.
+⚠️ **Write down every snag as it happens.** A snag in someone else's tool may be a bug worth
+reporting ([`../docs/upstream/`](../docs/upstream/README.md)), and it cannot be recovered afterwards.
 
 ⚠️ **Run the last cell.** On rented hardware a forgotten `vllm serve` bills until the box dies.

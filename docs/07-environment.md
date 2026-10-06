@@ -239,7 +239,7 @@ See **ADR-010** for the full decision. In short, after **H6** (2026-09-28): the 
 crossover transfers across hardware; the full **policy ranking**, the replica counts and **absolute ms
 and ₹** do not, and need `kvsim calibrate` on the user's own hardware. ⛔ Never blend a calibrated error bar with an uncalibrated recommendation.
 
-### ✅ ANSWERED 2026-09-20 — see the deployment notes
+### ✅ ANSWERED 2026-09-20
 
 **Render is CUT; docs go to GitHub Pages.** The reasoning below is kept as the record of why.
 
