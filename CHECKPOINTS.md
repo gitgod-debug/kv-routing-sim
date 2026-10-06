@@ -686,8 +686,9 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       cache check every time, 359 s a run. ⛔ **And the spread it prints is too narrow (C4's rule E
       does not hold):** another run's count is inside a run's own range in 178 of 216 cases
       (82.4%; 90% was the rule; 94.9% with one replica more each way). The two runs taken back to
-      back agree (97%); the run an hour earlier does not agree with them (75%). **Left:** the
-      line's wording must say "a floor: add one"
+      back agree (97%); the run an hour earlier does not agree with them (75%). ✅ **2026-10-06:**
+      the line now says so — "size for the larger, plus one", and when the repeats agree, "still
+      allow one more" — and the report gives C4's two percentages
 - [~] ⭐ **An SLO with its per-token half.** The first-token target was the only one: C3's live
       engine took 134–521 ms per token on traffic that met, or nearly met, it, and the MLPerf row
       the 2 s come from also limits the time per output token (100 ms). 🔨 **2026-10-05:** the

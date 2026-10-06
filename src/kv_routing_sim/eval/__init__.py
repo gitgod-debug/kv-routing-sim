@@ -10,7 +10,9 @@
   * `pareto.py`     — the non-dominated frontier over (hit rate, p95 TTFT, ₹/1k requests).
   * `rank.py`       — Kendall's tau-b, with ties handled: the statistic H6 is decided on.
   * `recommend.py`  — frontier + an SLO → ONE policy, ONE replica count, and the ₹ delta vs
-                      round-robin. This output is the thing no competitor produces.
+                      round-robin. (Not unique: NVIDIA's `aisimulate recommend` returns a GPU
+                      count under an SLO. What this adds is the routing policy —
+                      docs/04-prior-art.md §2a.)
   * `spread.py`     — how firm a replica count is: the same sizing on each repeat of the
                       calibration alone, side by side with the pooled answer.
   * `sweep.py`      — policy × replicas × seeds → points, and `crossover_sweep`, the H2 grid with

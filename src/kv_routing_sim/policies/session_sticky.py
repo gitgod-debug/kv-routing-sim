@@ -16,6 +16,13 @@ and has NO prefix-affinity router (docs/04-prior-art.md).
 
 A request with no session id falls back to least-loaded — real traffic has anonymous requests, and
 routing them all to one replica would be an artifact of the model rather than of the policy.
+
+⚠️ ITS KNOWN WEAKNESS, WHICH GENERATED TRAFFIC DOES NOT SHOW (added 2026-10-05): a session is
+placed once, when nothing is known about how long it will get. Real sessions differ widely in
+size, and a replica that happens to receive several long ones overloads. SMetric (arXiv
+2607.08565) measures a load 2.17× out of balance for routing by session id on production traces,
+and adds a rule that moves a session whose replica would miss its deadline. Every session
+`kvsim generate` makes has the same number of turns.
 """
 
 from __future__ import annotations

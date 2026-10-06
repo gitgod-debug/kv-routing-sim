@@ -11,6 +11,14 @@ router, Dynamo) does not have oracle knowledge of what is resident on each worke
 OWN approximate view of what it dispatched, and that view drifts from reality as blocks are evicted
 behind it. Handing the policy the true cache would overstate prefix-affinity's benefit by exactly
 the amount the drift costs, which is the number we would most want to be honest about.
+
+⚠️ CORRECTED 2026-10-05: THAT DESCRIBES ONE KIND OF PRODUCTION ROUTER, NOT ALL OF THEM. Dynamo's
+default router keeps "a prefix tree built from worker-reported KV events", vLLM publishes such
+events, and the LMetric authors' router follows the engine's step events: for those the true cache
+is what the router knows, late by an event. Routing from the dispatch record alone is Dynamo's
+*approximate* mode (`--no-router-kv-events`). This simulator models only that dispatch view; a
+policy with the event view is not built (docs/04-prior-art.md §2a). The rule stands for the
+policies here: a dispatch-view policy must not peek.
 """
 
 from __future__ import annotations

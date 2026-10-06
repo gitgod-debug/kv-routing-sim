@@ -342,7 +342,7 @@ every timing cell three times and keeps, beside the fit on all of it, the fit of
 
 ```text
 **session-sticky on 3 replica(s)** — cheapest configuration meeting the p95 TTFT SLO
-⚠️ how firm: 3 to 4 replicas across the calibration's 3 repeats taken alone — size for the larger
+⚠️ how firm: 3 to 4 replicas across the calibration's 3 repeats taken alone — size for the larger, plus one
 ```
 
 That range is what one calibration's own repeats disagree by: a floor on the uncertainty, not a
@@ -354,7 +354,8 @@ ran three times on one live T4 in one session, three repeats each. Across 18 siz
 both targets, another run's GPU count was inside a run's own range in **82% of cases**; the rule
 asked for 90%. Widened by one GPU each way, 95%. The two runs taken back to back agree with each
 other (97%); the one taken an hour earlier does not agree with them (75%) — and no run's repeats,
-six minutes apart, can know that. So: **size for the top of the range, plus one.** The command
+six minutes apart, can know that. So: **size for the top of the range, plus one** — which is
+what the tool's own line now says. The command
 itself works on a real engine with its repeats — exact on its cache check all three times, six
 minutes a run ([report](artifacts/results/c4_kaggle_t4/report.md)).
 

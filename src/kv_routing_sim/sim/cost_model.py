@@ -21,6 +21,11 @@ THE MODEL (ADR-001, iteration granularity):
 n = uncached tokens computed, c = cached tokens before them, b = sequences in the step, S = the
 sum of their context lengths (prompt + tokens generated so far).
 
+The prefill form is not this project's invention: with L = c + n it is c_lin·n + c_attn·n·(L − n/2),
+the cost model SMetric (arXiv 2607.08565, Eq. 1) takes from KunServe (EuroSys '26). C2 derived it
+from the cost of attention without knowing either; what is this project's is the T4 fit and the
+registered tests that it predicts traffic it never saw (docs/04-prior-art.md §2a).
+
 Prefill is compute-bound and scales with the tokens actually computed — which is exactly the
 quantity prefix caching reduces, and therefore exactly the quantity routing controls. Decode is
 memory-bandwidth-bound and scales with how many sequences share the step.

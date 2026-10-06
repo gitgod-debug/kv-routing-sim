@@ -52,7 +52,8 @@ The first public version: planned for PyPI before 2026-11-20.
   the counts in the finding's grid and within one on 96%.
 - **The "how firm" range is a floor, and a low one.** On a live T4 (C4) another run of
   `kvsim calibrate` gave a replica count outside a run's own range in 18% of cases; 5% with the
-  range widened by one replica each way. Size for the top of the range, plus one.
+  range widened by one replica each way. Size for the top of the range, plus one — `kvsim replay`
+  says this itself beside its recommendation.
 - The default latency target is on the first token only (p95 TTFT). The per-token half
   (`slo.tpot_p95_ms`) is optional and off by default. Its model was checked on a live T4 (C4):
   p95 time per output token within 7% on three workloads around a 100 ms limit — on one replica.

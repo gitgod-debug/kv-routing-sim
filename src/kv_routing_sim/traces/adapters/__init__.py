@@ -1,8 +1,9 @@
 """One adapter per input format. Each is a generator yielding `NormalizedRequest`.
 
-This is one of the project's two extension points (the other is `policies/`), and it is the one
-that separates this simulator from Vidur and Frontier: both replay their own trace formats. An
-adapter is a single file, which is what makes "add a trace adapter" an honest good-first-issue.
+This is one of the project's two extension points (the other is `policies/`). Vidur and Frontier
+replay their own trace formats; NVIDIA's AISimulate reads Mooncake and AgentX traces too
+(docs/04-prior-art.md §2a). An adapter is a single file, which is what makes "add a trace adapter"
+an honest good-first-issue.
 """
 
 from . import agentx, mooncake, openai_log, vllm_jsonl

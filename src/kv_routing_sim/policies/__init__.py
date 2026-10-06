@@ -1,10 +1,11 @@
-"""The six routing policies. One file each. 📐 designed, not built.
+"""The seven routing policies. One file each.
 
 Contract (ADR-003): `choose(fleet_state, request, rng) -> replica_index`. No global state; no
 policy may mutate the fleet. A new policy is a NEW FILE, never a core change.
 
   round_robin · least_loaded · power_of_two · consistent_hash_prefix · radix_affinity ·
-  session_sticky        (+ `base.py` for the interface, `registry.py` for name → class)
+  radix_affinity_balanced · session_sticky
+  (+ `base.py` for the interface, `registry.py` for name → class)
 
 ⚠️ EVERY TIE IS BROKEN FROM THE INJECTED `rng`. A `min()` over a dict silently prefers low replica
 indices and so fabricates locality the real engine does not have — a correctness bug that looks

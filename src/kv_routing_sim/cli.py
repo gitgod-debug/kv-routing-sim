@@ -103,12 +103,15 @@ def _count(n: int | None, swept_up_to: int) -> str:
 def _firmness(row: dict[str, Any], spread: dict[str, Any]) -> str:
     """One sentence beside the recommendation: its replica count on each repeat's fit."""
     top = spread["swept_up_to"]
+    # C4, rule E (2026-10-05): a run's own repeats do NOT cover another run's count often enough
+    # — 82% of cases on a live T4, 95% with one replica more each way. So both sentences say it.
     if row["firm"]:
         return (f"how firm: the same count on each of the calibration's {spread['repeats']} "
-                "repeats taken alone")
+                "repeats taken alone — still allow one more: another run of the calibration can "
+                "differ by a replica")
     return (f"⚠️ how firm: {_count(row['min'], top)} to {_count(row['max'], top)} replicas "
             f"across the calibration's {spread['repeats']} repeats taken alone — size for the "
-            "larger")
+            "larger, plus one")
 
 
 def _slo_sentence(cost: CostModel | None) -> str | None:
@@ -188,9 +191,12 @@ def _markdown(payload: dict[str, Any]) -> str:
         lines += [
             "",
             ("This is what ONE calibration's own repeats disagree by — a floor on the "
-             "uncertainty, not a confidence interval. It knows nothing about another day or "
-             "another software image: three calibrations of our own T4 agreed exactly on 71% of "
-             "counts and within one replica on 96%."),
+             "uncertainty, not a confidence interval, and a low floor. Measured on a live T4 "
+             "(C4, 2026-10-05): another run of the calibration, within the hour, gave a count "
+             "outside a run's own range in 18% of cases, and outside it by more than one replica "
+             "in 5%. So size for the top of the range, plus one. And it knows nothing about "
+             "another day or another software image: three calibrations of our own T4 agreed "
+             "exactly on 71% of counts and within one replica on 96%."),
             "",
         ]
     elif payload.get("replica_spread_note"):
@@ -248,7 +254,7 @@ def cmd_replay(args: argparse.Namespace) -> int:
                 "This profile carries no per-repeat fits, so how firm these replica counts are "
                 "cannot be shown. For scale: three calibrations of our own T4 agreed on a count "
                 "exactly at 71% of points and within one replica at 96%. A profile written by "
-                "`kvsim calibrate` shows its own spread.")
+                "`kvsim calibrate` shows its own spread — a floor: allow one replica more.")
     _emit(
         {
             "trace": info,
