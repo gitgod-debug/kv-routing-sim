@@ -21,9 +21,18 @@ below is kept as the record of how it was run.
 
 ---
 
-## ▶ Run next — C4: `c4_per_token_t4.ipynb` (about 67 minutes)
+## ✅ C4 — ran on 2026-10-05: seven of nine registered rules hold
 
-**What it tests:** the simulator's *second* speed — how fast the tokens after the first arrive —
+The per-token model is right where the limit is (p95 time per output token within 0%, 0% and 7% on
+three workloads under, on and over 100 ms); batches that share a prompt cost nothing extra for
+sharing; the fitted line is 12–15% too slow at five to nine times the batch sizes it was fitted
+on; `kvsim calibrate` works on a real T4 with its repeats. **Two rules failed, both predicted to
+hold:** one run's own spread covers another run's GPU count in 82% of cases (90% needed), and
+with both halves of the target prefix routing is one GPU below session-sticky at more loads than
+the rule allowed. Report: [`c4_kaggle_t4/report.md`](../artifacts/results/c4_kaggle_t4/report.md);
+the dated entry is in `docs/09-hypotheses.md` (2026-10-06). ⚠️ It has run: do not run it again.
+
+**What it tested:** the simulator's *second* speed — how fast the tokens after the first arrive —
 where it matters, and `kvsim calibrate` with its new repeats. Registered before the run:
 [`configs/c4_per_token.yaml`](../configs/c4_per_token.yaml) and `docs/09-hypotheses.md`
 (2026-10-05). Nine rules; predicted: all hold.
@@ -35,11 +44,10 @@ where it matters, and `kvsim calibrate` with its new repeats. Registered before 
 | 2b | the long gap every decoding sequence sees when one more request arrives | D2 |
 | 3 | three held-out workloads under, on and over a 100 ms per-token limit, every request's token times kept | T3a, T3b |
 
-**How it is run:**
+**How it was run:**
 `python scripts/kaggle_run.py notebooks/c4_per_token_t4.ipynb --slug kvsim-c4-per-token-t4 --out <folder>`
 (a private notebook on the T4 ×2 machine, internet on; see C3's section below for running by hand).
-Then, with no GPU: `python scripts/c4_grids.py` and `python scripts/c4_analyze.py`. ⚠️ Run it
-**once**.
+Then, with no GPU: `python scripts/c4_grids.py` (20 minutes) and `python scripts/c4_analyze.py`.
 
 The notebook carries the package's own wheel (built from commit `c5b5d74`) and C3's pre-flight.
 

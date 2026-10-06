@@ -179,3 +179,41 @@ check. The first three had missed the two things that mattered most.
 | SMetric: follow-ups stay on one instance; routing by session ID alone left the load 2.17× out of balance | arXiv 2607.08565 |
 | LMetric: no weight to tune; *"a statically tuned weight cannot always achieve competitive performance"* | arXiv 2603.15202 (OSDI '26) |
 | Dynamo's offline trace replay since March 2026 | `ai-dynamo/dynamo`, pull requests #7543 and #7553 |
+
+---
+
+## The GPU run that checked the second speed (2026-10-05, written up 2026-10-06)
+
+### C4: nine rules written down first. Seven held.
+
+T1 had failed: the simulator's time per token was wrong when a GPU is at its limit. But nothing
+had been measured where the limit of the rule is — under 100 ms per token. So one GPU session
+measured exactly that, with nine rules and nine predictions committed before it ran.
+
+- **The per-token model is right where it matters.** Three kinds of traffic — under the limit, on
+  it, over it. The simulator's p95 time per token was within 0%, 0% and 7% of the real engine's,
+  and its yes-or-no on the limit was the engine's own.
+- **Why T1 failed, found.** For very large batches the fitted line is 12–15% too slow. At the
+  limit of a GPU that small error feeds on itself: a slower step keeps more requests in the batch,
+  and the next step is slower again. 15% became 1.5–1.7×. I had written this explanation down
+  before the run, with the size I expected (10–15%).
+- **Two of my nine predictions were wrong, and both are in the README.**
+  - *The tool's "how firm" range is too narrow.* One calibration run's own repeats cover another
+    run's answer in 82% of cases. I had asked for 90%. The repeats of one run are taken within six
+    minutes; a run an hour earlier is further away than that.
+  - *"No saving with both speeds" was wrong as a prediction.* With 64 prompts, prefix routing was
+    one GPU below "keep each user on one GPU" at more loads than my rule allowed. One GPU is
+    inside the margin above, so it is not a result for prefix routing either.
+- **One thing I forgot, and how it is shown.** The registration promised one extra table. The
+  analysis script, committed before the run, did not compute it. I added it afterwards in a
+  separate script that says in its first lines that it was written after the results were seen.
+
+### Where the proof is
+
+| Claim | Proof |
+|---|---|
+| Nine rules and predictions, committed before the run | [`configs/c4_per_token.yaml`](../configs/c4_per_token.yaml) at commit `c5b5d74`; the notebook carries the wheel built from that commit |
+| Seven hold, two do not; every number above | [`c4_kaggle_t4/report.md`](../artifacts/results/c4_kaggle_t4/report.md), written by the registered script |
+| The explanation of T1, written before the run | [`09-hypotheses.md`](09-hypotheses.md), "C4 REGISTERED", the paragraph on D1b |
+| 82% against the 90% needed; 97% for the two runs taken back to back, 75% against the earlier one | the same report, section E · `tests/test_c4_results.py` |
+| The table added afterwards, and its label | [`c4_kaggle_t4/posthoc_fresh_cells.md`](../artifacts/results/c4_kaggle_t4/posthoc_fresh_cells.md) |

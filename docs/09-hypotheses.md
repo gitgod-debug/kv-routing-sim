@@ -211,9 +211,9 @@ calibration cannot cash.
 | **C3** | The context-aware `kvsim calibrate` on a real GPU: it works (C3a); its profile predicts traffic it never saw within 2× (C3b); C2's profile predicts another day within 2×, from numbers registered before (C3c) | C3 | `[x]` ✅ **2026-10-05, all three as predicted** — C3a exact · C3b within 1.41× · C3c within 1.38× · ⚠️ reported: a second run of the command is 4.17× off on one number at the knee, and a second calibration reverses H2b's verdict |
 
 | **T1** | The simulator's per-token latency matches the engine's: mean inter-token latency within 1.5× on the five held-out runs on disk | T1 | `[x]` ⛔ **DOES NOT HOLD 2026-10-05** (predicted: holds) — within 1.07× on the three runs off the knee, **1.54× and 1.71× too slow** on the two at it |
-| **T2** | Under a target with both halves (p95 TTFT ≤ 2 s **and** p95 time per output token ≤ 100 ms), on three calibrations: sticky still best or tied with 1 and 4 prompts (T2a), never worse than round-robin or least-loaded (T2b), and the first-token counts were optimistic by ≥ 1.5× (T2c) | T2 | `[x]` ✅ **2026-10-05, all three as predicted, on all three calibrations** — T2a 12 of 12 · T2b no exception · T2c 1.93–2.00× · ⚠️ these are the model's counts, and T1 says its per-token latency is unchecked where they live |
+| **T2** | Under a target with both halves (p95 TTFT ≤ 2 s **and** p95 time per output token ≤ 100 ms), on three calibrations: sticky still best or tied with 1 and 4 prompts (T2a), never worse than round-robin or least-loaded (T2b), and the first-token counts were optimistic by ≥ 1.5× (T2c) | T2 | `[x]` ✅ **2026-10-05, all three as predicted, on all three calibrations** — T2a 12 of 12 · T2b no exception · T2c 1.93–2.00× · ⚠️ these are the model's counts, and T1 says its per-token latency is unchecked where they live · *2026-10-06: C4 checked it there, on one replica — p95 time per token within 7% on three workloads around the limit* |
 
-| **C4** | On a real T4: `kvsim calibrate` with its repeats (C4a); decode of batches that share a prefix — free by itself (D1a), still a straight line past the cache (D1b); an arriving request's stall = its prefill (D2); per-request token times on traffic around the limit (T3a, T3b); one run's spread covers another's count (E); the 64-prompt question on fresh fits (F1, F2) | C4 | `[~]` **registered 2026-10-05** — `configs/c4_per_token.yaml`; not run yet |
+| **C4** | On a real T4: `kvsim calibrate` with its repeats (C4a); decode of batches that share a prefix — free by itself (D1a), still a straight line past the cache (D1b); an arriving request's stall = its prefill (D2); per-request token times on traffic around the limit (T3a, T3b); one run's spread covers another's count (E); the 64-prompt question on fresh fits (F1, F2) | C4 | `[x]` **2026-10-05/06 — 7 of 9 hold; predicted: all nine** — ✅ C4a · ✅ D1a (−3%, −4%) · ✅ D1b (+3% to +15%) · ✅ D2 (1.03–1.19×) · ✅ T3a (1.00×, 1.00×, 1.07×) · ✅ T3b · ⛔ **E** (82.4% covered; 90% needed; 94.9% within one more replica) · ✅ F1 (8·7·8 against 9·10·10) · ⛔ **F2** (under both halves balanced affinity is one replica below sticky at 3 and 4 of 6 loads on two of three fits) |
 
 **Amendments:** *(add dated entries below, never edit above)*
 
@@ -1709,3 +1709,142 @@ dated corrections, with the old text struck through rather than removed.
 **What is not decided.** Neither published policy has been run in this simulator, and no test here
 has used sessions of unequal size. Three ways forward are listed in `04-prior-art.md` §6. Choosing
 among them is still open.
+
+### 2026-10-06 — C4 RAN: seven of nine hold. The per-token model is right where the limit is. One calibration's own spread does not cover the next one's answer.
+Report: [`artifacts/results/c4_kaggle_t4/report.md`](../artifacts/results/c4_kaggle_t4/report.md);
+raw: `c4.json`, and `grids.json` for the three rules decided afterwards on a CPU.
+
+**The run.** Kaggle, one Tesla T4, 2026-10-05 16:48 UTC, about 65 minutes; vLLM 0.30.0, Qwen3-4B,
+1,537 blocks. The notebook, the predictions (`818e2c95…`) and the wheel (`36725240…`, built from
+`c5b5d74`) are the registered ones — the analysis checks all three and stops otherwise. The
+pre-flight repaired `torchaudio` again, before anything was measured. Nothing was invalid: all 24
+micro-benchmark cells valid, 0 preemptions, every shared request reported its 1,360 cached tokens,
+every traffic request has a time per token, the worst send lag was 2 ms. The CPU grids (22,032
+simulator runs, 20 minutes) ran on a clean tree at `7f95146`: two documentation commits after the
+registration; `git diff c5b5d74 7f95146 -- src scripts configs` is empty.
+
+**As registered — predicted: all nine hold. Seven do; E and F2 do not.**
+
+- **C4a HOLDS.** The command with its repeats works on a real engine: exit 0, calibrated, the
+  check's counters and all 48 requests' cached tokens equal to the registered prediction, capacity
+  1,537 as the engine's log says, and the profile carries the fit of each of its 3 repeats — on
+  the tested run (seed 0) and on the two after it. 359 s each.
+- **D1a HOLDS.** Sharing a prefix costs nothing by itself: 81.3 ms a step against 83.4 for unique
+  prompts at 8 sequences, 102.7 against 107.2 at 12 (−3%, −4%; allowed ±10%).
+- **D1b HOLDS.** The straight line continues past the cache. Profile A against the measured step:
+
+  | sequences | summed context | × the largest ever fitted | measured | profile A | A against measured |
+  |---:|---:|---:|---:|---:|---:|
+  | 16 | 23,104 | 1.1 | 122.2 ms | 126.3 ms | +3% |
+  | 32 | 46,208 | 2.3 | 207.0 ms | 212.4 ms | +3% |
+  | 64 | 92,416 | 4.6 | 342.3 ms | 384.7 ms | +12% |
+  | 96 | 138,624 | 6.9 | 494.1 ms | 556.9 ms | +13% |
+  | 128 | 184,832 | 9.2 | 634.1 ms | 729.2 ms | **+15%** |
+
+  Allowed: 1.25× either way. The registration said: *"I expect the model somewhat too slow at
+  b ≥ 64 and still inside 1.25×"*. That is what came out, in size and in sign.
+- **D2 HOLDS.** Prefill and decode add up. When one request with 128 new tokens arrives, each
+  sequence already decoding sees one gap longer than its usual one by 179 ms (8 sequences), 154 ms
+  (32) and 172 ms (64); profile A charges 184 ms at all three (1.03×, 1.19×, 1.07×; allowed 1.5×).
+- **T3a HOLDS.** p95 time per output token, measured against registered:
+
+  | workload | measured | registered (profile A) | factor | share of requests within 100 ms: engine · client · registered |
+  |---|---:|---:|---:|---|
+  | `long_below` | 82.6 ms | 82.9 ms | 1.00× | 100.0% · 100.0% · 100.0% |
+  | `short_at` | 104.2 ms | 104.3 ms | 1.00× | 90.6% · 90.6% · 91.4% |
+  | `long_above` | 279.7 ms | 298.5 ms | 1.07× | 47.7% · 47.7% · 46.1% |
+
+  Allowed: 1.25×.
+- **T3b HOLDS.** On the two workloads registered at least 15% from the limit, the model's verdict
+  is the engine's own: `long_below` meets the limit (the engine's histogram has 100% of its
+  requests at or under 0.1 s) and `long_above` does not (47.7%).
+- ⛔ **E DOES NOT HOLD** (predicted: holds — "the least sure"). Over the six ordered pairs of the
+  three runs, 18 cells and both targets, the other run's count lies inside a run's own range (its
+  pooled fit and its three repeats) in **178 of 216 cases: 82.4%**. Needed: 90%. With the range
+  widened by one replica each way: 94.9%. Eleven of the 38 misses are off by more than one.
+- **F1 HOLDS.** At 64 prompts and 2 sessions/s under the first-token target, the load weight of 1
+  needs **8 · 7 · 8** replicas against session-sticky's **9 · 10 · 10**, on the three fresh fits.
+- ⛔ **F2 DOES NOT HOLD** (predicted: holds). Its first half is true on all three fits: under both
+  halves the load weight of 1 holds nothing at 2 sessions/s on 32 replicas. Its second half is
+  not: balanced affinity (α 16) needs fewer replicas than session-sticky at 1, **3** and **4** of
+  the six loads on the three fits, where the rule allowed 2. Every one of those differences is
+  one replica:
+
+  | sessions/s | session-sticky, both halves (s0 · s1 · s2) | balanced affinity α 16 |
+  |---|---|---|
+  | 0.25 | 3 · 3 · 3 | 3 · 3 · 3 |
+  | 0.5 | 4 · 5 · 4 | 4 · 4 · 4 |
+  | 1 | 7 · 8 · 8 | 7 · 7 · 7 |
+  | 2 | 13 · 14 · 15 | 13 · 15 · 14 |
+  | 3 | 20 · 21 · 20 | 20 · 21 · 19 |
+  | 4 | 26 · 27 · 27 | 25 · 26 · 26 |
+
+**Reported, not tested.**
+- **The engine's histogram and the client-side arithmetic agree exactly** on the share of
+  requests within the limit, on all three workloads. `vllm:request_time_per_output_token_seconds`
+  measures what the simulator calls time per output token.
+- **The mean gap between tokens** is within 1.00–1.04× of the registered number, and the median
+  time per token within 1.00–1.02×.
+- **First-token latency is the less accurate half here, and always on one side:** measured p95
+  507, 471 and 954 ms against 400, 382 and 736 registered (1.27×, 1.23×, 1.30×); medians 1.22–1.33×.
+  Inside the 2× of C2c and C3, and the model is too fast every time.
+- **Hit rates** equal the registered ones to four decimals (0.9214, 0.8465, 0.9226).
+- **Each run's own pooled fit, replayed at the real send times:** p95 time per token within
+  1.01–1.05× on the two lighter workloads and 1.14–1.16× on `long_above`, where profile A is 1.07×.
+- **The three runs of the command.** The first differs from the two after it by more than any
+  run's repeats differ among themselves — decode cost per 1,000 context tokens 3.83 ms (repeats
+  3.79–3.91) against 3.76 (3.75–3.77) and 3.76 (3.76–3.76); prefill base 0.0 against 5.5 and
+  4.6 ms. That is where E failed: the two runs taken back to back cover each other's count in
+  70 of 72 cases (97%), and the first run against either of them in 108 of 144 (75%).
+- **E by cell.** Of the 38 misses, 18 are round-robin's and 28 are at 64 prompts. Of the 11 that
+  are off by more than one, six are a policy at a cliff — balanced affinity with one prompt holds
+  the first-token target at 2 sessions/s on 8 replicas on the first run and on none of 24 on the
+  second — four are round-robin at 64 prompts and 2 sessions/s (13–14 against 16), and one is
+  balanced affinity at 64 prompts (13 against 15). Profile A's count, fitted five days earlier,
+  is inside a fresh run's range in 79.6% of cases.
+- **The 64-prompt table under the first-token target** (replicas up to 32, which the earlier
+  grids did not have): at 3 sessions/s balanced affinity needs 16 · 16 · 17 against sticky's
+  17 · 18 · 19; at 4, 23 · 26 · 24 against 22 · 27 · 27. The load weight of 1 holds nothing at
+  3 and 4.
+
+**Post hoc — a reported item the registration listed and the registered analysis left out.** The
+config lists *"every cell's signed error against profile A, and against each fresh fit"*;
+`scripts/c4_analyze.py` compares the micro-benchmark cells with profile A only. The other half,
+added after the results were seen with the registration's own arithmetic
+([`posthoc_fresh_cells.md`](../artifacts/results/c4_kaggle_t4/posthoc_fresh_cells.md)): the three
+fresh fits are +4% to +7% up to 32 sequences and **+15% to +20%** from 64 to 128 — a little worse
+than A everywhere. Their fitted cost of context is 3.76–3.83 ms per 1,000 tokens against A's 3.50;
+from 8 to 128 sequences the measured step grows by 3.2 ms per 1,000 tokens of summed context,
+the cost per sequence included. The line bends: the further a fit's cells are from the large
+batches, the steeper it draws it.
+
+**What it means.**
+1. **T2's factor of two no longer rests on an unchecked model.** T1 found the per-token latency
+   wrong at the knee, with every run on disk above 100 ms per token. C4 measured below, at and
+   above 100 ms, per request: the p95 is within 0%, 0% and 7%, and the yes-or-no on the limit is the
+   engine's own. That is one replica and three workloads. A fleet has still not been measured.
+2. **T1's failure has its cause, and it is the one the registration named.** The micro-benchmarks
+   hold: sharing is free, the composition rule is right, and the line is 12–15% too slow where the
+   knee decodes (T1's post hoc: a median summed context of 160,000; here 138,624 and 184,832 were
+   measured directly). A 15% error per step became 1.5–1.7× in the mean because the knee feeds on
+   itself — a slower step keeps more sequences in the batch, which slows the next. The
+   registration said what follows from that: *the tool should say "this workload is at the knee"
+   instead of printing a number there.* Not built yet.
+3. **The "how firm" line is a floor, and now there is a number for how low a floor.** One run's
+   repeats are taken within six minutes; another run an hour apart on the same engine falls
+   outside their range in one case of six, almost always by one replica. The line's wording has to
+   say so, and the sound reading of any count stays "± one" — which three calibrations said in C3
+   and three more say here.
+4. **The 64-prompt question stays open, and moved a little.** Under both halves, balanced
+   prefix-affinity at the registered weight is never more than one replica from session-sticky on
+   the fresh fits, and it is the lower one at 8 of 18 (load, fit) points against 1. One replica is
+   inside the margin of point 3 — so this is no finding for prefix routing. But the exploratory
+   reading of T2, "no saving with both halves", was a prediction, it was registered, and it failed.
+5. **A possible improvement, not made:** `kvsim calibrate` could time a few batches that share a
+   prefix. They are cheap (the seven cells here took seconds each), they reach the large summed
+   contexts that unique prompts cannot, and they would take the bend out of the line.
+
+**My two wrong predictions.** E: I thought a run's three repeats would span what another run
+gives; they span what the same six minutes give. F2: I read T2's exploratory table as "no steady
+winner" and wrote a rule that allowed prefix routing two loads out of six; on two of three fresh
+calibrations it took three and four.

@@ -50,8 +50,16 @@ The first public version: planned for PyPI before 2026-11-20.
   at the edge of the target.
 - A replica count is good to about ± one: three calibrations of the same T4 agree exactly on 71% of
   the counts in the finding's grid and within one on 96%.
-- The latency target is on the first token only (p95 TTFT). Time per output token is not yet part of
-  it.
+- **The "how firm" range is a floor, and a low one.** On a live T4 (C4) another run of
+  `kvsim calibrate` gave a replica count outside a run's own range in 18% of cases; 5% with the
+  range widened by one replica each way. Size for the top of the range, plus one.
+- The default latency target is on the first token only (p95 TTFT). The per-token half
+  (`slo.tpot_p95_ms`) is optional and off by default. Its model was checked on a live T4 (C4):
+  p95 time per output token within 7% on three workloads around a 100 ms limit — on one replica.
+  At the knee of the load curve it is 1.5–1.7× too slow (T1): decode steps of very large batches
+  are 12–15% faster than the fitted line, and the knee multiplies that.
+- First-token latency on light traffic came out 1.23–1.30× the model's number in C4 (the model
+  too fast), inside the 2× it was tested for.
 - `kvsim calibrate` times prompts of up to 2,048 tokens and decode contexts of up to 1,024 by
   default. Longer prompts are an extrapolation unless you measure there (`--prefill-lengths`,
   `--prefill-cached`, `--decode-contexts`).

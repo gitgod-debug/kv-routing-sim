@@ -9,7 +9,16 @@
 >
 > Legend: `[ ]` not started · `[~]` in progress · `[x]` done & verified · `[!]` blocked · `[-]` cut
 
-**Last updated:** 2026-10-05 (**T1 and T2 RAN — the per-token half of the SLO.** T1 ⛔ did not
+**Last updated:** 2026-10-06 (**C4 RAN on a live T4 — seven of nine rules hold.** The per-token
+model is within 7% of the engine around the 100 ms limit, and T1's failure at the knee has its
+cause: the fitted line is 12–15% too slow at very large batches. ⛔ Two predictions failed: one
+calibration's own spread covers the next one's GPU count in 82% of cases, not 90; and with both
+halves of the target prefix routing is one GPU below session-sticky at more loads than the rule
+allowed. **And a prior-art check on 2026-10-05 found what three earlier ones had missed:** the
+routing result was published first (SMetric, LMetric), and NVIDIA's Dynamo ships a simulator for
+the same question. The "intersection nobody occupies" is withdrawn; `docs/04-prior-art.md` says
+what can still be claimed. Before that, on 2026-10-05: **T1 and T2 RAN — the per-token half of the
+SLO.** T1 ⛔ did not
 hold: the simulator's per-token latency is within 7% of the engine off the knee and 1.5–1.7× too
 slow at it. T2 ✅ all three rules on all three calibrations: under a target with both halves
 session-sticky is still best or tied with 1 and 4 prompts, never worse than round-robin or
@@ -38,11 +47,14 @@ R1/R2 ran on the first, context-free timing model (not yet re-run) · ✅ **6** 
 T4s within 1.4% (run twice); latency explained by C2 · ✅ **C2** — context, not CPU; the context-aware
 model predicts held-out traffic within 1.41× · 🔨 **7** — demo on the validated grid, 10×/100× done,
 `kvsim calibrate` proven on a real T4 in both its forms (C1, C3); PyPI left · 🔨 **8** — the preprint
-(optional; ⚠️ it predates C3 and states the 30 Sep finding without its margin). ▶ **Next:** one GPU
-run, registered first (C4): per-request token times on traffic around the per-token limit; decode
-cells that share a prefix; what an arriving request costs those already decoding; `kvsim
-calibrate` with its repeats, three times — and on those fresh calibrations, the 64-prompt question
-under both targets. Then H6 and R1/R2 on the validated model.
+(optional; ⚠️ it predates C3 and the prior-art check of 5 Oct: do not publish as it is) ·
+✅ **C4** (5 Oct, a live T4) — 7 of 9 rules hold: the per-token model is within 7% around the
+limit; ⛔ one calibration's spread covers the next one's count in 82% of cases, not 90 ·
+⛔ **prior art** (5 Oct) — the routing result was published first (SMetric, LMetric) and NVIDIA
+ships a simulator for the question; the "intersection" claim is withdrawn.
+▶ **Next:** R3, registered first — the two published policies and real sessions of unequal size,
+on a public production trace. Then H6 and R1/R2 on the validated model; the two-part target as
+the default; a warning when a workload is at the knee.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -669,8 +681,13 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       🔨 **2026-10-05, built:** every timing cell is now measured `--reps` times (3) and the
       profile keeps the fit of each repeat; `kvsim replay` sizes on each and prints the range
       beside its recommendation ("how firm: 3 to 4 replicas across the calibration's 3 repeats");
-      a profile without repeats says its spread is unknown (commit `5db6a9a`). Mock engine and
-      synthetic repeats only so far. **Left:** its first run on a real GPU (C4)
+      a profile without repeats says its spread is unknown (commit `5db6a9a`).
+      ✅ **2026-10-05, on a real T4 (C4a holds):** three runs, three repeats each, exact on the
+      cache check every time, 359 s a run. ⛔ **And the spread it prints is too narrow (C4's rule E
+      does not hold):** another run's count is inside a run's own range in 178 of 216 cases
+      (82.4%; 90% was the rule; 94.9% with one replica more each way). The two runs taken back to
+      back agree (97%); the run an hour earlier does not agree with them (75%). **Left:** the
+      line's wording must say "a floor: add one"
 - [~] ⭐ **An SLO with its per-token half.** The first-token target was the only one: C3's live
       engine took 134–521 ms per token on traffic that met, or nearly met, it, and the MLPerf row
       the 2 s come from also limits the time per output token (100 ms). 🔨 **2026-10-05:** the
@@ -703,7 +720,17 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       over the 100 ms limit, every request's token times kept and the engine's own histogram read
       (T3a, T3b); then, in the simulator, whether one run's spread covers another's count (E) and
       the 64-prompt question on the fresh fits under both targets (F1, F2). Predicted: all nine
-      hold. Dry-run against the mock: every timing rule within 7%. **Left:** the run
+      hold. Dry-run against the mock: every timing rule within 7%.
+      ✅ **C4 RAN 2026-10-05 — seven of nine hold**
+      ([`report.md`](artifacts/results/c4_kaggle_t4/report.md)): D1a −3%, −4% · D1b +3% to +15%
+      (allowed ±25%) · D2 1.03–1.19× · **T3a 1.00×, 1.00×, 1.07×** on p95 time per token under, on
+      and over the limit · T3b the model's verdict is the engine's own · F1 8 · 7 · 8 against
+      9 · 10 · 10. ⛔ **E** 82.4% (above). ⛔ **F2**: under both halves balanced affinity (α 16) is
+      one replica below session-sticky at 3 and 4 of 6 loads on two of the three fresh fits (the
+      rule allowed 2). So: the factor of two rests on a checked per-token model — on one replica;
+      T1's failure is the knee multiplying a 12–15% error at very large batches. **Left:** the
+      two-part target as the default; a "this workload is at the knee" warning; shared-prefix
+      cells in `kvsim calibrate`
 - [ ] **`configs/profiles/`** — committed calibration profiles keyed by
       `(gpu, model, block_size, max_num_seqs, engine_version)`; the CLI reports **how far** the user is
       from the nearest one. ⛔ Never interpolate between profiles — an interpolated error bar has no

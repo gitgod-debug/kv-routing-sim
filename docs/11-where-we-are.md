@@ -1,6 +1,6 @@
 # 11 — Where we are, in plain words
 
-**Written 2026-09-22; brought up to date 2026-10-05.** Everything this project has done so far, what it found, what was decided and
+**Written 2026-09-22; brought up to date 2026-10-06.** Everything this project has done so far, what it found, what was decided and
 why, what went wrong along the way, and what is left — in plain words, for someone who has forgotten
 all of it. The other docs have the detail; this one has the story.
 
@@ -253,6 +253,40 @@ on one GPU* (findings 18 and 19 below).
       matched exactly; every test was written down before it ran, and the failed ones are
       published; and we measured how far a simulator's GPU count can be trusted (findings 22–24).
       The README and the prior-art file now say exactly this, and no more.
+28. ✅ **The simulator's second speed is right where it matters** (C4, run on a real T4 on 5 Oct,
+    registered first; seven of its nine rules held).
+    - We chose three kinds of traffic: one under the 100 ms-per-token limit, one on it, one over
+      it. The simulator's number was within 0%, 0% and 7% of the real engine's. And its yes-or-no
+      answer ("does this traffic meet the limit?") was the same as the engine's own.
+    - Many requests that share one long prompt do not cost extra because they share it.
+    - When a new request arrives, the requests already running wait once while its prompt is read.
+      The simulator's rule for that wait was within 3–19%.
+    - The simulator's decode speed is right (within 3%) up to twice the batch sizes it was
+      calibrated on, and **12–15% too slow** at 5–9 times those sizes. That small error is what
+      grew into the big one in finding 24: at the edge of a GPU, a slightly slower step means more
+      requests pile up, which makes the next step slower again.
+    - `kvsim calibrate` with its three repeats works on a real GPU: three runs, six minutes each,
+      exact on the cache check every time.
+    So the "×2" of finding 25 now stands on a checked model — for one GPU and three kinds of
+    traffic. A whole fleet has still not been measured.
+29. ⛔ **The "how firm" range the tool prints is too narrow** (C4, rule E; I had predicted it would
+    hold). We ran `kvsim calibrate` three times in one hour on the same GPU. Each run gives a
+    range of GPU counts from its own three repeats. Another run's answer was inside that range in
+    82% of cases; we had asked for 90%. If we make the range one GPU wider on each side, it is 95%.
+    The reason: a run's three repeats are taken within six minutes, so they agree with each other.
+    The two runs taken one after the other also agreed (97%). The run taken an hour earlier did
+    not (75%). So the range is a lower limit, and the honest advice is: take the top of the range
+    and add one.
+30. **With 64 prompts, the two policies are one GPU apart at most — and my second prediction
+    failed** (C4, rules F1 and F2).
+    - With a target for the first word only, the small load weight (finding 26) again needed fewer
+      GPUs than keeping users on one GPU: 8, 7, 8 against 9, 10, 10 on three fresh calibrations.
+      (F1 held.) With a target for both speeds it again holds nothing.
+    - With a target for both speeds, I had written that prefix routing (with the registered weight
+      16) would need fewer GPUs at no more than 2 of 6 loads. On two of three fresh calibrations it
+      needed one GPU fewer at 3 and at 4 loads. (F2 failed.) Every difference is exactly one GPU,
+      and one GPU is what two calibrations disagree by (finding 29). So it is not a result for
+      prefix routing. But "there is no saving" was wrong as a prediction.
 
 ## 5. What we decided, and why
 
@@ -381,6 +415,12 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
   in a competitor's README. Three rules were added: search papers by the question; read the
   documentation of every "production system" for a simulator; follow the references of every close
   match. The old claims are kept in the docs, struck through, with the date.
+- **Two predictions about C4 were wrong** (6 Oct), and both are reported as failed. I expected
+  one calibration's own repeats to cover what another calibration gives (82%, not 90%). And I
+  wrote a rule about the 64-prompt case from a table I had only looked at, not tested. Also: the
+  registered analysis script forgot one item the registration had promised (each fresh
+  calibration against the micro-benchmark cells). It was added afterwards, with the registration's
+  own arithmetic, in a separate script that is labelled "written after the results were seen".
 - **The GPU box changed under us** (5 Oct). Kaggle updated its software, and the engine could no
   longer start: one package it needs was built for a different CUDA version, under the same version
   number, so the installer left it in place. C3's first attempt stopped before measuring anything.
@@ -399,7 +439,7 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 | 4 | Calibrated sweep; H1, H5, H6; the load weight; real traces | ✅ mostly — H6's ranking half ⛔, its crossover half ✅; Mooncake (R1) ⛔; AgentX (R2) ✅ |
 | 5 | **The finding** — when prefix-aware routing pays | ✅ **done, changed, then narrowed** — H2 ⛔; H2b ✅ on the first timing model, ⛔ on calibration A of the validated one, ✅ on two more calibrations of the same T4: *keep each user on one GPU* holds on all three; the prefix-routing half is not settled |
 | 6 | Two-GPU real-engine check under pressure | ✅ **holds**, run twice — hit rates within 1.4%; ⚠️ latency 5–222× the prediction |
-| 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | 🔨 demo, figure, 10×/100× done; `kvsim calibrate` works on a real T4 in both its forms (C1, C3); PyPI left |
+| 7 | Package, command line, static demo page, "what breaks at 10× and 100×" | 🔨 demo, figure, 10×/100× done; `kvsim calibrate` works on a real T4 in all its forms (C1, C3, and with its repeats in C4); the per-token model checked on a real T4 (C4); PyPI left |
 | 8 | Write-up, launch, the upstream pull request | 🔨 the guidellm fix is ready; the preprint is drafted (`paper/`) |
 
 ## 9. What is left
@@ -424,13 +464,17 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 - ✅ done 5 Oct: a speed target with both halves (T1 failed, T2 held — findings 24–26);
 - ✅ done 5 Oct: `kvsim calibrate` repeats every measurement three times, and `kvsim replay` prints
   how much the GPU count moves between those repeats (tested on the mock engine only so far);
-- ⭐ **next — one GPU run (C4), registered first.** It measures what T1 and T2 could not check from
-  old data: the time per token of every request on light traffic, around the 100 ms limit; decode
-  speed when many requests share a prompt (far beyond the cache); what one arriving request costs
-  the requests already running; and the new repeats on a real engine. On the fresh calibrations it
-  also asks the 64-prompt question again, under both targets;
-- then: re-run H6 and the two real traces (R1, R2) on the validated timing model — they all ran on
-  the first one;
+- ✅ done 5–6 Oct: **C4**, one GPU run, registered first (findings 28–30): seven of nine rules
+  held;
+- ✅ done 5 Oct: the check of other people's work (finding 27), and the README corrected;
+- ⭐ **next — R3, registered first, no GPU needed.** The two routing policies from the papers
+  (LMetric and SMetric's rule) are now built into the simulator. R3 runs them, and our own
+  policies, on a public trace from Alibaba's Qwen service: real sessions of very different sizes —
+  the case our generated traffic cannot show;
+- then: make the target with both speeds the default (its check has passed), and re-run H6 and the
+  two older real traces (R1, R2) on the validated timing model — they all ran on the first one;
+- then: a warning in the tool when a workload is at the edge of a GPU (finding 28 says a number
+  there cannot be trusted), and a few shared-prompt cells in `kvsim calibrate`;
 - later: the PyPI release.
 
 **The preprint (`paper/`) is optional.** It is a 7-page draft that tells the same story as the
@@ -450,10 +494,14 @@ text can become a blog post.
 - a GPU count is good to about ± one GPU: three calibrations of the same T4 agree exactly on 71%
   of counts and within one on 96%;
 - every GPU count in the README is for the first token only; with a per-token limit too, the
-  simulator needs about twice as many — and its per-token speed is not yet checked where that
-  answer lives (T1 failed at the limit of a GPU; nothing is measured below 100 ms per token);
+  simulator needs about twice as many. Its per-token speed is now checked where that answer lives
+  (C4: within 7%, on one GPU) and still wrong at the limit of a GPU (T1); a whole fleet has not
+  been measured;
 - near the limit of a GPU, one fit is not enough — the tool now shows the spread between its own
-  repeats, but that is a floor, not a full error bar;
+  repeats, but that is a floor, and a low one: another run falls outside it in about one case of
+  six (finding 29);
+- the first-word speed was 23–30% slower on the real GPU than the model said, on light traffic
+  (C4) — inside the factor of 2 we had tested for, but always on the same side;
 - every replay is *open-loop* — real agents wait for an answer before sending the next turn, and would
   then reuse the answer's cache blocks, which we cannot measure this way;
 - one GPU type (T4) and one model (Qwen3-4B) so far;
