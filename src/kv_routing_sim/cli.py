@@ -191,12 +191,19 @@ def _markdown(payload: dict[str, Any]) -> str:
             lines.append(f"tied on replicas with: {', '.join(rec['tied_with'])} "
                          "(between these the rupee gap is noise)")
             lines.append("")
-        if rec.get("inr_delta_pct_vs_baseline") is not None:
+        # A cost difference means something only between two configurations that both meet the
+        # SLO: rupees per SUCCESSFUL request of a fleet that misses it is not a price.
+        base = rec.get("baseline") or {}
+        if (rec.get("inr_delta_pct_vs_baseline") is not None and r.get("meets_slo")
+                and base.get("meets_slo")):
             lines.append(
                 f"vs round-robin: {rec['inr_delta_pct_vs_baseline']:+.1f}% cost, "
                 f"{rec['replica_delta_vs_baseline']:+d} replicas"
             )
             lines.append("")
+        elif r.get("meets_slo") and base.get("meets_slo") is False:
+            lines += [("round-robin met the SLO on none of the replica counts swept, so there is "
+                       "no cost to compare with."), ""]
         firm = ((payload.get("replica_spread") or {}).get("replicas") or {}).get(r["policy"])
         if firm:
             lines += [_firmness(firm, payload["replica_spread"]), ""]

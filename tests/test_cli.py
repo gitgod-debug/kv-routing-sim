@@ -213,3 +213,27 @@ def test_replay_sizes_on_both_halves_of_the_slo_by_default_and_says_so(tmp_path,
     assert not any(p["meets_slo"] for p in payload["points"])
     assert "NO configuration met the SLO (p95 TTFT and p95 time per output token)" in \
         payload["recommendation"]["reason"]
+
+
+
+def test_replay_compares_cost_with_round_robin_only_between_fleets_that_meet_the_slo(
+        tmp_path, capsys):
+    """Rupees per successful request of a fleet that misses the SLO is not a price. With both
+    halves of the SLO on, this small fleet meets nothing, and the report prints no cost
+    difference; on the first token alone both policies meet it, and it does."""
+    trace = tmp_path / "t.jsonl"
+    main(["generate", "--out", str(trace), "--sessions", "30", "--turns", "3", "--rate", "3"])
+    capsys.readouterr()
+    args = ["replay", str(trace), "--policies", "round-robin,session-sticky", "--replicas",
+            "3-6", "--seeds", "1", "--profile", CTX_PROFILE, "--cost-model",
+            "configs/cost_model.yaml", "--no-edge-check"]
+
+    assert main(args) == 0
+    nothing_met = capsys.readouterr().out
+    assert "NO configuration met the SLO" in nothing_met
+    assert "vs round-robin:" not in nothing_met
+
+    assert main([*args, "--tpot-slo-ms", "0"]) == 0
+    both_meet = capsys.readouterr().out
+    assert "cheapest configuration meeting the p95 TTFT SLO" in both_meet
+    assert "vs round-robin:" in both_meet

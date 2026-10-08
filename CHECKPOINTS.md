@@ -66,7 +66,7 @@ policies need two to three replicas fewer at the highest load.
 ✅ 7 Oct: `kvsim replay` sizes on both halves of the target by default (`--tpot-slo-ms`, ADR-013).
 ✅ 8 Oct: `kvsim replay` says whether its recommendation is at the edge or at the knee of the
 fleet's load curve (a 5% slowdown of the timings; post hoc check on T1's five runs).
-▶ **Now:** error bars per cell in the sweep report; then the last check before publishing.
+▶ **Now:** the last check before publishing (the gates at the end of this file, the package, the links).
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -502,8 +502,11 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       predicted, sticky, balanced AND pure affinity all need 2 T4s at every speed; round-robin needs
       5 at 2× ([`report.md`](artifacts/results/realtrace_agentx/report.md)). Pure affinity's collapse
       on Mooncake is caused by shared prompts
-- [~] **Multi-seed (5) + bootstrap CIs by session** — ✅ used for every H1 decision; per-cell p95 CIs
-      for the README tables are still to add
+- [x] **Multi-seed (5) + bootstrap CIs by session** — ✅ used for every H1 decision. Per-cell p95
+      intervals were not added to the README's tables: those state their uncertainty another way
+      (a count holds only if every seed holds it; ± one replica, measured across calibrations in
+      C3 and C4). An interval per cell in `kvsim replay` stays open on purpose — it is first issue
+      #3 in [`docs/good-first-issues.md`](docs/good-first-issues.md)
 - [x] ✅ `eval/cost.py` from `configs/cost_model.yaml` — every constant **cited and dated**: g4dn.xlarge
       $0.526/h, ₹95.87/$, SLO p95 TTFT ≤ 2,000 ms (MLPerf). **₹ per 1k successful requests**
 - [x] ✅ `eval/pareto.py` + `eval/recommend.py` → one policy, one replica count, a ₹ delta vs
@@ -860,6 +863,21 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 ## 🚧 Honesty gates — the things that make this repo trustworthy
 
 Check every one before anything is published.
+
+> **Checked 2026-10-08, nothing published yet — the boxes stay open until the day of publishing.**
+> - README, demo page, CONTRIBUTING, changelog, `src/` and `pyproject.toml` searched for every
+>   sentence of the ⛔ list and for "novel", "first", "unique", "only": none is claimed (the hits
+>   are the denials themselves). No `TBD` placeholder is left in them.
+> - All 287 relative links in the 54 tracked documents resolve.
+> - Every stored result that names its script names one that exists (38 of them); the others are
+>   outputs of the GPU notebooks, mapped in [`notebooks/README.md`](notebooks/README.md).
+> - The package: built from a clean export and from the working folder; both source packages
+>   hold `src/`, `tests/`, the README, the licence and `pyproject.toml`, and nothing else. The
+>   wheel installs into an empty environment with PyYAML alone, and `kvsim generate` and
+>   `kvsim replay` run from it. The licence field uses the current form (SPDX).
+> - 377 tests pass; the linter is clean.
+> - **Left for the day of publishing:** the repository links in the README, the demo page and
+>   `pyproject.toml`; the search above once more; the upstream PR's own gate, last in this list.
 
 - [ ] **No number in the README that was not measured.** Placeholders are marked `TBD — not yet measured`
       and are never quietly replaced by a plausible figure
