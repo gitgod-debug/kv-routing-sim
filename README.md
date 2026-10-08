@@ -294,8 +294,8 @@ charges a full decode step on top of every prefill, over-estimating an idle repl
 
 ## What it does
 
-1. **Trace ingestion** — reads real serving logs (vLLM/SGLang JSONL, OpenAI-style request logs) into one
-   normalized, versioned request schema. Prompts are hashed at the adapter boundary and **never enter the
+1. **Trace ingestion** — reads serving logs (vLLM-style JSONL, OpenAI-style request logs) and three
+   public trace formats (Mooncake, AgentX, Qwen-Bailian) into one normalized, versioned request schema. Prompts are hashed at the adapter boundary and **never enter the
    simulator**, so a trace's user content stays out of memory and out of artifacts.
 2. **A block-level KV cache model**, per replica. The default follows vLLM 0.30.0's block pool line by
    line — reference counts, tail-first freeing, cached decode blocks, admission by free memory, and

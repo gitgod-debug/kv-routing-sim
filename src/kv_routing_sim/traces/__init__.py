@@ -1,12 +1,13 @@
-"""Trace ingestion: any input format in, one versioned record type out. 📐 designed, not built.
+"""Trace ingestion: any input format in, one versioned record type out.
 
 Contract (ADR-004):
   * `schema.py`     — `NormalizedRequest` + `SCHEMA_VERSION`. Every results file records the
                       version it was produced under, so curves from different weeks are only
                       compared when they are actually comparable.
-  * `adapters/`     — one file per format (vLLM JSONL, SGLang, OpenAI-style logs). Each is a
-                      GENERATOR; none returns a list. Traces can be large and the memory ceiling
-                      is a stated number, not a discovered one.
+  * `adapters/`     — one file per format: vLLM-style JSONL and OpenAI-style logs, and three
+                      public trace formats that come as block hashes (Mooncake, AgentX,
+                      Qwen-Bailian). Each is a GENERATOR; none returns a list. Traces can be large
+                      and the memory ceiling is a stated number, not a discovered one.
   * `generator.py`  — synthetic agentic traffic with `prefix_sharing_ratio` as an explicit
                       parameter, because that parameter is the H2 sweep axis.
   * `hashing.py`    — prompt → block hashes, mirroring the engine's hash-chain rule: a block's
