@@ -1,7 +1,9 @@
 # 05 — Codebase map
 
-**Status: 2026-09-28 — built.** The contracts below were written before the code (ADRs 001–004), and
-the code implements them. 167 tests, `ruff` clean.
+**Status: 2026-10-08 — built.** The contracts below were written before the code (ADRs 001–004), and
+the code implements them. 377 tests, `ruff` clean. *(Brought back in line with the tree on
+2026-10-08: until then this page still named four modules from the design that were never
+separate files, and an adapter that was never written.)*
 
 *(2026-09-20 read: "built, except the three numbers that need an engine". Those numbers were measured
 on a T4 on 2026-09-22 — `configs/profiles/t4-qwen3-4b-vllm0.30.0.json` — and `calib/` was built on
@@ -36,8 +38,8 @@ one file each. Everything else is core and changes rarely.
 
 | Piece | Responsibility |
 |---|---|
-| `schema.py` | `NormalizedRequest` (pydantic) + `SCHEMA_VERSION`. Fields: `request_id`, `arrival_ts`, `session_id`, `block_hashes: list[int]`, `prompt_tokens`, `output_tokens`. |
-| `adapters/` | One file per format: `vllm_jsonl.py`, `sglang.py`, `openai_log.py`. Each is a generator — **never returns a list.** |
+| `schema.py` | `NormalizedRequest` (a slotted dataclass) + `SCHEMA_VERSION`. Fields: `request_id`, `arrival_ts`, `session_id`, `block_hashes`, `prompt_tokens`, `output_tokens`. |
+| `adapters/` | One file per format. Two for serving logs: `vllm_jsonl.py`, `openai_log.py`. Three for public traces that come as block hashes with no text: `mooncake.py`, `agentx.py`, `bailian.py`. `base.py` holds the shared streaming and the skip counts. Each is a generator — **never returns a list.** ⚠️ There is no SGLang adapter; a log with vLLM-style field names is read by `vllm_jsonl.py`. |
 | `generator.py` | The synthetic **agentic** traffic generator: shared system prompt + tool definitions + N turns, with a controllable **prefix-sharing ratio** (the H2 sweep axis) and arrival process. |
 | `hashing.py` | Prompt → block hashes, mirroring the engine's hash-chain rule (ADR-002): a block's hash depends on its contents **and its predecessors**. |
 
@@ -56,22 +58,27 @@ and maintain residency.
 
 | Piece | Responsibility |
 |---|---|
-| `block_trie.py` | The trie of resident blocks (plain dicts, ADR-002). `lookup(block_hashes) -> matched_depth`. |
-| `eviction.py` | LRU order + optional TTL, with a hard block-capacity bound derived from a GPU memory config. |
-| `replica_cache.py` | Trie + eviction + counters (`queries`, `hits`) named to mirror vLLM's own (ADR-008), so predicted and measured quantities are literally the same quantity. |
+| `block_trie.py` | The plain-LRU model (`cache_model="lru"`), kept as the ablation: the trie of resident blocks (plain dicts, ADR-002), LRU order, a hard capacity bound, and counters (`queries`, `hits`) named to mirror vLLM's own (ADR-008). The design had these as three files; they are one class, `BlockCache`. No TTL was built. |
+| `capacity.py` | How many KV blocks a replica can hold, from a model's shape and a memory budget — an estimate. A measured profile carries the engine's own number instead. |
 | ⭐ **`block_pool.py`** | ✅ **The default cache model (`cache_model="vllm"`), added 2026-09-22.** vLLM's block pool, every behaviour cited to its v0.30.0 source: reference counts, tail-first free, uncached-LIFO / cached-FIFO, partial and decode blocks in capacity, decode blocks hashed, the lookup cap, and eviction events by vLLM's own (quirky) rule. `block_trie.py` stays as the `"lru"` ablation baseline. |
 
 **The tests that matter most live here:** a known prefix sequence must produce a known hit/miss pattern,
 and the partial-block rule must hold (sharing 47 of 48 tokens at block size 16 shares **two** blocks, not
 three). If these are wrong, every downstream number is wrong and nothing else will reveal it.
 
-## `src/kv_routing_sim/policies/` — ✅ built + tested (**seven**, not six — see below)
+## `src/kv_routing_sim/policies/` — ✅ built + tested (**nine**: seven standard, two published ports)
 
 **Contract:** `choose(fleet_state, request, rng) -> replica_index`. One file per policy. No global state.
 No policy may mutate the fleet.
 
 `round_robin.py` · `least_loaded.py` · `power_of_two.py` · `consistent_hash_prefix.py` ·
 `radix_affinity.py` · **`radix_affinity_balanced.py`** · `session_sticky.py` · `base.py` · `registry.py`.
+
+Two ports of published policies, asked for by name (`--policies all` stays the seven above):
+`lmetric.py` (LMetric, OSDI '26) and `smetric_local.py` (SMetric's session rule, without its
+global cache tier). They use two hooks the others do not: a policy may be told when a request
+gets its first token and finishes, and may ask what a replica's cache really holds — the router
+that follows the engine's cache events, where the others keep their own record of what they sent.
 
 ⭐ **A seventh policy exists that the spec did not list, and the reason is a measurement.** Pure
 `radix-affinity` degenerates: every request shares the system-prompt first block, so one replica wins
@@ -90,21 +97,23 @@ result (ADR-003).
 
 | Piece | Responsibility |
 |---|---|
+| `cost_model.py` | `CostProfile`: the six timing coefficients, the KV capacity and where they were measured; loading a profile by path or shipped name; the per-repeat fits a calibration keeps. |
 | `replica.py` | One replica: continuous-batching admission bounded by `max_num_seqs`, a prefill/decode cost function **fitted** to the live engine (ADR-001), a waiting queue. Under `cache_model="vllm"` it also follows vLLM's scheduler: running requests first, FCFS preemption of the most recent when one cannot grow, memory-based admission, no admission in a step that preempted. |
-| `fleet.py` | N replicas + the router + the arrival stream; the event loop. |
-| `metrics.py` | The collector: per-request TTFT, per-replica hit/query counters, queue depths. Emits **distributions, not means** (ADR-006 / methodology §1). |
-| `engine.py` | `run(trace, policy, n_replicas, seed) -> RunResult`. The one function the sweep calls. |
+| `metrics.py` | The collector: per-request TTFT and time per output token, per-replica hit/query counters, preemptions. Emits **distributions, not means** (ADR-006 / methodology §1). |
+| `engine.py` | N replicas, the router, the arrival stream and the event loop: `run(trace, policy, n_replicas, seed) -> RunResult`. The one function the sweep calls. |
 
 ## `src/kv_routing_sim/eval/` — ✅ built + tested
 
 | Piece | Responsibility |
 |---|---|
-| `bootstrap.py` | Percentile bootstrap over requests; **paired** bootstrap for policy-vs-policy deltas. |
+| `bootstrap.py` | Percentile bootstrap that resamples **sessions**, not requests; a **paired** bootstrap for policy-vs-policy deltas. |
 | `cost.py` | Reads `configs/cost_model.yaml`. **No constant is defined in Python** (ADR-006). |
-| `pareto.py` | The non-dominated frontier over (hit rate, p95 TTFT, ₹/1k requests) + the plots. |
+| `pareto.py` | The non-dominated frontier over (hit rate, p95 TTFT, ₹/1k requests). |
 | `recommend.py` | Frontier + an SLO → *one* policy, *one* replica count, and the ₹ delta vs round-robin. ~~This is the output nobody else produces~~ — false: `aisimulate recommend` returns a GPU count and a configuration under an SLO. What this one adds is the routing policy; see `04-prior-art.md` §2a. |
 | `rank.py` | Kendall's tau-b with ties handled — the statistic H6 is decided on. |
 | `sweep.py` | policy × replicas × seeds → points, and `crossover_sweep`, the H2 grid with the sharing ratio as its own axis. |
+| `spread.py` | How firm a replica count is: the same sizing on each repeat of the calibration alone. |
+| `edge.py` | How close to saturation the recommended configuration sits: the same run on timings 5% slower. |
 
 ## `src/kv_routing_sim/calib/` — ✅ built + tested (2026-09-28)
 
@@ -123,6 +132,13 @@ timings, its check is exact, and a wrong block size is caught.
 
 `kvsim replay` (a trace in, a recommendation out), `kvsim generate`, `kvsim crossover`, and
 `kvsim calibrate`. Fails **loudly at startup** on a bad config; never silently mid-sweep (ADR-004).
+`replay` sizes on both halves of the SLO by default (ADR-013), and prints beside its answer how
+firm the count is (`spread.py`) and how close to the edge it sits (`edge.py`).
+
+## `src/kv_routing_sim/data/` — ✅ shipped with the package
+
+The measured T4 profiles and the cited cost model, byte-for-byte the files in `configs/`, so that
+`pip install kv-routing-sim` works without a clone (`--profile <name>`, `--cost-model default`).
 
 ---
 
@@ -163,7 +179,8 @@ Two classes, and the distinction is enforced:
   | Real traces R1, R2 — and again on the validated timing model | `run_realtrace.py`; `run_realtrace_ctx.py` (derives one config per calibration, runs the first unchanged) | `realtrace_mooncake/`, `realtrace_agentx/`, `realtrace_ctx/` |
   | Phase 6, C1–C4 (GPU, Kaggle) | `phase6_*.py`, `c1_*.py` … `c4_*.py` — `prepare` builds the notebook with the wheel inside, `dryrun` runs it against the mock engine, `analyze` is the registered analysis; `kaggle_run.py` pushes a notebook and fetches its output | `phase6_kaggle_t4/`, `c1_…` … `c4_kaggle_t4/` |
   | H2b on the validated model; T1, T2 (the per-token half) | `run_h2b_c2.py`; `t1_itl_check.py`, `run_t2_grid.py`, `t2_analyze.py`, `t2_verify_grid.py` | `h2b_c2/`, `t1_itl/`, `t2_two_part_slo/` |
-  | Post hoc, and named so | `*_posthoc*.py` — each says in its first lines that it was written after a result | beside the result it explains |
+  | R3 — the two published policies on a public production trace | `run_r3.py` (runs, decides nothing), `r3_analyze.py` | `r3_bailian/` |
+  | Post hoc, and named so | `*_posthoc*.py`, `edge_posthoc_t1.py` — each says in its first lines that it was written after a result | beside the result it explains |
 
 `_spike_common.py` holds the shared header/results helpers, adapted from the sibling project
 (`colpali-economics`) so both repos' artifacts are readable the same way.
@@ -175,7 +192,7 @@ Two classes, and the distinction is enforced:
   sweep and its decision rules), and `profiles/` (measured timing + capacity profiles, loaded with
   `--profile`). A committed config is what makes a sweep re-derivable.
 - **`artifacts/results/`** — JSON + **raw metric scrapes**, committed (they are the calibration evidence).
-  Bulk traces, sweeps and logs are gitignored. **Never hand-edited.**
+  Bulk traces, sweeps and logs are gitignored. **No measured value in them is ever edited.**
 - **`tests/`** — cache-model hit/miss tests first; a golden-file test on a small sweep; the property test
   that **prefix-affinity never scores below round-robin on perfectly-shared prefixes** (if it does, the
   cache model or the policy is broken, and no amount of calibration will show it).

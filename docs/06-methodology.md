@@ -96,8 +96,9 @@ worthless and a reviewer will say so in public.
 > own number.
 
 No hidden divisors. No `≈₹0.003/request` with no derivation. See `configs/cost_model.yaml` — every value
-ships as `<TBD>` with `source:` and `date:` fields present, so an uncited constant is **structurally
-obvious** rather than merely discouraged.
+has its `source:` and `date:` beside it. The file was written with every value as `<TBD>` and filled
+from cited sources on 2026-09-22, and the code refuses to run while a `<TBD>` remains, so an uncited
+constant is **structurally obvious** rather than merely discouraged.
 
 ### The shape of the calculation
 
