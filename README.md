@@ -25,7 +25,7 @@ repo was written down before it ran — the ones that failed too.
 > are first-token counts**: with a limit on token speed too, the simulator needs about twice as
 > many GPUs (the command itself applies that limit by default). One calibration's own repeats do not cover the next calibration's count often enough
 > (82% of cases; 90% was the rule), so the tool says "plus one". At the knee of a GPU's load curve
-> no number here is reliable. The test behind half of the old headline was decided inside the
+> no number here is reliable; the tool now says when a recommendation sits there. The test behind half of the old headline was decided inside the
 > ± one margin; that half is "not settled" below.
 >
 > **Not new.** The routing result was published first (SMetric, LMetric), and NVIDIA ships a larger
@@ -408,6 +408,25 @@ six minutes apart, can know that. So: **size for the top of the range, plus one*
 what the tool's own line now says. The command
 itself works on a real engine with its repeats — exact on its cache check all three times, six
 minutes a run ([report](artifacts/results/c4_kaggle_t4/report.md)).
+
+**And it says how close to the edge its recommendation sits.** `kvsim replay` runs the recommended
+configuration once more with every timing coefficient 5% larger — what a second calibration of
+the same GPU can differ by — and prints how far the p95 latencies moved:
+
+```text
+not at the edge: with timings 5% slower it still meets the SLO (p95 TTFT 1,021 → 1,076 ms (×1.05); p95 time per token 189 → 201 ms (×1.06)).
+```
+
+With room to spare, 5% in is 5% out, as above. If the configuration stops meeting the SLO, the
+line reads "⚠️ at the edge" and says to allow one replica more. If a p95 moves by more than 1.5×,
+it reads "⛔ at the knee": the fleet is close to saturation, and that is where the simulator's
+own latencies were 1.5–1.7× off on a live GPU (T1). `--no-edge-check` skips it.
+
+⚠️ **The 1.5 was chosen after looking** (post hoc, and labelled so). On T1's five held-out runs
+the 5% slowdown multiplies p95 TTFT by 5.3 and 5.5 on the two runs the simulator got wrong, and
+by 1.13–1.14 on the three it got right; nothing else moves by more than 1.21×
+([table](artifacts/results/t1_itl/posthoc_edge.md)). Five runs of three workloads on one GPU:
+an indication that the check sees the knee, not a validated threshold.
 
 ## ⭐ What transfers to your fleet, and what doesn't
 

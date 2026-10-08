@@ -1,0 +1,144 @@
+{
+ "script": "scripts/edge_posthoc_t1.py",
+ "date_utc": "2026-10-08T07:30:00+00:00",
+ "git_sha": "903ecdd",
+ "git_dirty": false,
+ "seed": 0,
+ "hardware_path": "cpu-only",
+ "hardware": {
+  "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+  "python": "3.13.12",
+  "usable_cpus": 12,
+  "gpus": [
+   "NVIDIA GeForce GTX 1650, 4096 MiB, 7.5, 595.71.05"
+  ],
+  "gpu_name": "NVIDIA GeForce GTX 1650",
+  "gpu_memory_total": "4096 MiB",
+  "compute_capability": "7.5",
+  "driver_version": "595.71.05",
+  "mig_enabled": false,
+  "mig_mode_current": [
+   "[N/A]"
+  ]
+ },
+ "packages": {
+  "vllm": "not installed",
+  "torch": "not installed",
+  "numpy": "2.5.3",
+  "pydantic": "2.13.5",
+  "httpx": "not installed",
+  "prometheus-client": "not installed",
+  "matplotlib": "3.11.2"
+ },
+ "post_hoc": true,
+ "slowdown": 1.05,
+ "knee_factor": 1.5,
+ "runs": [
+  {
+   "session": "c2",
+   "workload": "K1_half",
+   "t1_factor": 1.712,
+   "p95_ttft_ms": [
+    3277.3,
+    17923.2
+   ],
+   "ttft_factor": 5.469,
+   "p95_tpot_ms": [
+    1176.2,
+    1333.7
+   ],
+   "tpot_factor": 1.134,
+   "preemptions": [
+    6,
+    36
+   ],
+   "flagged_as_knee": true
+  },
+  {
+   "session": "c2",
+   "workload": "K64_quarter",
+   "t1_factor": 1.073,
+   "p95_ttft_ms": [
+    1891.8,
+    2143.2
+   ],
+   "ttft_factor": 1.133,
+   "p95_tpot_ms": [
+    326.0,
+    393.0
+   ],
+   "tpot_factor": 1.206,
+   "preemptions": [
+    0,
+    0
+   ],
+   "flagged_as_knee": false
+  },
+  {
+   "session": "c3",
+   "workload": "K1_half",
+   "t1_factor": 1.544,
+   "p95_ttft_ms": [
+    3277.6,
+    17475.0
+   ],
+   "ttft_factor": 5.332,
+   "p95_tpot_ms": [
+    1176.2,
+    1328.4
+   ],
+   "tpot_factor": 1.129,
+   "preemptions": [
+    6,
+    33
+   ],
+   "flagged_as_knee": true
+  },
+  {
+   "session": "c3",
+   "workload": "K64_quarter",
+   "t1_factor": 1.007,
+   "p95_ttft_ms": [
+    1891.7,
+    2143.1
+   ],
+   "ttft_factor": 1.133,
+   "p95_tpot_ms": [
+    326.0,
+    393.0
+   ],
+   "tpot_factor": 1.206,
+   "preemptions": [
+    0,
+    0
+   ],
+   "flagged_as_knee": false
+  },
+  {
+   "session": "c3",
+   "workload": "T6_K8",
+   "t1_factor": 1.023,
+   "p95_ttft_ms": [
+    658.6,
+    751.0
+   ],
+   "ttft_factor": 1.14,
+   "p95_tpot_ms": [
+    274.0,
+    318.1
+   ],
+   "tpot_factor": 1.161,
+   "preemptions": [
+    0,
+    0
+   ],
+   "flagged_as_knee": false
+  }
+ ],
+ "flags_every_run_the_model_got_wrong": true,
+ "flags_no_run_the_model_got_right": true,
+ "separating_range": [
+  1.206,
+  5.332
+ ]
+}
