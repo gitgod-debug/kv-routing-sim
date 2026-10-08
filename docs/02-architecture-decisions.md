@@ -803,3 +803,48 @@ analysis surfaced two things the model gets wrong, both measured
   step model is load-bearing and gets a pre-registered validation run before any curve is published.
 - **Phase 6's 2-replica run** misses TTFT by more than W3 did, at the loads where the crossover lands.
 - A **Phase-3b GPU run** that pre-registers a step-model change and validates it on a fresh workload.
+
+---
+
+## ADR-013: `kvsim replay` sizes on both halves of the SLO by default
+
+**Status:** Accepted · 2026-10-07 · Phase 7
+
+### Context
+
+Until now the target was the first token alone: p95 TTFT ≤ 2 s, from MLPerf's "Conversational"
+row. The same row also limits the time per output token, to 100 ms. On the first-token target
+alone a live T4 took 134–521 ms per token on traffic that met it (C3): a fleet sized that way
+answers quickly and then streams too slowly to use. T2 (2026-10-05) put a number on it — with both
+halves the simulator needs 1.93–2.00× the replicas — and the default was left alone until the
+per-token model had been checked where those counts live. C4 made that check on a live T4: p95
+time per output token within 7% on three workloads under, on and over the limit.
+
+### Decision
+
+`kvsim replay` applies a p95 limit of **100 ms per output token** beside the cost model's
+first-token limit, unless the cost model sets its own `slo.tpot_p95_ms`, or the option
+`--tpot-slo-ms` says otherwise (`0` sizes on the first token alone). The report states which
+target a ✅ was decided on and where the per-token limit came from.
+
+**The shipped cost model is not changed.** Every registered sweep reads
+`configs/cost_model.yaml` through the library, not through this command, and its stored results
+must stay what they were. So the default lives in the command, where a user meets it.
+
+### What it costs
+
+- **On the shipped T4 profile a small fleet often meets nothing.** The lightest of C4's three
+  workloads already had a p95 of 83 ms per token on a live T4, so a 100 ms limit leaves little
+  room. That is the measurement, not a fault of the default; the report names the option.
+- **The README's tables are first-token counts**, labelled so. They are no longer what the
+  command prints by default.
+- **The per-token model is checked on one replica** (C4) and is 1.5–1.7× too slow at the knee of
+  a GPU's load curve (T1). A fleet has not been measured.
+
+### Alternatives rejected
+
+| Option | Why not |
+|---|---|
+| **Put `tpot_p95_ms: 100` in the shipped cost model** | Registered sweeps read that file; their stored results would stop reproducing. |
+| **Leave it off, and say "lower bound"** | The tool's first answer would stay about half of what a product that streams needs, with the correction in a note. |
+| **Another limit, such as 200 ms** | 100 ms is the cited one. A looser number would be this project's invention; the option is there for a product that needs another. |

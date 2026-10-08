@@ -90,8 +90,10 @@ def test_replay_shows_how_firm_its_recommendation_is(tmp_path, capsys):
     trace = tmp_path / "t.jsonl"
     main(["generate", "--out", str(trace), "--sessions", "30", "--turns", "3", "--rate", "3"])
     capsys.readouterr()
+    # On the first-token target alone (`--tpot-slo-ms 0`): the counts pinned below are from it.
     args = ["replay", str(trace), "--policies", "session-sticky,round-robin", "--replicas",
-            "1-8", "--seeds", "1", "--cost-model", "configs/cost_model.yaml"]
+            "1-8", "--seeds", "1", "--cost-model", "configs/cost_model.yaml",
+            "--tpot-slo-ms", "0"]
 
     assert main([*args, "--profile", str(_with_repeats(tmp_path))]) == 0
     out = capsys.readouterr().out
@@ -129,8 +131,9 @@ def test_the_spread_reaches_the_json_output(tmp_path):
     main(["generate", "--out", str(trace), "--sessions", "30", "--turns", "3", "--rate", "3"])
     out = tmp_path / "r.json"
     assert main(["replay", str(trace), "--policies", "session-sticky", "--replicas", "2-5",
-                 "--seeds", "1", "--cost-model", "configs/cost_model.yaml", "--profile",
-                 str(_with_repeats(tmp_path)), "--format", "json", "--out", str(out)]) == 0
+                 "--seeds", "1", "--cost-model", "configs/cost_model.yaml", "--tpot-slo-ms", "0",
+                 "--profile", str(_with_repeats(tmp_path)), "--format", "json",
+                 "--out", str(out)]) == 0
     payload = json.loads(out.read_text())
     assert payload["replica_spread"]["replicas"]["session-sticky"]["repeats"] == [3, 4, 3]
     assert payload["replica_spread_note"] is None

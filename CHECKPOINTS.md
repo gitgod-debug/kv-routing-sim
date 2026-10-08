@@ -63,7 +63,8 @@ needs more replicas than session-sticky but fewer on one calibration only; ⛔ p
 does not fail on that trace; ✅ SMetric's rule within one of LMetric; ✅ balanced prefix-affinity and
 session-sticky the same everywhere. Reported: with a limit on token speed too, the published
 policies need two to three replicas fewer at the highest load.
-▶ **Now:** the two-part target as the default; a warning when a workload is at the knee.
+✅ 7 Oct: `kvsim replay` sizes on both halves of the target by default (`--tpot-slo-ms`, ADR-013).
+▶ **Now:** a warning when a workload is at the knee.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a
@@ -716,7 +717,9 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       back agree (97%); the run an hour earlier does not agree with them (75%). ✅ **2026-10-06:**
       the line now says so — "size for the larger, plus one", and when the repeats agree, "still
       allow one more" — and the report gives C4's two percentages
-- [~] ⭐ **An SLO with its per-token half.** The first-token target was the only one: C3's live
+- [x] ⭐ **An SLO with its per-token half.** ✅ **2026-10-07: on by default in `kvsim replay`** —
+      100 ms at p95, `--tpot-slo-ms` (0 = the first token alone), the shipped cost model unchanged
+      (ADR-013). How it got there: the first-token target was the only one: C3's live
       engine took 134–521 ms per token on traffic that met, or nearly met, it, and the MLPerf row
       the 2 s come from also limits the time per output token (100 ms). 🔨 **2026-10-05:** the
       simulator measures every request's time per output token, `kvsim replay` prints its p95, and

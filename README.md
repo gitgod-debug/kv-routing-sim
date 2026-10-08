@@ -23,7 +23,7 @@ repo was written down before it ran — the ones that failed too.
 >
 > **Known limits.** Replica counts are T4 figures on generated traffic, good to ± one, **and they
 > are first-token counts**: with a limit on token speed too, the simulator needs about twice as
-> many GPUs. One calibration's own repeats do not cover the next calibration's count often enough
+> many GPUs (the command itself applies that limit by default). One calibration's own repeats do not cover the next calibration's count often enough
 > (82% of cases; 90% was the rule), so the tool says "plus one". At the knee of a GPU's load curve
 > no number here is reliable. The test behind half of the old headline was decided inside the
 > ± one margin; that half is "not settled" below.
@@ -218,9 +218,10 @@ on a live T4:
 So the factor of two now rests on a per-token model that was checked where it lives — **on one
 replica and three workloads; a fleet has not been measured.** The counts in this README are still
 first-token counts: read them as a *lower bound* for anything that has to stream at a usable
-speed. The simulator prints p95 time per token in every report, and a cost model can make it part
-of the SLO (`slo.tpot_p95_ms`). It is still off by default: the check it was waiting for has
-passed, and switching the default is the next change, not this one
+speed. **The tool itself now sizes on both halves by default** (2026-10-07, ADR-013):
+`kvsim replay` applies a p95 limit of 100 ms per output token beside the first-token limit,
+unless the cost model sets its own (`slo.tpot_p95_ms`) or the option says otherwise
+(`--tpot-slo-ms 0` sizes on the first token alone). Every report says which target it used
 ([T1](artifacts/results/t1_itl/report.md) · [T2](artifacts/results/t2_two_part_slo/report.md) ·
 [C4](artifacts/results/c4_kaggle_t4/report.md) · [`docs/09-hypotheses.md`](docs/09-hypotheses.md)).
 
@@ -346,6 +347,11 @@ kvsim replay trace.jsonl --policies all --replicas 1-16 \
 (`--profile` also takes a path to any profile file, and `--cost-model` a path to your own YAML — the
 shipped ones are byte-for-byte `configs/profiles/` and `configs/cost_model.yaml`.)
 
+**The target has two halves by default:** p95 time to first token ≤ 2 s, from the cost model, and
+p95 time per output token ≤ 100 ms, from the command (`--tpot-slo-ms`; `0` turns that half off).
+On a T4 the second half is the hard one: expect about twice the GPUs of the first-token tables
+above, and "no configuration met the SLO" on a small fleet.
+
 To get **your** numbers, point `kvsim calibrate` at your own running vLLM (prefix caching on). It
 fits C2's context-aware timing model to your GPU and model — decode steps timed at several context
 lengths and batch sizes, prefill at several prompt lengths and after a cached prefix — reads the KV
@@ -386,6 +392,7 @@ every timing cell three times and keeps, beside the fit on all of it, the fit of
 ```text
 **session-sticky on 3 replica(s)** — cheapest configuration meeting the p95 TTFT SLO
 ⚠️ how firm: 3 to 4 replicas across the calibration's 3 repeats taken alone — size for the larger, plus one
+(this example was run with --tpot-slo-ms 0, on the first-token target)
 ```
 
 That range is what one calibration's own repeats disagree by: a floor on the uncertainty, not a
@@ -506,7 +513,7 @@ delete it and get it back, it doesn't ship.**
 | | |
 |---|---|
 | [`docs/00-START-HERE.md`](docs/00-START-HERE.md) | Start here — what this is, and the read order |
-| [`docs/02-architecture-decisions.md`](docs/02-architecture-decisions.md) | ADR-001…012: why this shape, this fidelity, this hardware |
+| [`docs/02-architecture-decisions.md`](docs/02-architecture-decisions.md) | ADR-001…013: why this shape, this fidelity, this hardware |
 | [`docs/04-prior-art.md`](docs/04-prior-art.md) | What exists, what to cite, **and the sentences that must never be written** |
 | [`docs/06-methodology.md`](docs/06-methodology.md) | The statistics protocol and the cost model |
 | [`docs/09-hypotheses.md`](docs/09-hypotheses.md) | **Every hypothesis, pre-registered** — H1–H6, H2b, R1–R2, C1–C2, Phase 6 and the re-test — with dated results, falsified ones included |

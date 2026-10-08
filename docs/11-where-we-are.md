@@ -516,7 +516,8 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
   a public trace from Alibaba's Qwen service. Two of four rules held;
 - ✅ done 6 Oct: the two older real traces (R1, R2) re-run on the checked timing model
   (finding 31);
-- then: make the target with both speeds the default (its check has passed);
+- ✅ done 7 Oct: the tool now sizes for both speeds by default — the first word within 2 seconds
+  and each further word within 100 ms. One option (`--tpot-slo-ms 0`) gives the old behaviour;
 - ✅ decided 6 Oct: H6 is **not** re-run. It was tested on the first timing model only and is
   labelled so. What followed from it ("calibrate your own GPU") is built, and C3 and C4 measured
   the same thing more directly;
