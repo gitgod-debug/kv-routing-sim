@@ -45,6 +45,11 @@ from pathlib import Path
 
 from ..cache.capacity import SHAPES, kv_blocks_for
 
+# The six coefficients of the timing model above. Everything else in a profile is capacity or
+# provenance: a second calibration of the same engine changes these and nothing else.
+TIMING_FIELDS = ("prefill_base_s", "prefill_per_token_s", "prefill_attn_s", "decode_base_s",
+                 "decode_per_seq_s", "decode_per_ctx_token_s")
+
 
 @dataclass(frozen=True, slots=True)
 class CostProfile:
@@ -161,10 +166,8 @@ def replicate_profiles(spec: str | Path) -> list[CostProfile]:
     if not reps:
         return []
     base = _profile_from_json(text, str(spec))
-    timing = ("prefill_base_s", "prefill_per_token_s", "prefill_attn_s", "decode_base_s",
-              "decode_per_seq_s", "decode_per_ctx_token_s")
     return [replace(base, name=f"{base.name}#repeat{r.get('rep', i)}",
-                    **{k: float(r[k]) for k in timing})
+                    **{k: float(r[k]) for k in TIMING_FIELDS})
             for i, r in enumerate(reps)]
 
 
