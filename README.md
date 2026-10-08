@@ -41,8 +41,9 @@ repo was written down before it ran — the ones that failed too.
 ## The finding
 
 > **Keep each user on one GPU.** On three calibrations of the same T4, session-sticky routing needs
-> the fewest GPUs — or ties for them — at every load with one shared system prompt and with four, and
-> it never needs more than round-robin or least-loaded anywhere. **Whether routing by prefix then
+> the fewest GPUs of the six policies in the registered grid — or ties for them — at every load
+> with one shared system prompt and with four, and it never needs more than round-robin or
+> least-loaded anywhere. **Whether routing by prefix then
 > saves GPUs, once tenants' prompts outgrow the cache, is not settled:** the registered test said no
 > on one calibration and yes on the two others. Read every GPU count here as ± one.
 
