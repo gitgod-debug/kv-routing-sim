@@ -286,12 +286,16 @@ path."
 
 - [x] `NormalizedRequest` + `SCHEMA_VERSION` (pydantic). Fields: request id, arrival ts, session id,
       block hashes, prompt/output token counts
-- [~] `hashing.py` — hash-chain rule implemented and unit-tested (blake2b for cross-process
-      determinism; partial trailing blocks never shared). ⛔ **Still owed: verification against the
-      engine's OBSERVED behaviour.** Right now it matches the documentation, which is exactly the
-      thing `Mike-Ew` did
+- [x] `hashing.py` — hash-chain rule implemented and unit-tested (blake2b for cross-process
+      determinism; partial trailing blocks never shared). ✅ **Verified against the engine's
+      observed behaviour in Phase 3 (2026-09-22):** on two workloads the model reproduced every
+      request's cached-token count on a live vLLM, three runs each — which is what the hash-chain
+      rule and the partial-block rule decide. *(Until then it matched the documentation only.)*
 - [x] Adapters: vLLM JSONL · OpenAI-style request log · (SGLang if a sample is obtainable)
-- [x] **Stream, never load.** A trace must not be read into RAM; state the tested ceiling
+- [x] **Adapters stream, and prompt text is never held.** Each adapter is a generator and hashes at
+      its boundary. ⚠️ A sweep does keep the hashed records in memory — it replays them many times
+      — and the tested ceiling is stated: 537 MiB of block hashes at 80,000 requests (README, *What
+      breaks at 10× and 100×*)
 - [x] **The agentic generator** — with **prefix-sharing ratio as an explicit parameter**. ⭐ It reports
       **cross-session sharing** and **total block reuse** SEPARATELY: within-session history reuse is
       captured by session-stickiness for free, so using total reuse as the H2 axis would hide the
@@ -491,7 +495,8 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       a new pre-registered GPU run, never a re-fit to W3
 - [x] Seven policies, one file each, behind one interface (ADR-003), every tie from a seeded RNG
 - [x] `sim/` — replica with memory-based admission and preemption, fitted cost, fleet event loop
-- [~] Sweep policy × replicas 1–8 on ≥2 traces — ✅ two generated shapes × six loads. **Real traces found
+- [x] Sweep policy × replicas 1–8 on ≥2 traces — ✅ two generated shapes × six loads, then three
+      real trace families (the third, Qwen-Bailian, in R3 on 2026-10-06). **Real traces found
       2026-09-23** (`FLAGSHIP_PROJECTS.md`): SemiAnalysis **AgentX** (64-token block hashes, scoped to the
       session) and **Mooncake** FAST'25 (512-token block hashes, global). ✅ **Mooncake done 2026-09-28**:
       the `mooncake` adapter (sessions inferred; Apache-2.0), R1 registered and run — ⛔ FALSIFIED: on
