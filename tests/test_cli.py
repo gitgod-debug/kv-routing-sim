@@ -72,9 +72,11 @@ def test_replay_on_the_calibrated_profile_carries_it_to_the_output(tmp_path):
     trace = tmp_path / "t.jsonl"
     main(["generate", "--out", str(trace), "--sessions", "10", "--turns", "2"])
     out = tmp_path / "r.json"
+    # The first-token target alone: this test is about the profile, and with the per-token half
+    # on (the default) nothing meets the SLO on 2 replicas, so no rupee figure would be defined.
     rc = main(["replay", str(trace), "--replicas", "2", "--seeds", "1", "--format", "json",
                "--profile", PROFILE, "--cost-model", "configs/cost_model.yaml",
-               "--out", str(out)])
+               "--tpot-slo-ms", "0", "--out", str(out)])
     assert rc == 0
     payload = json.loads(out.read_text())
     assert payload["profile"]["calibrated"] is True
@@ -161,28 +163,46 @@ def test_crossover_sweep_reports_the_measured_axis_not_the_knob():
     assert rows[1]["cross_session_sharing"] > rows[0]["cross_session_sharing"]
 
 
-def test_replay_shows_the_time_per_token_and_says_whether_the_slo_includes_it(tmp_path, capsys):
-    """The report always shows p95 time per output token. Whether it COUNTS is the cost model's
-    choice — and the report says which, so a ✅ on the first token alone cannot pass for both."""
+def test_replay_sizes_on_both_halves_of_the_slo_by_default_and_says_so(tmp_path, capsys):
+    """The report always shows p95 time per output token, and says what "meets the SLO" was decided
+    on. By default that is both halves: the cost model's first-token limit and this command's
+    per-token limit. `--tpot-slo-ms 0` sizes on the first token alone, and a cost model that sets
+    its own per-token limit keeps it whatever the option says."""
     trace = tmp_path / "t.jsonl"
     main(["generate", "--out", str(trace), "--sessions", "30", "--turns", "3", "--rate", "3"])
     capsys.readouterr()
     args = ["replay", str(trace), "--policies", "session-sticky", "--replicas", "3-4",
             "--seeds", "1", "--profile", CTX_PROFILE]
+    cited = ["--cost-model", "configs/cost_model.yaml"]
 
-    assert main([*args, "--cost-model", "configs/cost_model.yaml"]) == 0
+    assert main([*args, *cited]) == 0
+    default = capsys.readouterr().out
+    assert "p95 ms per token" in default
+    assert "AND p95 time per output token ≤ 100 ms" in default
+    assert "The per-token limit is this command's" in default
+    assert "the SLO (p95 TTFT and p95 time per output token)" in default
+
+    assert main([*args, *cited, "--tpot-slo-ms", "0"]) == 0
     first_only = capsys.readouterr().out
-    assert "p95 ms per token" in first_only
     assert "shown but NOT part of it" in first_only
     assert "meeting the p95 TTFT SLO" in first_only
+
+    assert main([*args, *cited, "--tpot-slo-ms", "250"]) == 0
+    looser = capsys.readouterr().out
+    assert "AND p95 time per output token ≤ 250 ms" in looser
+    # A tighter per-token limit can only take configurations away.
+    assert first_only.count("✅") >= looser.count("✅") >= default.count("✅")
+    assert first_only.count("✅") > default.count("✅")
 
     both = tmp_path / "cost_both.yaml"
     both.write_text(pathlib.Path("configs/cost_model.yaml").read_text().replace(
         "  ttft_p95_ms: 2000\n", "  ttft_p95_ms: 2000\n  tpot_p95_ms: 100\n"))
     out = tmp_path / "r.json"
-    assert main([*args, "--cost-model", str(both), "--format", "json", "--out", str(out)]) == 0
+    assert main([*args, "--cost-model", str(both), "--tpot-slo-ms", "0",
+                 "--format", "json", "--out", str(out)]) == 0
     payload = json.loads(out.read_text())
     assert "AND p95 time per output token ≤ 100 ms" in payload["slo"]
+    assert "this command's" not in payload["slo"]  # the limit is the cost model's own
     for p in payload["points"]:
         assert p["p95_tpot_ms"] > 0
         # The flag is the conjunction of the two halves — never the first-token half alone.

@@ -42,8 +42,10 @@ The first public version: planned for PyPI before 2026-11-20.
 - **Time per output token.** Every run now also measures each request's time per output token
   (last token − first token, over the tokens after the first — MLPerf's TPOT, vLLM's
   `request_time_per_output_token`), and `kvsim replay` prints its p95 beside the first-token
-  latency. A cost model may add `tpot_p95_ms` under `slo:` to make it the second half of the SLO;
-  without that key nothing is enforced on it and every earlier result is unchanged.
+  latency. **`kvsim replay` sizes on both halves by default:** beside the cost model's first-token
+  limit it applies p95 ≤ 100 ms per output token (`--tpot-slo-ms`; `0` sizes on the first token
+  alone), unless the cost model sets its own `tpot_p95_ms` under `slo:`. The library and the
+  shipped cost model are unchanged, so every registered result is what it was (ADR-013).
 - **`kvsim generate`** (agentic traffic with shared prompts, including many tenants) and
   **`kvsim crossover`** (sharing × load).
 - **Shipped data:** the context-aware T4 profile C2 validated (`--profile
@@ -66,8 +68,8 @@ The first public version: planned for PyPI before 2026-11-20.
   `kvsim calibrate` gave a replica count outside a run's own range in 18% of cases; 5% with the
   range widened by one replica each way. Size for the top of the range, plus one — `kvsim replay`
   says this itself beside its recommendation.
-- The default latency target is on the first token only (p95 TTFT). The per-token half
-  (`slo.tpot_p95_ms`) is optional and off by default. Its model was checked on a live T4 (C4):
+- **The README's tables are first-token counts; `kvsim replay`'s default target has both
+  halves**, and needs about twice the GPUs. The per-token model was checked on a live T4 (C4):
   p95 time per output token within 7% on three workloads around a 100 ms limit — on one replica.
   At the knee of the load curve it is 1.5–1.7× too slow (T1): decode steps of very large batches
   are 12–15% faster than the fitted line, and the knee multiplies that.

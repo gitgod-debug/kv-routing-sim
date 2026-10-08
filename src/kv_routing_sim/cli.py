@@ -14,6 +14,7 @@ that refuses to start.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import sys
 from pathlib import Path
@@ -114,16 +115,37 @@ def _firmness(row: dict[str, Any], spread: dict[str, Any]) -> str:
             "larger, plus one")
 
 
-def _slo_sentence(cost: CostModel | None) -> str | None:
+# ⭐ THE PER-TOKEN HALF IS ON BY DEFAULT IN `kvsim replay` (2026-10-07). The MLPerf row that the 2 s
+# first-token limit is cited from reads "TTFT/TPOT: 2000 ms/100 ms". Sizing on the first token
+# alone gave counts about half of what a fleet needs to stream at a usable speed (T2), and the
+# per-token model was then checked on a live T4 around this limit (C4: p95 within 7%). The
+# shipped cost model still sets the first half only, so that every registered sweep — they read
+# that file, not this command — means what it meant.
+DEFAULT_TPOT_SLO_MS = 100.0
+
+
+def _with_tpot_default(cost: CostModel | None, tpot_slo_ms: float) -> tuple[CostModel | None, bool]:
+    """The cost model with this command's per-token limit filled in, if it sets none itself.
+    Returns it and whether the limit came from the command. 0 (or less) leaves it off."""
+    if cost is None or cost.tpot_p95_slo_ms is not None or tpot_slo_ms <= 0:
+        return cost, False
+    return dataclasses.replace(cost, tpot_p95_slo_ms=float(tpot_slo_ms)), True
+
+
+def _slo_sentence(cost: CostModel | None, tpot_from_command: bool = False) -> str | None:
     """What "meets SLO" was decided on — and, when the per-token half is off, that it is."""
     if cost is None:
         return None
     if cost.tpot_p95_slo_ms is None:
         return (f"SLO: p95 time to first token ≤ {cost.ttft_p95_slo_ms:,.0f} ms. The time per "
-                "output token is shown but NOT part of it: add `tpot_p95_ms` under `slo:` in the "
-                "cost model to make it so.")
-    return (f"SLO: p95 time to first token ≤ {cost.ttft_p95_slo_ms:,.0f} ms AND p95 time per "
+                "output token is shown but NOT part of it (`--tpot-slo-ms 0`): read these replica "
+                "counts as a lower bound for anything that has to stream at a usable speed.")
+    both = (f"SLO: p95 time to first token ≤ {cost.ttft_p95_slo_ms:,.0f} ms AND p95 time per "
             f"output token ≤ {cost.tpot_p95_slo_ms:,.0f} ms.")
+    if tpot_from_command:
+        both += (" The per-token limit is this command's (`--tpot-slo-ms`; 0 sizes on the first "
+                 "token alone); the cost model sets none.")
+    return both
 
 
 def _markdown(payload: dict[str, Any]) -> str:
@@ -209,7 +231,7 @@ def _markdown(payload: dict[str, Any]) -> str:
 def cmd_replay(args: argparse.Namespace) -> int:
     names = policy_pkg.resolve(args.policies)
     replicas = _parse_replicas(args.replicas)
-    cost = _load_cost(args.cost_model)
+    cost, tpot_from_command = _with_tpot_default(_load_cost(args.cost_model), args.tpot_slo_ms)
     profile = _load_profile(args.profile)
     if args.block_size != profile.block_size:
         # Hashing the trace at one block size and simulating a cache of another would compare
@@ -261,7 +283,7 @@ def cmd_replay(args: argparse.Namespace) -> int:
             "profile": profile.provenance(),
             "points": [p.as_dict() for p in points],
             "recommendation": rec.as_dict(),
-            "slo": _slo_sentence(cost),
+            "slo": _slo_sentence(cost, tpot_from_command),
             "replica_spread": spread,
             "replica_spread_note": spread_note,
         },
@@ -374,6 +396,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="path to a cost_model.yaml, or 'default' for the shipped, cited one")
     r.add_argument("--profile", default=None,
                    help="a profile .json, or a shipped profile's name: t4-qwen3-4b-vllm0.30.0")
+    r.add_argument("--tpot-slo-ms", type=float, default=DEFAULT_TPOT_SLO_MS,
+                   help="the SLO's second half: p95 time per output token allowed, in ms, when the "
+                        "cost model sets no `tpot_p95_ms` itself (default: %(default)g, the limit "
+                        "MLPerf pairs with a 2 s first token). 0 sizes on the first token alone")
     r.add_argument("--format", default="md", choices=("md", "json"))
     r.add_argument("--out", default=None)
     r.add_argument("--no-spread", action="store_true",
