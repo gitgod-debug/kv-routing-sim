@@ -98,3 +98,49 @@ def test_no_edge_check_where_nothing_met_the_slo(tmp_path):
                  "--seeds", "1", "--profile", CTX, "--cost-model", CITED, "--format", "json",
                  "--out", str(report)]) == 0
     assert json.loads(report.read_text())["edge"] is None
+
+
+# ── post hoc: the check against T1's five held-out runs ─────────────────────────────────────────
+
+REPO = __import__("pathlib").Path(__file__).resolve().parents[1]
+POSTHOC = REPO / "artifacts" / "results" / "t1_itl"
+
+
+def _script():
+    import importlib.util
+    import sys
+
+    sys.path.insert(0, str(REPO / "scripts"))
+    spec = importlib.util.spec_from_file_location(
+        "edge_posthoc_t1", REPO / "scripts" / "edge_posthoc_t1.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["edge_posthoc_t1"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_the_post_hoc_table_reproduces_and_separates_the_runs_the_model_got_wrong():
+    """POST HOC, and labelled so: on T1's five held-out runs the 5% slowdown multiplies p95 TTFT
+    by more than five on the two where the simulator's per-token latency was 1.54x and 1.71x the
+    engine's, and by 1.13-1.14 on the three where it was within 1.07x. The module's docstring and
+    the README quote these numbers."""
+    stored = json.loads((POSTHOC / "posthoc_edge.json").read_text())
+    script = _script()
+    fresh = json.loads(json.dumps(script.analyze()))
+    assert {k: stored[k] for k in fresh} == fresh
+    assert stored["post_hoc"] is True and stored["git_dirty"] is False
+    assert (POSTHOC / "posthoc_edge.md").read_text() == script.markdown(stored, stored)
+
+    runs = {(r["session"], r["workload"]): r for r in stored["runs"]}
+    assert len(runs) == 5
+    wrong = [runs[("c2", "K1_half")], runs[("c3", "K1_half")]]
+    right = [runs[("c2", "K64_quarter")], runs[("c3", "K64_quarter")], runs[("c3", "T6_K8")]]
+    assert [r["t1_factor"] for r in wrong] == [1.712, 1.544]
+    assert round(max(r["t1_factor"] for r in right), 2) == 1.07  # "within 1.07x", as T1 reports it
+    assert [r["ttft_factor"] for r in wrong] == [5.469, 5.332]
+    assert [r["ttft_factor"] for r in right] == [1.133, 1.133, 1.14]
+    assert sorted({r["tpot_factor"] for r in stored["runs"]}) == [1.129, 1.134, 1.161, 1.206]
+    assert all(r["flagged_as_knee"] for r in wrong) and not any(r["flagged_as_knee"] for r in right)
+    assert [r["preemptions"] for r in wrong] == [[6, 36], [6, 33]]
+    assert stored["separating_range"] == [1.206, 5.332]
+    assert stored["separating_range"][0] < KNEE_FACTOR < stored["separating_range"][1]

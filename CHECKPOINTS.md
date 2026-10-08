@@ -64,7 +64,9 @@ does not fail on that trace; ✅ SMetric's rule within one of LMetric; ✅ balan
 session-sticky the same everywhere. Reported: with a limit on token speed too, the published
 policies need two to three replicas fewer at the highest load.
 ✅ 7 Oct: `kvsim replay` sizes on both halves of the target by default (`--tpot-slo-ms`, ADR-013).
-▶ **Now:** a warning when a workload is at the knee.
+✅ 8 Oct: `kvsim replay` says whether its recommendation is at the edge or at the knee of the
+fleet's load curve (a 5% slowdown of the timings; post hoc check on T1's five runs).
+▶ **Now:** error bars per cell in the sweep report; then the last check before publishing.
 
 > ## ⚠️ 2026-09-21 — the deployment plan was based on a stale fact. Corrected; see **ADR-011**.
 > Every deployment note here assumed a **free Gradio Space on CPU Basic**. Hugging Face now requires a

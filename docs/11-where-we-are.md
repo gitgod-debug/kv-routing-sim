@@ -521,8 +521,12 @@ Kept here on purpose. Each one was caught by a check we had built for exactly th
 - ✅ decided 6 Oct: H6 is **not** re-run. It was tested on the first timing model only and is
   labelled so. What followed from it ("calibrate your own GPU") is built, and C3 and C4 measured
   the same thing more directly;
-- then: a warning in the tool when a workload is at the edge of a GPU (finding 28 says a number
-  there cannot be trusted), and a few shared-prompt cells in `kvsim calibrate`;
+- ✅ done 8 Oct: the tool now says when its answer sits at the edge of a GPU (finding 28 says a
+  number there cannot be trusted). It runs its own answer again with the GPU 5% slower: if the
+  waiting time grows by 5%, there is room; if it grows by half or more, there is none. On the
+  five real GPU runs we have, that test picks out the two where our model was wrong and none of
+  the three where it was right — checked afterwards, not registered before;
+- later: a few shared-prompt cells in `kvsim calibrate`;
 - later: the PyPI release.
 
 **The preprint (`paper/`) is optional.** It is a 7-page draft that tells the same story as the

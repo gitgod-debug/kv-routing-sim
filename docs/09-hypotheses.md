@@ -2218,3 +2218,34 @@ registered target: 2, 4 and 7 replicas).
   target; with a limit on token speed too they need two to three fewer at the highest load. The
   README now says this beside the finding.
 - **Two of my four predictions failed.** R3a for want of a strict win; R3d outright.
+
+### 2026-10-08 — POST HOC, no GPU: the tool's edge check, on T1's five held-out runs
+Not registered; decides nothing. Script: `scripts/edge_posthoc_t1.py` →
+[`posthoc_edge.md`](../artifacts/results/t1_itl/posthoc_edge.md), from a clean tree at `903ecdd`.
+
+**What was built.** `kvsim replay` now runs its recommended configuration once more with every
+timing coefficient 5% larger — what two calibrations of one engine differ by (C3) — and says how
+far the p95 latencies moved (`eval/edge.py`). With room to spare, 5% in is 5% out. It calls a
+configuration *at the edge* if it stops meeting the SLO, and *at the knee* if a p95 moves by more
+than 1.5×.
+
+**The question.** T1 found the simulator's per-token latency 1.54× and 1.71× the engine's on the
+two held-out runs at the knee, and within 1.07× on the other three. Does the 5% slowdown tell
+those two from the three? The same five replays, with T1's own function, on profile A:
+
+| session · workload | simulator ÷ engine, per token (T1) | p95 TTFT under the 5% slowdown | p95 time per token | preemptions |
+|---|---:|---:|---:|---|
+| c2 · K1_half | 1.71× | ×5.47 (3,277 → 17,923 ms) | ×1.13 | 6 → 36 |
+| c3 · K1_half | 1.54× | ×5.33 (3,278 → 17,475 ms) | ×1.13 | 6 → 33 |
+| c2 · K64_quarter | 1.07× | ×1.13 | ×1.21 | 0 → 0 |
+| c3 · K64_quarter | 1.01× | ×1.13 | ×1.21 | 0 → 0 |
+| c3 · T6_K8 | 1.02× | ×1.14 | ×1.16 | 0 → 0 |
+
+It does: the check flags both runs the simulator got wrong and none of the three it got right.
+
+**What this is worth.** ⚠️ The threshold of 1.5 was chosen after seeing this table; any value
+between 1.21 and 5.33 separates the five. Three distinct workloads, one GPU, one replica. And the
+three "right" runs are not relaxed ones — a 5% slowdown moves them by 13–21%, not by 5% — so the
+check has been shown to tell a saturated replica from a loaded one, and nothing finer. It is an
+indication that the warning points at the right place. A registered test would need held-out
+runs on both sides of a knee that were not looked at first.
