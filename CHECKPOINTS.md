@@ -669,7 +669,10 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       byte-identical to `configs/` (`tests/test_packaging.py`); [`CHANGELOG.md`](CHANGELOG.md) for 0.1.0.
       Left: `--format html`; project URLs in `pyproject.toml`, and absolute image links in the README
       (PyPI shows neither relative links nor `<picture>`), once the repo is public; the PyPI upload
-- [~] ⭐ **`kvsim calibrate`** — expose the Phase-3 harness so a USER can fit a profile to their own GPU
+- [x] ⭐ **`kvsim calibrate`** — ✅ **complete as of C4 (2026-10-06):** the context-aware fit, the
+      repeats and the cache check all worked on a real T4, three runs in a row. *Optional, later:
+      a few decode cells for batches that share a prefix.* The history of the item:
+      expose the Phase-3 harness so a USER can fit a profile to their own GPU
       and model (~30 min). The ADR-010 mechanism, and the answer to *"why trust your numbers on my
       hardware?"* — *"you shouldn't; run this."* Needs the `[calib]` extra.
       🔨 **Built 2026-09-28** ([`calib/calibrate.py`](src/kv_routing_sim/calib/calibrate.py)) — and
