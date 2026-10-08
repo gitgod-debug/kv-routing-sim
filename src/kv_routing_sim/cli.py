@@ -22,6 +22,7 @@ from typing import Any
 
 from . import policies as policy_pkg
 from .eval.cost import CostModel, UnfilledCostModel
+from .eval.edge import edge_check
 from .eval.recommend import recommend
 from .eval.spread import replica_spread
 from .eval.sweep import crossover_sweep, sweep
@@ -148,6 +149,33 @@ def _slo_sentence(cost: CostModel | None, tpot_from_command: bool = False) -> st
     return both
 
 
+def _edge_line(e: dict[str, Any]) -> str:
+    """One line on how close to the edge the recommended configuration sits (eval/edge.py)."""
+    pct = round((e["slowdown"] - 1) * 100)
+
+    def moved(label: str, pair: list, factor: float | None) -> str | None:
+        if factor is None:
+            return None
+        return f"{label} {pair[0]:,.0f} → {pair[1]:,.0f} ms (×{factor:.2f})"
+
+    parts = [m for m in (moved("p95 TTFT", e["p95_ttft_ms"], e["ttft_factor"]),
+                         moved("p95 time per token", e["p95_tpot_ms"], e["tpot_factor"])) if m]
+    what = "; ".join(parts)
+    if e["verdict"] == "knee":
+        return (f"⛔ at the knee: with timings {pct}% slower, {what}. A {pct}% change in the "
+                f"timings moves a p95 by more than {round((e['knee_factor'] - 1) * 100)}%: the "
+                "fleet is close to saturation here, where the simulator's latencies were "
+                "1.5–1.7× off on a live GPU. Do not trust this count: size at least one replica "
+                "higher, and measure.")
+    if e["verdict"] == "edge":
+        return (f"⚠️ at the edge: with timings {pct}% slower this configuration no longer meets "
+                f"the SLO ({what}). Two calibrations of the same GPU differ by that much: allow "
+                "one replica more.")
+    if e["verdict"] == "not_met":
+        return f"with timings {pct}% slower: {what}."
+    return f"not at the edge: with timings {pct}% slower it still meets the SLO ({what})."
+
+
 def _markdown(payload: dict[str, Any]) -> str:
     lines: list[str] = []
     rec = payload.get("recommendation") or {}
@@ -172,6 +200,8 @@ def _markdown(payload: dict[str, Any]) -> str:
         firm = ((payload.get("replica_spread") or {}).get("replicas") or {}).get(r["policy"])
         if firm:
             lines += [_firmness(firm, payload["replica_spread"]), ""]
+        if payload.get("edge"):
+            lines += [_edge_line(payload["edge"]), ""]
         if rec.get("WARNING"):
             lines += [f"> ⚠️ {rec['WARNING']}", ""]
 
@@ -277,6 +307,12 @@ def cmd_replay(args: argparse.Namespace) -> int:
                 "cannot be shown. For scale: three calibrations of our own T4 agreed on a count "
                 "exactly at 71% of points and within one replica at 96%. A profile written by "
                 "`kvsim calibrate` shows its own spread — a floor: allow one replica more.")
+    # How close to the edge? Only where a configuration was recommended because it met an SLO.
+    edge = None
+    if (cost is not None and rec.chosen is not None and rec.chosen.meets_slo
+            and not args.no_edge_check):
+        edge = edge_check(trace, chosen=rec.chosen, seeds=tuple(range(args.seeds)),
+                          profile=profile, cost=cost, trace_info=info)
     _emit(
         {
             "trace": info,
@@ -286,6 +322,7 @@ def cmd_replay(args: argparse.Namespace) -> int:
             "slo": _slo_sentence(cost, tpot_from_command),
             "replica_spread": spread,
             "replica_spread_note": spread_note,
+            "edge": edge,
         },
         args.format,
         args.out,
@@ -402,6 +439,9 @@ def build_parser() -> argparse.ArgumentParser:
                         "MLPerf pairs with a 2 s first token). 0 sizes on the first token alone")
     r.add_argument("--format", default="md", choices=("md", "json"))
     r.add_argument("--out", default=None)
+    r.add_argument("--no-edge-check", action="store_true",
+                   help="skip the check of how close to saturation the recommended configuration "
+                        "sits (one extra run per seed, on timings 5%% slower)")
     r.add_argument("--no-spread", action="store_true",
                    help="skip re-sizing on each repeat of the calibration (one extra sweep per "
                         "repeat); the replica counts are then shown without their spread")
