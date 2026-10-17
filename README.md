@@ -16,7 +16,7 @@ repo was written down before it ran — the ones that failed too.
 | **How** | every test's design, rules and prediction committed before it ran; the failed ones are in [the log](docs/09-hypotheses.md), dated |
 | **Upstream** | a bug in `vllm-project/guidellm`'s trace replay, found while calibrating (one token lost per block with tokenizers that add a start token) — fix and test ready in [`docs/upstream/`](docs/upstream/), **not yet submitted** |
 
-> ## 🚧 Status (2026-10-06)
+> ## 🚧 Status (2026-10-18)
 > **Checked on a live T4, each test registered first:** the cache model (Phase 3, Phase 6), the
 > first-token timing (C2, C3), the per-token timing around the limit (C4), and `kvsim calibrate`
 > itself with its repeats (C1, C3, C4).
@@ -31,8 +31,9 @@ repo was written down before it ran — the ones that failed too.
 > **Not new.** The routing result was published first (SMetric, LMetric), and NVIDIA ships a larger
 > simulator for the same question — see the note under the finding, and the scope section.
 >
-> **Not released yet.** The package is not on PyPI and the repository's demo page is not
-> published; both are prepared. Every number still written as `TBD — not yet measured` **is exactly
+> **The demo page is live; the package is not on PyPI yet.** The demo:
+> [gitgod-debug.github.io/kv-routing-sim](https://gitgod-debug.github.io/kv-routing-sim/). Until the package is uploaded, install it from
+> a clone (see Install). Every number still written as `TBD — not yet measured` **is exactly
 > that**; see the honesty gates in [`CHECKPOINTS.md`](CHECKPOINTS.md). Start at
 > [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
 
@@ -148,7 +149,7 @@ Every hit rate matched within 1.4%, in the predicted order. The first timing mod
 ([Phase 6](artifacts/results/phase6_kaggle_t4/report.md) ·
 [post-hoc replay](artifacts/results/c2_kaggle_t4/posthoc_phase6.md)).
 
-**See it yourself:** the demo page ([`site/`](site/index.html)) looks up every point of the re-test's
+**See it yourself:** the [demo page](https://gitgod-debug.github.io/kv-routing-sim/) ([`site/`](site/index.html)) looks up every point of the re-test's
 grid — prompts × load (0.25–4 sessions/s) × replicas (1–16) × six policies, 6,912 simulator runs,
 rebuilt by [`scripts/build_grid.py`](scripts/build_grid.py) only if it reproduces the registered table
 exactly. To open it from a clone: `python -m http.server` in the repo root, then
@@ -450,7 +451,7 @@ The GPU appears **once**, on our calibration box, offline, before anything is pu
 deployed is pure CPU Python:
 
 - **PyPI** — on your machine. The real usage path.
-- **A static demo page** — a precomputed grid with selectors, so you can see the recommendation change
+- **A static demo page**, [live on GitHub Pages](https://gitgod-debug.github.io/kv-routing-sim/) — a precomputed grid with selectors, so you can see the recommendation change
   with the prompts and the load in ten seconds, with nothing installed. No server, so **nothing to wake up**, and every number on it comes
   from a committed script with a pinned seed. It is a **shop window, not a service**. ⛔ It deliberately
   does not accept uploaded production traces: those are your users' prompts, and they belong on your
@@ -541,7 +542,7 @@ delete it and get it back, it doesn't ship.**
 | [`docs/12-story-notes.md`](docs/12-story-notes.md) | Short pieces written to be told, each with its proof linked — starting with the day the finding changed |
 | [`CHECKPOINTS.md`](CHECKPOINTS.md) | Where the build actually is |
 
-**Sibling project:** [`colpali-lite`](../colpali-economics) — the same method (cost and tail latency under a
+**Sibling project:** `colpali-lite`, not public yet — the same method (cost and tail latency under a
 configuration choice, bootstrap CIs, an explicit cost model, reported as ₹ per unit of useful work) applied
 to late-interaction retrieval instead of LLM serving. Serving economics is systematically under-measured in
 ML systems: mean latency, no cost axis, no error bars.

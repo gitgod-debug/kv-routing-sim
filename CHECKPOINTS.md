@@ -667,8 +667,8 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       and runs `kvsim replay` from outside the repo — it now ships the measured T4 profile
       (`--profile t4-qwen3-4b-vllm0.30.0`) and the cited cost model (`--cost-model default`),
       byte-identical to `configs/` (`tests/test_packaging.py`); [`CHANGELOG.md`](CHANGELOG.md) for 0.1.0.
-      Left: `--format html`; project URLs in `pyproject.toml`, and absolute image links in the README
-      (PyPI shows neither relative links nor `<picture>`), once the repo is public; the PyPI upload
+      Left: `--format html`; absolute image links in the README (PyPI shows neither relative links
+      nor `<picture>`); the PyPI upload. ✅ 2026-10-18: the project URLs are in `pyproject.toml`
 - [x] ⭐ **`kvsim calibrate`** — ✅ **complete as of C4 (2026-10-06):** the context-aware fit, the
       repeats and the cache check all worked on a real T4, three runs in a row. *Optional, later:
       a few decode cells for batches that share a prefix.* The history of the item:
@@ -803,6 +803,9 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       `.github/workflows/pages.yml` publishes `site/` + the grid on every push to `main` that touches
       them. **Manual step:** push the repo to GitHub, then Settings → Pages → Source: *GitHub
       Actions*; the Static Space needs a Hugging Face account (upload the same two files)
+      ✅ **2026-10-18: GitHub Pages is live** at https://gitgod-debug.github.io/kv-routing-sim/, deployed by the workflow from
+      `main`; the page and both grids are served byte-identical to the repository. Left: the Static
+      Space
 - [x] ⭐ **The same curve images and calibration table go IN THE README**, for the reader who never
       leaves GitHub. *(No longer a workaround for cold starts — a static page does not sleep — just
       belt-and-braces.)*
@@ -884,8 +887,10 @@ Check every one before anything is published.
 >   wheel installs into an empty environment with PyYAML alone, and `kvsim generate` and
 >   `kvsim replay` run from it. The licence field uses the current form (SPDX).
 > - 377 tests pass; the linter is clean.
-> - **Left for the day of publishing:** the repository links in the README, the demo page and
->   `pyproject.toml`; the search above once more; the upstream PR's own gate, last in this list.
+> - **2026-10-18, the day the repository went public:** the repository links are in the README,
+>   the demo page and `pyproject.toml`; the search above was run once more and found no claim,
+>   only denials and technical uses of the words. Left: the upstream PR's own gate, last in this
+>   list.
 
 - [ ] **No number in the README that was not measured.** Placeholders are marked `TBD — not yet measured`
       and are never quietly replaced by a plausible figure
