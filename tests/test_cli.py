@@ -67,8 +67,7 @@ CTX_PROFILE = "configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json"
 
 
 def test_replay_on_the_calibrated_profile_carries_it_to_the_output(tmp_path):
-    """The fitted T4 profile must reach the sweep AND the output file. (Before Phase 4 the replay
-    command ignored any profile and wrote the uncalibrated one into its output regardless.)"""
+    """The fitted T4 profile reaches both the sweep and the output file."""
     trace = tmp_path / "t.jsonl"
     main(["generate", "--out", str(trace), "--sessions", "10", "--turns", "2"])
     out = tmp_path / "r.json"
@@ -178,21 +177,21 @@ def test_replay_sizes_on_both_halves_of_the_slo_by_default_and_says_so(tmp_path,
     assert main([*args, *cited]) == 0
     default = capsys.readouterr().out
     assert "p95 ms per token" in default
-    assert "AND p95 time per output token ≤ 100 ms" in default
+    assert "and p95 time per output token ≤ 100 ms" in default
     assert "The per-token limit is this command's" in default
     assert "the SLO (p95 TTFT and p95 time per output token)" in default
 
     assert main([*args, *cited, "--tpot-slo-ms", "0"]) == 0
     first_only = capsys.readouterr().out
-    assert "shown but NOT part of it" in first_only
+    assert "shown but not part of it" in first_only
     assert "meeting the p95 TTFT SLO" in first_only
 
     assert main([*args, *cited, "--tpot-slo-ms", "250"]) == 0
     looser = capsys.readouterr().out
-    assert "AND p95 time per output token ≤ 250 ms" in looser
+    assert "and p95 time per output token ≤ 250 ms" in looser
     # A tighter per-token limit can only take configurations away.
-    assert first_only.count("✅") >= looser.count("✅") >= default.count("✅")
-    assert first_only.count("✅") > default.count("✅")
+    assert first_only.count("| yes |") >= looser.count("| yes |") >= default.count("| yes |")
+    assert first_only.count("| yes |") > default.count("| yes |")
 
     both = tmp_path / "cost_both.yaml"
     both.write_text(pathlib.Path("configs/cost_model.yaml").read_text().replace(
@@ -201,11 +200,11 @@ def test_replay_sizes_on_both_halves_of_the_slo_by_default_and_says_so(tmp_path,
     assert main([*args, "--cost-model", str(both), "--tpot-slo-ms", "0",
                  "--format", "json", "--out", str(out)]) == 0
     payload = json.loads(out.read_text())
-    assert "AND p95 time per output token ≤ 100 ms" in payload["slo"]
+    assert "and p95 time per output token ≤ 100 ms" in payload["slo"]
     assert "this command's" not in payload["slo"]  # the limit is the cost model's own
     for p in payload["points"]:
         assert p["p95_tpot_ms"] > 0
-        # The flag is the conjunction of the two halves — never the first-token half alone.
+        # Meeting the SLO requires both halves, not only the first-token one.
         assert p["meets_slo"] == (p["p95_ttft_ms"] <= 2000 and p["p95_tpot_ms"] <= 100)
     # On this traffic the per-token half is the one that binds: the first token is in time on
     # both replica counts, the tokens after it are not.

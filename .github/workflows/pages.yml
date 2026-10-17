@@ -1,12 +1,17 @@
-# The static demo on GitHub Pages. No server and no build step: the page (site/) and the grid that
-# scripts/build_grid.py committed are copied side by side and published as they are (ADR-011).
-# One-time setup, by hand: repository Settings → Pages → Source: "GitHub Actions".
+# Publishes the static site to GitHub Pages: the pages in site/, the demo grids, and a wheel of the
+# package that the in-browser runner installs. Repository setting: Pages source = GitHub Actions.
 name: pages
 
 on:
   push:
     branches: [main]
-    paths: ["site/**", "artifacts/results/demo_grid*.json", ".github/workflows/pages.yml"]
+    paths:
+      - "site/**"
+      - "src/**"
+      - "pyproject.toml"
+      - "artifacts/results/demo_grid*.json"
+      - "scripts/build_site.py"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -26,10 +31,11 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Put the page and its grid side by side
-        run: |
-          mkdir -p _site
-          cp site/index.html artifacts/results/demo_grid.json artifacts/results/demo_grid_ctx.json _site/
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Build the site
+        run: python scripts/build_site.py --out _site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

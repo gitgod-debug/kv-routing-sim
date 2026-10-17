@@ -1,16 +1,7 @@
-"""Frontier + an SLO -> ONE policy, ONE replica count, and a rupee delta against the baseline.
+"""Turn sweep points and an SLO into one policy, one replica count and a cost delta.
 
-⛔ THE GUARD THAT MATTERS MOST IN THIS FILE: a recommendation built from an UNCALIBRATED profile is
-never presented as a prediction. ADR-010 splits the claim into tiers, and this is where the split is
-enforced in code rather than in a README sentence someone might forget to write:
-
-    calibrated   -> policy, replica count, and absolute latency/cost figures
-    uncalibrated -> policy and replica count ONLY, carrying an explicit warning that the
-                    latency and rupee numbers are shapes, not predictions
-
-H6 is what licenses even the first line: it predicts the policy RANKING survives a change of
-hardware. Until H6 is tested, the uncalibrated recommendation is a hypothesis about a hypothesis,
-and it says so.
+A recommendation from an uncalibrated profile carries a warning that its latency and rupee figures
+are not predictions (ADR-010); only a calibrated profile supports absolute figures.
 """
 
 from __future__ import annotations
@@ -30,9 +21,8 @@ class Recommendation:
     replica_delta: int | None
     calibrated: bool
     frontier_size: int
-    # Other policies that hold the SLO on the SAME number of replicas. Between those, the rupee gap
-    # is throughput noise (H6 found one choice made on a 0.1% difference), so they are reported as
-    # ties instead of being hidden behind the pick.
+    # Other policies that meet the SLO on the same number of replicas. The cost gap between them is
+    # throughput noise, so they are reported as ties rather than hidden behind the pick.
     tied_with: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
@@ -51,9 +41,9 @@ class Recommendation:
         if not self.calibrated:
             out["WARNING"] = (
                 "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost "
-                "profile and are NOT predictions for any real fleet. The recommended POLICY and "
-                "REPLICA COUNT depend on the hardware too: H6 found the full ranking moves with it "
-                "(only the direction of the prompt-count flip held). Measure your own profile."
+                "profile, not predictions for any real fleet. The recommended policy and replica "
+                "count depend on the hardware too: the full ranking of policies changes with it. "
+                "Measure your own profile with kvsim calibrate."
             )
         return out
 
@@ -61,17 +51,18 @@ class Recommendation:
 def recommend(
     points: list[Point], *, baseline_policy: str = "round-robin", slo: str = "p95 TTFT SLO"
 ) -> Recommendation:
-    """Cheapest configuration that meets the SLO; fall back to the lowest p95 if none does.
+    """Pick the cheapest configuration that meets the SLO, else the one with the lowest p95 TTFT.
 
-    `slo` names the SLO in the reason given — `CostModel.slo_label`, when it has two halves."""
+    Args:
+        slo: The SLO's name as used in the reason, normally `CostModel.slo_label`.
+    """
     front = frontier(points)
     calibrated = all(p.calibrated for p in points) and bool(points)
 
     if not points:
         return Recommendation(None, None, "no results", None, None, False, 0)
 
-    # Three genuinely different situations. Collapsing the first two — reporting "nothing met the
-    # SLO" when no SLO was ever supplied — would be a false statement about the result.
+    # Three different cases: "no SLO was supplied" must not be reported as "nothing met the SLO".
     no_slo_defined = all(p.meets_slo is None for p in points)
     feasible = [p for p in points if p.meets_slo and p.inr_per_1k != float("inf")]
     ties: tuple[str, ...] = ()
@@ -88,8 +79,7 @@ def recommend(
         ties = tuple(sorted({p.policy for p in feasible
                              if p.n_replicas == chosen.n_replicas and p.policy != chosen.policy}))
     else:
-        # A real failure: an SLO existed and nothing met it. Say so rather than quietly relaxing
-        # the constraint and presenting the result as though it had passed.
+        # An SLO was given and nothing met it: say so rather than relax the constraint.
         chosen = min(points, key=lambda p: (p.p95_ttft_ms, p.n_replicas))
         reason = (
             f"NO configuration met the {slo} — showing the lowest-p95 option. "

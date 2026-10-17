@@ -1,57 +1,11 @@
-"""`kvsim calibrate` — fit a timing profile to YOUR engine, and measure how well the cache model
-predicts it.
+"""`kvsim calibrate`: fit a timing profile to a live vLLM engine and check the cache model on it.
 
     kvsim calibrate --engine http://localhost:8000 --out configs/profiles/mine.json
 
-⭐ WHY THIS EXISTS. H6's ranking half was falsified (docs/09, 2026-09-28): rescale the T4's speed
-and the order of the policies moves (Kendall's tau-b down to 0.51), so a replica count measured on
-our T4 is not a replica count for your GPU. The direction of the finding transfers; the numbers do
-not. The honest answer to "why trust your numbers on my hardware?" is "don't — measure; it takes
-minutes".
-
-What it needs: a running vLLM (V1) with prefix caching on, reachable over HTTP. The GPU never has to
-be on this machine, and nothing beyond the standard library is used (the core install stays
-pyyaml-only, ADR-009).
-
-Three steps — the procedure C2 registered and validated on a real T4 (docs/09, 2026-09-30):
-  1. DECODE. Batches of b concurrent requests with prompts of several context lengths L. A request's
-     step is the mean gap from its `skip`-th streamed token to its last; a cell's, the median over
-     the batch. A cell that preempted is not used.
-  2. PREFILL. Sequential requests with 1 output token: cold prompts of spread lengths, AND new
-     tokens after a cached prefix (a warm request of c tokens, then c + n with the same first c).
-     ⚠️ The cached-prefix cells are not optional detail. Agentic traffic is mostly "a long cached
-     prefix, few new tokens", and cold prompts never measure that case: fitted on C2's cold cells
-     alone, the same model mispredicted a held-out p95 by 5.7–7.2×; with the cached-prefix cells,
-     both held-out workloads came within 1.36× (scripts/c3_precheck.py; docs/09, 2026-10-01).
-     Both are fitted to the context-aware model of `calib/fit.py`, by least squares with every
-     coefficient ≥ 0: decode(b, S) = d0 + d1·b + d2·S, prefill(n, c) = p0 + p1·n + p2·n·(c + n/2).
-     One decode step is taken out of each TTFT first (the simulator emits the first token at the END
-     of the step that prefills). Until 2026-09-30 this was a straight line with no context term — C2
-     showed that line up to 7× optimistic on long prompts.
-  3. CHECK. A small agentic workload with shared prefixes, sent one request at a time. The
-     engine's own prefix-cache counters against the simulator's prediction with the fitted
-     profile. The relative hit-rate error goes into the profile. Above --max-error, the profile is
-     written but NOT marked calibrated, and the command exits 1.
-
-⚠️ What the check can and cannot show. It is sized to fit the cache, so it tests the units, the
-block size, the partial-block rule and prefix matching on YOUR engine — the things that broke in
-Phase 0 — but not eviction under pressure. That was tested once, on vLLM 0.30.0 (Phase 3: exact); a
-different engine version is exactly where it could stop holding.
-
-⚠️ What the timings cover. By default prompts of up to 2,048 tokens and decode contexts of up to
-1,024 — the range C2 validated. Longer prompts are an extrapolation of the fitted curve: if your
-traffic is longer, measure there (--prefill-lengths, --prefill-cached, --decode-contexts).
-
-⭐ HOW FIRM IS THE FIT? Every timing cell is measured `--reps` times (3), and the profile carries,
-beside the fit on all of it, the fit on EACH repeat alone (`_source.replicates`). C3 ran this
-command twice on one engine, 25 minutes apart: the coefficients differed by 3–5%, and for a
-workload at the knee of the load curve that moved a predicted p95 from 1.08× the measured one to
-4.17×. One fit hides that; `kvsim replay` re-runs its sizing on each repeat's fit and shows the
-range of replica counts next to the one it recommends. The range is what THIS calibration's own
-repeats disagree by — a floor on the uncertainty, not a confidence interval.
-
-⛔ The KV capacity is READ, never estimated: `vllm:cache_config_info` in /metrics, else GET
-/server_info, else --kv-blocks. On the T4 an estimate from memory arithmetic was 56% too high.
+Timings measured on one GPU do not transfer to another (ADR-010), so the command measures the engine
+it is given: a vLLM V1 server with prefix caching, reached over HTTP using only the standard library
+(ADR-009). It probes the engine, fits decode and prefill timings with `calib/fit.py`, and checks the
+cache model's hit rate against the engine's prefix-cache counters.
 """
 
 from __future__ import annotations
@@ -82,7 +36,7 @@ from .fit import fit_decode, fit_prefill
 # Llama put theirs above 128,000) and above the byte and control range; --token-range overrides it.
 DEFAULT_TOKEN_RANGE = (1_000, 30_000)
 DEFAULT_PREFILL_LENGTHS = (64, 128, 256, 512, 768, 1024, 1536, 2048)
-# Prefill after a cached prefix: c cached tokens, then n new ones — the cells of C2's part B.
+# Prefill after a cached prefix: c cached tokens, then n new ones.
 DEFAULT_PREFILL_CACHED = (256, 768, 1280)
 DEFAULT_PREFILL_NEW = (64, 256, 704)
 DEFAULT_DECODE_BATCHES = (1, 2, 4, 8, 16)
@@ -91,15 +45,14 @@ DECODE_SKIP_TOKENS = 8  # gaps are timed from this token on: past every prefill 
 
 
 class CalibrationError(RuntimeError):
-    """A precondition failed. Stop before any number is written (ADR-004)."""
-
-
-# ── the engine, over HTTP ─────────────────────────────────────────────────────────────────────
+    """A precondition failed; raised before any number is written (ADR-004)."""
 
 
 def metric(text: str, family: str, **labels: str) -> float | None:
-    """Sum a family over matching labels. None = ABSENT, which is not the same as 0.
-    prometheus_client appends _total to counters, so both spellings match."""
+    """Sum a metric family over the samples matching `labels`, or return None if there are none.
+
+    prometheus_client appends `_total` to counters, so both spellings match.
+    """
     lab = "".join(f'(?=[^}}]*{k}="{v}")' for k, v in labels.items())
     pat = re.compile(r"^" + re.escape(family) + r"(?:_total)?\{" + lab + r"[^}]*\}\s+(\S+)",
                      re.MULTILINE)
@@ -119,7 +72,7 @@ def _counters(text: str) -> dict[str, float | None]:
 
 
 class Engine:
-    """A running vLLM server. Every call has a timeout; nothing here retries silently."""
+    """A running vLLM server, reached over HTTP. Every call has a timeout and none retries."""
 
     def __init__(self, base: str, *, timeout_s: float = 600.0, poll_s: float = 0.5) -> None:
         self.base = base.rstrip("/")
@@ -146,7 +99,7 @@ class Engine:
         return body
 
     def stream(self, model: str, ids: list[int], max_tokens: int) -> dict[str, Any]:
-        """One streamed completion: when it was sent, when each chunk arrived, and the usage."""
+        """Run one streamed completion and record its send time, chunk arrival times and usage."""
         body = {"model": model, "prompt": ids, "max_tokens": max_tokens, "temperature": 0.0,
                 "ignore_eos": True, "stream": True, "stream_options": {"include_usage": True}}
         req = urllib.request.Request(self.base + "/v1/completions", data=json.dumps(body).encode(),
@@ -179,8 +132,10 @@ class Engine:
 
 
 def settled_metrics(engine: Engine, *, max_wait_s: float = 180.0) -> str:
-    """Scrape once nothing is running or waiting AND the counters have stopped moving. Stats reach
-    /metrics a moment after the tokens they describe; an early read under-counts."""
+    """Scrape /metrics once nothing is running or waiting and the counters have stopped moving.
+
+    Stats reach /metrics a moment after the tokens they describe, so an early read under-counts.
+    """
     t0, prev = time.monotonic(), None
     while True:
         text = engine.metrics()
@@ -198,9 +153,6 @@ def settled_metrics(engine: Engine, *, max_wait_s: float = 180.0) -> str:
 def _delta(before: str, after: str, key: str) -> float:
     b, a = _counters(before)[key], _counters(after)[key]
     return (a or 0.0) - (b or 0.0)
-
-
-# ── step 0: what is this engine? ──────────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -238,7 +190,11 @@ def _as_int(value: Any) -> int | None:
 
 def probe(engine: Engine, *, model: str | None = None, kv_blocks: int | None = None,
           block_size: int | None = None, max_num_seqs: int | None = None) -> EngineInfo:
-    """Everything the fit needs to know about the engine — each value read from it, or passed in."""
+    """Read what the fit needs to know about the engine; values passed in take precedence.
+
+    The KV capacity comes from `kv_blocks`, else `vllm:cache_config_info` in /metrics, else
+    `GET /server_info`, and is never estimated from memory arithmetic.
+    """
     code, _ = engine.request("GET", "/health")
     if code != 200:
         raise CalibrationError(f"the engine at {engine.base} is not healthy (GET /health: {code})")
@@ -313,11 +269,12 @@ def probe(engine: Engine, *, model: str | None = None, kv_blocks: int | None = N
                       notes)
 
 
-# ── steps 1 and 2: the timing fit ─────────────────────────────────────────────────────────────
-
-
 def ols(xs: list[float], ys: list[float]) -> dict[str, float]:
-    """Least squares: slope, intercept and R². Fails loudly on fewer than two distinct x values."""
+    """Fit a least-squares line and return its slope, intercept, point count and R^2.
+
+    Raises:
+        CalibrationError: If there are fewer than two distinct x values.
+    """
     if len(set(xs)) < 2:
         raise CalibrationError(f"a line needs at least two distinct points, got {sorted(set(xs))}")
     slope, intercept = statistics.linear_regression(xs, ys)
@@ -333,7 +290,7 @@ def _prompt(rng: random.Random, n: int, token_range: tuple[int, int]) -> list[in
 
 
 def _check(rec: dict[str, Any], prompt_tokens: int, max_tokens: int) -> str | None:
-    """Why a response cannot be used, or None."""
+    """Return why a response cannot be used, or None if it can."""
     u = rec["usage"] or {}
     if rec["error"]:
         return rec["error"]
@@ -350,10 +307,16 @@ def measure_prefill(engine: Engine, info: EngineInfo, rng: random.Random, *,
                     lengths: tuple[int, ...], reps: int, token_range: tuple[int, int],
                     cached: tuple[int, ...] = (), new: tuple[int, ...] = (),
                     notes: list[str] | None = None) -> list[dict[str, float]]:
-    """(prompt tokens, uncached tokens, TTFT) from sequential prompts with one output token: cold
-    prompts of each length, then `new` tokens after each `cached` prefix, which its own request
-    warms first. The cached tokens are the engine's own report; without one, the designed prefix
-    is assumed."""
+    """Measure TTFT from sequential prompts with one output token.
+
+    Cold prompts of each length come first, then `new` tokens after each `cached` prefix, which a
+    request of its own warms first. Agentic traffic is mostly a long cached prefix with few new
+    tokens, which cold prompts never measure. The cached-token count is the engine's own report, or
+    the warmed prefix when the engine gives none.
+
+    Returns:
+        One dict per request with "rep", "prompt_tokens", "uncached_tokens" and "ttft_s".
+    """
     cap = info.max_model_len - 8
     lengths = tuple(sorted({min(n, cap) for n in lengths if n > 0}))
     prefixes = tuple(sorted({c - c % info.block_size for c in cached if c >= info.block_size}))
@@ -395,10 +358,13 @@ def measure_decode(engine: Engine, info: EngineInfo, rng: random.Random, *,
                    batches: tuple[int, ...], contexts: tuple[int, ...], output_tokens: int,
                    token_range: tuple[int, int], skip: int = DECODE_SKIP_TOKENS,
                    reps: int = 1) -> list[dict[str, Any]]:
-    """For each context length L and batch size b that fit the cache without preempting: b
-    concurrent requests of L random tokens; a request's step is its mean gap from token `skip`
-    on. The whole set is measured `reps` times, one full pass after another — so a slow drift of
-    the engine shows as a difference between repeats instead of hiding inside one cell."""
+    """Measure the decode step time for each context length and batch size that fits the cache.
+
+    A cell is b concurrent requests of L random tokens. A request's step is its mean gap from token
+    `skip` on, and a cell's step the median over its requests; a cell that preempted is marked
+    invalid. The whole set is measured `reps` times, one full pass after another, so a slow drift of
+    the engine shows as a difference between repeats rather than hiding inside one cell.
+    """
     rows = []
     budget = int(0.8 * info.kv_cache_blocks)  # headroom: a preempted cell times recomputation
     for rep in range(reps):
@@ -430,8 +396,11 @@ def measure_decode(engine: Engine, info: EngineInfo, rng: random.Random, *,
 
 def fit(prefill: list[dict[str, float]], decode: list[dict[str, Any]], *,
         output_tokens: int, skip: int = DECODE_SKIP_TOKENS) -> dict[str, Any]:
-    """The context-aware model of calib/fit.py: decode on the valid cells, then prefill with one
-    fitted decode step taken out of each TTFT."""
+    """Fit the context-aware model of calib/fit.py: decode on the valid cells, then prefill.
+
+    One fitted decode step is subtracted from each TTFT first, because the simulator emits the first
+    token at the end of the step that prefills.
+    """
     ok = [r for r in decode if r["valid"]]
     if len({(r["batch"], r["context"]) for r in ok}) < 3:
         raise CalibrationError(f"fewer than three usable decode cells ({len(ok)}): no decode fit")
@@ -455,9 +424,11 @@ COEFFICIENTS = ("prefill_base_s", "prefill_per_token_s", "prefill_attn_s", "deco
 
 def fit_replicates(prefill: list[dict[str, float]], decode: list[dict[str, Any]], *,
                    output_tokens: int, skip: int = DECODE_SKIP_TOKENS) -> list[dict[str, Any]]:
-    """The same fit on EACH repeat's measurements alone: how much the six coefficients move when
-    this engine is measured again a minute later. A repeat with too few usable decode cells has no
-    fit and is left out; with a single repeat there is nothing to compare, and the list is empty.
+    """Fit each repeat's measurements alone, to show how much the coefficients move between runs.
+
+    `kvsim replay` re-runs its sizing on each fit and shows the range of replica counts: a floor on
+    the uncertainty, not a confidence interval. A repeat with too few usable decode cells is left
+    out, and fewer than two fits give an empty list.
     """
     reps = sorted({p.get("rep", 0) for p in prefill} | {r.get("rep", 0) for r in decode})
     if len(reps) < 2:
@@ -476,17 +447,14 @@ def fit_replicates(prefill: list[dict[str, float]], decode: list[dict[str, Any]]
     return out if len(out) >= 2 else []
 
 
-# ── step 3: does the cache model predict this engine? ─────────────────────────────────────────
-
-
 def check_workload(rng: random.Random, sessions: int, turns: int,
                    token_range: tuple[int, int]) -> list[tuple[str, list[int]]]:
-    """Sessions that share one system prompt, each re-sending its own growing history.
+    """Build sessions that share one system prompt, each re-sending its own growing history.
 
-    ⚠️ The lengths are chosen, not arbitrary. None is a multiple of 16, so the partial-block rule
-    is exercised; and the shared prompt (150) ends mid-block for 16 AND for 32, so a wrong block
-    size changes every session's first hit. An earlier version used lengths that happened to align
-    to both 16 and 32 — and passed with the block size set wrong."""
+    No length is a multiple of 16, so the partial-block rule is exercised, and the shared prompt
+    (150 tokens) ends mid-block at block sizes 16 and 32, so a wrong block size changes every
+    session's first hit.
+    """
     shared = _prompt(rng, 150, token_range)
     out = []
     for s in range(sessions):
@@ -499,8 +467,11 @@ def check_workload(rng: random.Random, sessions: int, turns: int,
 
 
 def predict_check(work: list[tuple[str, list[int]]], profile: CostProfile):
-    """The simulator's prediction for the check: one request at a time, 1,000 simulated seconds
-    apart — far longer than any request takes — on one replica with the block-pool model."""
+    """Simulate the check workload on one replica with the block-pool model.
+
+    Requests are 1,000 simulated seconds apart, far longer than any takes, so they run one at a
+    time, as they are sent to the engine.
+    """
     trace = [NormalizedRequest(f"c{i}", i * 1000.0, chain_hashes(ids, profile.block_size), len(ids),
                                1, sid) for i, (sid, ids) in enumerate(work)]
     return run(trace, policy="round-robin", n_replicas=1, profile=profile, cache_model="vllm",
@@ -510,7 +481,11 @@ def predict_check(work: list[tuple[str, list[int]]], profile: CostProfile):
 def check_cache_model(engine: Engine, info: EngineInfo, profile: CostProfile,
                       rng: random.Random, *, sessions: int, turns: int,
                       token_range: tuple[int, int]) -> dict[str, Any]:
-    """The engine's prefix-cache counters over a sequential workload, against the simulator."""
+    """Compare the engine's prefix-cache counters over a sequential workload with the simulator's.
+
+    The workload fits in the cache, so this checks units, block size, the partial-block rule and
+    prefix matching on the engine, but not eviction under pressure.
+    """
     work = check_workload(rng, sessions, turns, token_range)
     blocks = len({h for _, ids in work for h in chain_hashes(ids, info.block_size)}) + len(work)
     if blocks > info.kv_cache_blocks // 2:
@@ -562,11 +537,8 @@ def check_cache_model(engine: Engine, info: EngineInfo, profile: CostProfile,
     }
 
 
-# ── all of it ─────────────────────────────────────────────────────────────────────────────────
-
-
 def _local_gpu(base: str) -> str:
-    """The GPU's name, when the engine runs on this machine and nvidia-smi can say. Else ''."""
+    """Return the GPU name from nvidia-smi when the engine runs on this machine, else ''."""
     host = urllib.parse.urlparse(base).hostname or ""
     if host not in ("localhost", "127.0.0.1", "::1") or not shutil.which("nvidia-smi"):
         return ""
@@ -594,7 +566,15 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
               max_error: float = 0.05, seed: int = 0,
               token_range: tuple[int, int] = DEFAULT_TOKEN_RANGE,
               log=print) -> tuple[dict[str, Any], bool]:
-    """Probe, fit, check. Returns (the profile as a JSON-ready dict, whether it is calibrated)."""
+    """Probe the engine, fit the timing profile and check the cache model.
+
+    The default prompt lengths reach 2,048 tokens and decode contexts 1,024; timings for longer
+    traffic are extrapolated. The profile is marked calibrated only if the hit-rate error is within
+    `max_error` and every per-request cached-token count the engine reports matches the model.
+
+    Returns:
+        The profile as a JSON-ready dict, and whether it is calibrated.
+    """
     rng = random.Random(seed)
     info = probe(engine, model=model, kv_blocks=kv_blocks, block_size=block_size,
                  max_num_seqs=max_num_seqs)
@@ -653,18 +633,18 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
         engine_version=info.version,
         calibrated=False,
     )
-    # Its own random stream: the check's prompts depend only on the seed, not on how many timing
-    # requests came first — so its expected hit rate can be computed, and registered, in advance.
+    # The check has its own random stream, so its prompts depend only on the seed, not on how many
+    # timing requests came first, and its expected hit rate can be computed in advance.
     check = check_cache_model(engine, info, profile, random.Random(f"check-{seed}"),
                               sessions=check_sessions, turns=check_turns, token_range=token_range)
     err = check["relative_error"]
     n_cmp, n_eq = check["cached_tokens_compared"], check["cached_tokens_equal"]
-    # Both must hold. On a sequential workload that fits in the cache the model was exact on a real
-    # T4 (Phase 3), so ONE request whose cached tokens differ means a rule differs on this engine —
-    # even when the aggregate error is small (a wrong block size moves it by only a few percent).
+    # Both must hold. On a sequential workload that fits in the cache the model should be exact, so
+    # one request whose cached tokens differ means a rule differs on this engine, even when the
+    # aggregate error is small (a wrong block size moves it by only a few percent).
     ok = err is not None and err <= max_error and n_eq == n_cmp
     log(f"check    hit rate: engine {check['measured']['hit_rate']:.4f}, model "
-        f"{check['predicted']['hit_rate']:.4f} → error {err:.2%} over {check['requests']} requests")
+        f"{check['predicted']['hit_rate']:.4f}, error {err:.2%} over {check['requests']} requests")
     if n_cmp:
         log(f"         per-request cached tokens: {n_eq} of {n_cmp} equal")
     else:
@@ -688,7 +668,7 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
             "decode_fit": f["decode_fit"],
             "decode_cells": decode,
             "prefill_points": prefill,
-            # The fit on each repeat alone — `kvsim replay` sizes on each and shows the range.
+            # The fit on each repeat alone; `kvsim replay` sizes on each and shows the range.
             "replicates": replicates,
             "check": check,
             "notes": f["notes"],

@@ -1,9 +1,4 @@
-"""How firm is a replica count? The sizing re-run on each repeat of the calibration.
-
-C3 measured why this exists: two runs of `kvsim calibrate` on one engine differed by 3–5% in their
-coefficients, and three calibrations of one T4 agreed on a replica count exactly at 102 of 144
-points and within one at 138. A count printed alone claims more than that.
-"""
+"""Sizing on each repeat of the calibration, and how the report shows the spread of counts."""
 
 from __future__ import annotations
 
@@ -79,7 +74,7 @@ def test_the_spread_is_the_count_on_every_repeat_beside_the_pooled_one(tmp_path)
                        replicates=replicate_profiles(path), **kw)
     assert (s["repeats"], s["swept_up_to"]) == (3, 6)
     sticky, rr = s["replicas"]["session-sticky"], s["replicas"]["round-robin"]
-    # Repeat 0 IS the pooled fit; repeat 1 is 30% slower and needs one replica more.
+    # Repeat 0 is the pooled fit; repeat 1 is 30% slower and needs one replica more.
     assert sticky == {"pooled": 3, "repeats": [3, 4, 3], "min": 3, "max": 4, "firm": False}
     # 30% slower, round-robin no longer fits on the six replicas swept: "not met" is the maximum.
     assert rr["pooled"] == 5 and rr["repeats"] == [5, None, 5]
@@ -98,27 +93,27 @@ def test_replay_shows_how_firm_its_recommendation_is(tmp_path, capsys):
     assert main([*args, "--profile", str(_with_repeats(tmp_path))]) == 0
     out = capsys.readouterr().out
     assert "**session-sticky on 3 replica(s)**" in out
-    assert "⚠️ how firm: 3 to 4 replicas across the calibration's 3 repeats" in out
+    assert "How firm: 3 to 4 replicas across the calibration's 3 repeats" in out
     assert "| session-sticky | 3 | 3 · 4 · 3 |" in out and "| round-robin | 5 | 5 · 7 · 5 |" in out
     assert "a floor on the uncertainty, not a confidence interval" in out
-    # C4's rule E failed: a run's own range covers another run's count in 82% of cases, not 90.
-    # The tool therefore says to add one, and says where that comes from.
+    # A run's own range covers another run's count in 82% of cases, so the report says to add
+    # one replica and cites that figure.
     assert "size for the larger, plus one" in out
     assert "outside a run's own range in 18% of cases" in out and "plus one." in out
 
-    # Repeats that agree say so, in one line, without a warning sign — and still allow one more:
-    # in C4, 24 of the 38 misses were of a range that was a single count.
+    # Repeats that agree say so in one line and still allow one replica more: most misses on a
+    # live T4 were of ranges that were a single count.
     agree = _with_repeats(tmp_path, scales=(1.0, 1.0))
     assert main([*args, "--profile", str(agree)]) == 0
     out = capsys.readouterr().out
-    assert "how firm: the same count on each of the calibration's 2 repeats" in out
+    assert "How firm: the same count on each of the calibration's 2 repeats" in out
     assert "still allow one more" in out
-    assert "⚠️ how firm" not in out
+    assert "size for the larger" not in out
 
     # A profile with no repeats: the report says the spread is unknown, it does not stay silent.
     assert main([*args, "--profile", str(CTX)]) == 0
     out = capsys.readouterr().out
-    assert "carries no per-repeat fits" in out and "How firm are the replica counts?" not in out
+    assert "has no per-repeat fits" in out and "How firm are the replica counts?" not in out
 
     # --no-spread: one sweep, no spread, no note.
     assert main([*args, "--profile", str(_with_repeats(tmp_path)), "--no-spread"]) == 0

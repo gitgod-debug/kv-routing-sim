@@ -128,12 +128,24 @@ install never needs a GPU wheel (ADR-009). The *designed* split — `metrics_scr
 Tested against the repo's mock engine (`scripts/phase3_dryrun.py`): it recovers the mock's known
 timings, its check is exact, and a wrong block size is caught.
 
-## `src/kv_routing_sim/cli.py` — ✅ built + tested
+## `src/kv_routing_sim/service.py`, `report.py`, `cli.py`, `browser.py` — built + tested
 
-`kvsim replay` (a trace in, a recommendation out), `kvsim generate`, `kvsim crossover`, and
-`kvsim calibrate`. Fails **loudly at startup** on a bad config; never silently mid-sweep (ADR-004).
-`replay` sizes on both halves of the SLO by default (ADR-013), and prints beside its answer how
-firm the count is (`spread.py`) and how close to the edge it sits (`edge.py`).
+- `service.py` is the replay workflow as a library call, `replay(trace, ReplayOptions(...))`:
+  validate the options, load the trace, profile and cost model, sweep, recommend, then check how
+  firm the count is (`spread.py`) and how close to the edge it sits (`edge.py`). Bad input raises
+  `ConfigError` before any simulation runs (ADR-004); an optional callback reports progress.
+- `report.py` renders a report as Markdown.
+- `cli.py` is the `kvsim` command line: `replay`, `generate`, `crossover` and `calibrate`. It only
+  parses arguments, calls the service and prints; `replay` sizes on both halves of the SLO by
+  default (ADR-013).
+- `browser.py` is the entry point of the in-browser runner (`site/run.html`): plain settings in,
+  plain data out, plus the `kvsim` commands that reproduce the run.
+
+## `site/` — the published pages
+
+`index.html` explores precomputed results (ADR-011). `run.html` runs the simulator in the browser:
+`worker.js` loads Pyodide and installs the package's wheel, published next to the page by
+`scripts/build_site.py`, which the Pages workflow runs on every change to `site/` or `src/`.
 
 ## `src/kv_routing_sim/data/` — ✅ shipped with the package
 
