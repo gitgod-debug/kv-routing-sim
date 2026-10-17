@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
-"""R3's grid: a public production trace through every policy, on every calibration.
+"""R3 grid: a public production trace replayed through every policy on every calibration.
 
-    python scripts/run_r3.py --probe     # round-robin ALONE, one calibration: to choose the speeds
+    python scripts/run_r3.py --probe     # round-robin alone, one calibration: to choose the speeds
     python scripts/run_r3.py             # configs/r3_bailian.yaml -> artifacts/results/r3_bailian/
 
-Registered before it ran (the config, and a dated entry in docs/09-hypotheses.md). Like
-scripts/run_t2_grid.py, this script only RUNS the simulator and writes down what each run measured
-— p95 time to first token, p95 time per output token, hit rate, how unevenly the requests were
-spread, and the policy's own account of its decisions. It applies no target and decides nothing:
-`scripts/r3_analyze.py` does that, from this file.
+Runs the simulator and records what each run measured: p95 time to first token, p95 time per
+output token, hit rate, how unevenly the requests were spread, and the policy's own counts of its
+decisions. It applies no target; `scripts/r3_analyze.py` does that from the grid file.
 
-`--probe` runs round-robin alone — no comparison between policies — and exists only to choose the
-replay speeds by the rule in the config, the way R1 and R2 chose theirs.
+`--probe` runs round-robin alone, with no comparison between policies, to choose the replay speeds
+by the rule in the config, and writes probe.json instead of grid.json.
 
-The trace is other people's data and is never committed (.gitignore: artifacts/traces/). Fetch it
-from the source named in the config; the results record its sha256, so a reader can check they
-replayed the same bytes.
+The trace is third-party data and is not committed (artifacts/traces/ is in .gitignore). Fetch it
+from the source named in the config; the results record its sha256 so a reader can check that the
+same bytes were replayed.
 
-Tier (ADR-010): T4 timings and a SCALED replay (every token count × `token_scale`) — see the
-adapter's docstring for what that keeps and what it does not.
+ADR-010 tier: T4 timings and a scaled replay (every token count times `token_scale`); the adapter's
+docstring says what the scaling keeps and what it does not.
 """
 
 from __future__ import annotations
@@ -59,8 +57,10 @@ def read_trace(cfg: dict[str, Any]) -> tuple[tuple[NormalizedRequest, ...], Trac
 
 
 def structure(trace: tuple[NormalizedRequest, ...], block_size: int) -> dict[str, Any]:
-    """What the traffic looks like, with an unbounded cache and in arrival order — a description
-    of the trace, independent of any policy."""
+    """Describe the trace's structure, independent of any policy.
+
+    The reuse shares assume an unbounded cache and arrival order.
+    """
     seen: set[int] = set()
     by_session: dict[str | None, set[int]] = {}
     sizes: Counter = Counter()
@@ -114,7 +114,7 @@ def _init(config_path: str) -> None:
 
 @cache
 def _at_speed(speed: float) -> tuple[tuple[NormalizedRequest, ...], int]:
-    """The window at `speed`× the recorded arrival rate, and how many requests are warm-up."""
+    """The window at `speed` times the recorded rate, and the number of warm-up requests."""
     base = _STATE["trace"]
     warmup = sum(1 for r in base if r.arrival_ts < _STATE["cfg"]["warmup_s"])
     return tuple(dataclasses.replace(r, arrival_ts=r.arrival_ts / speed) for r in base), warmup
@@ -193,7 +193,7 @@ def main() -> int:
     sys.path.insert(0, str(REPO / "scripts"))
     from _spike_common import results_header
 
-    # Taken BEFORE the runs: the header must describe the tree that produced the numbers.
+    # Taken before the runs, so the header describes the tree that produced the numbers.
     payload = results_header("scripts/run_r3.py", seed=0, hardware_path="cpu-only")
     trace_path = REPO / cfg["trace"]
     sha = hashlib.sha256(trace_path.read_bytes()).hexdigest()

@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""R1 and R2 again, on the validated timing model — the same procedure, with the profile swapped.
+"""R1 and R2 re-run on the validated timing model, with only the profile and speeds changed.
 
-    python scripts/run_realtrace_ctx.py --probe   # round-robin ALONE on calibration A: the speeds
+    python scripts/run_realtrace_ctx.py --probe   # round-robin alone on calibration A: the speeds
     python scripts/run_realtrace_ctx.py           # configs/realtrace_ctx.yaml ->
                                                   # artifacts/results/realtrace_ctx/
 
-Registered before it ran (the config, and a dated entry in docs/09-hypotheses.md). This script
-decides nothing about a policy. For every (test, calibration) it writes a config that is the
-registered one — configs/realtrace_mooncake.yaml or configs/realtrace_agentx.yaml — with two keys
-replaced, `profile` and `speeds`, and runs `scripts/run_realtrace.py` on it: R1's and R2's own
-procedure, unchanged, which applies R1's and R2's own rules. Then it puts the verdicts side by
-side and applies the one added rule (R1w).
+For every (test, calibration) pair this writes a copy of the test's config
+(configs/realtrace_mooncake.yaml or configs/realtrace_agentx.yaml) with `profile` and `speeds`
+replaced, and runs `scripts/run_realtrace.py` on it, which applies R1's and R2's own rules
+unchanged. It then puts the verdicts side by side and applies one more rule, R1w: on Mooncake,
+balanced affinity and session-sticky within `r1w_within` replicas. It decides nothing about a
+policy itself.
 
-`--probe` runs that script's own `--probe` — round-robin alone — on the first calibration, and
-prints the speeds the registered rule gives. No other policy is run before the speeds are fixed.
+`--probe` runs that script's `--probe` (round-robin alone) on the first calibration and prints the
+speeds the config's rule gives, so no other policy runs before the speeds are fixed.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ _PROBE = re.compile(r"^probe (\S+) speed (\S+): round-robin needs (\d+|more than
 
 def derive(base: dict[str, Any], test: str, cal: str, profile: str, speeds: list[float],
            out_dir: str) -> dict[str, Any]:
-    """The registered config with the profile and the speeds replaced — and nothing else."""
+    """The test's config with only the profile, speeds, output directory and titles replaced."""
     cfg = dict(base)
     cfg.update({"profile": profile, "speeds": list(speeds), "results_dir": out_dir,
                 "name": test,
@@ -70,8 +70,11 @@ def parse_probe(stdout: str) -> dict[str, dict[str, int | None]]:
 
 
 def choose_speeds(probe_speeds: list[float], needs: dict[str, dict[str, int | None]]) -> list:
-    """The registered rule: the highest probe speed at which round-robin holds the SLO on 8 or
-    fewer replicas on EVERY trace, and the two probe speeds below it. [] if it holds at none."""
+    """Apply the speed rule to the probe's results.
+
+    The rule picks the highest probe speed at which round-robin holds the SLO on 8 or fewer
+    replicas on every trace, and the two probe speeds below it; [] if there is no such speed.
+    """
     ordered = sorted(probe_speeds)
     held = [sp for sp in ordered if needs and all(by.get(f"{sp:g}") is not None
                                                   for by in needs.values())]
@@ -82,8 +85,10 @@ def choose_speeds(probe_speeds: list[float], needs: dict[str, dict[str, int | No
 
 
 def within(req: dict[str, dict[str, dict[str, int]]], limit: int) -> dict[str, Any]:
-    """R1w on one calibration: balanced affinity and session-sticky within `limit` replicas at
-    every testable speed of every trace. `req[trace][speed][policy]`."""
+    """R1w on one calibration: balanced affinity and session-sticky within `limit` replicas.
+
+    Checked at every testable speed of every trace; `req` is indexed [trace][speed][policy].
+    """
     pairs = [(tr, sp, r[STAR], r[STICKY]) for tr, by in req.items() for sp, r in by.items()
              if min(r[STAR], r[STICKY]) < NOT_MET]
     apart = [{"trace": tr, "speed": sp, "balanced": a, "sticky": b}
@@ -93,7 +98,10 @@ def within(req: dict[str, dict[str, dict[str, int]]], limit: int) -> dict[str, A
 
 
 def verdict(by_cal: dict[str, bool | None]) -> str:
-    """HOLDS on every calibration, FALSIFIED on every one, or neither. None = untestable."""
+    """HOLDS on every calibration, FALSIFIED on every one, or CALIBRATION-DEPENDENT.
+
+    A None (untestable) on any calibration makes the result UNTESTABLE.
+    """
     values = list(by_cal.values())
     if not values or any(v is None for v in values):
         return "UNTESTABLE"

@@ -1,27 +1,25 @@
 #!/usr/bin/env python3
-"""C4's registration: the wheel built from a clean tree, the predictions computed, the notebook
-written.
+"""Prepare the C4 run: build the wheel, compute the predictions, and write the notebook.
 
     python scripts/c4_prepare.py
         # configs/c4_per_token.yaml -> artifacts/results/c4_prereg/predictions.json
         #                           -> notebooks/c4_per_token_t4.ipynb
 
-What is registered here, before the run — every number from profile A, the shipped C2 fit:
-  * the wheel the notebook carries (built from committed code only, so this refuses a dirty tree),
+The registration file records, with every number from profile A (the shipped C2 fit):
+  * the wheel the notebook embeds (built from committed code only, so this refuses a dirty tree)
     and the command's default timing cells, read from that code;
-  * the cache check `kvsim calibrate` will send, per seed, and the simulator's prediction for it;
-  * part 3's traffic (fingerprints, checked against the notebook's port of the generator) and what
-    profile A predicts for it at the scheduled times: first-token latency, time per output token
-    (p50, p95, the share of requests within the limit) and the mean inter-token latency;
+  * per seed, the cache check `kvsim calibrate` will send and the simulator's prediction for it;
+  * part 3's traffic (fingerprints, checked against the notebook's port of the generator) and
+    profile A's predictions for it at the scheduled times: first-token latency, time per output
+    token (p50, p95, the share of requests within the limit) and the mean inter-token latency;
   * part 2's decode steps and part 2b's stalls, as profile A's model gives them.
-What the fresh calibrations will say (rules E, F) cannot be registered: they do not exist until the
-run. The procedure that will produce those numbers — scripts/c4_grids.py and scripts/c4_analyze.py
-— is committed with this script instead.
+Rules E and F depend on the fresh calibrations, which exist only after the run; scripts/c4_grids.py
+and scripts/c4_analyze.py compute them.
 
     python scripts/c4_prepare.py --amend "WHY, as one sentence."
 
-rebuilds the notebook from the current builder WITHOUT touching anything registered (see
-scripts/c3_prepare.py, whose rules for an amendment these are).
+rebuilds the notebook from the current builder without changing anything registered, under the
+same checks as scripts/c3_prepare.py --amend.
 """
 
 from __future__ import annotations
@@ -64,8 +62,10 @@ MAX_BLOCK_SHARE = 0.85  # of the usable blocks: above this a cell could preempt
 
 def shared_step(profile: CostProfile, cfg: dict[str, Any], b: int,
                 length: int) -> dict[str, float]:
-    """The model's decode step for b sequences of `length` context tokens — the quantity part 2
-    times: S = b × (length + the middle of the tokens that are timed)."""
+    """The model's decode step for b sequences of `length` context tokens, as part 2 times it.
+
+    The summed context is S = b × (length + the middle of the timed tokens).
+    """
     s = cfg["decode_shared"]
     summed = b * (length + (s["skip_tokens"] + s["output_tokens"]) / 2.0)
     return {"summed_context": summed, "step_s": profile.decode_s(b, round(summed))}
@@ -73,9 +73,11 @@ def shared_step(profile: CostProfile, cfg: dict[str, Any], b: int,
 
 def stall_prediction(profile: CostProfile, cfg: dict[str, Any], b: int,
                      new: int) -> dict[str, float]:
-    """What the model charges the b decoding sequences when one more request arrives: the step
-    that prefills it costs its prefill plus a decode step of b + 1 — against the usual step of b.
-    Contexts are taken at the middle of the output, as for the decode cells."""
+    """What the model charges b decoding sequences when one more request arrives.
+
+    The step that prefills the new request costs its prefill plus a decode step of b + 1, against
+    the usual step of b. Contexts are taken at the middle of the output, as for the decode cells.
+    """
     s, t = cfg["decode_shared"], cfg["stall"]
     ctx = s["prefix_tokens"] + s["suffix_tokens"] + t["output_tokens"] / 2.0
     usual = profile.decode_s(b, round(b * ctx))
@@ -86,8 +88,10 @@ def stall_prediction(profile: CostProfile, cfg: dict[str, Any], b: int,
 
 
 def predict_holdout(pairs: list, profile: CostProfile, limit_ms: float) -> dict[str, Any]:
-    """Profile A, one replica, every request at its SCHEDULED time. Percentiles by the notebook's
-    nearest-rank rule, over all requests."""
+    """Predict a workload with profile A on one replica, every request at its scheduled time.
+
+    Percentiles use the notebook's nearest-rank rule over all requests.
+    """
     r = run([q for q, _ in pairs], policy="round-robin", n_replicas=1, seed=0, profile=profile,
             cache_model="vllm", record_per_request=True)
     ttfts = sorted(v["ttft_ms"] for v in r.per_request.values())
@@ -161,8 +165,10 @@ def predictions(cfg: dict[str, Any], traces: dict[str, list], profile: CostProfi
 
 
 def fitted_max_summed_context() -> float:
-    """The largest summed context any of C2's decode cells measured — what profile A was fitted
-    on. Rule D1b is about the cells beyond it."""
+    """The largest summed context among C2's decode cells, the range profile A was fitted on.
+
+    Rule D1b tests the cells beyond it.
+    """
     c2 = json.loads((REPO / "artifacts/results/c2_kaggle_t4/c2.json").read_text())
     d = c2["design"]["decode"]
     mid = (d["skip_tokens"] + d["output_tokens"]) / 2.0

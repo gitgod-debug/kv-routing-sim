@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""Dry-run the C3 notebook on this machine against a mock engine — then the analysis, end to end.
+"""Dry-run the C3 notebook against a mock engine, then run the analysis on its output.
 
     python scripts/c3_dryrun.py [--keep]
 
-Builds a SMALL version of the notebook (short held-out traffic; the registered notebook and
-predictions are never touched), executes every code cell the way Run-All does against Phase 3's
-mock engine, and then runs scripts/c3_analyze.py — the registered analysis — on what came out. This
-environment's installed package stands in for the embedded wheel: that one cell is skipped.
+Builds a small version of the notebook (short held-out traffic; the registered notebook and
+predictions are left alone), runs every code cell as Run-All would against Phase 3's mock engine,
+then runs scripts/c3_analyze.py on the results. The installed package stands in for the embedded
+wheel, whose cell is skipped.
 
-⭐ The mock runs with KNOWN context terms, and the "C2 profile" of the small config is the mock's
-own profile. So here the model IS the engine, and all three rules must hold: the command's check
-exact, its fit close enough to predict the traffic, and the registered predictions true. Anything
-else is a bug in the notebook or the analysis, found before a GPU is spent. It says nothing about
-vLLM.
+The mock has known context terms and the small config's "C2 profile" is the mock's own profile, so
+the model is the engine and all three rules must hold: the command's check exact, its fit close
+enough to predict the traffic, and the registered predictions true. A failure is a bug in the
+notebook or the analysis; this says nothing about vLLM.
 """
 
 from __future__ import annotations
@@ -69,8 +68,10 @@ def _smoke(work: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path]:
 
 
 def _fake_torch(pkg: pathlib.Path) -> None:
-    """What the pre-flight asks of torch, for the fresh interpreters it starts: a version, a CUDA
-    build and a GPU. This environment has no torch, and needs none."""
+    """Write a stand-in torch package with a version, a CUDA build and a GPU.
+
+    The pre-flight queries torch in fresh interpreters, and this environment has no torch.
+    """
     (pkg / "torch").mkdir(parents=True, exist_ok=True)
     (pkg / "torch" / "__init__.py").write_text(
         '__version__ = "0.0.0+dryrun"\n\n\nclass version:\n    cuda = "0.0"\n\n\n'
@@ -124,7 +125,7 @@ def main() -> int:
         with contextlib.redirect_stdout(buf):
             for i, src in enumerate(cells):
                 exec(compile(src, f"cell{i}", "exec"), ns)  # noqa: S102 - the point of a dry-run
-    except Exception as e:  # noqa: BLE001 - whatever a cell raises IS the dry-run's finding
+    except Exception as e:  # noqa: BLE001 - whatever a cell raises is the dry-run's finding
         err = f"{type(e).__name__} in code cell {i}: {e}"
     finally:
         with contextlib.suppress(Exception), contextlib.redirect_stdout(io.StringIO()):

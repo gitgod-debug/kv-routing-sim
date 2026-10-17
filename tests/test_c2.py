@@ -1,7 +1,7 @@
-"""C2's analysis (scripts/c2_analyze.py) — committed before the run, so it is tested before the run.
+"""Tests for C2's analysis (scripts/c2_analyze.py) on synthetic data.
 
 The two fits must recover known coefficients from clean data, and the constrained least squares must
-never return a negative cost: a negative "per token" coefficient would make a longer prompt faster.
+never return a negative cost: a negative per-token coefficient would make a longer prompt faster.
 """
 
 from __future__ import annotations
@@ -28,8 +28,7 @@ def test_nnls_solves_an_exact_system():
 
 
 def test_nnls_never_returns_a_negative_cost():
-    """Data that falls with x: unconstrained least squares gives a negative slope; the registered
-    rule clamps it to zero and refits the rest."""
+    """On data that falls with x, the slope is clamped to zero and the intercept refitted."""
     rows = [[1.0, x] for x in (1.0, 2.0, 3.0, 4.0)]
     coef, _ = c2.nnls(rows, [5.0, 4.0, 3.0, 2.0])
     assert coef[1] == 0.0

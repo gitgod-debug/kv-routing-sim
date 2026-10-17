@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
-"""Regenerate the policy x replica sweep. Every README table comes from a script like this one.
-
-`run_*.py` scripts are held to a stricter standard than `spike_*.py` (docs/05-codebase-map.md):
-seeded, config-driven, and byte-identical on re-run apart from the timestamp. If re-running this
-changes a number, something is reading unseeded randomness and must be found.
-
-⚠️ THIS PRODUCES NO PUBLISHABLE LATENCY OR COST NUMBER. The cost profile is uncalibrated, so what
-comes out is the policy RANKING and the cache behaviour (ADR-010 tier 1, pending H6). The
-millisecond figures are shapes. Phase 3 replaces the profile; until then this script exists to make
-the pipeline reproducible, not to make claims.
+"""Run the policy x replica sweep on a generated trace with the uncalibrated cost profile.
 
     python scripts/run_sweep.py --sharing 0.6 --replicas 1,2,4,8
+
+Seeded, and byte-identical on re-run apart from the header's timestamp. Because the profile is
+uncalibrated, the output is the policy ranking and the cache behaviour (ADR-010 tier 1); the
+millisecond figures are not predictions. Writes artifacts/results/sweep.json (see --out).
 """
 
 from __future__ import annotations
@@ -19,9 +14,8 @@ import argparse
 import sys
 from pathlib import Path
 
-# The package is imported normally — it is installed (`pip install -e ".[dev]"`), so no sys.path
-# surgery is needed for it. Only `_spike_common` lives beside this file rather than in the package,
-# and it is imported inside main() so every top-level import here stays ordinary.
+# The package is installed (`pip install -e ".[dev]"`). Only `_spike_common` lives beside this
+# file, so it is imported inside main() after the sys.path entry is added.
 from kv_routing_sim import policies
 from kv_routing_sim.eval.recommend import recommend
 from kv_routing_sim.eval.sweep import sweep

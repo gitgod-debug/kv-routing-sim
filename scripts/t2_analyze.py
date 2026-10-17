@@ -1,27 +1,28 @@
 #!/usr/bin/env python3
-"""T2's analysis — committed BEFORE the grid runs, so nothing in it is chosen after a result.
+"""Analyse T2's grids against the rules in configs/tpot_slo.yaml.
 
     python scripts/t2_analyze.py
         # artifacts/results/t2_two_part_slo/grid_{A,B,C}.json -> analysis.json, report.md
 
-The procedure, exactly as configs/tpot_slo.yaml registers it. For each calibration the grid file
-holds every run's p95 time to first token and p95 time per output token; from those:
+For each calibration the grid file holds every run's p95 time to first token and p95 time per
+output token. From those:
 
-  R(policy) = the fewest replicas whose cell meets the target on EVERY seed; `not met` if none.
-    first-token target:  p95 TTFT ≤ ttft_p95_ms                       (every result so far)
-    two-part target:     that AND p95 TPOT ≤ tpot_p95_ms
+  R(policy) = the fewest replicas whose cell meets the target on every seed; `not met` if none.
+    first-token target:  p95 TTFT ≤ ttft_p95_ms
+    two-part target:     that, and p95 TPOT ≤ tpot_p95_ms
 
-  GUARD — under the first-token target, on replicas 1–16, every calibration must reproduce its
-          committed table exactly, or this stops: the code drifted and nothing is comparable.
-  T2a   — at every load with the prompts in `t2a_prompts`, no policy needs fewer replicas than
-          session-sticky under the two-part target.
-  T2b   — at every (prompts, load) point, session-sticky needs no more replicas than each policy
-          in `t2b_versus`.
-  T2c   — over the points where session-sticky's count is defined under both targets, the median
-          of R(two-part) ÷ R(first token) is at least `t2c_min_median_ratio`; fewer than
-          `t2c_min_points` such points leave it UNDECIDED.
-Each rule must hold on ALL calibrations. A point where no policy holds the target is a tie, as in
-the claims these rules restate; the report counts such points beside each verdict.
+  Guard: under the first-token target, on the committed table's replica range, every calibration
+         must reproduce its committed table exactly; otherwise the code has drifted and this stops.
+  T2a:   at every load with the prompts in `t2a_prompts`, no policy needs fewer replicas than
+         session-sticky under the two-part target.
+  T2b:   at every (prompts, load) point, session-sticky needs no more replicas than each policy
+         in `t2b_versus`.
+  T2c:   over the points where session-sticky's count is defined under both targets, the median
+         of R(two-part) / R(first token) is at least `t2c_min_median_ratio`; fewer than
+         `t2c_min_points` such points leave it undecided.
+Each rule must hold on all calibrations. A point where no policy holds the target counts as a tie,
+and the report counts such points beside each verdict. The decision rules are read from the
+config; this script applies them and tunes nothing.
 
 Reported, not tested: every count under both targets, which half binds, how far the calibrations
 agree, H2b's rules under the two-part target (exploratory), and the tables at the per-token limits
@@ -48,13 +49,15 @@ SHORT = {"session-sticky": "sticky", "radix-affinity-balanced@16": "balanced α1
          "least-loaded": "least-loaded", "radix-affinity": "pure affinity"}
 
 
-# ── replica counts from a grid ──────────────────────────────────────────────────────────────────
+# Replica counts from a grid.
 
 
 def required(cell: dict[str, Any], replicas: list[int], ttft_ms: float,
              tpot_ms: float | None, max_replicas: int | None = None) -> int:
     """The fewest replicas whose cell meets the target on every seed; one past the axis if none.
-    `tpot_ms=None` is the first-token target alone. `max_replicas` cuts the axis short."""
+
+    `tpot_ms=None` is the first-token target alone. `max_replicas` cuts the axis short.
+    """
     for i, n in enumerate(replicas):
         if max_replicas is not None and n > max_replicas:
             return max_replicas + 1
@@ -82,7 +85,7 @@ def guard(grid: dict[str, Any], committed: dict[str, Any], ttft_ms: float) -> li
             for ld, by_pol in by_load.items() for p, r in by_pol.items() if mine[k][ld][p] != r]
 
 
-# ── the rules ───────────────────────────────────────────────────────────────────────────────────
+# The rules.
 
 
 def _points(tab: dict) -> list[tuple[str, str]]:
@@ -121,7 +124,7 @@ def rule_c(first: dict, both: dict, not_met: int, min_ratio: float,
 
 
 def h2b_rules(tab: dict) -> dict[str, Any]:
-    """H2b's three registered rules, unchanged — here applied for the record only."""
+    """H2b's three rules, unchanged, applied for the report only."""
     ks = sorted(tab, key=int)
     win = {(k, ld): ("affinity" if r[BAL] < r[STICKY] else "sticky" if r[STICKY] < r[BAL]
                      else "tie") for k in ks for ld, r in tab[k].items()}
@@ -225,7 +228,7 @@ def analyze(cfg: dict[str, Any], grids: dict[str, dict], committed: dict[str, di
     return out
 
 
-# ── the report ──────────────────────────────────────────────────────────────────────────────────
+# The report.
 
 
 def _r(x: int, not_met: int) -> str:

@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""Dry-run notebooks/c1_calibrate_t4.ipynb on this machine, against the mock engine.
+"""Dry-run notebooks/c1_calibrate_t4.ipynb against the mock engine on this machine.
 
     python scripts/c1_dryrun.py [--keep]
 
-Every code cell runs in one namespace, the way Run-All does, with Phase 3's mock standing in for
-`vllm serve` (through the same shim on PATH) and this environment's installed package standing in
-for the embedded wheel — that one cell is skipped, so the editable install is not replaced.
-
-The mock IS the simulator's model, so C1 must HOLD here: the check exact, the capacity read equal to
-the mock's log line, and the check's prediction equal to the registered one. Anything else is a bug
-in the notebook, found before a GPU is spent.
+Every code cell runs in one namespace, as Run-All would, with Phase 3's mock standing in for
+`vllm serve` (through the same shim on PATH) and the installed package standing in for the
+embedded wheel, whose cell is skipped so the editable install is not replaced. The mock is the
+simulator's model, so C1 must hold here: the check exact, the capacity read equal to the mock's
+log line, and the check's prediction equal to the registered one. A failure is a bug in the
+notebook.
 """
 
 from __future__ import annotations
@@ -67,7 +66,7 @@ def main() -> int:
         with contextlib.redirect_stdout(buf):
             for i, src in enumerate(cells):
                 exec(compile(src, f"cell{i}", "exec"), ns)  # noqa: S102 - the point of a dry-run
-    except Exception as e:  # noqa: BLE001 - whatever a cell raises IS the dry-run's finding
+    except Exception as e:  # noqa: BLE001 - whatever a cell raises is the dry-run's finding
         err = f"{type(e).__name__} in code cell {i}: {e}"
     finally:
         with contextlib.suppress(Exception), contextlib.redirect_stdout(io.StringIO()):

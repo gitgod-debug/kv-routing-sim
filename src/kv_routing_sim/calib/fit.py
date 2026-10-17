@@ -1,15 +1,11 @@
-"""The context-aware timing model's fit — the procedure C2 registered and validated on a real T4.
+"""Least-squares fit of the context-aware timing model, using only the standard library.
 
-    decode(b, S)  = d0 + d1·b + d2·S          b sequences in the step, S = their summed context
-    prefill(n, c) = p0 + p1·n + p2·n·(c + n/2)  n new tokens after c cached ones
+    decode(b, S)  = d0 + d1*b + d2*S              b sequences in the step, S their summed context
+    prefill(n, c) = p0 + p1*n + p2*n*(c + n/2)    n new tokens after c cached ones
 
-Least squares with every coefficient ≥ 0: every subset of free coefficients is solved and the
-feasible one with the least squared error wins — a negative "per token" cost would make a longer
-prompt faster. C2 fitted this on micro-benchmarks and it predicted held-out traffic within 1.41×
-(configs/c2_timing.yaml, docs/09-hypotheses.md 2026-09-30); `kvsim calibrate` fits the same model.
-
-The same arithmetic as scripts/c2_analyze.py — which is a registered script and stays byte-for-byte
-as it ran — kept here so the installed package needs no scripts/. Standard library only.
+Every coefficient is constrained to be >= 0, since a negative per-token cost would make a longer
+prompt faster. The arithmetic duplicates scripts/c2_analyze.py, which is kept exactly as it ran, so
+that the installed package does not need scripts/.
 """
 
 from __future__ import annotations
@@ -34,8 +30,11 @@ def _solve(a: list[list[float]], b: list[float]) -> list[float] | None:
 
 
 def nnls(rows: list[list[float]], y: list[float]) -> tuple[list[float], float]:
-    """Least squares with every coefficient ≥ 0, by solving every subset of free coefficients.
-    Exhaustive and deterministic: ties go to the subset enumerated first."""
+    """Fit least squares with every coefficient >= 0; return (coefficients, squared error).
+
+    Every subset of free coefficients is solved, and the feasible one with the least squared error
+    wins. The search is exhaustive and deterministic: ties go to the subset enumerated first.
+    """
     k = len(rows[0])
     best: tuple[float, list[float]] | None = None
     for mask in range(1 << k):
@@ -66,8 +65,13 @@ def r_squared(rows: list[list[float]], y: list[float], coef: list[float]) -> flo
 
 
 def fit_decode(cells: list[dict], mid_tokens: float) -> dict[str, float]:
-    """cells: {"batch", "context", "step_s"}; S = b·(context + mid_tokens), the batch's mean
-    summed context over the tokens that were timed."""
+    """Fit the decode model to measured cells.
+
+    Args:
+        cells: Dicts with "batch", "context" (prompt tokens) and "step_s" (seconds per step).
+        mid_tokens: Generated tokens at the middle of the timed span, so that
+            `S = batch * (context + mid_tokens)` is the batch's mean summed context while timed.
+    """
     rows = [[1.0, float(c["batch"]), c["batch"] * (c["context"] + mid_tokens)] for c in cells]
     y = [c["step_s"] for c in cells]
     coef, _ = nnls(rows, y)
@@ -76,8 +80,11 @@ def fit_decode(cells: list[dict], mid_tokens: float) -> dict[str, float]:
 
 
 def fit_prefill(points: list[dict], dec: dict[str, float]) -> dict[str, float]:
-    """points: {"cached_tokens", "uncached_tokens", "ttft_s"}. The simulator's TTFT of a lone
-    request is prefill plus one decode step, so that step is taken out of each TTFT first."""
+    """Fit the prefill model to TTFT points, given a fitted decode model.
+
+    `points` hold "cached_tokens", "uncached_tokens" and "ttft_s". The simulator's TTFT of a lone
+    request is prefill plus one decode step, so that step is subtracted from each TTFT first.
+    """
     rows, y = [], []
     for p in points:
         c, n = p["cached_tokens"], p["uncached_tokens"]

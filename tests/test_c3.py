@@ -1,8 +1,8 @@
-"""C3's analysis (scripts/c3_analyze.py) — committed before the run, so it is tested before the run.
+"""Tests for C3's analysis (scripts/c3_analyze.py) on a synthetic run.
 
-The end-to-end cases build a tiny "GPU run" in which the engine IS a known profile: the simulator
-makes the measurements. A profile equal to that engine must then predict them exactly, a profile
-three times too fast must fail, and a missing one must leave its rule undecided — never passed.
+The end-to-end cases build a small run whose engine is a known profile, with the simulator making
+the measurements. A profile equal to that engine must predict them exactly, one three times too
+fast must fail, and a missing one must leave its rule undecided rather than passed.
 """
 
 from __future__ import annotations
@@ -144,8 +144,8 @@ def test_capacity_is_read_from_the_engine_log(tmp_path):
 
 
 def test_the_grid_helper_counts_what_the_readme_claims():
-    """`--grid` compares a second calibration's replica table with the committed one. Its count of
-    points where session-sticky is best or tied must be the README's 22 of 24 on that table."""
+    """`--grid` counts session-sticky as best or tied at 22 of the committed table's 24 points, as
+    the README states."""
     committed = json.loads((REPO / "artifacts/results/h2b_c2/h2b_c2.json").read_text())
     req = committed["required_replicas"]
     assert sum(len(v) for v in req.values()) == 24

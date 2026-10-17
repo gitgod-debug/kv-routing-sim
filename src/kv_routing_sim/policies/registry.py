@@ -1,4 +1,4 @@
-"""name -> policy class. ONE source of truth for `--policies all` (ADR-003)."""
+"""Map policy names to classes; the single source of truth for `--policies` (ADR-003)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .round_robin import RoundRobin
 from .session_sticky import SessionSticky
 from .smetric_local import SMetricLocal
 
-# Ordered cheapest-to-most-sophisticated, which is also the order results tables read best in.
+# Ordered from simplest to most sophisticated, the order results tables use.
 REGISTRY: dict[str, type[RoutingPolicy]] = {
     RoundRobin.name: RoundRobin,
     LeastLoaded.name: LeastLoaded,
@@ -22,14 +22,13 @@ REGISTRY: dict[str, type[RoutingPolicy]] = {
     RadixAffinity.name: RadixAffinity,
     RadixAffinityBalanced.name: RadixAffinityBalanced,
     SessionSticky.name: SessionSticky,
-    # Published policies, added 2026-10-05 (docs/04-prior-art.md §2a). Asked for by name.
+    # Published policies, requested by name rather than through `all`.
     LMetric.name: LMetric,
     SMetricLocal.name: SMetricLocal,
 }
 
-# ⚠️ `all` IS THE SEVEN POLICIES OF THE REGISTERED SWEEPS, AND STAYS THAT. Phase 4's design says
-# `policies: all`, and H6 re-runs it against Phase 4's stored table: letting `all` grow would
-# change what a registered experiment means. A policy added later is named explicitly.
+# `all` is a fixed set: stored experiment configs say `policies: all`, and growing the set would
+# change what they run. A policy added later is named explicitly.
 ALL = (
     RoundRobin.name,
     LeastLoaded.name,
@@ -43,7 +42,7 @@ BASELINE = RoundRobin.name  # what every delta is measured against
 
 
 def build(name: str, n_replicas: int, **kwargs: object) -> RoutingPolicy:
-    """Construct a policy by name. Fails LOUDLY on a typo (ADR-004 config semantics)."""
+    """Construct a policy by name; an unknown name raises ValueError (ADR-004)."""
     try:
         cls = REGISTRY[name]
     except KeyError:

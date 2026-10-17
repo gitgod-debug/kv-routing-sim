@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
-"""T2's grid: H2b-C2's traffic on one calibration, with every run's two latencies kept.
+"""Run T2's grid: H2b-C2's traffic on one calibration, keeping every run's two p95 latencies.
 
     python scripts/run_t2_grid.py                 # all three calibrations, ~10 minutes each
     python scripts/run_t2_grid.py --calibration A
         # configs/tpot_slo.yaml -> artifacts/results/t2_two_part_slo/grid_<A|B|C>.json
 
-Registered before it ran (configs/tpot_slo.yaml; docs/09-hypotheses.md). This script only RUNS the
-simulator and writes down, for every (prompts, load, policy, replicas, seed), the run's p95 time to
-first token and p95 time per output token. It applies no target and decides nothing:
-`scripts/t2_analyze.py` does that, from these files — which is why the replica count under any
-target, the registered one or a reported one, comes from the same runs.
-
-The grid is H2b-C2's (configs/h2b_c2.yaml: the traffic, loads, policies, load weights, seeds),
-read from that file, with the replica axis extended to `t2.replicas_max`.
+For every (prompts, load, policy, replicas, seed) this records the run's p95 time to first token
+and p95 time per output token, and applies no target: scripts/t2_analyze.py applies the targets to
+these files, so the replica counts under every target come from the same runs. The grid is
+H2b-C2's (configs/h2b_c2.yaml: traffic, loads, policies, load weights, seeds), with the replica
+axis extended to `t2.replicas_max`.
 """
 
 from __future__ import annotations
@@ -91,7 +88,7 @@ def run_calibration(name: str, cfg: dict[str, Any], out: pathlib.Path, workers: 
     sys.path.insert(0, str(REPO / "scripts"))
     from _spike_common import results_header
 
-    # Taken BEFORE the runs: the header must describe the tree that produced the numbers.
+    # Taken before the runs, so the header describes the tree that produced the numbers.
     payload = results_header("scripts/run_t2_grid.py", seed=0, hardware_path="cpu-only")
     pols = [(p, a) for p, a in grid["policies"]]
     jobs = [(k, ld, p, a, n, s) for k in grid["prompts"] for ld in grid["loads"] for p, a in pols

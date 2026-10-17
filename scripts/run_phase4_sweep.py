@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Phase 4's first CALIBRATED sweep — and its pre-registered tests of H1 and H5.
+"""Phase 4: the sweep on the calibrated T4 profile, with the tests of H1 and H5.
 
     python scripts/run_phase4_sweep.py        # configs/phase4_sweep.yaml
                                               #   -> artifacts/results/phase4_sweep_t4/
 
-The design and every decision rule were committed before this ran (configs/phase4_sweep.yaml, plus a
-dated amendment in docs/09-hypotheses.md). This script IS that procedure: it chooses nothing after
-seeing a result.
+Runs every policy over the config's traces, loads, replica counts and seeds, then reports the
+fewest replicas each policy needs to hold the SLO, a recommendation at each load, H1 (hit rate
+against least-loaded, paired session bootstrap) and H5 (replicas needed against round-robin). The
+decision rules come from the config; this script applies them and tunes nothing.
 
-Tier (ADR-010): the profile is calibrated — Phase 3's fitted T4 timings — so milliseconds and rupees
-here are **T4 figures**, and are not predictions for any other GPU. Whether the policy RANKING
-transfers to other hardware is H6's question, tested separately.
+ADR-010 tier: the profile holds Phase 3's fitted T4 timings, so milliseconds and rupees here are
+T4 figures and not predictions for any other GPU. Whether the policy ranking transfers to other
+hardware is tested by H6 (scripts/run_h6.py).
 """
 
 from __future__ import annotations
@@ -42,9 +43,6 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 _CONFIG_PATH = REPO / "configs" / "phase4_sweep.yaml"
 
 
-# ── one run, in a worker process ──────────────────────────────────────────────────────────────
-
-
 @lru_cache(maxsize=1)
 def _cfg() -> dict[str, Any]:
     return yaml.safe_load(_CONFIG_PATH.read_text())
@@ -72,16 +70,13 @@ def _job(key: tuple) -> tuple:
     r = run(trace, policy=policy, n_replicas=n, seed=seed, profile=_profile(),
             cache_model=_cfg()["cache_model"], record_per_request=keep)
     per_request = None
-    if keep:  # (session, cached tokens, prompt tokens) — the H1 bootstrap's raw material
+    if keep:  # (session, cached tokens, prompt tokens) per request, for the H1 bootstrap
         meta = {q.request_id: (q.session_id, q.prompt_tokens) for q in trace}
         per_request = [(meta[rid][0], v["cached_tokens"], meta[rid][1])
                        for rid, v in sorted(r.per_request.items())]
     extra = {"preemptions": r.preemptions, "p99_ms": r.ttft_percentiles()["p99_ms"],
              "completed": r.completed}
     return key, to_point(r, _cost()), extra, per_request
-
-
-# ── the decision rules ────────────────────────────────────────────────────────────────────────
 
 
 def _ratio(items: list[tuple[int, int]]) -> float:
@@ -149,7 +144,7 @@ def main() -> int:
     req = {name: {str(load): {p: required(name, load, p) for p in pols} for load in loads}
            for name in cfg["traces"]}
 
-    # H1 — high sharing: affinity vs least-loaded, paired by session, at every load.
+    # H1, high sharing: affinity vs least-loaded hit rate, paired by session, at every load.
     h1_out: dict[str, Any] = {}
     for pol in h1["policies"]:
         per_load = {}
@@ -170,7 +165,7 @@ def main() -> int:
                                     for v in per_load.values()),
                        "per_load": per_load}
 
-    # H5 — per trace: fewer replicas somewhere, more nowhere.
+    # H5, per trace: fewer replicas than round-robin at some load and more at none.
     h5_out: dict[str, Any] = {}
     for name in cfg["traces"]:
         h5_out[name] = {}

@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
-"""POST HOC — H2b-C2's grid on three calibrations of the same T4: which claims survive all three?
+"""Post hoc: compare H2b-C2's grid across three calibrations of the same T4.
 
     python scripts/c3_posthoc_grid.py
         # -> artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.{json,md}
 
-⚠️ Post hoc, and labelled so wherever its numbers are quoted. C3 registered ONE comparison as a
-reported item: H2b-C2's grid re-run on the profile `kvsim calibrate` wrote in its first run,
-against the committed table (`scripts/c3_analyze.py --grid`). That comparison reversed H2b's
-verdict. This script was written after seeing it, to ask how much of the grid a calibration can
-move: it adds the profile from the command's second run, and lays the three tables side by side.
-
-The three profiles describe the same GPU type, model and engine version:
-  A — C2's fit (2026-09-30): 101 measured points, fitted by scripts/c2_analyze.py. The committed
-      table, artifacts/results/h2b_c2/ — the one the README's finding rests on.
-  B — `kvsim calibrate`, C3 part 1 (2026-10-05): the run C3a and C3b were decided on.
-  C — `kvsim calibrate`, C3 part 3, 25 minutes later on the same engine.
-Tables B and C are made by scripts/run_h2b_c2.py with its registered config unchanged but for the
-profile. This script reads the three results and chooses nothing in them.
+C3 reported one comparison (`scripts/c3_analyze.py --grid`): the grid re-run on the profile from
+`kvsim calibrate`'s first run, against the committed table. That comparison reversed H2b's
+verdict, so this post hoc script adds the profile from the command's second run and lays the three
+tables side by side to show how much of the grid a calibration can move. The three profiles share
+the GPU type, model and engine version:
+  A: C2's fit (101 measured points, scripts/c2_analyze.py); its table, artifacts/results/h2b_c2/,
+     is the committed one behind the README's finding.
+  B: `kvsim calibrate` in C3 part 1, the run C3a and C3b were decided on.
+  C: `kvsim calibrate` in C3 part 3, later on the same engine.
+Tables B and C come from scripts/run_h2b_c2.py with its config unchanged except for the profile.
+This script only reads the three results.
 """
 
 from __future__ import annotations
@@ -83,7 +81,7 @@ def analyze(tables: dict[str, dict]) -> dict:
         by_k.setdefault(k, [0, 0])[1] += 1
     for k, _ld in best_all:
         by_k[k][0] += 1
-    # Points where sticky needs no more replicas than the other policy on EVERY calibration.
+    # Points where sticky needs no more replicas than the other policy on every calibration.
     never_more = {q: sum(1 for k, ld in points
                          if all(req[t][k][ld][STICKY] <= req[t][k][ld][q] for t in names))
                   for q in pols if q != STICKY}

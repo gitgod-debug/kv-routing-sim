@@ -1,12 +1,8 @@
-"""LMetric: (prefill tokens waiting at a replica + this request's own) × (its requests + 1).
+"""LMetric routing: minimise (queued plus new prefill tokens) times (active requests + 1).
 
 Zhang et al., "Simple is Better: Multiplication May Be All You Need for LLM Request Scheduling",
-OSDI '26 (arXiv 2603.15202). ⭐ NOT THIS PROJECT'S IDEA: it is here because it is the published
-answer to the question this project asks, and a comparison that leaves it out is not a comparison
-(docs/04-prior-art.md §2a).
-
-Implemented from the authors' own router rather than from the paper's figure —
-blitz-serving/blitz-router @ lmetric/camera-ready, `docs/dsl/policies.md`:
+OSDI '26 (arXiv 2603.15202). Ported from the authors' router, blitz-serving/blitz-router at
+lmetric/camera-ready, `docs/dsl/policies.md`:
 
     policy lmetric-q:   Select min by prefill_tokens(req, sctx) · (sctx.bs + 1)
 
@@ -18,22 +14,19 @@ and `docs/dsl/schema.md` for the terms:
     queued_tokens(sctx)         prefill tokens committed to the replica and not yet done:
                                 += new_tokens(req, sctx) when a request is dispatched to it
 
-"The (bs + 1) term ensures idle replicas (bs == 0) are still distinguishable by their prefill
-load alone" (their `lmetric.rs`).
+The `+ 1` keeps idle replicas (bs == 0) distinguishable by their prefill load alone (their
+`lmetric.rs`). A product needs no weight: in a weighted sum `cache_score - alpha * load` the right
+alpha changes with the load, while in a product the exchange rate cancels when two replicas are
+compared.
 
-WHY A PRODUCT. A weighted sum `cache_score − α · load` needs an α that converts blocks into
-requests, and the right α moves with the load — this project swept it (16, then 1) and found no
-value that is right everywhere. In a product the exchange rate cancels when two replicas are
-compared, so there is nothing to tune.
+Choices this port makes, each of which can move a result:
 
-THREE THINGS THIS PORT DECIDES, each stated because each could move a result:
-
-1. THE INDEX. `index="events"` (default) asks the engine what each replica holds, as their router
-   does: its radix tree follows the engine's step events. `index="dispatch"` uses this router's
-   own record of what it sent where (policies/base.py explains the two).
-2. WHEN QUEUED PREFILL IS RELEASED. At the request's first token — in this simulator a request is
-   prefilled in the step that admits it and emits its first token at that step's end.
-3. TIES go to the injected rng, as for every policy here; theirs takes the first minimum.
+1. The index. `index="events"` (the default) asks the engine what each replica holds, as the
+   authors' router does by following the engine's step events; `index="dispatch"` uses this router's
+   own record of what it sent where (see policies/base.py).
+2. Queued prefill is released at the request's first token: in this simulator a request is prefilled
+   in the step that admits it and emits its first token at that step's end.
+3. Ties are broken with the injected rng; the authors' router takes the first minimum.
 """
 
 from __future__ import annotations
@@ -64,7 +57,7 @@ class LMetric(RadixAffinity):
         if index not in INDEXES:
             raise ValueError(f"index must be one of {INDEXES}, got {index!r}")
         profile = kwargs.pop("profile", None)
-        kwargs.pop("load_penalty", None)  # this policy has no weight; that is its point
+        kwargs.pop("load_penalty", None)  # the product needs no weight
         super().__init__(n_replicas, **kwargs)
         self.index = index
         self.wants_cache_view = index == "events"
@@ -79,8 +72,8 @@ class LMetric(RadixAffinity):
         if self.index == "events":
             assert state.hit_blocks is not None  # the engine fills it for wants_cache_view
             return [state.hit_blocks(i, request) for i in range(self.n_replicas)]
-        # The engine never reports a whole prompt as cached — the last token is always computed
-        # (cache/block_pool.py `max_hit_blocks`) — so neither does this view of it.
+        # The engine never reports a whole prompt as cached, since the last token is always
+        # computed (cache/block_pool.py `max_hit_blocks`), so neither does this view of it.
         cap = max_hit_blocks(request.prompt_tokens, self.block_size)
         blocks = request.block_hashes[:cap]
         first = self._owners.get(blocks[0], 0) if blocks else 0

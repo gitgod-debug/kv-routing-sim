@@ -1,21 +1,18 @@
 #!/usr/bin/env python3
-"""Dry-run the C4 notebook on this machine against a mock engine — then the whole analysis.
+"""Dry-run the C4 notebook against a mock engine, then run the whole analysis on its output.
 
     python scripts/c4_dryrun.py [--keep]
 
-Builds a SMALL version of the notebook (fewer and smaller cells, short traffic, two runs of the
-command; the registered notebook and predictions are never touched), executes every code cell the
-way Run-All does against Phase 3's mock engine, then runs scripts/c4_grids.py and
-scripts/c4_analyze.py — the registered analysis — on what came out.
+Builds a small version of the notebook (fewer and smaller cells, short traffic, two runs of the
+command; the registered notebook and predictions are left alone), runs every code cell as Run-All
+would against Phase 3's mock engine, then runs scripts/c4_grids.py and scripts/c4_analyze.py on the
+results.
 
-⭐ The mock IS the simulator's model, with known context terms, and the small registration's
-predictions are made with the mock's own profile. So every timing rule must HOLD here with a
-factor near 1: the shared-prefix cells, the stall cells, and the per-request token times on
-traffic. Anything else is a bug in the notebook or the analysis, found before a GPU is spent. It
-says nothing about vLLM.
-
-What only a real engine can show is NOT covered: whether vLLM serves the two histograms as the
-mock does, and every number.
+The mock is the simulator's model with known context terms, and the small registration's
+predictions use the mock's own profile, so every timing rule must hold with a factor near 1: the
+shared-prefix cells, the stall cells, and the per-request token times on traffic. A failure is a
+bug in the notebook or the analysis. Not covered: whether vLLM serves the two histograms as the
+mock does, and any real number.
 """
 
 from __future__ import annotations
@@ -110,7 +107,7 @@ def main() -> int:
         with contextlib.redirect_stdout(buf):
             for i, src in enumerate(cells):
                 exec(compile(src, f"cell{i}", "exec"), ns)  # noqa: S102 - the point of a dry-run
-    except Exception as e:  # noqa: BLE001 - whatever a cell raises IS the dry-run's finding
+    except Exception as e:  # noqa: BLE001 - whatever a cell raises is the dry-run's finding
         err = f"{type(e).__name__} in code cell {i}: {e}"
     finally:
         with contextlib.suppress(Exception), contextlib.redirect_stdout(io.StringIO()):

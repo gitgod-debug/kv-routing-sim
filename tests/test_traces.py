@@ -1,4 +1,4 @@
-"""Trace ingestion: the schema contract, dirty input, and the generator's honesty about its knob."""
+"""Tests for trace ingestion (schema, dirty input, format adapters) and the workload generator."""
 
 from __future__ import annotations
 
@@ -105,7 +105,7 @@ def test_unknown_format_fails_loudly():
 
 
 def test_generator_reports_what_it_achieved_not_what_was_asked():
-    """The knob is a target. Reporting it as the outcome would be a quiet substitution."""
+    """The sharing ratio is a target; the report gives the achieved value alongside it."""
     for requested in (0.0, 0.3, 0.6, 0.85):
         wl = AgenticWorkload(n_sessions=60, prefix_sharing_ratio=requested, seed=0)
         _, report = wl.generate()
@@ -215,7 +215,7 @@ def test_mooncake_token_scale_keeps_structure_and_shrinks_sizes(tmp_path):
 
 def test_mooncake_sessions_follow_histories_but_never_a_shared_prompt(tmp_path):
     """A turn that re-sends a request's full blocks joins its session. Requests that only share a
-    hot system prompt — one many different blocks follow — stay separate."""
+    hot system prompt (one that many different blocks follow) stay separate."""
     # five users behind shared prompt 0: its fan-out is 5
     rows = [{"timestamp": i, "input_length": 1536, "output_length": 1,
              "hash_ids": [0, 100 + i, 200 + i]} for i in range(5)]
@@ -244,7 +244,7 @@ def test_mooncake_bad_lines_are_skipped_and_counted(tmp_path):
 
 
 def _agentx(tmp_path, bad_count=False):
-    """Two tiny AgentX sessions; the second reuses the first's LOCAL ids on purpose."""
+    """Two tiny AgentX sessions; the second reuses the first's local ids on purpose."""
     s1 = {"id": "t1", "models": ["main-model"], "block_size": 64, "hash_id_scope": "local",
           "requests": [
               {"t": 0.0, "type": "n", "model": "main-model", "in": 1024, "out": 64,
@@ -266,15 +266,15 @@ def _agentx(tmp_path, bad_count=False):
 
 
 def test_agentx_hash_scope_is_local_and_blocks_group_at_the_scale(tmp_path):
-    """At 1/64, sixteen 64-token trace blocks make one 16-token block. Equal ids share within a
-    session; the same ids in ANOTHER session must not — the dataset's ids are session-local."""
+    """At 1/64, sixteen 64-token trace blocks make one 16-token block. Equal ids are shared within a
+    session but not across sessions, because the dataset's ids are session-local."""
     reqs = list(adapters.get("agentx").read(_agentx(tmp_path), token_scale=1 / 64,
                                             concurrency=2, stagger_s=0.0))
     t1 = [r for r in reqs if r.session_id == "t1"]
     (t2,) = [r for r in reqs if r.session_id == "t2"]
     assert [len(r.block_hashes) for r in t1] == [1, 2]
     assert t1[0].block_hashes[0] == t1[1].block_hashes[0]  # shared within the session
-    assert t2.block_hashes[0] != t1[0].block_hashes[0]  # the same local ids: NOT shared
+    assert t2.block_hashes[0] != t1[0].block_hashes[0]  # the same local ids: not shared
     assert (t1[0].prompt_tokens, t1[0].output_tokens) == (16, 1)
 
 
@@ -337,7 +337,7 @@ def test_bailian_sessions_are_the_traces_own_and_prefixes_are_chained(tmp_path):
     assert [r.session_id for r in (a, b, c, d, e)] == ["b0", "b1", "b0", "b0", "b4"]
     assert a.block_hashes[:2] == b.block_hashes[:2]
     assert a.block_hashes[2] != b.block_hashes[2]
-    # Block 8 is at position 3 in both, after DIFFERENT prefixes: it is not shared.
+    # Block 8 is at position 3 in both, after different prefixes: it is not shared.
     assert a.block_hashes[3] != b.block_hashes[3]
     assert c.block_hashes[:4] == a.block_hashes and len(c.block_hashes) == 6  # 100 // 16
     assert d.block_hashes[:6] == c.block_hashes and len(d.block_hashes) == 7  # 120 // 16

@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""POST HOC — why T1 failed where it did: was the timing model asked about batches it never saw?
+"""Post hoc: compare the summed context in T1's replays with the range the model was fitted on.
 
-    python scripts/t1_posthoc_range.py     # -> artifacts/results/t1_itl/posthoc_range.{json,md}
+    python scripts/t1_posthoc_range.py
+        # configs/tpot_slo.yaml, artifacts/results/t1_itl/t1.json
+        #   -> artifacts/results/t1_itl/posthoc_range.{json,md}
 
-⚠️ Post hoc: written after T1 ran and did not hold. T1's five replays came out in two groups —
-three within 1.07× of the engine's mean inter-token latency, two (the same workload, `K1_half`, in
-both sessions) 1.5–1.7× too slow. This asks one question of the same five replays, and chooses
-nothing in them: in each decode step, how large was the batch's SUMMED context (the S in
-decode(b, S) = d0 + d1·b + d2·S) — and how does that compare with the largest S any calibration
-cell measured?
+T1 did not hold: three of its five replays were within 1.07× of the engine's mean inter-token
+latency, and two (`K1_half` in both sessions) were 1.5–1.7× too slow. For every decode step of the
+same five replays this records the batch's summed context S, as in decode(b, S) = d0 + d1·b + d2·S,
+and compares it with the largest S any calibration cell measured.
 
-Why it could matter. A calibration cell is b sequences with UNIQUE prompts, so b × context cannot
-exceed the KV cache (24,592 tokens on this T4): the largest S measured is ~20,000. Traffic that
-shares one system prompt is different — the shared blocks are stored once, so far more sequences
-fit, while each still attends over its whole context. S can then be several times the cache, and
-the model's decode cost there is a straight-line extrapolation.
+A calibration cell is b sequences with unique prompts, so b × context cannot exceed the KV cache
+(24,592 tokens on this T4) and the largest S measured is about 20,000. Traffic that shares a system
+prompt stores the shared blocks once, so far more sequences fit while each still attends over its
+whole context; S can then be several times the cache, where the model's decode cost is a
+straight-line extrapolation.
 """
 
 from __future__ import annotations
@@ -93,7 +93,7 @@ def main() -> int:
                 "decode_steps": len(STEPS),
                 "median_batch": statistics.median(b for b, _ in STEPS),
                 "max_batch": max(b for b, _ in STEPS),
-                # Per TOKEN, not per step: a step of 60 sequences is 60 tokens' worth of latency.
+                # Per token, not per step: a step of 60 sequences is 60 tokens' worth of latency.
                 "summed_context_median": statistics.median(s_by_token),
                 "summed_context_p95": s_by_token[round(0.95 * (len(s_by_token) - 1))],
                 "summed_context_max": s_by_token[-1],

@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Real traffic, replayed through every policy on the T4 profile: R1 (Mooncake) and R2 (AgentX).
+"""Replay real traffic through every policy on the T4 profile: R1 (Mooncake) and R2 (AgentX).
 
     python scripts/run_realtrace.py            # configs/realtrace_mooncake.yaml (R1)
     python scripts/run_realtrace.py --config configs/realtrace_agentx.yaml          # R2
     python scripts/run_realtrace.py --probe    # round-robin only: how many replicas at each speed
 
-The design and every decision rule were committed before the run (the config, plus a dated entry in
-docs/09-hypotheses.md). The `--probe` mode runs round-robin ALONE — no comparison between policies —
-and exists only to choose the speeds, the way Phase 4 chose its loads.
+Writes realtrace.json and report.md to the config's results_dir. The decision rules come from the
+config; this script applies them and tunes nothing. `--probe` runs round-robin alone, with no
+comparison between policies, to choose the replay speeds.
 
-The trace files are other people's data and are never committed (.gitignore: artifacts/traces/).
-Fetch them from the source named in the config; the results file records each file's sha256, so a
-reader can check they replayed the same bytes.
+The trace files are third-party data and are not committed (artifacts/traces/ is in .gitignore).
+Fetch them from the source named in the config; the results file records each file's sha256 so a
+reader can check that the same bytes were replayed.
 
-Tier (ADR-010): T4 timings, and a SCALED replay (every token count × `token_scale`) — see the
-adapter's docstring for what that does and does not preserve.
+ADR-010 tier: T4 timings and a scaled replay (every token count times `token_scale`); the
+adapter's docstring says what the scaling preserves and what it does not.
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ def _base_trace(name: str) -> tuple:
 
 @cache
 def _trace(name: str, speed: float) -> tuple[tuple, int]:
-    """The window at `speed`× the recorded arrival rate, and how many requests are warm-up."""
+    """The window at `speed` times the recorded rate, and the number of warm-up requests."""
     base = _base_trace(name)
     trace = tuple(dataclasses.replace(r, arrival_ts=r.arrival_ts / speed) for r in base)
     warmup = sum(1 for r in base if r.arrival_ts < _cfg()["warmup_s"])
@@ -153,7 +153,7 @@ def main() -> int:
     sys.path.insert(0, str(REPO / "scripts"))
     from _spike_common import results_header
 
-    # Taken BEFORE the runs: the header must describe the tree that produced the numbers.
+    # Taken before the runs, so the header describes the tree that produced the numbers.
     payload = results_header("scripts/run_realtrace.py", seed=0, hardware_path="cpu-only",
                              extra={"config": cfg})
     payload["trace_sha256"] = {nm: _sha256(REPO / cfg["traces"][nm]) for nm in names}
@@ -206,12 +206,12 @@ def main() -> int:
 
 
 def _rule(rule: str, req: dict[str, dict[str, int]], wins: dict[str, str], star: str) -> bool:
-    """One registered rule on one trace. `req[speed][policy]` = replicas needed (NOT_MET if none).
+    """One decision rule on one trace; `req[speed][policy]` is replicas needed, or NOT_MET.
 
-    affinity_wins / affinity_never_wins (R1): balanced affinity at alpha* against session-sticky.
-    tie_within_one / pure_affinity_ties_sticky (R2): at every speed where either policy holds the
-    SLO on 8, the two need replicas within one of each other — and at least one speed must be
-    testable, or the rule does not hold (an untestable rule is not a confirmed one).
+    affinity_wins / affinity_never_wins (R1) compare balanced affinity at alpha* with
+    session-sticky. tie_within_one / pure_affinity_ties_sticky (R2) require that, at every speed
+    where either policy holds the SLO on 8 replicas, the two need replicas within one of each
+    other; at least one speed must be testable, or the rule does not hold.
     """
     aff = [sp for sp, w in wins.items() if w == "affinity"]
     stk = [sp for sp, w in wins.items() if w == "sticky"]

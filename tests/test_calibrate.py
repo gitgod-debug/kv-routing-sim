@@ -1,9 +1,9 @@
-"""`kvsim calibrate`, against the repo's mock vLLM — the one engine whose true timings are known.
+"""Tests for `kvsim calibrate` against the repository's mock vLLM, whose true timings are known.
 
-The mock (scripts/phase3_dryrun.py) is a real HTTP server that schedules requests in real time with
-the simulator's own vLLM model and a known profile: prefill 1 ms + 0.02 ms per token, decode
-0.5 ms + 2.5 ms per sequence in the batch. So a correct calibration must recover those numbers, and
-its cache check must come out exact — here the model IS the engine, as in the Phase 3 dry-run.
+The mock (scripts/phase3_dryrun.py) is an HTTP server that schedules requests in real time with the
+simulator's vLLM model and a known profile: prefill 1 ms + 0.02 ms per token, decode 0.5 ms +
+2.5 ms per sequence in the batch. A correct calibration recovers those numbers, and its cache check
+is exact because the model is the engine.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ QUIET = {"log": lambda *_: None}
 SMALL = {"prefill_lengths": (64, 256, 1024, 2048), "reps": 2, "prefill_cached": (256, 1024),
          "prefill_new": (64, 512), "decode_batches": (1, 2, 4, 8), "decode_contexts": (32, 1024),
          "decode_tokens": 32, "check_sessions": 8, "check_turns": 3}
-# The context terms a second mock is given — C2's T4 fit is 3.5e-6 and 7.6e-7; these are close.
+# The context terms given to a second mock. C2's T4 fit is 3.5e-6 and 7.6e-7; these are close.
 CTX = {"MOCK_DECODE_PER_CTX_TOKEN_S": "4e-6", "MOCK_PREFILL_ATTN_S": "2e-8"}
 
 
@@ -96,8 +96,8 @@ def test_calibration_recovers_the_mock_engines_own_timings(mock_url, tmp_path):
     out.write_text(json.dumps(profile))
     loaded = load_profile(out)  # the file is a profile the simulator accepts as it is
     assert loaded.calibrated and loaded.kv_cache_blocks == 4000
-    # Every timing cell was measured `reps` times, and the profile keeps the fit of each repeat —
-    # what `kvsim replay` sizes on to show how firm a replica count is.
+    # Every timing cell is measured `reps` times, and the profile keeps the fit of each repeat,
+    # which `kvsim replay` uses to show how firm a replica count is.
     src = profile["_source"]
     cells = {(c["batch"], c["context"]) for c in src["decode_cells"]}
     assert len(src["decode_cells"]) == SMALL["reps"] * len(cells)
@@ -112,8 +112,8 @@ def test_calibration_recovers_the_mock_engines_own_timings(mock_url, tmp_path):
 
 
 def test_calibration_recovers_known_context_terms(ctx_mock_url):
-    """C2's point: decode and prefill cost grow with context. A mock given known context terms must
-    have them recovered — and the profile must carry them, or replicas would be sized optimistic."""
+    """Known context terms given to the mock are recovered and kept in the profile, without which
+    replica counts would be too optimistic."""
     profile, ok = calibrate(Engine(ctx_mock_url, poll_s=0.05), model="mock", **SMALL, **QUIET)
     assert ok and profile["calibration_error"] == 0.0
     assert profile["decode_per_ctx_token_s"] == pytest.approx(
@@ -123,9 +123,8 @@ def test_calibration_recovers_known_context_terms(ctx_mock_url):
 
 
 def test_prefill_is_also_timed_after_a_cached_prefix(ctx_mock_url):
-    """Agentic traffic is a long cached prefix and few new tokens — the case cold prompts never
-    measure (scripts/c3_precheck.py). Each such cell must reach the fit with the cached tokens the
-    ENGINE reported, not the ones the design hoped for."""
+    """Cells with a cached prefix (the agentic case; see scripts/c3_precheck.py) are fitted with the
+    cached tokens the engine reported, not the ones the design asked for."""
     profile, _ = calibrate(Engine(ctx_mock_url, poll_s=0.05), model="mock", **SMALL, **QUIET)
     points = profile["_source"]["prefill_points"]
     after = [(p["prompt_tokens"] - p["uncached_tokens"], p["uncached_tokens"]) for p in points
@@ -138,8 +137,8 @@ def test_prefill_is_also_timed_after_a_cached_prefix(ctx_mock_url):
 
 
 def _synthetic(scale_by_rep: dict[int, float]) -> tuple[list[dict], list[dict]]:
-    """Timing points an engine with known coefficients would give — each repeat's engine the true
-    one scaled, so the fit of that repeat alone must come out scaled the same."""
+    """Timing points from an engine with known coefficients, scaled per repeat, so each repeat's
+    own fit must come out scaled the same way."""
     d0, d1, d2 = 0.04, 3e-4, 3.5e-6
     p0, p1, p2 = 0.0, 3e-4, 7.5e-7
     mid = (8 + 64) / 2
@@ -157,8 +156,8 @@ def _synthetic(scale_by_rep: dict[int, float]) -> tuple[list[dict], list[dict]]:
 
 
 def test_the_fit_of_each_repeat_alone_shows_how_much_the_engine_moved():
-    """Three repeats; the engine is 10% slower in the second and 5% faster in the third. The pooled
-    fit lands in between — and hides that. The per-repeat fits show it."""
+    """With the engine 10% slower in the second repeat and 5% faster in the third, the per-repeat
+    fits show the drift that the pooled fit averages away."""
     prefill, decode = _synthetic({0: 1.0, 1: 1.1, 2: 0.95})
     pooled = fit(prefill, decode, output_tokens=64)
     reps = fit_replicates(prefill, decode, output_tokens=64)
@@ -176,7 +175,7 @@ def test_the_fit_of_each_repeat_alone_shows_how_much_the_engine_moved():
 def test_one_repeat_has_nothing_to_compare_and_a_broken_one_is_left_out():
     prefill, decode = _synthetic({0: 1.0})
     assert fit_replicates(prefill, decode, output_tokens=64) == []  # one repeat: no spread
-    # Points from before repeats were tagged (no "rep" key) are one repeat, not an error.
+    # Points without a "rep" key (older profiles) count as one repeat, not an error.
     untagged = ([{k: v for k, v in p.items() if k != "rep"} for p in prefill],
                 [{k: v for k, v in c.items() if k != "rep"} for c in decode])
     assert fit_replicates(*untagged, output_tokens=64) == []
@@ -186,7 +185,7 @@ def test_one_repeat_has_nothing_to_compare_and_a_broken_one_is_left_out():
         if c["rep"] == 1:
             c["valid"] = False
     assert [r["rep"] for r in fit_replicates(prefill, decode, output_tokens=64)] == [0, 2]
-    # …and if that leaves a single one, there is again nothing to compare.
+    # If that leaves a single repeat, there is again nothing to compare.
     for c in decode:
         if c["rep"] == 2:
             c["valid"] = False
@@ -223,8 +222,8 @@ def test_cached_prefix_cells_that_do_not_fit_the_engine_are_skipped():
 
 
 def test_the_command_lines_default_cells_are_the_librarys():
-    """The default cells are named twice — the parser's strings and the library's constants. If
-    they drift apart, the documented procedure and the one that runs are different procedures."""
+    """The parser's default cells equal the library's constants, so the documented procedure is
+    the one that runs."""
     from kv_routing_sim.calib import calibrate as lib
     from kv_routing_sim.cli import _ints, build_parser
 
@@ -238,7 +237,7 @@ def test_the_command_lines_default_cells_are_the_librarys():
 
 def test_a_wrong_block_size_is_caught_by_the_check(mock_url):
     """With 32-token blocks the model mispredicts almost every request's cached tokens, while the
-    total hit rate moves by only a few percent — which is why every request is compared."""
+    total hit rate moves by only a few percent, which is why every request is compared."""
     profile, ok = calibrate(Engine(mock_url, poll_s=0.05), model="mock", block_size=32,
                             **SMALL, **QUIET)
     assert not ok and profile["calibrated"] is False
@@ -307,7 +306,7 @@ def _real(metrics: str) -> dict:
 
 
 def test_probe_reads_what_a_real_vllm_0_30_served():
-    """Parsed from what vLLM 0.30.0 actually served on the T4 in Phase 3 — not from the mock."""
+    """Parses what vLLM 0.30.0 served on the T4 in Phase 3, not the mock's output."""
     metrics = (PHASE3 / "metrics_W2_short_r1_before.txt").read_text()
     info = probe(_Canned(_real(metrics)))
     assert (info.kv_cache_blocks, info.block_size, info.max_num_seqs) == (512, 16, 256)

@@ -4,21 +4,16 @@
     python scripts/build_grid.py                   # context-free profile -> demo_grid.json
     python scripts/build_grid.py --source h2b_c2   # C2's context-aware one -> demo_grid_ctx.json
 
-⭐ THIS IS THE DEMO'S ENTIRE BACKEND (ADR-011). The static page (`site/`) ships this file and its
-selectors look answers up in it: no server, nothing to wake, and every number comes from this
-committed script with pinned seeds — auditable exactly like anything else in `artifacts/results/`.
+The static demo page (site/, ADR-011) has no server: it looks every answer up in this file. Each
+cell is one H2b configuration (K distinct tenant prompts, offered load, replicas, policy) on the
+calibrated T4 profile and the cost model, with its hit rate, TTFT percentiles, cost and whether it
+holds the p95 TTFT SLO. Traffic, prompt counts, loads, replicas, seeds and alpha* are read from
+configs/phase5_crossover.yaml and Phase 5's results, and the build stops unless the grid
+reproduces Phase 5's H2b required-replica table exactly.
 
-The axes are the finding's (H2b): K distinct tenant prompts × offered load × replicas × policy, on
-the calibrated T4 profile and the cited cost model, so each cell says whether it holds the 2 s p95
-TTFT target and what it costs. Traffic, prompt counts, loads, replicas, seeds and alpha* are read
-from Phase 5's config and results, and a guard stops the build unless the grid reproduces Phase 5's
-H2b required-replica table exactly: the demo cannot drift from the experiment it illustrates.
-
-`--source h2b_c2` builds the same grid on C2's context-aware T4 profile, with the loads and replicas
-of configs/h2b_c2.yaml, and guards it against that registered re-test's table instead.
-
-⚠️ T4 figures, generated traffic, one model. The direction of the K flip survived H6's hardware
-rescales; the replica counts and rupees did not transfer (H6's ranking half). The page says so.
+`--source h2b_c2` uses C2's context-aware T4 profile with the loads and replicas of
+configs/h2b_c2.yaml, and checks against that experiment's table instead. Output goes to
+artifacts/results/. The numbers are specific to a T4, generated traffic and one model.
 """
 
 from __future__ import annotations
@@ -68,8 +63,10 @@ def _p5_results() -> dict[str, Any]:
 
 @lru_cache(maxsize=1)
 def _src() -> dict[str, Any]:
-    """The profile, loads and replicas to build on, and the registered table the grid must match.
-    The traffic is always Phase 5's H2b traffic."""
+    """Profile, loads, replicas and reference table for the selected source.
+
+    The traffic is Phase 5's H2b traffic for both sources.
+    """
     if _SOURCE == "phase5":
         p5 = _p5()
         return {"profile": p5["profile"], "loads": p5["loads"], "replicas": p5["replicas"],
@@ -99,7 +96,7 @@ def _policies() -> list[tuple[str, float | None]]:
         ("session-sticky", None),
         ("radix-affinity", None),
         ("radix-affinity-balanced", alpha_star),  # Phase 5's A1 choice
-        ("radix-affinity-balanced", 1.0),  # the best weight once prompts multiply (post-hoc)
+        ("radix-affinity-balanced", 1.0),  # best weight at large K, chosen post hoc
     ]
 
 
@@ -156,9 +153,9 @@ def main() -> int:
         runs.setdefault((k, ld, p, al, n), []).append(point)
     agg = {key: average_points(pts) for key, pts in runs.items()}
 
-    # Guard: every cell here is also in the registered experiment's grid — same traces, seeds,
-    # profile, cost model and code path. If the fewest replicas holding the SLO differ anywhere,
-    # the page would show numbers the experiment did not produce: stop instead of writing.
+    # Guard: every cell here is also a cell of the reference experiment (same traces, seeds,
+    # profile, cost model and code path), so the fewest replicas holding the SLO must match its
+    # table exactly, or the page would show numbers the experiment did not produce.
     want = src["guard"]
     for k in ks:
         for ld in loads:

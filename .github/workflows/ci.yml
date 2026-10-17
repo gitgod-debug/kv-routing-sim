@@ -1,5 +1,5 @@
-# Tests and lint on every push and pull request. CPU only: the core install never pulls a GPU
-# wheel (ADR-009), so this is also the check that it still installs without one.
+# Lint and tests on every push and pull request, on CPU only: the core install must never need a
+# GPU wheel (ADR-009).
 name: ci
 
 on:
@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - name: Install (core + dev extras only — no vLLM, no torch)
+      - name: Install the package with its dev extras
         run: python -m pip install -e ".[dev]"
       - name: Lint
         run: ruff check .

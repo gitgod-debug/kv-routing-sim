@@ -1,30 +1,24 @@
 #!/usr/bin/env python3
-"""Phase-0 spike: does a live vLLM expose a MOVING prefix-cache hit rate, and on this hardware?
+"""Phase 0 spike: check that a live vLLM exposes prefix-cache counters that move under load.
 
-⛔ This script gates the whole project. `CHECKPOINTS.md` Phase 0: no simulator code is written until
-it passes. Every assumption underneath the calibration plan — that prefix caching behaves as
-documented on this GPU, that the two counters exist and move, that the `vllm:kv_block_*` histograms
-are reachable — has never been executed once, and a cache model designed against documentation is
-how `Mike-Ew/kv-cache-routing` ended up citing a metric that does not exist
-(see `docs/04-prior-art.md`).
+This is the Phase 0 metric gate in CHECKPOINTS.md: the calibration relies on these metrics, so they
+are checked on a real server rather than taken from documentation. Checks, most important first:
 
-WHAT IT CHECKS, in order of how badly a "no" would hurt:
+  1. `vllm:prefix_cache_queries` and `vllm:prefix_cache_hits` are present (ADR-008).
+  2. Both increase when a shared-prefix workload is sent; counters that are present but flat
+     would otherwise pass for a success.
+  3. `vllm:prefix_cache_hit_rate` is absent, as ADR-008 expects (the gauge went away with V0).
+  4. The hit rate with prefix caching on is higher than with it off. Only this check tests the
+     caching mechanism rather than the metrics plumbing.
+  5. The three `vllm:kv_block_*` histograms appear under `--kv-cache-metrics-sample`; H4 depends
+     on them.
 
-  1. `vllm:prefix_cache_queries` and `vllm:prefix_cache_hits` are PRESENT.          (ADR-008)
-  2. Both MOVE when a shared-prefix workload is sent. Present-but-flat is a silent
-     failure mode and the one most likely to be mistaken for success.
-  3. `vllm:prefix_cache_hit_rate` is ABSENT. We expect absent; if it is ever present
-     on some version, ADR-008 is wrong and must be amended. Checked, not assumed.
-  4. The hit rate with prefix caching ON is materially higher than with it OFF. This
-     is the only arm that proves the mechanism rather than the plumbing.
-  5. The three `vllm:kv_block_*` histograms appear under `--kv-cache-metrics-sample`.
-     ⚠️ Hypothesis H4 is gated on this. If absent, amend H4 with a date — do not keep
-     the narrative.
+The gate passes on checks 1 and 2; the rest are reported. Writes spike_vllm_metrics.json and the
+raw /metrics scrapes to artifacts/results/.
 
-DELIBERATELY STDLIB-ONLY. No httpx, no prometheus-client, no import of this project's own package,
-so the file can be scp'd to an unfamiliar box on its own and run against whatever is there. The
-thing under test is the environment; a spike that needs its environment installed first cannot test
-it. (`_spike_common.py` is the one optional import, for the provenance header.)
+Stdlib only (no httpx, prometheus-client or this project's package), so the file can be copied to
+an unfamiliar machine and run against whatever is installed there. `_spike_common.py` is an
+optional import, for the provenance header.
 
 Usage:
     python scripts/spike_vllm_metrics.py --model Qwen/Qwen3-0.6B
@@ -50,11 +44,9 @@ try:
 except ImportError:  # running the file in isolation on a bare box
     results_header = None  # type: ignore[assignment]
 
-# ── The metric families under test. Exact spelling; these are grep targets on a screen. ──────────
-#
-# ⚠️ prometheus_client appends `_total` to counter families, so the scraped line is very likely
-# `vllm:prefix_cache_queries_total{...}`. Match the family with an OPTIONAL `_total` — hard-coding
-# either spelling is how this check returns a confident false negative.
+# The metric families under test, spelled exactly. prometheus_client appends `_total` to counter
+# families, so the scraped line is likely `vllm:prefix_cache_queries_total{...}`; families are
+# matched with an optional `_total`, because hard-coding either spelling risks a false negative.
 COUNTERS = ("vllm:prefix_cache_queries", "vllm:prefix_cache_hits")
 MUST_NOT_EXIST = "vllm:prefix_cache_hit_rate"  # went away with V0. See ADR-008.
 KV_BLOCK_HISTOGRAMS = (
@@ -108,8 +100,8 @@ def http_post_json(url: str, payload: dict[str, Any], timeout: float = 120.0) ->
 def parse_metric_sum(scrape: str, family: str) -> float | None:
     """Sum every sample of one metric family, tolerating an optional `_total` and any labels.
 
-    Returns None if the family is absent — which is a different answer from 0.0, and the
-    difference is the whole point of check 1 vs check 2.
+    Returns None if the family is absent, which is distinct from 0.0: that difference separates
+    check 1 from check 2.
     """
     pattern = re.compile(
         r"^" + re.escape(family) + r"(?:_total)?(?:\{[^}]*\})?\s+([0-9eE+.\-]+)\s*$",
@@ -120,19 +112,18 @@ def parse_metric_sum(scrape: str, family: str) -> float | None:
 
 
 def family_present(scrape: str, family: str) -> bool:
-    """Is this family in the scrape at all — as a sample, or only as HELP/TYPE metadata?
+    """Whether any sample line of the family is in the scrape (HELP/TYPE lines do not count).
 
-    A histogram appears as `_bucket`/`_count`/`_sum` lines, so match the family as a line prefix
-    rather than as a whole metric name.
+    A histogram appears as `_bucket`/`_count`/`_sum` lines, so the family is matched as a line
+    prefix rather than as a whole metric name.
     """
     return bool(re.search(r"^" + re.escape(family), scrape, re.MULTILINE))
 
 
 def flag_supported(flag: str) -> bool | None:
-    """Does `vllm serve --help` mention this flag? None if vllm could not be run at all.
+    """Whether `vllm serve --help` mentions the flag; None if vllm could not be run at all.
 
-    This is the direct answer to the third row of the spec's feasibility risk table: the version
-    that actually installs may not be the version the plan was written against.
+    The installed vLLM version may not be the one the plan assumed, so flags are probed.
     """
     try:
         out = subprocess.run(
@@ -159,11 +150,10 @@ def wait_until_ready(port: int, timeout_s: float) -> bool:
 def start_server(
     model: str, port: int, prefix_caching: bool, kv_sample: str | None, extra: list[str]
 ) -> tuple[subprocess.Popen[bytes], list[str]]:
-    """Launch one vLLM server. Returns the process and the exact argv, which is README content.
+    """Launch one vLLM server; return the process and the exact argv, which is recorded.
 
-    ⚠️ In vLLM V1 prefix caching is ON by default, so the "off" arm needs the explicit negation —
-    omitting `--enable-prefix-caching` does NOT turn it off. Getting that backwards would make the
-    off/on comparison meaningless while still producing two plausible numbers.
+    In vLLM V1 prefix caching is on by default, so the "off" arm needs the explicit
+    `--no-enable-prefix-caching`; omitting `--enable-prefix-caching` does not turn it off.
     """
     argv = ["vllm", "serve", model, "--port", str(port)]
     argv += ["--enable-prefix-caching"] if prefix_caching else ["--no-enable-prefix-caching"]
@@ -178,9 +168,7 @@ def start_server(
 def send_shared_prefix_workload(port: int, model: str, n_requests: int) -> dict[str, Any]:
     """Send N requests that share a long prefix and differ only in the tail.
 
-    That is the whole mechanism under test: identical leading blocks, so every request after the
-    first should hit cache on the shared span. If hits do not move here, they will not move
-    anywhere.
+    Every request after the first should hit the cache on the shared leading blocks.
     """
     url = f"http://127.0.0.1:{port}/v1/completions"
     latencies: list[float] = []
@@ -213,7 +201,7 @@ def run_arm(
     try:
         if not wait_until_ready(port, args.startup_timeout):
             arm_result["error"] = f"server not ready within {args.startup_timeout}s"
-            # The server log is the only evidence of WHY, so keep the tail of it.
+            # The server log is the only evidence of why, so keep its tail.
             proc.terminate()
             try:
                 out, _ = proc.communicate(timeout=30)
@@ -232,7 +220,7 @@ def run_arm(
         _, after = http_get(f"http://127.0.0.1:{port}/metrics", timeout=20.0)
         arm_result["after"] = {f: parse_metric_sum(after, f) for f in COUNTERS}
 
-        # ── The five checks ──────────────────────────────────────────────────────────────────
+        # Checks 1, 2, 3 and 5 of the module docstring; check 4 needs both arms and is in main().
         present = {f: parse_metric_sum(after, f) is not None for f in COUNTERS}
         moved = {
             f: (
@@ -247,14 +235,14 @@ def run_arm(
         arm_result["checks"] = {
             "counters_present": present,
             "counters_moved": moved,
-            # Expected False. True would mean ADR-008 is wrong on this version — amend it.
+            # Expected False; True would mean ADR-008 is wrong for this version.
             "hit_rate_metric_exists": family_present(after, MUST_NOT_EXIST),
             "kv_block_histograms_present": {
                 f: family_present(after, f) for f in KV_BLOCK_HISTOGRAMS
             },
             "other_wanted_present": {f: family_present(after, f) for f in OTHER_WANTED},
         }
-        # The derived hit rate. ⛔ Two counters, never a gauge (ADR-008).
+        # The hit rate is derived from the two counters, never read from a gauge (ADR-008).
         arm_result["derived_hit_rate"] = (
             round(h / q, 6) if (q not in (None, 0) and h is not None) else None
         )
@@ -296,7 +284,7 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    # Probe the flag BEFORE spending a server startup on it.
+    # Probe the flag before spending a server startup on it.
     kv_flag_ok = flag_supported("--kv-cache-metrics-sample")
     print(f"--kv-cache-metrics-sample supported by this vllm: {kv_flag_ok}", flush=True)
     if kv_flag_ok is None:
@@ -320,7 +308,7 @@ def main() -> int:
     on = next(a for a in arms if a["arm"] == "caching_on")
     off = next((a for a in arms if a["arm"] == "caching_off"), None)
 
-    # ── The gate verdict. Stated explicitly so the exit code is not the only signal. ─────────
+    # The gate verdict, recorded explicitly so the exit code is not the only signal.
     checks = on.get("checks", {})
     gate = {
         "counters_present": all(checks.get("counters_present", {}).values()) or False,
@@ -340,8 +328,8 @@ def main() -> int:
         if off is not None
         else None,
     }
-    # H4's gate is reported, not required — the exit gate in CHECKPOINTS.md is counters present
-    # AND moving. Conflating "nice to have" with "blocking" is how a gate stops meaning anything.
+    # The other checks, H4's included, are reported but not required: the Phase 0 gate in
+    # CHECKPOINTS.md is counters present and moving.
     gate["PHASE_0_METRIC_GATE"] = gate["counters_present"] and gate["counters_moved"]
 
     payload: dict[str, Any] = {}

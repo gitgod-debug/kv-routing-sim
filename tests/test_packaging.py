@@ -1,8 +1,7 @@
-"""What `pip install kv-routing-sim` ships: the measured profile and the cited cost model, by name.
+"""Tests for the profile and cost model shipped inside the package for users without a clone.
 
-A user without a clone has no `configs/` directory. So the T4 profile and the cost model travel
-inside the package, as COPIES of the files in `configs/` — and a copy that drifts from its source
-would put two different "measured" profiles in the world under one name. This file stops that.
+They are copies of the files in `configs/` and must stay byte-identical to them, so one name never
+refers to two different measured profiles.
 """
 
 from __future__ import annotations

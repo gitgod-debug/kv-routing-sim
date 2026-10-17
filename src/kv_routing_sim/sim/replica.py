@@ -1,15 +1,9 @@
-"""One replica: a bounded batch, a waiting queue, and a prefix cache.
+"""One replica: a bounded batch, a waiting queue and a prefix cache, with continuous batching.
 
-The continuous-batching model (docs/03-background-concepts.md §4): a request does not wait for the
-batch ahead of it to FINISH, it waits for a SLOT. Each iteration admits whatever fits, runs one
-prefill pass over the newly admitted, and advances every running sequence by one token.
-
-⭐ WHERE THE CACHE ENTERS, AND WHY IT IS HERE AND NOT IN THE ROUTER: the lookup happens at
-ADMISSION, not at arrival. A request routed to a replica with a warm prefix still has to wait for a
-slot, and by the time it gets one the prefix may have been evicted by whatever ran in between. That
-gap between "routed here because the cache was warm" and "actually found it warm" is a real source
-of loss, it is what punishes locality under load, and it is a mechanism behind the H2 crossover.
-Doing the lookup at arrival instead would quietly delete that effect.
+A request waits for a slot, not for the batch ahead of it to finish. Each iteration admits what
+fits, prefills the newly admitted and advances every running sequence by one token. The cache is
+looked up at admission rather than arrival, so a prefix that was warm when the request was routed
+may have been evicted by the time it is admitted, as on a real engine.
 """
 
 from __future__ import annotations
@@ -38,14 +32,14 @@ class InFlight:
 
 
 class Replica:
-    """One replica. Two cache models behind one interface — `cache_model` picks which.
+    """One replica, with one of two cache models chosen by `cache_model`.
 
-    * `"vllm"` (default) — the block pool of `cache/block_pool.py`, driven the way vLLM's scheduler
-      drives it: RUNNING requests are scheduled first, and one that cannot grow preempts the most
-      recently admitted; WAITING requests are admitted only in a step with no preemption, and only
-      while memory lasts. Each rule cites scheduler.py @ v0.30.0.
-    * `"lru"` — the original model, unchanged, kept as the ablation baseline. No memory-based
-      admission control, no preemption, nothing is ever freed.
+    * `"vllm"` (default): the block pool of `cache/block_pool.py`, driven as vLLM's scheduler drives
+      it. Running requests are scheduled first, and one that cannot grow preempts the most recently
+      admitted; waiting requests are admitted only in a step with no preemption, and only while
+      memory lasts. Each rule cites scheduler.py at v0.30.0.
+    * `"lru"`: the plain-LRU ablation baseline, with no memory-based admission control, no
+      preemption and no freeing.
     """
 
     __slots__ = (
@@ -98,13 +92,8 @@ class Replica:
             return self._step_lru(now)
         return self._step_vllm(now)
 
-    # ── the original model — unchanged, the ablation baseline ────────────────────────────────
-
     def _step_lru(self, now: float) -> tuple[float, list[InFlight]]:
-        """Admission first, then one decode step for everything in the batch — the order a real
-        scheduler uses, and the reason a newly admitted request emits its first token at the end
-        of the same iteration it was admitted in.
-        """
+        """Run one iteration of the LRU model: admit, then one decode step for the whole batch."""
         p = self.profile
         prefill_s = 0.0
 
@@ -130,23 +119,21 @@ class Replica:
         duration = prefill_s + p.decode_s(len(self.running), self._context_tokens())
         return duration, self._emit(now + duration)
 
-    # ── the vLLM model ────────────────────────────────────────────────────────────────────────
-
     def _step_vllm(self, now: float) -> tuple[float, list[InFlight]]:
-        """One `Scheduler.schedule()` step, as vLLM orders it.
+        """Run one `Scheduler.schedule()` step in vLLM's order.
 
-        Token accounting, one rule for every case: a scheduled sequence computes KV up to
-        `prompt + emitted_so_far` tokens this step and samples one more token. A fresh request
-        (emitted 0) therefore prefills its prompt; a decoding one computes one token; a resumed
-        preempted one recomputes prompt + everything it had generated, minus cache hits.
+        A scheduled sequence computes KV up to `prompt + emitted_so_far` tokens and samples one more
+        token. A fresh request therefore prefills its prompt, a decoding one computes one token, and
+        a preempted one, once readmitted, recomputes its prompt and everything it had generated,
+        minus cache hits.
         """
         p = self.profile
         pool = self.pool
         prefill_s = 0.0
         preempted_now = False
 
-        # 1. RUNNING first (scheduler.py:612). A request that cannot grow preempts running[-1] —
-        #    the most recently admitted, under FCFS (scheduler.py:785) — until it fits or has
+        # 1. Running requests first (scheduler.py:612). One that cannot grow preempts running[-1],
+        #    the most recently admitted under FCFS (scheduler.py:785), until it fits or has
         #    preempted itself, which ends scheduling of running requests (scheduler.py:797).
         i = 0
         while i < len(self.running):
@@ -164,9 +151,9 @@ class Replica:
                 break
             i += 1
 
-        # 2. WAITING — only in a step with no preemption (scheduler.py:854), while slots remain
-        #    (scheduler.py:864). A request that does not fit STOPS admission; waiting requests
-        #    never preempt anyone (scheduler.py:1172-1178).
+        # 2. Waiting requests, only in a step with no preemption (scheduler.py:854) and while
+        #    slots remain (scheduler.py:864). A request that does not fit stops admission; waiting
+        #    requests never preempt anyone (scheduler.py:1172-1178).
         if not preempted_now:
             while self.queue and len(self.running) < p.max_num_seqs:
                 item = self.queue[0]
@@ -206,16 +193,18 @@ class Replica:
         return duration, finished
 
     def _context_tokens(self) -> int:
-        """Σ context over the batch — prompt plus tokens generated so far, per sequence — for the
-        decode step's context term. Computed only when the profile has one: 0 otherwise."""
+        """Sum the batch's prompt and generated tokens, or 0 if the profile has no context term."""
         if not self.profile.decode_per_ctx_token_s:
             return 0
         return sum(s.request.prompt_tokens + s.tokens_emitted for s in self.running)
 
     def _preempt(self, seq: InFlight) -> None:
-        """scheduler.py `_preempt_request`: free the blocks (their hashes survive), keep the
-        generated tokens, and put the request back at the FRONT of the waiting queue."""
-        self.pool.free(seq.request.request_id)  # NOT forget(): its chain can be re-hit on resume
+        """Preempt a sequence as scheduler.py `_preempt_request` does.
+
+        Its blocks are freed but their hashes survive, its generated tokens are kept, and it goes
+        back to the front of the waiting queue.
+        """
+        self.pool.free(seq.request.request_id)  # not forget(): its chain can be hit again later
         seq.num_preemptions += 1
         self.preemptions += 1
         self.queue.appendleft(seq)

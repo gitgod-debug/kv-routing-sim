@@ -1,26 +1,20 @@
 #!/usr/bin/env python3
-"""Phase-0 spike: can TWO vLLM servers coexist on this one GPU, and by which path?
+"""Phase 0 spike: whether two vLLM servers can run at once on one GPU, and by which path.
 
-The spec planned the 2-replica validation on Kaggle's dual-T4 session and flagged, correctly, that
-nobody had ever checked whether that works. (ADR-005 briefly moved this to A100/H100 + MIG; reversed
-2026-09-22 — Kaggle 2x T4 is the hardware, and two PHYSICAL GPUs beat MIG.) Paths, in order:
-MIG instances, with a memory-split fallback. This script answers which of the three states we are in
-BEFORE Phase 6 depends on the answer.
+Tries two MIG instances first, then two servers splitting one card's memory, and records which
+path worked and what it permits reporting (ADR-005):
 
-  path = "mig"           two MIG instances. Partitions SMs *and* memory.
-                         → hit rate AND TTFT percentiles are both reportable.
-  path = "memory-split"  two servers on one un-partitioned card, ~45% memory each.
-                         → hit rate is reportable; ⛔ TTFT percentiles are NOT. The two servers
-                           contend for the same SMs, so a latency difference measured here is an
-                           artifact of the test rig, not an effect of the routing policy. Reporting
-                           it as a routing result would be the exact error this project exists to
-                           be trusted about.
-  path = None            neither works. Phase 6 takes its documented fallback: a single-replica
-                         calibration plus a reproducible account of why 2 replicas failed. That
-                         write-up is itself an OSS-PR premise.
+  path = "mig"           two MIG instances, which partition SMs and memory.
+                         Hit rate and TTFT percentiles are both reportable.
+  path = "memory-split"  two servers on one unpartitioned card, about 45% of memory each.
+                         Hit rate is reportable; TTFT percentiles are not, because the servers
+                         contend for the same SMs, so a latency difference is an artifact of the
+                         test rig rather than an effect of the routing policy.
+  path = None            neither works. Phase 6 then falls back to a single-replica calibration
+                         plus a reproducible account of why two replicas failed.
 
-DELIBERATELY STDLIB-ONLY, for the same reason as `spike_vllm_metrics.py`: the environment is the
-thing under test.
+Stdlib only, like `spike_vllm_metrics.py`, because the environment is what is under test. Writes
+artifacts/results/spike_two_servers.json.
 
 Usage:
     python scripts/spike_two_servers.py --model Qwen/Qwen3-0.6B
@@ -63,7 +57,7 @@ def mig_uuids() -> list[str]:
     Lines look like:
       GPU 0: NVIDIA A100-SXM4-80GB (UUID: GPU-...)
         MIG 3g.40gb  Device  0: (UUID: MIG-abc123...)
-    We want the MIG-… UUIDs, which are what CUDA_VISIBLE_DEVICES accepts.
+    Returns the MIG-... UUIDs, which are what CUDA_VISIBLE_DEVICES accepts.
     """
     try:
         out = subprocess.run(
@@ -131,7 +125,7 @@ def try_pair(
     timeout: float,
     extra: list[str],
 ) -> dict[str, Any]:
-    """Start two servers concurrently and report whether BOTH became ready."""
+    """Start two servers concurrently and report whether both became ready."""
     procs: list[subprocess.Popen[bytes]] = []
     launched: list[dict[str, Any]] = []
     result: dict[str, Any] = {}
@@ -143,14 +137,13 @@ def try_pair(
             print(f"  launched: {' '.join(info['argv'])}  (dev={dev})", flush=True)
         result["launched"] = launched
 
-        # ⚠️ Both must be ready SIMULTANEOUSLY. Sequential readiness proves nothing: the whole
-        # point is concurrent contention for one arrival stream (see ADR-005's rejected
-        # "two sequential runs, stitched" alternative).
+        # Both must be ready at the same time: what is tested is concurrent contention for one
+        # arrival stream (ADR-005 rejects "two sequential runs, stitched").
         ready = {}
         for port in ports:
             ready[port] = wait_until_ready(port, timeout)
             print(f"  port {port} ready: {ready[port]}", flush=True)
-        # Re-check the first one: a second server can OOM the first out from under us, and that
+        # Re-check both: starting the second server can push the first out of memory, and that
         # failure only shows up on a re-check.
         still_ready = {port: wait_until_ready(port, 15.0) for port in ports}
         result["ready_first_pass"] = ready
@@ -166,7 +159,7 @@ def try_pair(
         for proc in procs:
             try:
                 out, _ = proc.communicate(timeout=60)
-                if proc.returncode not in (0, -15):  # -15 is our own SIGTERM
+                if proc.returncode not in (0, -15):  # -15 is the SIGTERM sent above
                     result.setdefault("server_log_tails", []).append(
                         out.decode("utf-8", errors="replace")[-3000:]
                     )

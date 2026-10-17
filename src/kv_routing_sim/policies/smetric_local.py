@@ -1,11 +1,11 @@
-"""SMetric's routing rule, without its global cache tier: stick a session's follow-ups to the
-replica that holds its history — unless that replica would miss the first-token deadline; then
-move the session.
+"""SMetric's session routing rule, without the paper's global KV cache tier.
+
+A session's follow-up requests stay on the replica that holds its history unless that replica would
+miss the first-token deadline, in which case the session moves.
 
 Wang et al., "SMetric: Rethink LLM Scheduling for Serving Agents with Balanced Session-centric
-Scheduling", arXiv 2607.08565 (v2, 2026-09-13). ⭐ NOT THIS PROJECT'S IDEA (docs/04-prior-art.md
-§2a). Written from the paper's Figure 27 — its pseudocode for engines that prefill and decode on
-the same instance, which is what this simulator models:
+Scheduling", arXiv 2607.08565 (v2). Written from the paper's Figure 27, its pseudocode for engines
+that prefill and decode on the same instance, which is what this simulator models:
 
     c    = hit length of the request on each instance
     q    = prefill cost already queued at each instance
@@ -18,28 +18,25 @@ the same instance, which is what this simulator models:
     estimate_load(i):   q[i] + prefill_cost(request, c[i])
     prefill_cost:       C_LIN · n + C_ATT · n · (L − n/2)       # n new tokens of a prompt of L
 
-That cost is the form of this simulator's own prefill model (sim/cost_model.py; the paper takes
-it from KunServe, EuroSys '26), so the run's timing profile supplies C_LIN and C_ATT, costs are in
-seconds, and PREFILL_RATE is 1.
+The prefill cost has the form of this simulator's prefill model (sim/cost_model.py), so the run's
+timing profile supplies C_LIN and C_ATT, costs are in seconds, and PREFILL_RATE is 1.
 
-⚠️ FOUR DEPARTURES FROM THE PAPER — each could move a result, so a result from this policy is a
-result about THIS rule, not about SMetric:
+Departures from the paper, each of which can move a result:
 
-1. NO GLOBAL TIER. SMetric assumes a shared KV store (Mooncake, LMCache) from which a migrated
-   session's cache is fetched. This simulator has none: a session that moves recomputes its
-   history. The paper itself reports that its lead does not hold "for setups without any global
-   KV$ store". That is the setting here.
-2. NO TPOT FILTER. Figure 27 first drops instances whose running decodes the new prefill would
-   push past their per-token deadline. That needs each decode's remaining slack, which this
-   router does not track. Left out, and said.
-3. THE TURN COMES FROM THE SESSION ID. The paper counts the messages in the request, because a
-   provider's requests carry no session id. A trace's do; the answer is the same.
-4. THE BALANCE SCORE has LMetric's `+ 1` — estimate_load · (requests + 1), as its authors' router
-   computes it (policies/lmetric.py) — where the paper's simplified figure has none.
+1. No global tier. SMetric assumes a shared KV store (Mooncake, LMCache) from which a migrated
+   session's cache is fetched; here a session that moves recomputes its history. The paper reports
+   that its lead does not hold "for setups without any global KV$ store".
+2. No TPOT filter. Figure 27 first drops instances whose running decodes the new prefill would push
+   past their per-token deadline; that needs each decode's remaining slack, which this router does
+   not track.
+3. The turn comes from the session id. The paper counts the messages in the request because a
+   provider's requests carry no session id; a trace's do, and the answer is the same.
+4. The balance score is estimate_load * (requests + 1), with LMetric's `+ 1` as its authors' router
+   computes it (policies/lmetric.py); the paper's simplified figure has no `+ 1`.
 
-`SLACK` and `HIT_RATIO` are the paper's two settings. It reports that results move by about 1%
-over SLACK 0.5–2 and 2% over the whole range of HIT_RATIO, and its text names no default: 1.0 and
-0.5 are this file's choices.
+`SLACK` and `HIT_RATIO` are the paper's two settings. It reports results moving by about 1% over
+SLACK 0.5-2 and by 2% over the whole range of HIT_RATIO, and names no default; 1.0 and 0.5 are this
+module's choices.
 """
 
 from __future__ import annotations
@@ -134,7 +131,9 @@ class SMetricLocal(LMetric):
             self._queued_cost[entry[0]] -= entry[1]
 
     def stats(self) -> dict[str, object]:
-        """Follow-ups that stayed, follow-ups moved because their replica would have missed the
-        deadline, and requests placed by the balance score (first turns, and follow-ups whose
-        history was cached nowhere)."""
+        """Return how many follow-ups stayed, how many moved, and how many requests were balanced.
+
+        A follow-up moves when its replica would have missed the deadline; balanced requests are
+        first turns and follow-ups whose history is cached nowhere.
+        """
         return {"stuck": self.stuck, "migrated": self.migrated, "balanced": self.balanced}

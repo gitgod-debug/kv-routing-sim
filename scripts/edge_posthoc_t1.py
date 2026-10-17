@@ -1,22 +1,18 @@
 #!/usr/bin/env python3
-"""POST HOC: does the edge check see the knee? T1's five held-out runs, on timings 5% slower.
+"""Post hoc: test whether the edge check flags the T1 runs on which the simulator was wrong.
 
     python scripts/edge_posthoc_t1.py
         # artifacts/results/c2_kaggle_t4, c3_kaggle_t4, t1_itl -> t1_itl/posthoc_edge.{json,md}
 
-`kvsim replay` warns when its recommended configuration sits at the knee of the fleet's load curve
-(src/kv_routing_sim/eval/edge.py): it runs that configuration again with every timing coefficient
-5% larger and looks at how far the p95 latencies move. This script asks whether that movement
-tells apart the runs on which the simulator was wrong from the runs on which it was right.
-
-T1 (registered, 2026-10-05) replayed five held-out runs from a live T4 on one simulated replica.
-On two of them — both at the knee — the simulator's mean inter-token latency was 1.54× and 1.71×
-the engine's. On the other three it was within 1.07×. Here the same five replays are repeated on
-timings 5% slower, with T1's own replay function.
-
-⚠️ WRITTEN AFTER T1's RESULT WAS KNOWN, AND THE CHECK'S THRESHOLD (1.5×) WAS CHOSEN AFTER SEEING
-THESE NUMBERS. Nothing here was registered and it decides nothing. Five runs of three workloads
-on one GPU: an indication, not a validation.
+`kvsim replay` warns when its recommended configuration sits at the knee of the load curve
+(src/kv_routing_sim/eval/edge.py): it reruns the configuration with every timing coefficient 5%
+larger and checks how far the p95 latencies move. T1 replayed five held-out T4 runs on one
+simulated replica; on two, both at the knee, the simulator's mean inter-token latency was 1.54×
+and 1.71× the engine's, and on the other three it was within 1.07×. This repeats the five replays
+on the slower timings with T1's replay function and T1's config (configs/tpot_slo.yaml), and asks
+whether the movement separates the two groups. The check's threshold (1.5×) was chosen after
+seeing these numbers, and five runs of three workloads on one GPU are an indication, not a
+validation.
 """
 
 from __future__ import annotations
@@ -31,7 +27,7 @@ import yaml
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import t1_itl_check as t1  # T1's replay, imported — never copied
+import t1_itl_check as t1  # T1's replay function
 from _spike_common import results_header
 
 from kv_routing_sim.eval.edge import KNEE_FACTOR, SLOWDOWN, slowed

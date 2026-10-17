@@ -1,9 +1,9 @@
-"""T2's committed result must come out of the committed grids — and the grids out of the code.
+"""Pins T2's registered result (configs/tpot_slo.yaml): the result must come out of the committed
+grids, and the grids out of the code.
 
-T2 (configs/tpot_slo.yaml, registered 2026-10-05): the finding's grid under a target with both
-halves, on three calibrations of one T4. All three rules held. ⚠️ T1 did not (the per-token model
-is 1.5–1.7× too slow at the knee), so these counts are the model's answer, not checked guidance —
-which is how every place that quotes them must put it.
+T2 reruns the replica grid under a two-part SLO on three calibrations of one T4; all three rules
+hold. Because T1 failed (the per-token model is 1.5 to 1.7x too slow at the knee), these counts are
+the model's answer, not validated guidance.
 """
 
 from __future__ import annotations
@@ -58,11 +58,8 @@ def test_the_grids_are_the_registered_design_from_committed_code():
 
 
 def test_the_dirty_headers_are_what_the_record_says_and_the_cells_were_run_again():
-    """The three calibrations ran one after another in one process, started on a clean tree. While
-    B and C were running, other files were edited — none of them imported by a grid run, and the
-    process had loaded its code before — so their headers say dirty. Not hidden, and not argued
-    away: 240 random cells of each grid were run again from a clean checkout whose `src/` is the
-    registration commit's (scripts/t2_verify_grid.py). All 720 are identical."""
+    """B and C's headers say dirty because files no grid run imports were edited while they ran;
+    240 cells of each, rerun from a clean checkout (scripts/t2_verify_grid.py), are identical."""
     assert GRIDS["A"]["git_dirty"] is False
     touched = {p.split()[-1] for n in "BC" for p in GRIDS[n]["git_dirty_paths"]}
     assert touched == {
@@ -83,8 +80,7 @@ def test_the_dirty_headers_are_what_the_record_says_and_the_cells_were_run_again
     ("A", 4, 4, LL, 25, 1), ("B", 1, 0.25, BAL1, 3, 0), ("C", 64, 3, STICKY, 21, 2),
 ])
 def test_a_stored_cell_is_what_the_simulator_gives(name, k, load, policy, n, seed):
-    """Six cells, two per calibration, run again here from the committed code: the numbers in the
-    grid files are the simulator's own, whatever tree they were first written from."""
+    """Six cells, two per calibration, rerun from the committed code, match the stored values."""
     grid = GRIDS[name]
     trace, _ = AgenticWorkload(**grid["trace"], n_shared_prefixes=k,
                                arrival_rate=float(load)).generate()
@@ -118,24 +114,24 @@ def test_the_numbers_the_write_up_quotes(analysis):
     def row(tab, k, load, policy):
         return [tab[n][str(k)][str(load)][policy] for n in "ABC"]
 
-    # One prompt, 2 sessions/s: 5 T4s for the first token, 10–12 for both halves.
+    # One prompt, 2 sessions/s: 5 T4s for the first token, 10 to 12 for both halves.
     assert row(first, 1, 2, STICKY) == [5, 5, 5] and row(both, 1, 2, STICKY) == [10, 12, 12]
     assert row(both, 1, 2, RR) == [14, 15, 15] and row(both, 1, 2, LL) == [13, 14, 14]
-    # 64 prompts, 2 sessions/s: sticky and balanced affinity one apart, no steady winner…
+    # 64 prompts, 2 sessions/s: sticky and balanced affinity are one apart, with no steady winner,
     assert row(both, 64, 2, STICKY) == [13, 14, 14] and row(both, 64, 2, BAL16) == [13, 14, 15]
-    # …and the load weight of 1 — the first-token hint (8 against 10–12) — holds nothing here.
+    # and load weight 1, the first-token hint (8 against 10 to 12), holds nothing here.
     assert row(first, 64, 2, BAL1) == [8, 8, 8] and row(both, 64, 2, BAL1) == [33, 33, 33]
     assert analysis["binding"] == {"cells": 432, "per_token_half_adds_replicas": 309,
                                    "same_count_under_both": 20, "held_under_neither": 103}
     two, one = analysis["agreement"]["two_part"], analysis["agreement"]["first_token"]
     assert (two["identical"], two["within_one"], two["cells"]) == (81, 121, 144)
-    assert (one["identical"], one["within_one"]) == (90, 126)  # on replicas 1–32
+    assert (one["identical"], one["within_one"]) == (90, 126)  # on replicas 1 to 32
     assert two["sticky_best_or_tied"] == {"A": 18, "B": 22, "C": 22}
     assert two["sticky_best_or_tied_on_all"] == 16
     # H2b's rules, exploratory: no steady verdict under the two-part target either.
     assert [analysis["h2b_exploratory"]["two_part"][n]["holds"] for n in "ABC"] == [
         True, True, False]
-    # A looser per-token limit: the factor shrinks as it should.
+    # A looser per-token limit shrinks the factor.
     lim = analysis["other_limits"]
     assert [round(lim["150"]["t2c_median_ratio"][n], 2) for n in "ABC"] == [1.5, 1.52, 1.5]
     assert [round(lim["200"]["t2c_median_ratio"][n], 2) for n in "ABC"] == [1.37, 1.37, 1.33]

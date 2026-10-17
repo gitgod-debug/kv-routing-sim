@@ -1,4 +1,4 @@
-"""Policy behaviour, including the property test the spec names explicitly."""
+"""Tests for the routing policies' choices, determinism and tie-breaking."""
 
 from __future__ import annotations
 
@@ -63,14 +63,15 @@ def test_least_loaded_picks_the_least_loaded():
 
 
 def test_radix_affinity_follows_the_prefix_over_the_load():
-    """Locality wins over load — the behaviour that makes H2's crossover possible."""
+    """Locality wins over load, the behaviour that makes H2's crossover possible."""
     p = policies.build("radix-affinity", 4)
     p.observe(3, REQ)
     assert p.choose(_state([0, 0, 0, 99]), REQ, random.Random(0)) == 3
 
 
 def test_radix_affinity_tracks_multiple_owners_per_block():
-    """A block lives on every replica that served it. Exclusive ownership made the router thrash."""
+    """A block lives on every replica that served it; exclusive ownership would make the router
+    thrash."""
     p = policies.build("radix-affinity", 4)
     p.observe(1, REQ)
     p.observe(2, REQ)

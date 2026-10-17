@@ -1,15 +1,7 @@
-"""What a run produces. Distributions, not means (docs/06-methodology.md §1).
+"""The result of one simulation run, with latency reported as percentiles rather than means.
 
-⛔ TTFT IS REPORTED AS p50/p95/p99, NEVER AS A MEAN ± STD. The whole argument of this project lives
-in the tail: a routing policy that improves the mean while blowing p99 has made the product worse,
-and averaging is how that gets hidden. `mean_ttft_ms` is deliberately absent rather than merely
-discouraged.
-
-TWO LATENCIES, because a response has two: how long until the first token (TTFT), and how fast the
-rest arrive — TPOT, the time per output token. The MLPerf row this project's 2-second TTFT limit
-comes from sets both (configs/cost_model.yaml). Until 2026-10-05 only the first was measured here;
-C3's live engine then took 134–521 ms per token on traffic that met, or nearly met, the first-token
-limit (docs/09-hypotheses.md).
+A routing policy can improve mean TTFT while worsening the tail, so TTFT and time per output token
+(TPOT) are reported as p50, p95 and p99, and there is deliberately no mean TTFT.
 """
 
 from __future__ import annotations
@@ -20,10 +12,10 @@ from typing import Any
 
 
 def percentile(sorted_values: list[float], q: float) -> float:
-    """Nearest-rank percentile on an ALREADY SORTED list. No interpolation.
+    """Return the nearest-rank percentile of an already sorted list, without interpolation.
 
-    Nearest-rank is used because an interpolated p99 invents a latency no request experienced. Every
-    number here is a value some request actually saw.
+    An interpolated p99 can be a latency no request experienced; nearest rank always returns a value
+    some request saw.
     """
     if not sorted_values:
         return float("nan")
@@ -41,32 +33,32 @@ class RunResult:
 
     cache_model: str = "vllm"
 
-    # Cache — in TOKENS, as vLLM counts (ADR-008, confirmed on a live engine 2026-09-21).
-    # `cache_queries`/`cache_hits` exclude preempted re-lookups, exactly like vllm:prefix_cache_*.
+    # Cache counters, in tokens as vLLM counts them (ADR-008). `cache_queries` and `cache_hits`
+    # exclude lookups by preempted requests, as vllm:prefix_cache_* do.
     cache_queries: int = 0
     cache_hits: int = 0
-    evictions: int = 0  # REAL evictions: a block that held a cached prefix was reused
+    evictions: int = 0  # real evictions: a block that held a cached prefix was reused
     preemptions: int = 0
     preempted_queries: int = 0
     preempted_hits: int = 0
     eviction_events: list[Any] = field(default_factory=list)  # only with track_block_metrics
     # request_id -> {cached_tokens, ttft_ms, tpot_ms, preemptions, replica}; only with
     # record_per_request. The engine reports the same `cached_tokens` per request
-    # (`usage.prompt_tokens_details`), so a calibration can say WHICH requests diverge, not just
+    # (`usage.prompt_tokens_details`), so a calibration can say which requests diverge, not only
     # whether the total does.
     per_request: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     ttft_ms: list[float] = field(default_factory=list)
-    # Time per output token, one value per request and ALIGNED with `ttft_ms`:
-    #     (last token − first token) ÷ (output tokens − 1), in ms.
-    # MLPerf's TPOT ("the average interval between all the tokens generated") and vLLM's
-    # `mean_time_per_output_token` (v1/metrics/stats.py:549-562 @ v0.30.0) — a stall while
-    # preempted is inside it, as it is there. NaN for a request with ONE output token: it has no
-    # interval, so it is in no percentile and cannot miss a per-token limit.
+    # Time per output token in ms, one value per request, aligned with `ttft_ms`:
+    #     (last token - first token) / (output tokens - 1)
+    # as MLPerf's TPOT and vLLM's `mean_time_per_output_token` define it
+    # (v1/metrics/stats.py:549-562 at v0.30.0), including any stall while preempted. NaN for a
+    # request with one output token: it has no interval, so it is in no percentile and cannot miss
+    # a per-token limit.
     tpot_ms: list[float] = field(default_factory=list)
     # The engine's own inter-token counters, as vllm:inter_token_latency_seconds_{sum,count}
-    # accumulate them — one observation per token after a request's first (stats.py:498-504).
-    # Whole-run, like `cache_queries`: an engine does not know about warm-up.
+    # accumulate them: one observation per token after a request's first (stats.py:498-504).
+    # Whole-run, like `cache_queries`, since an engine does not know about warm-up.
     itl_sum_s: float = 0.0
     itl_count: int = 0
     completed: int = 0
@@ -82,7 +74,7 @@ class RunResult:
 
     @property
     def hit_rate(self) -> float:
-        """⛔ Derived from two counters. Never a stored gauge (ADR-008)."""
+        """Cached tokens over queried tokens, derived from the two counters (ADR-008)."""
         return self.cache_hits / self.cache_queries if self.cache_queries else 0.0
 
     @property
@@ -96,8 +88,7 @@ class RunResult:
             "p95_ms": round(percentile(s, 0.95), 3),
             "p99_ms": round(percentile(s, 0.99), 3),
             "max_ms": round(s[-1], 3) if s else float("nan"),
-            # The request count behind every percentile — a p99 from 100 requests is ONE request,
-            # and a reader cannot judge the number without knowing that.
+            # The request count behind the percentiles: a p99 over 100 requests is one request.
             "n": len(s),
         }
 
@@ -113,21 +104,17 @@ class RunResult:
         }
 
     def engine_itl_mean_ms(self) -> float:
-        """Σ inter-token gaps ÷ their number — what Δsum ÷ Δcount of
-        `vllm:inter_token_latency_seconds` gives on a live engine.
+        """Return the mean inter-token gap in ms, as `vllm:inter_token_latency_seconds` gives it.
 
-        ⚠️ For comparing with that counter, and nothing else. It is a mean: no target is set on
-        it and nothing is sized on it — the per-token target is a percentile of per-request TPOT.
-        It exists for the reason `hit_rate` does: the engine publishes two counters, and a model
-        that cannot be compared with them cannot be checked.
+        That is the counter's sum over its count, for comparison with a live engine only; targets
+        and sizing use percentiles of per-request TPOT instead.
         """
         return self.itl_sum_s / self.itl_count * 1000.0 if self.itl_count else float("nan")
 
     def load_imbalance(self) -> float:
-        """max/mean requests per replica. 1.0 is perfect balance.
+        """Return max over mean requests per replica; 1.0 is perfect balance.
 
-        This is how locality's cost shows up: prefix-affinity concentrates traffic, and this is the
-        number that says by how much. It is the mechanism behind H2 made visible.
+        It shows how much a policy concentrates traffic, which is the cost of prefix locality.
         """
         if not self.per_replica_requests:
             return float("nan")

@@ -1,19 +1,12 @@
-"""The cost model. Every constant comes from a committed, cited, dated config (ADR-006).
-
-⛔ THIS MODULE REFUSES TO RUN ON AN UNFILLED CONFIG. `configs/cost_model.yaml` ships with every
-value as `<TBD>`, and a missing constant raises instead of defaulting to zero. A cost model that
-silently treats an unknown FX rate as 0 produces a confident, free-looking number — which is worse
-than no number, because it looks like an answer.
+"""The cost model, with every constant read from a cited config file (ADR-006).
 
     rupees per 1k successful requests
       = (replicas x price_per_hour_usd x usd_to_inr) / successful_requests_per_hour x 1000
 
-The denominator is SUCCESSFUL requests — ones that met the SLO. A configuration that serves more
-traffic by blowing p95 has not become cheaper; it has changed the product.
-
-THE SLO HAS TWO POSSIBLE HALVES. `slo.ttft_p95_ms` — the first token — is required. The optional
-`slo.tpot_p95_ms` adds the time per output token; the MLPerf row the first limit is cited from sets
-both. Left out, nothing is enforced on it and every result is what it was before the key existed.
+A successful request is one within the SLO: its TTFT within `slo.ttft_p95_ms` and, when the optional
+`slo.tpot_p95_ms` is set, its time per output token within that. Serving more traffic by missing the
+SLO therefore does not lower the cost. A constant still marked `<TBD>` raises rather than defaulting
+to zero.
 """
 
 from __future__ import annotations
@@ -28,7 +21,7 @@ TBD = "<TBD>"
 
 
 class UnfilledCostModel(RuntimeError):
-    """Raised when a cost constant is still `<TBD>`. Deliberately fatal."""
+    """Raised when a cost constant is still `<TBD>`."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,14 +31,16 @@ class CostModel:
     sku: str
     ttft_p95_slo_ms: float
     provenance: dict[str, Any]
-    # The per-token half of the SLO. None = not part of it (the default: every result registered
-    # up to 2026-10-05 is on the first-token limit alone).
+    # The per-token half of the SLO, in ms; None leaves it out, so only TTFT is limited.
     tpot_p95_slo_ms: float | None = None
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> CostModel:
-        """From a YAML file, or `"default"` for the cited cost model shipped with the package (the
-        same file as `configs/cost_model.yaml`)."""
+        """Load from a YAML file, or `"default"` for the cost model shipped with the package.
+
+        Raises:
+            UnfilledCostModel: If any constant is still `<TBD>`.
+        """
         if str(path) == "default":
             from .. import data
 
@@ -72,14 +67,16 @@ class CostModel:
 
     @property
     def slo_label(self) -> str:
-        """What "the SLO" means under this cost model, for a sentence."""
+        """Name the SLO this cost model applies, for use in a sentence."""
         if self.tpot_p95_slo_ms is None:
             return "p95 TTFT SLO"
         return "SLO (p95 TTFT and p95 time per output token)"
 
     def meets_slo(self, p95_ttft_ms: float, p95_tpot_ms: float) -> bool:
-        """Both halves, when there are two. A run with no multi-token request has no per-token
-        latency (NaN), and cannot miss a limit on it."""
+        """Return whether p95 TTFT, and p95 TPOT when it is limited, are within the SLO.
+
+        A run with no multi-token request has a NaN TPOT, which cannot miss the limit.
+        """
         if not p95_ttft_ms <= self.ttft_p95_slo_ms:
             return False
         return self.tpot_p95_slo_ms is None or not p95_tpot_ms > self.tpot_p95_slo_ms
@@ -107,10 +104,11 @@ def _find_tbd(node: Any, path: str = "") -> list[str]:
 def successful_requests(ttft_ms: list[float], slo_p95_ms: float,
                         tpot_ms: list[float] | None = None,
                         tpot_slo_ms: float | None = None) -> int:
-    """Requests that met the SLO. The cost denominator.
+    """Count the requests that met the SLO, the denominator of the cost.
 
-    With a per-token limit, a request must meet both: `tpot_ms` is aligned with `ttft_ms`, and a
-    NaN in it (a single-token request: no interval) cannot miss the limit."""
+    With a per-token limit a request must meet both limits. `tpot_ms` is aligned with `ttft_ms`, and
+    a NaN in it (a single-token request) cannot miss the limit.
+    """
     if tpot_slo_ms is None or tpot_ms is None:
         return sum(1 for t in ttft_ms if t <= slo_p95_ms)
     return sum(1 for t, g in zip(ttft_ms, tpot_ms, strict=True)

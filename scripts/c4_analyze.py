@@ -1,36 +1,36 @@
 #!/usr/bin/env python3
-"""C4's analysis — committed BEFORE the run, so nothing in it is chosen after seeing a result.
+"""Analyse the C4 run against the rules in configs/c4_per_token.yaml.
 
     python scripts/c4_analyze.py
         # artifacts/results/c4_kaggle_t4/ -> analysis.json, report.md
-        # rules E, F1 and F2 need grids.json too: run scripts/c4_grids.py first (CPU, no GPU)
+        # rules E, F1 and F2 also need grids.json: run scripts/c4_grids.py first (CPU only)
 
-The procedure, exactly as configs/c4_per_token.yaml registers it. "Within f×" is either direction.
-Medians are over repeats, of VALID cells only. A rule whose data is missing is UNDECIDED, and an
-undecided rule does not hold. Every predicted number is the one registered before the run
-(profile A), read from artifacts/results/c4_prereg/predictions.json — not recomputed here.
+"Within f×" means in either direction. Medians are over repeats, of valid cells only. A rule whose
+data is missing is undecided, and an undecided rule does not hold. Every predicted number is
+profile A's, read from artifacts/results/c4_prereg/predictions.json rather than recomputed. The
+decision rules are read from the config; this script applies them and tunes nothing.
 
-  C4a  the command's first run: C3a's five conditions, recomputed from the raw files, AND the
+  C4a  the command's first run meets C3a's five conditions, recomputed from the raw files, and its
        profile carries the fit of each of its repeats.
-  D1a  at each control's batch size: the shared-prefix cell's step within d1a_max_factor of the
+  D1a  at each control's batch size, the shared-prefix cell's step is within d1a_max_factor of the
        unique-prompt control's.
-  D1b  for EVERY shared cell whose summed context is beyond the largest C2 fitted: the registered
-       step within d1b_max_factor of the measured one.
-  D2   for EVERY stall cell: (gap at the arrival − the usual gap) within d2_max_factor of the
+  D1b  for every shared cell whose summed context is beyond the largest C2 fitted, the registered
+       step is within d1b_max_factor of the measured one.
+  D2   for every stall cell, (gap at the arrival − the usual gap) is within d2_max_factor of the
        registered extra gap. A measured extra of zero or less is a miss, not a missing value.
-  T3a  for EVERY workload: the registered p95 time per output token within t3a_max_factor of the
-       p95 measured client-side, over the requests whose every token came as its own chunk.
-  T3b  for the workloads registered at least t3b_min_margin away from the limit: the model's
-       verdict (p95 ≤ limit) equals the engine's — at least 95% of its requests at or under the
-       limit, from its own histogram; from the client-side times if it has none (and said so).
-  E    over every ordered pair of runs (i, j), every cell of the firmness grid and both targets:
+  T3a  for every workload, the registered p95 time per output token is within t3a_max_factor of
+       the p95 measured client-side, over the requests whose every token came as its own chunk.
+  T3b  for the workloads registered at least t3b_min_margin away from the limit, the model's
+       verdict (p95 ≤ limit) equals the engine's: at least 95% of requests at or under the limit,
+       from the engine's histogram, or from the client-side times if it has none.
+  E    over every ordered pair of runs (i, j), every cell of the firmness grid and both targets,
        the count from run j's pooled fit lies between the smallest and largest count over run i's
-       fits (pooled and repeats), in at least e_min_coverage of cases.
-  F1   first-token target, 64 prompts, f1_load sessions/s: balanced affinity with load weight 1
-       needs fewer replicas than session-sticky, on EVERY fresh pooled fit.
-  F2   two-part target, on EVERY fresh pooled fit: (i) that policy does not hold the target at
-       f1_load on the replicas swept; (ii) balanced affinity (α 16) needs fewer replicas than
-       session-sticky at no more than f2_max_loads_won loads.
+       fits (pooled and repeats) in at least e_min_coverage of cases.
+  F1   under the first-token target at 64 prompts and f1_load sessions/s, balanced affinity with
+       load weight 1 needs fewer replicas than session-sticky on every fresh pooled fit.
+  F2   under the two-part target, on every fresh pooled fit: (i) that policy does not hold the
+       target at f1_load on the replicas swept; (ii) balanced affinity (α 16) needs fewer replicas
+       than session-sticky at no more than f2_max_loads_won loads.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ from typing import Any
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import c2_analyze as c2  # nearest-rank percentile and the factor: imported, never copied
+import c2_analyze as c2  # nearest-rank percentile and the factor
 import c3_analyze as c3  # the command's five conditions, and the engine log's capacity
 import t1_itl_check as t1  # C2c's replay, returning the whole run
 import t2_analyze as t2  # replica counts from stored percentiles
@@ -72,7 +72,7 @@ def _all_within(rows: list[dict], limit: float) -> tuple[bool, bool]:
     return decided, decided and all(r["factor"] <= limit for r in rows)
 
 
-# ── C4a ─────────────────────────────────────────────────────────────────────────────────────────
+# C4a: the command's runs.
 
 
 def rule_c4a(data: dict, prereg: dict, results: pathlib.Path) -> dict[str, Any]:
@@ -96,7 +96,7 @@ def rule_c4a(data: dict, prereg: dict, results: pathlib.Path) -> dict[str, Any]:
     return {"commands": commands, "decided": first["decided"], "holds": first["holds"]}
 
 
-# ── D1, D2: the micro-benchmarks ────────────────────────────────────────────────────────────────
+# D1 and D2: the micro-benchmarks.
 
 
 def rule_d1(data: dict, prereg: dict) -> dict[str, Any]:
@@ -159,11 +159,11 @@ def rule_d2(data: dict, prereg: dict) -> dict[str, Any]:
     return {"cells": cells, "decided": decided, "holds": holds, "max_factor": limit}
 
 
-# ── T3: traffic around the per-token limit ──────────────────────────────────────────────────────
+# T3: traffic around the per-token limit.
 
 
 def measured_run(m: dict, limit_ms: float) -> dict[str, Any]:
-    """One held-out run, from its per-request records — not from what the notebook printed."""
+    """Summarise one held-out run from its per-request records, not the notebook's printout."""
     reqs = m["requests"]
     ttft = sorted(r["ttft_ms"] for r in reqs if r["valid"] and r["ttft_ms"])
     tpot = sorted(r["tpot_ms"] for r in reqs if r["valid"] and r.get("tpot_ms") is not None)
@@ -238,7 +238,7 @@ def rule_t3(data: dict, prereg: dict, fresh: dict[str, Any]) -> dict[str, Any]:
                     "min_margin": rules["t3b_min_margin"]}}
 
 
-# ── E, F: the fresh calibrations in the simulator ───────────────────────────────────────────────
+# E and F: the fresh calibrations in the simulator.
 
 
 def _tables(grid: dict, slo: dict) -> dict[str, dict[str, Any]]:
@@ -252,7 +252,7 @@ def _tables(grid: dict, slo: dict) -> dict[str, dict[str, Any]]:
 
 
 def _runs_of(fit_ids: list[str]) -> dict[str, list[str]]:
-    """{run: its fits — pooled first, then each repeat's}, from ids like s0, s0r1."""
+    """{run: its fits, pooled first and then each repeat's}, from ids like s0, s0r1."""
     runs: dict[str, list[str]] = {}
     for f in sorted(fit_ids):
         if f.startswith("s"):
@@ -328,7 +328,7 @@ def rule_f(grids: dict, prereg: dict) -> dict[str, Any]:
                    "holds": decided and all(v["holds"] for v in f2.values())}}
 
 
-# ── all of it ───────────────────────────────────────────────────────────────────────────────────
+# All rules together.
 
 
 def analyze(data: dict, prereg: dict, results: pathlib.Path,
@@ -368,7 +368,7 @@ def analyze(data: dict, prereg: dict, results: pathlib.Path,
     return out
 
 
-# ── the report ──────────────────────────────────────────────────────────────────────────────────
+# The report.
 
 RULES = (("c4a", "**C4a** — the command, with its repeats, works on a real engine"),
          ("d1a", "**D1a** — sharing a prefix costs nothing by itself"),

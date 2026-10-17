@@ -1,17 +1,9 @@
-"""Consistent hashing on the prompt prefix: stateless locality, zero load feedback.
+"""Consistent hashing on the prompt prefix: locality with no state and no load feedback.
 
-How it works: take the first few blocks of the prompt as a key, hash it onto a ring of virtual
-nodes, and send the request to the replica that owns that point. Identical prefixes always land on
-the same replica, so the cache hits — with no coordination and no state anywhere.
-
-⚠️ AND THE FAILURE MODE IS THE POINT, not a bug to fix: a hot prefix means a hot replica. If every
-user on the fleet sends the same system prompt, this policy sends EVERY request to one replica and
-the other N-1 sit idle. It is the purest form of "locality with no load feedback", which makes it
-the clearest illustration of the tension H2 is about.
-
-Virtual nodes (not `hash % n`) so that adding a replica reshuffles ~1/N of the keyspace instead of
-almost all of it — the actual point of consistent hashing, and the reason a sizing sweep across
-replica counts stays meaningful instead of being dominated by remapping churn.
+The first few blocks of the prompt are hashed onto a ring of virtual nodes, so identical prefixes
+always reach the same replica, and a hot prefix makes a hot replica; that is inherent to the policy,
+not a bug. Virtual nodes, rather than `hash % n`, mean that adding a replica remaps about 1/N of the
+keys, so a sweep across replica counts is not dominated by remapping.
 """
 
 from __future__ import annotations

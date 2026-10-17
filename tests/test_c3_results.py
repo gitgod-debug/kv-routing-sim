@@ -1,9 +1,8 @@
-"""C3's committed result must come out of the committed raw files — and so must every number the
-README quotes from it.
+"""Pins C3's registered result: the verdicts and every number the README quotes must come out of
+the committed raw files.
 
-The run is not repeatable (it was a GPU session on Kaggle), but everything after it is: the
-registered analysis on the raw files, and the post-hoc comparison of three calibrations. If either
-stops reproducing, a quoted number has lost its source.
+The GPU run itself cannot be repeated, but the registered analysis of its raw files and the post hoc
+comparison of three calibrations can, and both are rerun here.
 """
 
 from __future__ import annotations
@@ -53,21 +52,21 @@ def test_the_factors_the_readme_quotes(analysis):
     assert set(rows) == {"K1_half", "K64_quarter", "T6_K8"}
     worst_b = max(v for r in rows.values() for v in r["command_factor"].values())
     worst_c = max(v for r in rows.values() for v in r["c2_factor"].values())
-    assert worst_b == pytest.approx(1.41, abs=0.005)  # C3b: "within 1.41×"
-    assert worst_c == pytest.approx(1.38, abs=0.005)  # C3c: "within 1.38×"
-    # Reported, and uncomfortable: the command's second run, on the workload at the knee.
+    assert worst_b == pytest.approx(1.41, abs=0.005)  # C3b: within 1.41x
+    assert worst_c == pytest.approx(1.38, abs=0.005)  # C3c: within 1.38x
+    # Reported, not a rule: the command's second run on the workload at the knee.
     second = {w: r["command"]["1"]["factor"] for w, r in rows.items()}
     assert second["K1_half"]["p95"] == pytest.approx(4.17, abs=0.01)
     others = [v for w, f in second.items() for q, v in f.items() if (w, q) != ("K1_half", "p95")]
-    assert max(others) < 1.36  # "the other five numbers stayed within 1.35×"
+    assert max(others) < 1.36  # the other five numbers stay within 1.35x
     # Every hit rate equals its registered prediction to four decimals.
     for r in rows.values():
         assert round(r["measured"]["hit_rate"], 4) == round(r["c2_registered"]["hit_rate"], 4)
 
 
 def test_the_reported_grid_comparison_is_what_the_two_tables_say():
-    """`c3_analyze.py --grid` took minutes of CPU; its counts must follow from the two committed
-    tables — C2's profile, and the profile the command wrote."""
+    """The `c3_analyze.py --grid` counts follow from the two committed tables (C2's profile and the
+    command's), without rerunning the slow grid."""
     a = json.loads(posthoc.TABLES["A"][1].read_text())
     b = json.loads(posthoc.TABLES["B"][1].read_text())
     pairs = [(r, b["required_replicas"][k][ld][p])
@@ -83,23 +82,23 @@ def test_the_reported_grid_comparison_is_what_the_two_tables_say():
 
 
 def test_what_survives_three_calibrations_and_what_does_not():
-    """POST HOC (scripts/c3_posthoc_grid.py). The README's headline claims only what all three
-    calibrations support; these are those claims, and the one that did not survive."""
+    """Post hoc (scripts/c3_posthoc_grid.py): the README's headline claims hold on all three
+    calibrations; H2b's verdict does not."""
     tables = {t: json.loads(path.read_text()) for t, (_, path) in posthoc.TABLES.items()}
     a = posthoc.analyze(tables)
     assert a == json.loads((RESULTS / "posthoc_three_calibrations.json").read_text())
     assert (a["cells"], a["cells_identical_on_all"], a["cells_within_one"]) == (144, 102, 138)
     # Does not survive: H2b's verdict.
     assert [a["h2b_verdict"][t]["holds"] for t in "ABC"] == [False, True, True]
-    # Survives: sticky best or tied at every load with 1 prompt and with 4 …
+    # Holds on all three: sticky best or tied at every load with 1 prompt and with 4,
     by_k = a["sticky_best_or_tied_on_all_by_K"]
     assert (by_k["1"], by_k["4"]) == ({"points": 6, "of": 6}, {"points": 6, "of": 6})
     assert a["sticky_best_or_tied"] == {"A": 22, "B": 20, "C": 20}
     assert a["sticky_best_or_tied_on_all"] == 19
-    # … and never more replicas than round-robin or least-loaded, anywhere, on any calibration.
+    # and never more replicas than round-robin or least-loaded, on any calibration.
     never = a["sticky_never_needs_more_than"]
     assert never["round-robin"] == never["least-loaded"] == a["points"] == 24
-    # The README's two table rows at 2 sessions/s, on A · B · C.
+    # The README's two table rows at 2 sessions/s, on A, B and C.
     row = a["required_replicas"]
     assert row["1@2"]["session-sticky"] == [5, 5, 5] and row["1@2"]["round-robin"] == [7, 7, 7]
     assert row["1@2"]["radix-affinity-balanced@16"] == [10, 17, 17]  # 17 = not held on 16

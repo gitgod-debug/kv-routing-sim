@@ -1,25 +1,21 @@
 #!/usr/bin/env python3
-"""T1 — is the simulator's per-token latency right? Checked on the held-out runs already on disk.
+"""T1: check the simulator's per-token latency against the held-out runs already on disk.
 
     python scripts/t1_itl_check.py      # configs/tpot_slo.yaml -> artifacts/results/t1_itl/
 
-Registered before it ran (configs/tpot_slo.yaml, and a dated entry in docs/09-hypotheses.md). The
-procedure, exactly:
-  1. Take the five held-out traffic runs of C2 (part D) and C3 (part 2): one live T4 each. For each
-     the notebook recorded the engine's own mean inter-token latency over the run — Δsum ÷ Δcount of
-     vllm:inter_token_latency_seconds, one observation per token after a request's first.
-  2. Replay each run through the simulator on one replica, every request at the time it was really
-     sent — C2c's replay — with profile A, the shipped C2-fitted one. Read the same quantity off the
-     simulator: Σ inter-token time ÷ Σ gaps, over every request (`RunResult.engine_itl_mean_ms`).
-  3. T1 holds only if all five predictions are within `max_factor` of the measurements (either
-     direction). A run without a measurement leaves it UNDECIDED, and undecided does not hold.
+  1. Take the five held-out traffic runs of C2 (part D) and C3 (part 2), one live T4 each. For
+     each, the notebook recorded the engine's mean inter-token latency over the run: Δsum / Δcount
+     of vllm:inter_token_latency_seconds, one observation per token after a request's first.
+  2. Replay each run on one simulated replica, every request at its measured send time (C2c's
+     replay), with profile A, the shipped C2 fit. Read the same quantity off the simulator:
+     Σ inter-token time / Σ gaps over every request (`RunResult.engine_itl_mean_ms`).
+  3. T1 holds only if all five predictions are within `max_factor` of the measurements, in either
+     direction. A run without a measurement leaves it undecided, and undecided does not hold.
+Caveat: the measurements were on disk, and three had been read, before the rule was fixed.
 
-⚠️ The measurements were on disk, and three were read, before this was registered. The simulator's
-side had never been computed: it could not measure time per token until commit 534f5b9.
-
-⚠️ What it cannot show: C3's three runs are themselves beyond a 100 ms per-token limit, and C2's two
-are the same workloads. T1 checks the model where the engine was loaded more heavily than any
-configuration T2 will call acceptable. The report counts how many runs are beyond the limit.
+C3's three runs are beyond a 100 ms per-token limit and C2's two are the same workloads, so T1
+checks the model only where the engine was more heavily loaded than any configuration T2 accepts.
+The report counts how many runs are beyond the limit.
 """
 
 from __future__ import annotations
@@ -36,7 +32,7 @@ import yaml
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import c2_analyze as c2  # the registered replay's percentile and factor: imported, never copied
+import c2_analyze as c2  # C2c's percentile rule and factor
 from _spike_common import results_header
 
 from kv_routing_sim.sim.cost_model import CostProfile, load_profile
@@ -49,8 +45,11 @@ OUT = REPO / "artifacts" / "results" / "t1_itl"
 
 
 def replay(spec: dict, measured: dict, profile: CostProfile) -> RunResult:
-    """C2c's replay — scripts/c2_analyze.py `replay`, step for step — returning the whole run, so
-    the per-token side can be read off it. `one()` checks it against the registered function."""
+    """C2c's replay (scripts/c2_analyze.py `replay`, step for step), returning the whole run.
+
+    The per-token latencies are read off the returned run; `one()` checks that its first-token
+    percentiles match `c2_analyze.replay`.
+    """
     sent = {r["request_id"]: max(0.0, r["send_offset_s"]) for r in measured["requests"]}
     trace, _ = AgenticWorkload(**spec).generate()
     trace = sorted((dataclasses.replace(q, arrival_ts=sent[q.request_id]) for q in trace),
@@ -60,8 +59,7 @@ def replay(spec: dict, measured: dict, profile: CostProfile) -> RunResult:
 
 
 def one(name: str, spec: dict, measured: dict, profile: CostProfile) -> dict[str, Any]:
-    """One held-out run against one profile: the engine's mean inter-token latency and the
-    simulator's, and the first-token numbers beside them."""
+    """One held-out run against one profile: mean inter-token latency and first-token numbers."""
     r = replay(spec, measured, profile)
     valid = {x["request_id"] for x in measured["requests"] if x["valid"]}
     ttfts = sorted(v["ttft_ms"] for k, v in r.per_request.items() if k in valid)

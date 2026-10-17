@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-"""C4, after the GPU run: the fresh calibrations in the simulator. Needs no GPU.
+"""Run the C4 simulator grids on the session's fresh calibrations (CPU only).
 
     python scripts/c4_grids.py        # artifacts/results/c4_kaggle_t4/ -> grids.json
 
-Committed before the run (configs/c4_per_token.yaml, docs/09-hypotheses.md). Like
-scripts/run_t2_grid.py — whose worker code it uses — this only RUNS the simulator and writes down
-each run's p95 time to first token and p95 time per output token. It applies no target and decides
-nothing: scripts/c4_analyze.py reads the file and applies rules E, F1 and F2.
+Reads configs/c4_per_token.yaml. Like scripts/run_t2_grid.py, whose worker code it uses, this only
+runs the simulator and records each run's p95 time to first token and p95 time per output token;
+scripts/c4_analyze.py reads grids.json and applies rules E, F1 and F2.
 
 Two grids, both on H2b-C2's traffic and seeds (read from that config):
-  firmness   — every fit the session produced: each run of `kvsim calibrate`, its pooled fit and
-               the fit of each repeat alone; and profile A, for the report.
-  prompts64  — the pooled fit of each run, at 64 prompts.
+  firmness   every fit from the session: each run of `kvsim calibrate`, as its pooled fit and as
+             the fit of each repeat alone, plus profile A for the report.
+  prompts64  the pooled fit of each run, at 64 prompts.
 """
 
 from __future__ import annotations
@@ -32,7 +31,7 @@ import yaml
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import run_t2_grid as worker  # its _init / _job are the grid's worker code: reused, not copied
+import run_t2_grid as worker  # its _init and _job are the grid's worker code
 from _spike_common import results_header
 
 from kv_routing_sim.sim.cost_model import CostProfile, load_profile, replicate_profiles
@@ -42,8 +41,11 @@ RESULTS = REPO / "artifacts" / "results" / "c4_kaggle_t4"
 
 
 def fits(cfg: dict[str, Any], results: pathlib.Path) -> dict[str, CostProfile]:
-    """Every fit of the session, by id: `s<seed>` a run's pooled fit, `s<seed>r<rep>` the fit of
-    one of its repeats — and `A`, the shipped profile the predictions were made with."""
+    """Every fit from the session, keyed by id.
+
+    `s<seed>` is a run's pooled fit, `s<seed>r<rep>` the fit of one of its repeats, and `A` the
+    shipped profile the predictions were made with.
+    """
     out: dict[str, CostProfile] = {"A": load_profile(REPO / cfg["profile"])}
     for seed in cfg["calibrate"]["seeds"]:
         path = results / f"calibrated_profile_seed{seed}.json"
@@ -101,7 +103,7 @@ def main() -> int:
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     args = ap.parse_args()
     cfg = yaml.safe_load(args.config.read_text())
-    # Taken BEFORE the runs: the header must describe the tree that produced the numbers.
+    # Taken before the runs, so the header describes the tree that produced the numbers.
     payload = results_header("scripts/c4_grids.py", seed=0, hardware_path="cpu-only")
     every = fits(cfg, args.results)
     pooled = {k: v for k, v in every.items() if k != "A" and "r" not in k}

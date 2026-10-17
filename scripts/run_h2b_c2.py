@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""H2b under C2's timing model: does the finding survive a timing model that matches the engine?
+"""H2b under C2's timing model: Phase 5's H2b grid re-run on the context-aware T4 profile.
 
     python scripts/run_h2b_c2.py        # configs/h2b_c2.yaml -> artifacts/results/h2b_c2/
 
-Registered before it ran (the config, plus a dated entry in docs/09-hypotheses.md). It re-runs
-Phase 5's H2b grid — K tenant prompts × load × replicas — on C2's fitted, context-aware T4 profile,
-and applies H2b's three rules unchanged. This script chooses nothing after seeing a result.
+Runs the H2b grid (K tenant prompts × load × replicas, with the session shape and prompts read
+from Phase 5's config) on C2's fitted, context-aware T4 profile. The decision rules are H2b's,
+unchanged, and come from the config; this script applies them and tunes nothing.
 
-Tier (ADR-010): a measured profile for one T4 and one model. Its timing was validated on held-out
-single-engine traffic (C2c) and, post hoc, on Phase 6's two replicas — so its replica counts are the
-best T4 figures this project has, and still T4 figures.
+ADR-010 tier: a measured profile for one T4 and one model, validated on held-out single-engine
+traffic (C2c) and, post hoc, on Phase 6's two replicas. The replica counts are T4 figures.
 """
 
 from __future__ import annotations
@@ -108,7 +107,7 @@ def main() -> int:
     sys.path.insert(0, str(REPO / "scripts"))
     from _spike_common import results_header
 
-    # Taken BEFORE the runs: the header must describe the tree that produced the numbers.
+    # Taken before the runs, so the header describes the tree that produced the numbers.
     payload = results_header("scripts/run_h2b_c2.py", seed=0, hardware_path="cpu-only",
                              extra={"config": cfg})
     pols = ([(STICKY, None), (BAL, alpha)] + [(BAL, a) for a in cfg["alphas_reported"]]

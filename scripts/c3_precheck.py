@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""Before C3: would `kvsim calibrate`'s OWN measurements have been enough? Asked of C2's data.
+"""Check on C2's data whether the cells `kvsim calibrate` measures are enough to fit its model.
 
     python scripts/c3_precheck.py     # artifacts/results/c2_kaggle_t4/c2.json
                                       #   -> artifacts/results/c3_prereg/precheck.{json,md}
 
-⚠️ POST HOC, and no GPU. C2 measured more cells than the command does (28 decode cells × 2, 15
-prefill cells × 3). This takes the cells the command would have measured, fits them with the
-command's own code (`calib.calibrate.fit`), and replays C2's two held-out workloads with the result
-— the same replay C2c was decided on. It was run to choose the command's design BEFORE its first
-real-GPU run in this form (C3), and it changed that design: see `cold_only` below.
-
-What it cannot show: the command's own cells on a real engine (context 32 instead of 128, cold
-prompts at 8 lengths instead of 6, no cache reset between cells). That is C3.
+Post hoc and CPU-only. C2 measured more cells than the command does (28 decode cells × 2, 15
+prefill cells × 3). This takes the subset the command would measure, fits it with the command's
+own code (`calib.calibrate.fit`), and replays C2's two held-out workloads with the result, using
+C2c's replay. The `cold_only` rows show why the command also times prompts after a cached prefix.
+It cannot show the command's own cells on a real engine (context 32 instead of 128, cold prompts
+at 8 lengths instead of 6, no cache reset between cells); C3 measures those.
 """
 
 from __future__ import annotations
@@ -49,8 +47,10 @@ def _prefill(data: dict, cached_cells: bool) -> list[dict]:
 
 
 def _prefill_time(m: dict, spec: dict, base: float, per_token: float, attn: float) -> float:
-    """Total prefill time a fit charges a held-out run's requests, at the cached tokens the engine
-    really reported for each."""
+    """Total prefill time a fit charges a held-out run's requests.
+
+    Each request is charged at the cached tokens the engine reported for it.
+    """
     trace, _ = AgenticWorkload(**spec).generate()
     length = {q.request_id: q.prompt_tokens for q in trace}
     total = 0.0

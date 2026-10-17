@@ -1,34 +1,19 @@
-"""Adapter for SemiAnalysis's AgentX traces — real coding-agent sessions, as block hashes, no text.
+"""Adapter for SemiAnalysis's AgentX traces: real coding-agent sessions as block hashes, no text.
 
-The format (huggingface.co/datasets/semianalysisai/cc-traces-weka-042026, README.md): one JSON
-object per line, ONE AGENT SESSION each —
+The format (huggingface.co/datasets/semianalysisai/cc-traces-weka-042026, README.md) has one JSON
+object per line, one agent session each:
 
     id             the session, e.g. "trace_0001"
     models         the session's models; the first is its main one
-    block_size     64: each hash id covers one FULL 64-token block of input
+    block_size     64: each hash id covers one full 64-token block of input
     hash_id_scope  "local": ids are comparable only within one session
     requests       in order; each has t (seconds since the session began), type ("n", "s", or
-                   "subagent" — which carries its own nested requests, timed from its own start),
+                   "subagent", which carries its own nested requests, timed from its own start),
                    model, in, out (tokens), hash_ids, api_time, think_time
 
-⚠️ FOUR THINGS THIS ADAPTER DOES THAT CHANGE WHAT A RESULT MEANS — each is a parameter, and each
-must be stated next to any number produced from it:
-
-1. HASH SCOPE IS LOCAL. Every session's blocks are made distinct from every other session's. A
-   system prompt two users really share is invisible here: this trace shows reuse WITHIN a session
-   and nothing across users. That is its value next to Mooncake, whose ids are global.
-2. BLOCK SIZE AND TOKEN SCALE. `token_scale` shrinks every token count; at the default 1/32, eight
-   64-token trace blocks (512 tokens) become ONE 16-token block — the geometry of the Mooncake
-   replay. Reuse finer than 512 tokens is not seen; a partial group at the end is never shared.
-3. A FLEET TIMELINE. The sessions were recorded separately, each from its own zero. They are
-   replayed `concurrency` at a time: each slot plays sessions back to back, in a seeded shuffle, a
-   session starting when the one before it would have finished. A request arrives at its session's
-   start plus its recorded `t` — the recorded think and tool times, open-loop. The slots start
-   spread over the first `stagger_s` seconds.
-4. ONE MODEL. A fleet serves one model, so requests to any model other than the session's main one
-   are dropped and counted (`other_model`), unless `models="all"`. A sub-agent is its own session.
-
-Sessions are REAL here, not inferred as they are for Mooncake: a session is a trace.
+Because hash ids are local, each session's blocks are kept distinct from every other session's: the
+replay shows reuse within a session and none across users, unlike Mooncake's global ids. Sessions
+are the trace's own, not inferred.
 """
 
 from __future__ import annotations
@@ -54,8 +39,7 @@ def _hash(scope: str, prev: int, ids: list[int]) -> int:
 
 
 def _flat(d: dict[str, Any]) -> Iterator[tuple[float, str, dict[str, Any]]]:
-    """(time from the session's start, session id, request) — sub-agents flattened, as their own
-    sessions, their requests timed from the sub-agent's start."""
+    """Yield (time from session start, session id, request); a sub-agent is its own session."""
     for r in d.get("requests") or []:
         if r.get("type") == "subagent":
             sid = f"{d['id']}/{r.get('agent_id', 'subagent')}"
@@ -99,7 +83,24 @@ def read(
     **_: object,
 ) -> Iterator[NormalizedRequest]:
     """Replay AgentX sessions `concurrency` at a time, as `NormalizedRequest`s in arrival order.
-    See the module docstring for the four parameters that change what a replay means."""
+
+    The sessions were recorded separately, each from its own zero. Each of `concurrency` slots plays
+    sessions back to back in a seeded shuffle, a session starting when the one before it would have
+    finished, and a request arrives at its session's start plus its recorded `t`, which includes the
+    recorded think and tool times (open loop). Results depend on these choices, so state them with
+    any number produced.
+
+    Args:
+        token_scale: Factor applied to every token count. At the default 1/32, eight 64-token trace
+            blocks (512 tokens) become one 16-token block: reuse finer than 512 tokens is not seen,
+            and a partial group at the end is never shared.
+        concurrency: Number of sessions replayed at once.
+        window_s: Keep only requests that arrive before this time, in seconds; None keeps all.
+        stagger_s: The slots start at random times spread over this many seconds.
+        seed: Seed for the session order and the slots' start times.
+        models: "main" drops requests to any model other than the session's main one, counted as
+            `other_model`; "all" keeps them. A sub-agent is its own session either way.
+    """
     group = block_size / (TRACE_BLOCK_TOKENS * token_scale)
     if token_scale <= 0 or group < 1 or group != int(group):
         raise ValueError(

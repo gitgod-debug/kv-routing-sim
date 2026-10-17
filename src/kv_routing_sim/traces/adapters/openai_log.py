@@ -1,9 +1,7 @@
-"""Adapter for OpenAI-style request logs (chat completions, and the `usage` block).
+"""Adapter for OpenAI-style request logs: chat completions with a `usage` block.
 
-The distinguishing feature versus the vLLM adapter: the prompt is a `messages` LIST, and it must be
-flattened IN ORDER. Order is not cosmetic here — a chat prompt's shared prefix is the leading system
-and tool messages, so flattening them in any other order destroys the prefix structure the entire
-simulation is about.
+The prompt is a `messages` list, flattened in order: a chat prompt's shared prefix is its leading
+system and tool messages, and any other order would destroy that prefix.
 """
 
 from __future__ import annotations
@@ -33,11 +31,10 @@ def _flatten_messages(messages: list[dict[str, Any]]) -> str:
 
 
 def _first_present(obj: dict[str, Any], keys: tuple[str, ...]) -> Any:
-    """First key that is present and non-None.
+    """Return the value of the first key that is present and not None.
 
-    ⛔ NOT `a or b or c`. A timestamp of 0 is falsy, so `or` would treat the first request of a
-    trace normalized to start at t=0 as having no timestamp and skip it — silently, as a
-    "malformed line". Our own writer emits exactly that trace, which is how this was caught.
+    Not `a or b or c`: a timestamp of 0 is falsy, so the first request of a trace that starts at t=0
+    would be skipped as malformed.
     """
     for k in keys:
         if k in obj and obj[k] is not None:

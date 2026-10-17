@@ -1,29 +1,28 @@
 #!/usr/bin/env python3
-"""R3's analysis — committed BEFORE the run, so nothing in it is chosen after seeing a result.
+"""R3 analysis: the decision rules of configs/r3_bailian.yaml applied to the R3 grid.
 
     python scripts/r3_analyze.py
         # artifacts/results/r3_bailian/grid.json -> analysis.json, report.md
 
-The procedure, exactly as configs/r3_bailian.yaml registers it.
-
 R(policy) is the fewest replicas, of those swept, whose cell meets the target on every seed; a
-policy that holds it on none counts as one more than the most swept. A speed is TESTABLE on a
-calibration if some policy holds the target there. Each rule is decided under the registered
-target, on EVERY calibration: one calibration on which it fails, fails it. A rule with no testable
-speed on some calibration is UNDECIDED, and an undecided rule does not hold.
+policy that never holds it counts as one more than the most swept. A speed is testable on a
+calibration if some policy holds the target there. Each rule is decided under the config's target
+and must hold on every calibration. A rule with no testable speed on some calibration is
+undecided, and an undecided rule does not hold.
 
-  R3a  the published product needs no more GPUs than keeping sessions in place: R(lmetric) <=
-       R(session-sticky) at every testable speed, and fewer at one or more.
+  R3a  LMetric needs no more GPUs than session-sticky: R(lmetric) <= R(session-sticky) at every
+       testable speed, and fewer at one or more.
   R3b  moving sessions adds nothing without a shared cache store: R(smetric-local) within
        `within` of R(lmetric) at every testable speed.
-  R3c  the old finding's two policies tie on real traffic: R(balanced prefix-affinity, the
-       registered weight) within `within` of R(session-sticky) at every testable speed.
+  R3c  balanced prefix-affinity and session-sticky tie: R(balanced prefix-affinity at the
+       configured weight) within `within` of R(session-sticky) at every testable speed.
   R3d  pure prefix-affinity fails: at every testable speed it needs more replicas than
-       round-robin, or holds the target on none.
+       round-robin, or never holds the target.
 
-Reported, not tested: the same four rules under the other target; every policy's count on every
-calibration under both targets; hit rates, how unevenly requests were spread, and each policy's
-own account of its decisions, at the replica count where session-sticky first holds the target.
+Also reported, not tested: the same rules under the other target; every policy's count on every
+calibration under both targets; and each policy's hit rate, request spread and router decision
+counts at the replica count where session-sticky first holds the target. The decision rules come
+from the config; this script applies them and tunes nothing.
 """
 
 from __future__ import annotations
@@ -39,7 +38,7 @@ import yaml
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import t2_analyze as t2  # `required`: replica counts from stored percentiles — imported, not copied
+import t2_analyze as t2  # t2.required: replica counts from stored percentiles
 
 CONFIG = REPO / "configs" / "r3_bailian.yaml"
 RULES = (("r3a", "**R3a** — LMetric needs no more GPUs than session-sticky, and fewer somewhere"),
@@ -101,8 +100,11 @@ def decide(tab: dict[str, Any], roles: dict[str, str], within: int,
 
 
 def at_sticky(grid: dict[str, Any], tab: dict[str, Any], roles: dict[str, str]) -> dict[str, Any]:
-    """Reported: every policy's hit rate, spread and decisions at the replica count where
-    session-sticky first holds the registered target (the most swept, if it never does)."""
+    """Every policy's hit rate, spread and router counts at session-sticky's replica count.
+
+    That count is where session-sticky first holds the target, or the largest swept if it never
+    does.
+    """
     reps = grid["axes"]["replicas"]
     out: dict[str, Any] = {}
     for cal, by_speed in grid["cells"].items():
@@ -148,9 +150,6 @@ def analyze(grid: dict[str, Any], cfg: dict[str, Any]) -> dict[str, Any]:
     out["grid_header"] = {k: grid.get(k) for k in ("git_sha", "git_dirty", "date_utc", "n_runs",
                                                    "runtime_s", "trace_sha256")}
     return out
-
-
-# ── the report ──────────────────────────────────────────────────────────────────────────────────
 
 
 def _verdict(rule: dict[str, Any]) -> str:

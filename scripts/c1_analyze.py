@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""C1's result: `kvsim calibrate` on a real T4, against the rules registered before the run.
+"""Analyse the C1 run of `kvsim calibrate` on a T4 against the rules in configs/c1_calibrate.yaml.
 
     python scripts/c1_analyze.py      # artifacts/results/c1_kaggle_t4/ -> report.md
 
-C1 holds only if both hold (configs/c1_calibrate.yaml; docs/09, 2026-09-28):
-  C1a — the command exits 0, its check within the error limit, and EVERY check request's cached
-        tokens equal the model's (the registered prediction: exact);
-  C1b — the KV capacity it reads equals the engine log's `GPU KV cache size` ÷ block size.
-Both are recomputed here from the raw files, not copied from the notebook's own verdict. The fitted
-timings against Phase 3's were registered as reported, not tested.
+C1 holds only if both parts hold:
+  C1a: the command exits 0 and marks the profile calibrated, its check's hit and query counts
+       equal the registered prediction, and every check request's cached tokens equal the model's;
+  C1b: the KV capacity it reads equals the engine log's `GPU KV cache size` / block size.
+Both are recomputed from the raw files rather than taken from the notebook's verdict. The fitted
+timings are reported beside Phase 3's, not tested.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ def main() -> int:
     c1a = c1["returncode"] == 0 and prof["calibrated"] and exact_counts and every_request
     c1b = log_blocks is not None and prof["kv_cache_blocks"] == log_blocks
 
-    # Reported: the prefill line, and what it hides. Per-token cost by prompt length.
+    # Reported only: median prefill time per prompt length, and a line fitted to the short ones.
     pts = src["prefill_points"]
     by_len: dict[int, list[float]] = {}
     for q in pts:

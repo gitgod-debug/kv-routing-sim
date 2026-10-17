@@ -1,10 +1,8 @@
-"""The C3 notebook's pre-flight cell (scripts/_c3_notebook.py) — the one cell that is C3's own.
+"""Tests for the pre-flight cell of the C3 notebook (scripts/_c3_notebook.py).
 
-C3's first attempt on Kaggle stopped before any measurement: the image shipped a torchaudio built
-for another CUDA than the torch vLLM installs, under the very version number vLLM pins, so pip kept
-it and vLLM could not start (docs/09, 2026-10-05). The pre-flight repairs that and stops early when
-it cannot. It decides whether a GPU hour is spent, so its logic is tested here, with the package
-manager and the interpreter replaced by fakes — nothing in this file installs or removes anything.
+The Kaggle image can ship a torchaudio built for a different CUDA than vLLM's torch but carrying
+the version vLLM pins, so pip keeps it and vLLM cannot start. The pre-flight repairs such a package
+or stops early. The package manager and interpreter are replaced by fakes, so nothing is installed.
 """
 
 from __future__ import annotations
@@ -34,7 +32,7 @@ REQUIRES = ["numpy", "transformers>=5.10.4", "numba==0.65.0", "torch==2.13.0",
 
 
 def _functions() -> dict:
-    """The cell's definitions, executed without its "run it" part — as a notebook would have them
+    """The cell's definitions, executed without its "run it" part, as a notebook would have them
     after the cells above it."""
     ns = {"subprocess": subprocess, "sys": sys, "json": json, "re": re, "pathlib": pathlib,
           "OUT_DIR": "unused", "ENV": {}}
@@ -62,13 +60,13 @@ def test_the_pinned_version_comes_from_vllms_own_requirements():
     assert pinned("torchvision", REQUIRES) == "0.28.0"
     assert pinned("torch", REQUIRES) == "2.13.0"  # and not torchaudio's or torchvision's line
     assert pinned("torchcodec", REQUIRES) is None  # a range is not a pin
-    assert pinned("zentorch", REQUIRES) is None  # an optional extra is not installed, so not ours
+    assert pinned("zentorch", REQUIRES) is None  # an optional extra is not installed: not a pin
     assert pinned("torchaudio", []) is None
 
 
 def test_a_broken_package_gets_the_build_vllm_pins_from_pypi():
-    """The Kaggle case: 2.11.0+cu128 satisfies `==2.11.0`, so pip kept it. The repair forces the
-    PyPI build back in, touching nothing else — and stops there once it imports."""
+    """2.11.0+cu128 satisfies `==2.11.0`, so the repair force-reinstalls the PyPI build without
+    dependencies and stops once the package imports."""
     ns = _functions()
     probe, run, ran = _fakes([BROKEN, FIXED])
     now = ns["repair"]("torchaudio", probe=probe, run=run, pinned=lambda m: "2.11.0")
@@ -108,8 +106,7 @@ def test_a_healthy_or_absent_package_is_left_alone():
 
 def test_the_probe_runs_in_a_fresh_interpreter_and_survives_a_module_that_raises(
         tmp_path, monkeypatch):
-    """The real probe, on modules made for it: one that imports, one that raises as torchaudio
-    did, one that is not there."""
+    """The real probe, on modules that import, raise on import, or do not exist."""
     (tmp_path / "c3_good_mod.py").write_text("x = 1\n")
     (tmp_path / "c3_bad_mod.py").write_text(
         "raise RuntimeError('compiled with different CUDA versions')\n")
@@ -122,19 +119,19 @@ def test_the_probe_runs_in_a_fresh_interpreter_and_survives_a_module_that_raises
 
 
 def test_an_early_stop_leaves_a_zip_and_says_nothing_was_measured():
-    """Before the client cell runs there is no save(): every stop in the start cell must write the
-    diagnostics zip first, or "download the zip" is a lie — as it was on the first attempt."""
+    """Before the client cell runs there is no save(), so every stop must first write the
+    diagnostics zip."""
     cell = nb._start_cell()
     assert cell.count("diag_zip()") == cell.count("raise Stop(") == 2
     for m in re.finditer(r"raise Stop\(", cell):
         assert cell[:m.start()].rstrip().endswith("diag_zip()")
     assert "Nothing was measured" in cell
     run_part = nb.PREFLIGHT_CELL.split("# ── run it")[1]
-    assert run_part.count("raise Stop(") == 3  # no GPU · not a T4 · vLLM cannot start
+    assert run_part.count("raise Stop(") == 3  # no GPU, not a T4, vLLM cannot start
     assert '"T4" not in' in run_part  # C3 is registered for a T4: no other GPU is measured
     for m in re.finditer(r"raise Stop\(", run_part):
         assert run_part[:m.start()].rstrip().endswith("diag_zip()")
-    assert '_run(["vllm", "serve", "--help"]' in run_part  # the check the first attempt failed
+    assert '_run(["vllm", "serve", "--help"]' in run_part  # checks that vLLM can start
 
 
 def test_the_notebook_says_on_page_one_what_was_amended(tmp_path):

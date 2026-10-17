@@ -1,10 +1,8 @@
-"""R3's committed result must be what the stored runs say, through the registered analysis.
+"""Pins R3's registered result (configs/r3_bailian.yaml) to the stored runs.
 
-R3 (configs/r3_bailian.yaml, registered 2026-10-06): the two published routing policies — LMetric,
-and SMetric's rule without its global tier — beside this project's own, on Alibaba's public coder
-trace, on four calibrations. The trace is other people's data and is not in the repository, so
-nothing here replays it: these tests tie the analysis and every quoted number to the stored grid,
-and the stored grid to the registered design.
+R3 compares LMetric and SMetric's rule without its global tier with this project's policies on
+Alibaba's public coder trace, on four calibrations. The trace is not in the repository, so these
+tests tie the analysis and quoted numbers to the stored grid, and the grid to the registered design.
 """
 
 from __future__ import annotations
@@ -198,8 +196,8 @@ def test_the_side_numbers_the_write_up_quotes():
 
 
 def test_session_stickys_known_weakness_does_not_show_on_this_trace():
-    """SMetric reports the load 2.17x out of balance under routing by session id. Here the busiest
-    replica gets at most 1.14x its share in any cell with two or more replicas."""
+    """SMetric reports a 2.17x load imbalance under session-id routing; here the busiest replica
+    gets at most 1.14x its share in any cell with two or more replicas."""
     worst = max(b for c in CALS for sp in SPEEDS
                 for b in GRID["cells"][c][sp][STICKY]["busiest_over_mean"][1:])
     assert round(worst, 2) == 1.14
