@@ -1,0 +1,485 @@
+diff --git a/docs/source/use_cases/prefix-aware-routing.rst b/docs/source/use_cases/prefix-aware-routing.rst
+index b1324f9..e006a15 100644
+--- a/docs/source/use_cases/prefix-aware-routing.rst
++++ b/docs/source/use_cases/prefix-aware-routing.rst
+@@ -10,7 +10,8 @@ Table of Contents
+ 2. `Step 1: Deploy with Prefix Aware Routing`_
+ 3. `Step 2: Port Forwarding`_
+ 4. `Step 3: Testing Prefix Aware Routing`_
+-5. `Step 4: Clean Up`_
++5. `Bounding the router's memory`_
++6. `Step 4: Clean Up`_
+ 
+ Prerequisites
+ -------------
+@@ -85,6 +86,21 @@ Specifically, you should see some log like the following:
+    [2025-06-03 06:16:28,963] LMCache DEBUG: Scheduled to load 5 tokens for request cmpl-306538839e87480ca5604ecc5f75c847-0 (vllm_v1_adapter.py:299:lmcache.integration.vllm.vllm_v1_adapter)
+    [2025-06-03 06:16:28,966] LMCache DEBUG: Retrieved 6 out of 6 out of total 6 tokens (cache_engine.py:330:lmcache.experimental.cache_engine)
+ 
++Bounding the router's memory
++----------------------------
++
++The router finds prefix matches in a trie of hashed 128-character chunks that it builds from its own dispatch history. By default the trie forgets nothing, so on a workload with ever-new prompts (long-document QA, for instance) it grows for as long as the router runs, and a router pod with a memory limit is eventually restarted (`#687 <https://github.com/vllm-project/production-stack/issues/687>`_).
++
++``--prefix-max-chunks-per-endpoint`` (``routerSpec.prefixMaxChunksPerEndpoint`` in the Helm chart) bounds the trie: once an endpoint is listed on more chunks than this, its least recently used chunks are forgotten, the tail chunks of a prompt before its head chunks. That is also the order in which a vLLM instance frees a finished request's KV blocks, so the trie's picture of each endpoint's cache ages roughly the way the cache itself does, and a chunk the router has forgotten is one the engine would have evicted around the same time.
++
++Size the bound from the engine's own KV cache, which ``/metrics`` reports in ``vllm:cache_config_info`` as ``num_gpu_blocks`` and ``block_size``: the cache holds ``num_gpu_blocks * block_size`` tokens, and one chunk of 128 characters is about 32 tokens of English text. For an instance with 100,000 blocks of 16 tokens, 1,600,000 tokens, that is 50,000 chunks:
++
++.. code-block:: bash
++
++   vllm-router ... --routing-logic prefixaware --prefix-max-chunks-per-endpoint 50000
++
++The router then holds at most 50,000 chunk nodes per endpoint. A bound smaller than the engine's cache makes the router forget prefixes the engine still holds; a bound larger than it keeps the router routing to prefixes the engine has already evicted, which is what an unbounded trie does all the time.
++
+ Step 4: Clean Up
+ -----------------
+ 
+diff --git a/helm/README.md b/helm/README.md
+index fa9f1a3..36321fc 100644
+--- a/helm/README.md
++++ b/helm/README.md
+@@ -266,6 +266,7 @@ Set `servingEngineSpec.modelSpec[].raySpec.enabled: true` to deploy the model as
+ | `routerSpec.staticModels` | string | `""` | Comma-separated list of model names if serviceDiscovery is "static" |
+ | `routerSpec.routingLogic` | string | `"roundrobin"` | Routing logic: `"roundrobin"`, `"session"`, `"prefixaware"`, `"kvaware"`, `"disaggregated_prefill"`, or `"disaggregated_prefill_orchestrated"` |
+ | `routerSpec.prefixMinMatchLength` | integer | `0` | Minimum prefix match length for `prefixaware` routing to reuse a matched endpoint; below this, requests fall back to QPS routing. Quantized to the prefix chunk size (default 128). `0` disables it |
++| `routerSpec.prefixMaxChunksPerEndpoint` | integer | `0` | Upper bound on the prompt chunks (128 characters each) that `prefixaware` routing remembers per endpoint, least recently used forgotten first. Size it from the engine's KV cache (see `--prefix-max-chunks-per-endpoint`). `0` means no bound |
+ | `routerSpec.sessionKey` | string | `""` | Session key if using "session" routing logic |
+ | `routerSpec.extraArgs` | list | `[]` | Extra command line arguments to pass to the router |
+ | `routerSpec.extraVolumes` | list | `[]` | Additional volumes to add to the router pod, in Kubernetes volume format |
+diff --git a/helm/templates/deployment-router.yaml b/helm/templates/deployment-router.yaml
+index ab979df..7442277 100644
+--- a/helm/templates/deployment-router.yaml
++++ b/helm/templates/deployment-router.yaml
+@@ -120,6 +120,10 @@ spec:
+           - "--prefix-min-match-length"
+           - "{{ .Values.routerSpec.prefixMinMatchLength }}"
+           {{- end }}
++          {{- if .Values.routerSpec.prefixMaxChunksPerEndpoint }}
++          - "--prefix-max-chunks-per-endpoint"
++          - "{{ .Values.routerSpec.prefixMaxChunksPerEndpoint }}"
++          {{- end }}
+           {{- if .Values.routerSpec.sessionKey }}
+           - "--session-key"
+           - "{{ .Values.routerSpec.sessionKey }}"
+diff --git a/helm/values.schema.json b/helm/values.schema.json
+index 53db5ee..4c09685 100644
+--- a/helm/values.schema.json
++++ b/helm/values.schema.json
+@@ -723,6 +723,10 @@
+                     "description": "Customized pod annotations for the router pods",
+                     "type": "object"
+                 },
++                "prefixMaxChunksPerEndpoint": {
++                    "description": "Upper bound on the number of prompt chunks (128 characters each by default) that prefixaware routing remembers per endpoint. Each endpoint's least recently used chunks are forgotten first, the tail chunks of a prompt before its head chunks, the order a vLLM instance frees its own KV blocks. Size it from the engine's KV cache: num_gpu_blocks * block_size (both in vllm:cache_config_info) divided by about 32 tokens per chunk. Defaults to 0: no bound, and the router's memory grows with every distinct prompt it has seen.",
++                    "type": "integer"
++                },
+                 "prefixMinMatchLength": {
+                     "description": "Minimum prefix match length required for prefixaware routing to reuse a matched endpoint. If the longest prefix match is shorter than this value, the request falls back to least-inflight routing via request_stats (same load signal as loadaware). Prefix matches are computed in chunks (chunk size defaults to 128 characters), so this threshold is effectively quantized to that granularity. Defaults to 0, which disables it.",
+                     "type": "integer"
+diff --git a/helm/values.yaml b/helm/values.yaml
+index 3ecb291..c203821 100644
+--- a/helm/values.yaml
++++ b/helm/values.yaml
+@@ -584,6 +584,16 @@ routerSpec:
+   # quantized to that granularity. Defaults to 0, which disables it.
+   prefixMinMatchLength: 0
+ 
++  # -- Upper bound on the number of prompt chunks (128 characters each by
++  # default) that prefixaware routing remembers per endpoint. Each endpoint's
++  # least recently used chunks are forgotten first, the tail chunks of a
++  # prompt before its head chunks, the order a vLLM instance frees its own KV
++  # blocks. Size it from the engine's KV cache: num_gpu_blocks * block_size
++  # (both in vllm:cache_config_info) divided by about 32 tokens per chunk.
++  # Defaults to 0: no bound, and the router's memory grows with every distinct
++  # prompt it has seen.
++  prefixMaxChunksPerEndpoint: 0
++
+   # -- session key if using "session" routing logic
+   sessionKey: ""
+ 
+diff --git a/src/tests/test_hashtrie.py b/src/tests/test_hashtrie.py
+new file mode 100644
+index 0000000..5aa52e7
+--- /dev/null
++++ b/src/tests/test_hashtrie.py
+@@ -0,0 +1,115 @@
++import random
++
++import pytest
++
++from vllm_router.prefix.hashtrie import HashTrie
++
++CHUNK = 128
++A, B, C = "http://engine-a.com", "http://engine-b.com", "http://engine-c.com"
++
++
++def chunks(label: str, n: int = 1) -> str:
++    """A prompt of exactly n chunks, all distinct from each other and from
++    every other label's chunks."""
++    return "".join(f"{label}:{i}".ljust(CHUNK, ".") for i in range(n))
++
++
++def count_nodes(trie: HashTrie) -> int:
++    stack, n = [trie.root], 0
++    while stack:
++        node = stack.pop()
++        n += len(node.children)
++        stack.extend(node.children.values())
++    return n
++
++
++async def match_length(trie: HashTrie, prompt: str, endpoints=None) -> int:
++    length, _ = await trie.longest_prefix_match(prompt, endpoints or {A, B, C})
++    return length
++
++
++@pytest.mark.asyncio
++async def test_unbounded_by_default_keeps_every_chunk():
++    trie = HashTrie()
++    for i in range(50):
++        await trie.insert(chunks(f"p{i}"), A)
++    assert trie.num_nodes == count_nodes(trie) == 50
++    assert await trie.longest_prefix_match(chunks("p0"), {A}) == (CHUNK, {A})
++
++
++@pytest.mark.asyncio
++async def test_bound_holds_per_endpoint_under_random_traffic():
++    trie = HashTrie(max_chunks_per_endpoint=10)
++    rng = random.Random(0)
++    for i in range(500):
++        await trie.insert(chunks(f"p{i}", rng.randint(1, 4)), rng.choice([A, B, C]))
++        assert trie.num_nodes == count_nodes(trie) <= 30
++        assert all(len(listed) <= 10 for listed in trie._recency.values())
++
++
++@pytest.mark.asyncio
++async def test_least_recently_used_prompt_is_forgotten_first():
++    trie = HashTrie(max_chunks_per_endpoint=2)
++    await trie.insert(chunks("old"), A)
++    await trie.insert(chunks("new"), A)
++    await trie.insert(chunks("old"), A)  # touched: "old" is now the most recent
++    await trie.insert(chunks("newest"), A)  # over budget: "new" goes
++    assert await match_length(trie, chunks("new")) == 0
++    assert await match_length(trie, chunks("old")) == CHUNK
++    assert await match_length(trie, chunks("newest")) == CHUNK
++    assert trie.num_nodes == count_nodes(trie) == 2
++
++
++@pytest.mark.asyncio
++async def test_tail_chunks_are_forgotten_before_head_chunks():
++    """As a vLLM instance frees a request's blocks tail first: the prefix survives."""
++    trie = HashTrie(max_chunks_per_endpoint=4)
++    await trie.insert(chunks("doc", 3), A)
++    await trie.insert(chunks("other", 3), A)  # 6 listed, 4 allowed: doc's tail goes
++    assert await match_length(trie, chunks("doc", 3)) == CHUNK
++    assert await match_length(trie, chunks("other", 3)) == 3 * CHUNK
++    assert trie.num_nodes == count_nodes(trie) == 4
++
++
++@pytest.mark.asyncio
++async def test_forgetting_one_endpoint_keeps_the_others_listing():
++    trie = HashTrie(max_chunks_per_endpoint=1)
++    await trie.insert(chunks("shared"), A)
++    await trie.insert(chunks("shared"), B)
++    await trie.insert(chunks("a-only"), A)  # A forgets "shared"; B still lists it
++    assert await trie.longest_prefix_match(chunks("shared"), {A, B}) == (CHUNK, {B})
++    assert trie.num_nodes == count_nodes(trie) == 2
++
++
++@pytest.mark.asyncio
++async def test_node_is_dropped_once_no_endpoint_lists_it():
++    trie = HashTrie(max_chunks_per_endpoint=1)
++    await trie.insert(chunks("shared"), A)
++    await trie.insert(chunks("shared"), B)
++    await trie.insert(chunks("a-only"), A)
++    await trie.insert(chunks("b-only"), B)
++    assert await match_length(trie, chunks("shared")) == 0
++    assert trie.num_nodes == count_nodes(trie) == 2
++
++
++@pytest.mark.asyncio
++async def test_listings_stay_prefix_closed_however_inserts_interleave():
++    """A chunk an endpoint lists has a parent it lists, so a match never
++    dead-ends above a surviving suffix."""
++    trie = HashTrie(max_chunks_per_endpoint=6)
++    rng = random.Random(1)
++    for i in range(300):
++        head = chunks(f"h{rng.randint(0, 3)}", rng.randint(1, 2))
++        tail = chunks(f"t{i}", rng.randint(0, 3))
++        await trie.insert(head + tail, rng.choice([A, B]))
++        for endpoint, listed in trie._recency.items():
++            for node in listed:
++                assert node.parent is trie.root or endpoint in node.parent.endpoints
++
++
++@pytest.mark.asyncio
++async def test_a_bound_below_one_prompt_keeps_its_head():
++    trie = HashTrie(max_chunks_per_endpoint=2)
++    await trie.insert(chunks("long", 5), A)
++    assert await match_length(trie, chunks("long", 5)) == 2 * CHUNK
++    assert trie.num_nodes == count_nodes(trie) == 2
+diff --git a/src/tests/test_prefixaware_router.py b/src/tests/test_prefixaware_router.py
+index 4e475f0..f6ebb85 100644
+--- a/src/tests/test_prefixaware_router.py
++++ b/src/tests/test_prefixaware_router.py
+@@ -381,3 +381,28 @@ async def test_default_threshold_zero_preserves_original_behavior():
+     assert url == "http://engine1.com"
+ 
+     fake_hashtrie.insert.assert_awaited_once()
++
++
++@pytest.mark.asyncio
++async def test_bound_is_passed_to_the_trie_and_holds_end_to_end():
++    """
++    #687: with the bound set, routing an endless stream of distinct prompts
++    leaves the trie at most max_chunks_per_endpoint nodes per endpoint.
++    """
++    endpoints = [
++        EndpointInfo(url="http://engine1.com"),
++        EndpointInfo(url="http://engine2.com"),
++    ]
++    request_stats = {
++        "http://engine1.com": RequestStats(qps=1.0),
++        "http://engine2.com": RequestStats(qps=1.0),
++    }
++    router = PrefixAwareRouter(prefix_max_chunks_per_endpoint=5)
++    assert router.hashtrie.max_chunks_per_endpoint == 5
++
++    for i in range(200):
++        prompt = f"document {i} ".ljust(128 * 3, ".")  # three distinct chunks
++        await router.route_request(
++            endpoints, None, request_stats, Request(headers={}), {"prompt": prompt}
++        )
++        assert router.hashtrie.num_nodes <= 5 * len(endpoints)
+diff --git a/src/vllm_router/app.py b/src/vllm_router/app.py
+index f9446c8..7c2636b 100644
+--- a/src/vllm_router/app.py
++++ b/src/vllm_router/app.py
+@@ -281,6 +281,7 @@ def initialize_all(app: FastAPI, args):
+         kv_aware_threshold=args.kv_aware_threshold,
+         loadaware_beta=args.loadaware_beta,
+         prefix_min_match_length=args.prefix_min_match_length,
++        prefix_max_chunks_per_endpoint=args.prefix_max_chunks_per_endpoint,
+         priority_header=args.priority_header,
+         priority_field=args.priority_field,
+         priority_default=args.priority_default,
+diff --git a/src/vllm_router/parsers/parser.py b/src/vllm_router/parsers/parser.py
+index 4bd7612..4719a25 100644
+--- a/src/vllm_router/parsers/parser.py
++++ b/src/vllm_router/parsers/parser.py
+@@ -480,6 +480,21 @@ def parse_args():
+         "Defaults to 0, which disables the threshold.",
+     )
+ 
++    parser.add_argument(
++        "--prefix-max-chunks-per-endpoint",
++        type=int,
++        default=0,
++        help="Upper bound on the number of prompt chunks (chunk_size, default "
++        "128 characters) that prefixaware routing remembers per endpoint. "
++        "Each endpoint's least recently used chunks are forgotten first, the "
++        "tail chunks of a prompt before its head chunks, which is the order a "
++        "vLLM instance frees its own KV blocks, so the router's picture of "
++        "each cache ages the way the cache does. Size it from the engine: "
++        "num_gpu_blocks * block_size tokens (both in vllm:cache_config_info) "
++        "divided by about 32 tokens per chunk. Defaults to 0: no bound, and "
++        "the router's memory grows with every distinct prompt it has seen.",
++    )
++
+     parser.add_argument(
+         "--priority-header",
+         type=str,
+diff --git a/src/vllm_router/prefix/hashtrie.py b/src/vllm_router/prefix/hashtrie.py
+index 7c81d20..c1398a6 100644
+--- a/src/vllm_router/prefix/hashtrie.py
++++ b/src/vllm_router/prefix/hashtrie.py
+@@ -13,7 +13,8 @@
+ # limitations under the License.
+ 
+ import asyncio
+-from typing import Generator, Set, Tuple
++from collections import OrderedDict
++from typing import Dict, Generator, List, Optional, Set, Tuple
+ 
+ import xxhash
+ 
+@@ -23,25 +24,48 @@ logger = init_logger(__name__)
+ 
+ 
+ class TrieNode:
+-    def __init__(self):
+-        self.children = {}
+-        self.endpoints = set()
++    def __init__(self, parent: Optional["TrieNode"] = None, key: Optional[int] = None):
++        self.children: Dict[int, "TrieNode"] = {}
++        self.endpoints: Set[str] = set()
+ 
+         # assign a lock for each trie node.
+         # this assures that each node will only be accessed by one co-routine
+         # at a time.
+         self.lock = asyncio.Lock()
+ 
++        # where the node hangs in the trie, so that it can be detached once no
++        # endpoint lists it any more (see HashTrie.max_chunks_per_endpoint)
++        self.parent = parent
++        self.key = key
++
+ 
+ class HashTrie:
+-    def __init__(self, chunk_size: int = 128):
++    def __init__(self, chunk_size: int = 128, max_chunks_per_endpoint: int = 0):
+         """
+         Initialize the HashTrie.
+         Args:
+             chunk_size (int): the string chunk size (in terms of # characters)
++            max_chunks_per_endpoint (int): how many chunk nodes the trie keeps
++                listed for each endpoint. 0 keeps every chunk ever inserted,
++                so the trie grows with every distinct prompt the router has
++                seen. Above 0, an endpoint's least recently used chunks are
++                forgotten first, the tail chunks of a prompt before its head
++                chunks, which is the order in which a vLLM instance frees its
++                own KV blocks: the trie's picture of each endpoint's cache
++                then ages the way the cache itself does. The trie as a whole
++                holds at most max_chunks_per_endpoint nodes per endpoint.
+         """
+         self.root = TrieNode()
+         self.chunk_size = chunk_size
++        self.max_chunks_per_endpoint = max_chunks_per_endpoint
++        # endpoint -> the nodes that list it, least recently used first.
++        # Only kept when max_chunks_per_endpoint > 0.
++        self._recency: Dict[str, "OrderedDict[TrieNode, None]"] = {}
++        # the recency bookkeeping and the eviction it triggers are done by one
++        # co-routine at a time.
++        self._recency_lock = asyncio.Lock()
++        # nodes below the root, kept up to date by insert and eviction
++        self.num_nodes = 0
+ 
+     def _chunk_and_hash(self, request: str) -> Generator[int, None, None]:
+         """
+@@ -66,13 +90,70 @@ class HashTrie:
+         node = self.root
+         async with node.lock:
+             node.endpoints.add(endpoint)
++        path: List[TrieNode] = []
+         for chunk_hash in self._chunk_and_hash(request):
+             async with node.lock:
+-                if chunk_hash not in node.children:
+-                    node.children[chunk_hash] = TrieNode()
+-                node = node.children[chunk_hash]
++                child = node.children.get(chunk_hash)
++                if child is None:
++                    child = TrieNode(parent=node, key=chunk_hash)
++                    node.children[chunk_hash] = child
++                    self.num_nodes += 1
++                node = child
+             async with node.lock:
+                 node.endpoints.add(endpoint)
++            path.append(node)
++        if self.max_chunks_per_endpoint > 0:
++            await self._touch_and_evict(endpoint, path)
++
++    async def _touch_and_evict(self, endpoint: str, path: List[TrieNode]) -> None:
++        """
++        Mark the chunks of a request as the endpoint's most recently used ones,
++        then forget the endpoint's least recently used chunks until it is
++        within its budget.
++
++        The path is touched tail first, so after one request its head chunk is
++        the most recent and its tail chunk the least recent: the tail of a
++        prompt is forgotten before its head, and a parent is always more recent
++        than its children. That is the order in which a vLLM instance frees a
++        finished request's KV blocks (in reverse, so that the tail blocks are
++        evicted first), and it keeps every endpoint's entries prefix-closed: a
++        node an endpoint still lists has a parent it still lists, so a match
++        never dead-ends above a surviving suffix.
++        """
++        forgotten = 0
++        async with self._recency_lock:
++            recency = self._recency.setdefault(endpoint, OrderedDict())
++            for node in reversed(path):
++                if node in recency:
++                    recency.move_to_end(node)
++                else:
++                    recency[node] = None
++            while len(recency) > self.max_chunks_per_endpoint:
++                victim, _ = recency.popitem(last=False)
++                await self._forget(victim, endpoint)
++                forgotten += 1
++        if forgotten:
++            logger.debug(
++                f"Forgot {forgotten} least recently used chunk(s) of {endpoint}; "
++                f"the trie now holds {self.num_nodes} nodes"
++            )
++
++    async def _forget(self, node: TrieNode, endpoint: str) -> None:
++        """
++        Remove an endpoint from a node, and detach the node from the trie once
++        no endpoint lists it. By the tail-first order of _touch_and_evict such a
++        node has no children left, so detaching it frees it.
++        """
++        async with node.lock:
++            node.endpoints.discard(endpoint)
++            orphaned = not node.endpoints and not node.children
++        parent = node.parent
++        if orphaned and parent is not None:
++            async with parent.lock:
++                if parent.children.get(node.key) is node:
++                    del parent.children[node.key]
++                    self.num_nodes -= 1
++            node.parent = None
+ 
+     async def longest_prefix_match(
+         self, request: str, available_endpoints: Set[str] = set()
+diff --git a/src/vllm_router/routers/routing_logic.py b/src/vllm_router/routers/routing_logic.py
+index 70b8bb6..061ffab 100644
+--- a/src/vllm_router/routers/routing_logic.py
++++ b/src/vllm_router/routers/routing_logic.py
+@@ -853,19 +853,26 @@ class PrefixAwareRouter(RoutingInterface):
+     Route the request to the appropriate engine URL by where the longest
+     prefix match is found.
+ 
+-    In this class, we assume that there is no eviction of prefix cache.
++    The trie is built from the router's own dispatch history, not from the
++    engines' caches, so it can only approximate what each instance still
++    holds. With prefix_max_chunks_per_endpoint > 0 it forgets each endpoint's
++    least recently used chunks the way the instance frees its own KV blocks;
++    with 0 (the default) it forgets nothing and grows with every distinct
++    prompt the router has seen.
+     """
+ 
+     def __init__(
+         self,
+         prefix_min_match_length: int = 0,
++        prefix_max_chunks_per_endpoint: int = 0,
+     ):
+         if hasattr(self, "_initialized"):
+             return
+         from vllm_router.prefix.hashtrie import HashTrie
+ 
+-        self.hashtrie = HashTrie()
++        self.hashtrie = HashTrie(max_chunks_per_endpoint=prefix_max_chunks_per_endpoint)
+         self.prefix_min_match_length = prefix_min_match_length
++        self.prefix_max_chunks_per_endpoint = prefix_max_chunks_per_endpoint
+         self._initialized = True
+ 
+     async def route_request(
+@@ -880,7 +887,8 @@ class PrefixAwareRouter(RoutingInterface):
+         Route the request to the appropriate engine URL by where the longest
+         prefix match is found.
+ 
+-        In this routing logic, we do not consider the eviction of prefix cache.
++        The engines' own evictions are not observed; see the class docstring
++        for how the trie approximates them.
+ 
+         Args:
+             endpoints (List[EndpointInfo]): The list of engine URLs
+@@ -1259,6 +1267,9 @@ def initialize_routing_logic(
+         logger.info("Initializing prefix-aware routing logic")
+         router = PrefixAwareRouter(
+             prefix_min_match_length=kwargs.get("prefix_min_match_length", 0),
++            prefix_max_chunks_per_endpoint=kwargs.get(
++                "prefix_max_chunks_per_endpoint", 0
++            ),
+         )
+     elif routing_logic == RoutingLogic.DISAGGREGATED_PREFILL:
+         logger.info("Initializing disaggregated prefill routing logic")
