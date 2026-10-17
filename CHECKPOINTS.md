@@ -800,7 +800,7 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       placeholder that proved the pipeline, nothing more — ✅ **rebuilt 2026-09-28** from the calibrated
       profile, from a clean tree (`6bdee6c`)
 - [~] Publish that page to **GitHub Pages** AND to a **free Static Space** — same build, two URLs.
-      `.github/workflows/pages.yml` publishes `site/` + the grid on every push to `master` that touches
+      `.github/workflows/pages.yml` publishes `site/` + the grid on every push to `main` that touches
       them. **Manual step:** push the repo to GitHub, then Settings → Pages → Source: *GitHub
       Actions*; the Static Space needs a Hugging Face account (upload the same two files)
 - [x] ⭐ **The same curve images and calibration table go IN THE README**, for the reader who never

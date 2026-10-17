@@ -5,7 +5,7 @@ name: pages
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths: ["site/**", "artifacts/results/demo_grid*.json", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
