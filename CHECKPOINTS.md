@@ -562,7 +562,7 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       replicas, paired session-bootstrap CIs; **H2b** (new) — K tenant prompts (the generator's new
       `n_shared_prefixes`), affinity at α\* vs session-sticky on replicas needed
 - [x] Sweep **prefix-sharing ratio as its own axis**, crossed with offered load — the H2 grid
-      ([`report.md`](artifacts/results/phase5_crossover/report.md)): 14,592 runs, clean tree `3967a56`
+      ([`report.md`](artifacts/results/phase5_crossover/report.md)): 14,592 runs, clean tree
 - [-] ~~Add turns-per-session as a third axis~~ — **deferred** (2026-09-28): the reason sticky won in
       Phase 4 is more likely that ONE small shared prompt fits in every replica's cache. H2b tests that
       mechanism directly (the number of tenant prompts); turns per session comes back if H2b fails
@@ -599,7 +599,7 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 > standard library): two vLLM 0.30.0 servers, Qwen3-4B, **one per physical T4**, 1,537 blocks each; H2b's
 > traffic with one shared prompt (K1) and 64 tenant prompts (K64); routed by round-robin, session-sticky
 > and radix-affinity through ports of the simulator's own policies. Predictions committed first
-> ([`predictions.json`](artifacts/results/phase6_prereg/predictions.json), from a clean tree at `8951a1e`);
+> ([`predictions.json`](artifacts/results/phase6_prereg/predictions.json), from a clean tree);
 > decided by **S1** (each run's hit rate within 10%) and **S2** (policies predicted ≥ 0.02 apart keep
 > their order — the headline pair is K64 radix-affinity 0.8436 above session-sticky 0.8214).
 > `scripts/phase6_dryrun.py` runs the whole notebook against two mock engines and passes.
@@ -616,7 +616,7 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       batch sizes, which also tells context cost from CPU contention. Phase 6's measured latencies
       are then the held-out test — seen already, so labelled post hoc — and a fresh two-replica run
       the real one. 🔨 **C2 registered 2026-09-28** ([`configs/c2_timing.yaml`](configs/c2_timing.yaml),
-      [`c2_timing_t4.ipynb`](notebooks/c2_timing_t4.ipynb), from the clean commit `adfada5`): the
+      [`c2_timing_t4.ipynb`](notebooks/c2_timing_t4.ipynb), from the clean registration commit): the
       model has two context terms (zero by default — every earlier result unchanged); parts A–C
       measure decode, prefill and contention, part D is held-out traffic the fit never sees. C2a
       (context real) / C2b (contention real) / C2c (D within 2×) — predicted holds / fails / holds.
@@ -682,7 +682,7 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       it recovers the known timings (decode 2.53 ms/seq against 2.5; prefill 0.022 ms/token against
       0.020), its check is exact (48 of 48 requests), and a wrong block size is caught — which the
       first version of the check missed. **C1 registered 2026-09-28:** [`c1_calibrate_t4.ipynb`](notebooks/c1_calibrate_t4.ipynb)
-      carries the wheel of the clean commit `5a34c6d`; predicted exact (48 of 48; hit rate 0.714286).
+      carries the wheel built at registration; predicted exact (48 of 48; hit rate 0.714286).
       ✅ **C1 RAN on a real T4 and HOLDS** ([`report.md`](artifacts/results/c1_kaggle_t4/report.md)):
       the check exact (48 of 48; 9,840 of 13,776 tokens), 1,537 blocks read = the engine log, 48 s.
       ⚠️ Its straight-line timing fit is not good enough to size a fleet: T4 prefill is 0.71 ms/token
@@ -696,8 +696,8 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       C2's cached-prefix cells, within 1.36×. The command now times those cells too
       (`--prefill-cached`, `--prefill-new`).
       🔨 **C3 registered 2026-10-01** ([`configs/c3_calibrate.yaml`](configs/c3_calibrate.yaml),
-      [`c3_calibrate_t4.ipynb`](notebooks/c3_calibrate_t4.ipynb) with the wheel of the clean commit
-      `016d167`): C3a the command works (check exact, capacity read) / C3b its profile predicts
+      [`c3_calibrate_t4.ipynb`](notebooks/c3_calibrate_t4.ipynb) with the wheel built at
+      registration): C3a the command works (check exact, capacity read) / C3b its profile predicts
       three held-out workloads within 2× / C3c C2's profile predicts them within 2×, from numbers
       registered now — predicted holds / holds / holds. The third workload has a shape no design
       decision saw. Dry-run against a mock with known terms: recovered, all three within 1.07×.
@@ -722,7 +722,7 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       🔨 **2026-10-05, built:** every timing cell is now measured `--reps` times (3) and the
       profile keeps the fit of each repeat; `kvsim replay` sizes on each and prints the range
       beside its recommendation ("how firm: 3 to 4 replicas across the calibration's 3 repeats");
-      a profile without repeats says its spread is unknown (commit `5db6a9a`).
+      a profile without repeats says its spread is unknown.
       ✅ **2026-10-05, on a real T4 (C4a holds):** three runs, three repeats each, exact on the
       cache check every time, 359 s a run. ⛔ **And the spread it prints is too narrow (C4's rule E
       does not hold):** another run's count is inside a run's own range in 178 of 216 cases
@@ -737,7 +737,7 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
       the 2 s come from also limits the time per output token (100 ms). 🔨 **2026-10-05:** the
       simulator measures every request's time per output token, `kvsim replay` prints its p95, and
       a cost model can make it part of the SLO with `slo.tpot_p95_ms` (off by default; no earlier
-      number moved — commit `534f5b9`). **T1 and T2 registered 2026-10-05**
+      number moved). **T1 and T2 registered 2026-10-05**
       ([`configs/tpot_slo.yaml`](configs/tpot_slo.yaml)): T1 — the model's mean inter-token latency
       within 1.5× of the engine's on the five held-out runs on disk; T2 — the finding's grid under
       both halves on three calibrations (sticky still best with 1 and 4 prompts / never worse than
@@ -798,7 +798,7 @@ sweep's claim from *predictive* to *comparative* — and say so — rather than 
 - [x] ⚠️ **Rebuild `demo_grid.json` from the CALIBRATED T4 profile.** The committed grid was built on an
       A100-shaped guess (2026-09-21) that no longer describes any hardware in the plan. It is a
       placeholder that proved the pipeline, nothing more — ✅ **rebuilt 2026-09-28** from the calibrated
-      profile, from a clean tree (`6bdee6c`)
+      profile, from a clean tree
 - [~] Publish that page to **GitHub Pages** AND to a **free Static Space** — same build, two URLs.
       `.github/workflows/pages.yml` publishes `site/` + the grid on every push to `main` that touches
       them. **Manual step:** push the repo to GitHub, then Settings → Pages → Source: *GitHub

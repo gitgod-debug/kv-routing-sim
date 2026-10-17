@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""Dry-run the Phase 6 notebook on this machine, against TWO mock engines.
+"""Dry-run the Phase 6 notebook on this machine against two mock vLLM engines.
 
     python scripts/phase6_dryrun.py [--keep]
 
-Builds a SMALL version of the notebook — the same cells from the same builder, fewer sessions and
-faster arrivals, in a temp directory; never the registered notebook or predictions — and executes
-every code cell in one namespace, the way Run-All does. Phase 3's mock engine stands in for both
-`vllm serve` processes (one per port), through the same `vllm` shim on PATH.
+Builds a small version of the notebook in a temp directory (the same cells from the same builder,
+with fewer sessions and faster arrivals; the committed notebook and predictions are not touched)
+and executes every code cell in one namespace, the way Run-All does. Phase 3's mock engine stands
+in for both `vllm serve` processes, one per port, through the same `vllm` shim on PATH.
 
-⚠️ What it proves, and what it cannot: the PLUMBING — the regenerated traces and their
-fingerprints, two servers, resets on both, the routers, streaming, the counters, the verdict and the
-zip. It cannot show that vLLM behaves like the simulator, because here the simulator IS the engine
-(with a faster timing profile, so routing and batching differ a little from the prediction). That is
-the GPU run's job.
+This tests the plumbing: the regenerated traces and their fingerprints, two servers, resets on
+both, the routers, streaming, the counters, the verdict and the zip. It cannot test whether vLLM
+behaves like the simulator, because here the simulator is the engine (with a faster timing
+profile, so routing and batching differ a little from the prediction).
 """
 
 from __future__ import annotations
@@ -38,7 +37,7 @@ from phase3_dryrun import _fake_vllm, _needles, _port_free, _shim
 
 
 def _smoke_notebook(work: pathlib.Path) -> pathlib.Path:
-    """The registered config with a small, fast workload: ~20 s per run instead of ~3 minutes."""
+    """The Phase 6 config with a small, fast workload: about 20 s per run instead of 3 minutes."""
     cfg = yaml.safe_load((REPO / "configs" / "phase6_sim2real.yaml").read_text())
     for spec in cfg["workloads"].values():
         spec.update(n_sessions=16, arrival_rate=4.0, think_time_s=2.0)
@@ -89,7 +88,7 @@ def main() -> int:
         with contextlib.redirect_stdout(buf):
             for i, src in enumerate(cells):
                 exec(compile(src, f"cell{i}", "exec"), ns)  # noqa: S102 - the point of a dry-run
-    except Exception as e:  # noqa: BLE001 - whatever a cell raises IS the dry-run's finding
+    except Exception as e:  # noqa: BLE001 - whatever a cell raises is the dry-run's finding
         err = f"{type(e).__name__} in code cell {i}: {e}"
     finally:
         with contextlib.suppress(Exception), contextlib.redirect_stdout(io.StringIO()):

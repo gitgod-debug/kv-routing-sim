@@ -1,28 +1,26 @@
 #!/usr/bin/env python3
-"""C3's registration: the wheel built from a clean tree, the predictions computed, the notebook
-written.
+"""Prepare the C3 run: build the wheel, compute the predictions, and write the notebook.
 
     python scripts/c3_prepare.py
         # configs/c3_calibrate.yaml -> artifacts/results/c3_prereg/predictions.json
         #                           -> notebooks/c3_calibrate_t4.ipynb
 
-What is registered here, before the run:
-  * the wheel the notebook carries — built from committed code only, which is why this refuses to
-    run on a dirty tree — and the command's default timing cells, read from that code;
-  * the cache check `kvsim calibrate` will send, per seed, and the simulator's prediction for it
-    (C3a), as in C1;
-  * part 2's traffic (fingerprints, checked against the notebook's port of the generator) and what
-    C2's profile predicts for it at the scheduled times — hit rate, p50 and p95 TTFT (C3c).
-What the command's own profile predicts (C3b) cannot be registered: it does not exist until the run.
-The procedure that will produce it — scripts/c3_analyze.py — is committed with this script instead.
+The registration file records:
+  * the wheel the notebook embeds, built from committed code only (so this refuses a dirty tree),
+    and the command's default timing cells, read from that code;
+  * per seed, the cache check `kvsim calibrate` will send and the simulator's prediction for it
+    (C3a);
+  * part 2's traffic (fingerprints, checked against the notebook's port of the generator) and the
+    hit rate, p50 and p95 TTFT that C2's profile predicts for it at the scheduled times (C3c).
+The command's own profile (C3b) exists only after the run; scripts/c3_analyze.py evaluates it.
 
     python scripts/c3_prepare.py --amend "WHY, as one sentence."
 
-rebuilds the notebook from the current builder WITHOUT touching anything registered — for plumbing
-the run turned out to need, such as a repair of the GPU box's software. It refuses unless the
-config, the traffic, the predictions and the command's default cells all come out as registered,
-re-embeds the registered wheel byte for byte, and records the reason, the commit and the
-notebook's hash before and after in the registration file. A dated entry in docs/09 goes with it.
+rebuilds the notebook from the current builder without changing anything registered, for plumbing
+such as a repair of the GPU box's software. It refuses unless the config, the traffic, the
+predictions and the command's default cells all come out as registered, re-embeds the registered
+wheel byte for byte, and records the reason, the commit and the notebook's hash before and after
+in the registration file.
 """
 
 from __future__ import annotations
@@ -66,9 +64,10 @@ CODE = ("src", "pyproject.toml", "configs/c3_calibrate.yaml",
 
 
 def command_defaults() -> dict[str, Any]:
-    """The timing cells `kvsim calibrate` measures when no option is passed — what C3 runs. Read
-    from the command line's own parser: that, not the library's constants, is what the notebook
-    invokes."""
+    """The timing cells `kvsim calibrate` measures when given no options, which is what C3 runs.
+
+    Read from the CLI parser rather than the library's constants, since the notebook runs the CLI.
+    """
     ns = build_parser().parse_args(["calibrate", "--out", "x.json"])
     cells = {k: list(_ints(getattr(ns, k), k)) for k in (
         "prefill_lengths", "prefill_cached", "prefill_new", "decode_batches", "decode_contexts")}
@@ -85,7 +84,7 @@ def check_design(cfg: dict[str, Any], traces: dict[str, list],
         if longest > e["max_model_len"]:
             raise SystemExit(f"error: {name}'s longest request needs {longest} tokens > "
                              f"max_model_len {e['max_model_len']}")
-    # "C2's two, unchanged" must be literally true: the same traces, by fingerprint.
+    # Workloads that share a name with C2's must be the same traces, by fingerprint.
     c2 = json.loads(C2_PREREG.read_text())["trace_fingerprints_sha256"]
     for name, fp in c2.items():
         if name in fingerprints and fingerprints[name] != fp:
@@ -95,8 +94,10 @@ def check_design(cfg: dict[str, Any], traces: dict[str, list],
 
 
 def predict_check(cfg: dict[str, Any], seed: int) -> dict[str, Any]:
-    """The simulator's prediction for the cache check the command sends with this seed. The check
-    fits in a fraction of any T4's cache, so nothing is evicted and timing does not enter it."""
+    """The simulator's prediction for the cache check the command sends with this seed.
+
+    The check uses a fraction of any T4's cache, so nothing is evicted and timing plays no part.
+    """
     c = cfg["calibrate"]
     work = cal.check_workload(random.Random(f"check-{seed}"), c["check_sessions"],
                               c["check_turns"], tuple(c["token_range"]))
@@ -108,8 +109,10 @@ def predict_check(cfg: dict[str, Any], seed: int) -> dict[str, Any]:
 
 
 def predict_holdout(pairs: list, profile) -> dict[str, Any]:
-    """C2's profile, one replica, every request at its SCHEDULED time. Percentiles by the
-    notebook's nearest-rank rule, over all requests."""
+    """Predict a workload with C2's profile on one replica, every request at its scheduled time.
+
+    Percentiles use the notebook's nearest-rank rule over all requests.
+    """
     r = run([q for q, _ in pairs], policy="round-robin", n_replicas=1, seed=0, profile=profile,
             cache_model="vllm", record_per_request=True)
     ttfts = sorted(v["ttft_ms"] for v in r.per_request.values())
@@ -134,7 +137,7 @@ def _sha(text: str) -> str:
 def amend(args: argparse.Namespace, cfg: dict[str, Any], header: dict[str, Any], dirty: str,
           workloads: dict[str, Any], fingerprints: dict[str, str], pred: dict[str, Any],
           pred_sha: str) -> int:
-    """The notebook rebuilt from the current builder, with everything registered left as it is."""
+    """Rebuild the notebook from the current builder, leaving everything registered as it is."""
     prereg = json.loads(args.prereg.read_text())
     old = args.notebook.read_text(encoding="utf-8")
     same = {
@@ -154,7 +157,7 @@ def amend(args: argparse.Namespace, cfg: dict[str, Any], header: dict[str, Any],
     wheel = base64.b64decode(re.search(r'b64decode\("""([A-Za-z0-9+/=]*)"""\)', src).group(1))
     if hashlib.sha256(wheel).hexdigest() != prereg["wheel"]["sha256"]:
         raise SystemExit("error: the notebook no longer carries the registered wheel")
-    # The registered wheel must still BE the repo's code, or the notebook would run one thing
+    # The registered wheel must still be the repo's code, or the notebook would run one thing
     # while the tests and the dry-run check another.
     moved = subprocess.run(["git", "diff", "--quiet", prereg["wheel"]["built_from"], "HEAD", "--",
                             "src", "pyproject.toml"], cwd=REPO, check=False).returncode

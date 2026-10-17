@@ -1,15 +1,8 @@
-"""Confidence intervals, resampled correctly for THIS data (docs/06-methodology.md §1).
+"""Percentile bootstrap confidence intervals that resample whole sessions, not requests.
 
-⛔ THE RESAMPLING UNIT IS A SESSION, NOT A REQUEST. This is the one place this project's statistics
-differ from the sibling's, and getting it wrong inflates confidence badly.
-
-Requests in an agentic trace are NOT independent: a session's turns share prefixes by construction,
-which is the entire phenomenon under study. Resampling individual requests pretends that dependence
-away and produces intervals that are far too tight — a bootstrap that says "+-0.3%" about a quantity
-whose real uncertainty is +-3%. Sessions are the independent unit, so sessions are what we resample.
-
-`bootstrap_ci` (ungrouped) exists only for quantities that genuinely are independent. Anything that
-goes in a README table uses `bootstrap_ci_grouped`, and every caption states the unit.
+Requests in an agentic trace are not independent: a session's turns share prefixes by construction.
+Resampling single requests ignores that dependence and gives intervals that are far too narrow, so
+sessions are the resampling unit.
 """
 
 from __future__ import annotations
@@ -29,7 +22,7 @@ class CI:
     lo: float
     hi: float
     n_resamples: int
-    unit: str  # "session" or "request" — printed in every caption, never assumed
+    unit: str  # "session" or "request", stated wherever the interval is reported
 
     def __str__(self) -> str:
         return f"{self.point:.4f} [{self.lo:.4f}, {self.hi:.4f}]"
@@ -59,10 +52,10 @@ def bootstrap_ci_grouped(
     confidence: float = 0.95,
     seed: int = 0,
 ) -> CI:
-    """Percentile bootstrap, resampling whole GROUPS (sessions) with replacement.
+    """Return a percentile bootstrap CI, resampling whole groups (sessions) with replacement.
 
-    Items may be any type the statistic understands — e.g. `(cached, prompt)` token pairs, so a
-    hit rate is resampled as a RATIO of sums, which is what the engine's counters compute.
+    Items may be any type the statistic accepts, for example `(cached, prompt)` token pairs, so that
+    a hit rate is resampled as a ratio of sums, as the engine's counters compute it.
     """
     flat = [v for g in groups for v in g]
     if not flat:
@@ -94,12 +87,11 @@ def paired_bootstrap_delta(
     confidence: float = 0.95,
     seed: int = 0,
 ) -> CI:
-    """CI on the DIFFERENCE (a - b), resampling the same group indices for both.
+    """Return a CI on the difference a - b, resampling the same group indices for both.
 
-    ⭐ Why this and not two separate intervals: both policies ran on the SAME trace, so
-    trace-difficulty variance is shared and cancels. Comparing 0.41 [0.38, 0.44] against
-    0.33 [0.30, 0.36] and noting the intervals overlap tells you almost nothing; the CI on the
-    delta is usually far tighter and is the correct test. Every policy-vs-baseline row gets one.
+    Both policies ran on the same trace, so variance from the trace itself is shared and cancels in
+    the difference. The interval on the delta is usually much narrower than two separate intervals
+    suggest, and is the right test for a policy against a baseline.
     """
     if len(groups_a) != len(groups_b):
         raise ValueError(

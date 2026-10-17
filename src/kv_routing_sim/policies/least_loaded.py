@@ -1,9 +1,4 @@
-"""Least-loaded (LOR / join-shortest-queue): optimises load, ignores the cache completely.
-
-The interesting policy in this project, because it is the one prefix-affinity has to beat — and the
-one that wins back above the H2 crossover, when concentrating a hot prefix costs more in queueing
-than it saves in prefill.
-"""
+"""Least-loaded routing (join-shortest-queue): balances load and ignores the cache."""
 
 from __future__ import annotations
 

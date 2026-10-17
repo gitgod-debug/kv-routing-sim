@@ -1,17 +1,9 @@
-"""The full simulator against numbers MEASURED on a live engine.
+"""The full simulator against counters measured on live vLLM engines (T4, block size 16).
 
-Sources: artifacts/results/phase0_kaggle_t4/ (v1, vLLM 0.29.0) and phase0_v2_kaggle_t4/ (v2, vLLM
-0.30.0) — Qwen/Qwen3-0.6B — and phase3_kaggle_t4/ (Phase 3, vLLM 0.30.0, Qwen/Qwen3-4B, a 512-block
-cache under eviction pressure). Block size 16, Kaggle Tesla T4.
-
-These replay the exact workloads the notebooks sent, through `engine.run`, and demand the engine's
-counters to the token. A failure means the simulator has drifted from real vLLM behaviour.
-
-⚠️ What these do and do not prove: v1/v2 never filled the cache, so they pin ACCOUNTING — the token
-unit, the partial-block rule, the lookup cap, per-replica cold prefixes, the eviction-event quirk.
-Phase 3 adds EVICTION UNDER PRESSURE: 120 agentic requests through 511 usable blocks, reproduced to
-the token, request by request. Still one request at a time — batching is tested by W3, whose
-numbers depend on a fitted timing profile and so are pinned in the calibration report, not here.
+v1 and v2 (artifacts/results/phase0_kaggle_t4/ and phase0_v2_kaggle_t4/: vLLM 0.29.0 and 0.30.0,
+Qwen3-0.6B) never fill the cache, so they pin accounting only; Phase 3 (phase3_kaggle_t4/: vLLM
+0.30.0, Qwen3-4B) adds eviction under pressure. Every workload sends one request at a time;
+batching depends on a fitted timing profile and is pinned in the calibration report instead.
 """
 
 from __future__ import annotations
@@ -52,14 +44,14 @@ def _caching_on_arm() -> list[NormalizedRequest]:
 
 
 def _round_robin_arm() -> list[NormalizedRequest]:
-    """64 x (a FRESH prefix + 1 unique token, max_tokens=8), alternated across two replicas."""
+    """64 x (a fresh prefix + 1 unique token, max_tokens=8), alternated across two replicas."""
     fresh = tuple(range(1001, 1033))
     return [NormalizedRequest(f"rr{i}", GAP * i, fresh, 513, 8, f"rr{i}") for i in range(64)]
 
 
 @pytest.mark.parametrize("cache_model", ["vllm", "lru"])
 def test_caching_on_arm_counters_match_the_engine_exactly(cache_model):
-    """v1 AND v2 both measured 33,344 / 32,768 / 576 — on different vLLM versions and machines."""
+    """v1 and v2 both measured 33,344 / 32,768 / 576, on different vLLM versions and machines."""
     r = run(_caching_on_arm(), policy="round-robin", n_replicas=1, profile=T4_06B_ON,
             cache_model=cache_model)
     assert r.cache_queries == 33_344  # vllm:prefix_cache_queries_total
@@ -70,7 +62,7 @@ def test_caching_on_arm_counters_match_the_engine_exactly(cache_model):
 
 @pytest.mark.parametrize("cache_model", ["vllm", "lru"])
 def test_round_robin_two_replicas_matches_the_engine_exactly(cache_model):
-    """v2 §7: predicted 1,088 / 0.966862 before the run; the engine measured exactly that."""
+    """v2 (section 7): the engine measured exactly the predicted 1,088 / 0.966862."""
     r = run(_round_robin_arm(), policy="round-robin", n_replicas=2, profile=T4_06B_REPLICA,
             cache_model=cache_model)
     assert r.cache_queries - r.cache_hits == 1_088
@@ -79,13 +71,8 @@ def test_round_robin_two_replicas_matches_the_engine_exactly(cache_model):
 
 
 def test_vllm_model_reproduces_the_engines_eviction_histograms():
-    """⭐ The engine's odd histograms, reproduced by the model — quirk included.
-
-    v2 measured kv_block_* counts of 64 (caching-on arm) with the cache never full: every one a
-    request's partial tail block being recycled LIFO, which vLLM reports as an "eviction" because
-    `on_block_evicted` runs before the hash check (block_pool.py:739 vs 741). Lifetime equal to
-    idle time (the block is never hit), zero reuse gaps. The lru model cannot produce these at all.
-    """
+    """v2's 64 kv_block_* events, with the cache never full, are partial tail blocks recycled LIFO;
+    vLLM reports them as evictions because block_pool.py:739 fires before the hash check."""
     r = run(_caching_on_arm(), policy="round-robin", n_replicas=1, profile=T4_06B_ON,
             cache_model="vllm", track_block_metrics=True)
     ev = r.eviction_events
@@ -97,8 +84,8 @@ def test_vllm_model_reproduces_the_engines_eviction_histograms():
 
 
 def test_vllm_model_reproduces_the_per_replica_histograms():
-    """v2 §7: 31 samples on EACH replica — every request but the first recycles its predecessor's
-    partial block; the first starts cold and recycles nothing."""
+    """v2 (section 7): 31 samples on each replica, because every request but the first recycles its
+    predecessor's partial block."""
     trace = _round_robin_arm()
     per_replica = []
     for rep in (0, 1):
@@ -110,8 +97,8 @@ def test_vllm_model_reproduces_the_per_replica_histograms():
 
 
 def test_lookup_cap_is_applied_by_both_models():
-    """kv_cache_manager.py:295. A repeated, block-ALIGNED prompt recomputes its last block.
-    v1/v2 never exercised this (their prompts were 513 tokens), so it is pinned separately."""
+    """kv_cache_manager.py:295: a repeated block-aligned prompt recomputes its last block, a case
+    the 513-token v1 and v2 prompts never exercised."""
     reqs = [NormalizedRequest(f"a{i}", GAP * i, PREFIX, 512, 2, f"a{i}") for i in range(3)]
     for model in ("vllm", "lru"):
         r = run(reqs, policy="round-robin", n_replicas=1, profile=T4_06B_ON, cache_model=model)
@@ -119,7 +106,7 @@ def test_lookup_cap_is_applied_by_both_models():
         assert r.cache_hits == 2 * 496, model
 
 
-# ── Phase 3: eviction under pressure (vLLM 0.30.0, Qwen3-4B, 511 usable blocks) ──────────────────
+# Phase 3: eviction under pressure (vLLM 0.30.0, Qwen3-4B, 511 usable blocks)
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 PHASE3 = REPO / "artifacts" / "results" / "phase3_kaggle_t4" / "phase3.json"
@@ -136,10 +123,9 @@ def _phase3():
 
 @pytest.mark.parametrize("workload", ["W1_long", "W2_short"])
 def test_vllm_model_reproduces_phase3_on_the_live_engine(workload):
-    """⭐ Every counter, every run, every request — recomputed from the model NOW, not read from
-    the committed predictions. If a model change breaks agreement with the real engine, this fails.
-    Measured: W1 28,304 hits / 29,656 computed / 1,880 histogram events; W2 35,296 / 22,664 / 963.
-    """
+    """Every counter of every run and request matches the model, recomputed here rather than read
+    from the committed predictions. Measured: W1 28,304 hits / 29,656 computed / 1,880 histogram
+    events; W2 35,296 / 22,664 / 963."""
     res, predictions = _phase3()
     p = predictions["workloads"][workload]["predictions"]["vllm"]
     runs = [r for r in res["runs"] if r["workload"] == workload]
@@ -153,7 +139,7 @@ def test_vllm_model_reproduces_phase3_on_the_live_engine(workload):
 
 def test_lru_model_misses_phase3_w1_by_what_it_ignores():
     """The ablation, on a real engine: LRU leaves decode blocks out of capacity, so it over-predicts
-    W1 by 6,896 hit tokens (11.90 points) — the size of what the block-pool model adds."""
+    W1 by 6,896 hit tokens (11.90 points), the size of what the block-pool model adds."""
     res, predictions = _phase3()
     lru = predictions["workloads"]["W1_long"]["predictions"]["lru"]
     for r in (x for x in res["runs"] if x["workload"] == "W1_long"):

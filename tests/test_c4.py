@@ -1,7 +1,7 @@
-"""C4's analysis (scripts/c4_analyze.py) — committed before the run, so tested before the run.
+"""Tests for C4's analysis (scripts/c4_analyze.py) on hand-built data.
 
-Every case is built by hand: what a rule must say when a model is right, when it is wrong by a
-known amount, and when the data is not there. Nothing here knows what the GPU will measure.
+Each case fixes what a rule must report when the model is right, when it is wrong by a known amount,
+and when the data is missing.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ def _shared(scale: dict[int, float] | None = None, reps: int = 2) -> list[dict]:
             for r in range(reps) for b, s in STEP.items()]
 
 
-# ── D1: decode with a shared prefix ──────────────────────────────────────────────────────────
+# D1: decode with a shared prefix
 
 
 def test_d1_holds_when_the_line_continues_and_sharing_is_free():
@@ -67,14 +67,14 @@ def test_d1_holds_when_the_line_continues_and_sharing_is_free():
 
 
 def test_d1b_fails_when_the_engine_is_much_faster_than_the_line_at_large_batches():
-    """The case T1 points at: at b = 64 the real step is 0.27 s where the line says 0.38."""
+    """The case T1 suggests: at b = 64 the real step is 0.27 s where the line says 0.38 s."""
     data = {"decode_shared": _shared({64: 0.27 / 0.38}), "decode_control": []}
     d = c4.rule_d1(data, _prereg())
     big = next(c for c in d["cells"] if c["b"] == 64)
     assert big["factor"] == pytest.approx(0.38 / 0.27) and big["factor"] > 1.25
-    assert big["predicted_over_measured"] > 1  # signed: the model is too SLOW
+    assert big["predicted_over_measured"] > 1  # signed: the model is too slow
     assert d["d1b"]["decided"] and not d["d1b"]["holds"]
-    # …and a miss inside the fitted range (b = 8) is reported but is not what D1b is decided on.
+    # A miss inside the fitted range (b = 8) is reported, but D1b is not decided on it.
     inside = c4.rule_d1({"decode_shared": _shared({8: 2.0}), "decode_control": []}, _prereg())
     assert inside["d1b"]["holds"]
 
@@ -88,7 +88,7 @@ def test_d1_is_undecided_without_valid_cells_and_never_passed():
     assert not d["d1b"]["decided"] and not d["d1b"]["holds"]
     assert not d["d1a"]["decided"] and not d["d1a"]["holds"]  # no control was measured
     one = _shared()
-    one[3]["valid"] = False  # ONE repeat of b = 64 lost: the other still decides
+    one[3]["valid"] = False  # one repeat of b = 64 lost: the other still decides
     assert c4.rule_d1({"decode_shared": one, "decode_control": []}, _prereg())["d1b"]["holds"]
 
 
@@ -96,10 +96,10 @@ def test_d1a_fails_when_sharing_a_prefix_changes_the_step():
     data = {"decode_shared": _shared(),
             "decode_control": [{"rep": 0, "L": 1408, "b": 8, "valid": True, "step_s": 0.095}]}
     d = c4.rule_d1(data, _prereg())
-    assert d["d1a"]["decided"] and not d["d1a"]["holds"]  # 0.095 against 0.080: 1.19×
+    assert d["d1a"]["decided"] and not d["d1a"]["holds"]  # 0.095 against 0.080: 1.19x
 
 
-# ── D2: the stall ────────────────────────────────────────────────────────────────────────────
+# D2: the decode stall caused by an arriving prefill
 
 
 def _stall(extra: dict[int, float | None]) -> list[dict]:
@@ -116,7 +116,7 @@ def test_d2_compares_the_extra_gap_not_the_gap():
     d = c4.rule_d2({"stall": _stall({8: 0.170, 64: 0.150})}, _prereg())
     assert d["decided"] and d["holds"]
     assert [round(c["factor"], 3) for c in d["cells"]] == [round(0.18 / 0.17, 3), 1.2]
-    # Half the predicted stall at b = 64 — prefill inside a busy batch is cheaper than alone.
+    # Half the predicted stall at b = 64: prefill inside a busy batch is cheaper than alone.
     d = c4.rule_d2({"stall": _stall({8: 0.170, 64: 0.085})}, _prereg())
     assert d["decided"] and not d["holds"] and d["cells"][1]["factor"] > 2
 
@@ -128,7 +128,7 @@ def test_d2_no_stall_at_all_is_a_miss_and_a_missing_cell_is_undecided():
     assert not missing["decided"] and not missing["holds"]
 
 
-# ── T3: traffic ──────────────────────────────────────────────────────────────────────────────
+# T3: held-out traffic
 
 
 def _holdout(name: str, tpots: list[float], share_engine: float | None = 0.0) -> dict:
@@ -173,9 +173,9 @@ def test_t3_tests_numbers_everywhere_and_verdicts_only_away_from_the_limit():
                         _holdout("at", [95.0] * 100, share_engine=1.0),  # the engine meets it
                         _holdout("above", [230.0] * 100, share_engine=0.3)]}
     t = c4.rule_t3(data, _traffic_prereg(runs), fresh={})
-    assert t["t3a"]["holds"]  # 80/70, 104/95, 250/230: all within 1.25×
-    # `at` was registered 4% from the limit: its verdict differs from the engine's, and that is
-    # not counted against the model — a coin landing on its edge is not a test.
+    assert t["t3a"]["holds"]  # 80/70, 104/95, 250/230: all within 1.25x
+    # `at` was registered 4% from the limit, too close for its verdict to be tested: it disagrees
+    # with the engine's, and that is not counted against the model.
     assert t["t3b"]["workloads_tested"] == ["below", "above"] and t["t3b"]["holds"]
     at = next(r for r in t["runs"] if r["workload"] == "at")
     assert at["verdict_agrees"] is False and at["verdict_tested"] is False
@@ -200,7 +200,7 @@ def test_t3_uses_the_clients_times_when_the_engine_has_no_histogram_and_says_so(
     assert not missing["t3a"]["decided"] and not missing["t3b"]["decided"]
 
 
-# ── E and F: the fresh calibrations in the simulator ─────────────────────────────────────────
+# E and F: the fresh calibrations, in the simulator
 
 
 def _cell(first_ok: int, both_ok: int, n: int) -> dict:
@@ -231,10 +231,10 @@ def test_e_counts_how_often_one_runs_spread_covers_another_runs_count():
     }
     e = c4.rule_e({"grids": {"firmness": _grid(fits)}}, _e_prereg())
     assert e["runs"] == {"s0": 3, "s1": 3}  # each run: its pooled fit and two repeats
-    # first token: s0's range 3–4 covers s1's 4 ✓; s1's range 4–4 does not cover s0's 3 ✗.
-    # both halves: s0's range 5–6 does not cover s1's 7 ✗; s1's 7–7 does not cover s0's 5 ✗.
+    # First token: s0's range 3-4 covers s1's 4, but s1's range 4-4 does not cover s0's 3.
+    # Both halves: s0's range 5-6 does not cover s1's 7, and s1's 7-7 does not cover s0's 5.
     assert (e["cases"], e["covered"]) == (4, 1) and e["coverage"] == 0.25
-    assert e["coverage_within_one"] == 0.75  # widened by one: all but 7–7 against 5
+    assert e["coverage_within_one"] == 0.75  # widened by one: all but 7-7 against 5
     assert e["decided"] and not e["holds"] and len(e["misses"]) == 3
     # Profile A (3, 5): inside s0's ranges on both targets, outside s1's on both.
     assert e["profile_a_coverage"] == 0.5
@@ -272,14 +272,14 @@ def test_f1_and_f2_on_a_grid_where_both_hold():
 
 def test_f_fails_on_one_fresh_fit_and_says_which():
     ok = {"2": {STICKY: (6, 7), BAL16: (6, 7), BAL1: (4, 0)}}
-    tie = {"2": {STICKY: (6, 7), BAL16: (6, 7), BAL1: (6, 5)}}  # no saving; and it holds both
+    tie = {"2": {STICKY: (6, 7), BAL16: (6, 7), BAL1: (6, 5)}}  # weight 1: no saving, holds both
     f = c4.rule_f({"grids": {"prompts64": _f_grid({"s0": ok, "s1": tie})}}, _e_prereg())
     assert not f["f1"]["holds"] and f["f1"]["by_fit"]["s0"]["holds"]
     assert not f["f1"]["by_fit"]["s1"]["holds"]  # 6 against 6 is not "fewer"
     assert not f["f2"]["holds"] and not f["f2"]["by_fit"]["s1"]["weight_1_holds_nothing"]
 
 
-# ── the gate in front of everything ──────────────────────────────────────────────────────────
+# The registration check
 
 
 def test_a_run_that_is_not_the_registered_one_is_refused(tmp_path):

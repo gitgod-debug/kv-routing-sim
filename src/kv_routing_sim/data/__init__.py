@@ -1,11 +1,9 @@
-"""Data shipped inside the package, so `pip install kv-routing-sim` works without a clone.
+"""Data files shipped with the package, so it works without a clone of the repository.
 
-  * `profiles/*.json` — measured timing + capacity profiles, loadable by NAME:
-                        `kvsim replay trace.jsonl --profile t4-qwen3-4b-vllm0.30.0`
-  * `cost_model.yaml` — the cited cost model: `--cost-model default`
-
-⛔ These are COPIES of `configs/profiles/` and `configs/cost_model.yaml`, which stay the source of
-truth for the repo's scripts. `tests/test_packaging.py` fails if a copy drifts by one byte.
+`profiles/*.json` are measured timing profiles, loadable by name
+(`--profile t4-qwen3-4b-vllm0.30.0`), and `cost_model.yaml` is the cited cost model
+(`--cost-model default`). They are copies of `configs/profiles/` and `configs/cost_model.yaml`,
+which remain the source of truth; `tests/test_packaging.py` fails if a copy differs.
 """
 
 from __future__ import annotations
@@ -19,7 +17,7 @@ def root() -> Traversable:
 
 
 def profiles() -> dict[str, Traversable]:
-    """Every shipped profile, by name (the file name without `.json`)."""
+    """Return every shipped profile by name (its file name without `.json`)."""
     return {p.name.removesuffix(".json"): p for p in (root() / "profiles").iterdir()
             if p.name.endswith(".json")}
 

@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
-"""Build a PROBE notebook: the C3 notebook's environment, install and pre-flight cells, and nothing
-else.
+"""Build a probe notebook with only the C3 notebook's environment, install and pre-flight cells.
 
     python scripts/c3_probe.py OUT.ipynb
     python scripts/kaggle_run.py OUT.ipynb --slug kvsim-c3-preflight-probe --out SOMEWHERE
 
-It starts no engine, sends no request and measures nothing: it answers one question — on the GPU
-box as it is today, does the pre-flight leave software that can start vLLM? Written after C3's
-first attempt stopped at start-up because the box's image had changed (docs/09, 2026-10-05), so
-that the repair is checked on the real image in about ten minutes, before the registered run
-spends an hour.
-
-The cells are the builder's own (`_c3_notebook.PREFLIGHT_CELL`, Phase 6's environment cell,
-Phase 3's install cell), so what the probe checks is what the registered notebook will run.
+The probe starts no engine and measures nothing. In about ten minutes on the GPU box's current
+image, it checks that the pre-flight leaves software that can start vLLM, before a full run spends
+an hour. The cells are the builder's own (`_c3_notebook.PREFLIGHT_CELL`, Phase 6's environment
+cell, Phase 3's install cell), so the probe runs what the registered notebook runs. The vLLM
+version comes from configs/c3_calibrate.yaml.
 """
 
 from __future__ import annotations

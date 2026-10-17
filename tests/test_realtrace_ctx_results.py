@@ -1,8 +1,7 @@
-"""R1 and R2 on the validated timing model: the committed result must be what the stored runs say.
+"""Pins R1 and R2's registered result on the validated timing model (configs/realtrace_ctx.yaml).
 
-Registered 2026-10-06 (configs/realtrace_ctx.yaml). The traces are other people's data and are
-not in the repository, so nothing here replays them: these tests tie the summary and the quoted
-numbers to the stored per-calibration results, and the stored runs to the registered design.
+The traces are not in the repository, so these tests tie the summary and quoted numbers to the
+stored per-calibration results, and the stored runs to the registered design.
 """
 
 from __future__ import annotations
@@ -76,22 +75,21 @@ def test_r2_is_untestable_as_designed_and_was_not_run():
     r2 = SUMMARY["tests"]["R2"]
     assert r2["verdict"] == "UNTESTABLE" and r2["calibrations"] == {}
     assert not (RESULTS / "R2" / "A").exists() and not (RESULTS / "R2" / "s0").exists()
-    assert r2["first_model"]["holds"] is True  # what it said on the first model stays on record
+    assert r2["first_model"]["holds"] is True  # the first model's verdict is kept
 
 
 def test_the_verdicts_the_write_up_quotes():
-    """Predicted: R1 falsified again, R1w holds, R2 holds. R1 and R1w came out as predicted; R2
-    could not be tested."""
+    """R1 is falsified and R1w holds, as predicted; R2 could not be tested."""
     assert SUMMARY["predicted_outcomes"] == {"R1": "falsified", "R1w": "holds", "R2": "holds"}
     r1 = SUMMARY["tests"]["R1"]
     assert r1["verdict"] == "FALSIFIED"
     assert {c: v["holds"] for c, v in r1["calibrations"].items()} == {"A": False, "s0": False}
     assert SUMMARY["R1w"] == {"by_calibration": {"A": True, "s0": True}, "verdict": "HOLDS"}
-    # Tool-agent: no winner at any speed on either calibration — R1's rule there asked for one.
+    # Tool-agent: no winner at any speed on either calibration, where R1's rule required one.
     for cal in ("A", "s0"):
         assert set(r1["calibrations"][cal]["winner_by_speed"]["toolagent"].values()) == {"tie"}
         assert r1["calibrations"][cal]["rules"]["toolagent"] == {"affinity_wins": False}
-    # Conversation: affinity wins once on A (6 against 7 at 1×), never on s0.
+    # Conversation: affinity wins once on A (6 against 7 at 1x), never on s0.
     assert r1["calibrations"]["A"]["winner_by_speed"]["conversation"] == {
         "0.25": "tie", "0.5": "tie", "1": "affinity"}
     assert set(r1["calibrations"]["s0"]["winner_by_speed"]["conversation"].values()) == {"tie"}
@@ -123,7 +121,7 @@ def test_the_replica_counts_the_write_up_quotes():
     b = SUMMARY["tests"]["R1"]["calibrations"]["s0"]["required_replicas"]
     gaps = [abs(a[tr][sp][p] - b[tr][sp][p]) for tr in a for sp in a[tr] for p in a[tr][sp]]
     assert (len(gaps), sum(1 for g in gaps if g), max(gaps)) == (48, 9, 1)
-    # At the one speed both models share (1×), the validated model needs one or two replicas more.
+    # At the one speed both models share (1x), the validated model needs one or two replicas more.
     first = SUMMARY["tests"]["R1"]["first_model"]["required_replicas"]
     assert [first["toolagent"]["1"][p] for p in (RR, STICKY, STAR)] == [4, 4, 4]
     assert [first["conversation"]["1"][p] for p in (RR, STICKY, STAR)] == [5, 5, 4]

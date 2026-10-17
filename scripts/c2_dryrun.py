@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""Dry-run the C2 notebook on this machine against two mock engines — then the analysis, end to end.
+"""Dry-run the C2 notebook against two mock engines, then run the analysis on its output.
 
     python scripts/c2_dryrun.py [--keep]
 
-Builds a SMALL version of the notebook (one rep per part, short held-out traffic; the registered
-notebook and predictions are never touched), executes every code cell the way Run-All does against
-Phase 3's mock engine on both ports, and then runs scripts/c2_analyze.py — the registered analysis
-— on what came out.
-
-⭐ The mocks run with KNOWN context terms (below). So the dry-run checks more than plumbing: the fit
-must recover them. It cannot say anything about vLLM — here the simulator is the engine.
+Builds a small version of the notebook (one rep per part, short held-out traffic; the registered
+notebook and predictions are left alone), runs every code cell as Run-All would against Phase 3's
+mock engine on both ports, then runs scripts/c2_analyze.py on the results. The mocks have known
+context terms (the MOCK_* constants), so the fit must recover them. This tests the notebook and
+the analysis, not vLLM.
 """
 
 from __future__ import annotations
@@ -94,7 +92,7 @@ def main() -> int:
         with contextlib.redirect_stdout(buf):
             for i, src in enumerate(cells):
                 exec(compile(src, f"cell{i}", "exec"), ns)  # noqa: S102 - the point of a dry-run
-    except Exception as e:  # noqa: BLE001 - whatever a cell raises IS the dry-run's finding
+    except Exception as e:  # noqa: BLE001 - whatever a cell raises is the dry-run's finding
         err = f"{type(e).__name__} in code cell {i}: {e}"
     finally:
         with contextlib.suppress(Exception), contextlib.redirect_stdout(io.StringIO()):

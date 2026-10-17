@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
-"""Dry-run notebooks/phase3_calibration.ipynb on this machine, against a MOCK engine.
+"""Dry-run notebooks/phase3_calibration.ipynb on this machine against a mock vLLM engine.
 
     python scripts/phase3_dryrun.py [--vllm-src PATH/TO/site-packages/vllm] [--keep]
 
-The mock is a real HTTP server on a real port, started by the notebook through a `vllm` shim on
-PATH exactly as it starts the real engine. It speaks the subset of vLLM's API the notebook uses —
-/health, /metrics, streamed /v1/completions with usage, /reset_prefix_cache, /server_info — and
-schedules requests IN REAL TIME with this repo's own vLLM model (`sim/replica.py`,
-cache_model="vllm"). It also rejects token ids outside Qwen3's vocabulary, as vLLM does.
+The mock is an HTTP server on a real port, started by the notebook through a `vllm` shim on PATH
+exactly as it starts the real engine. It serves the parts of vLLM's API the notebook uses
+(/health, /metrics, streamed /v1/completions with usage, /reset_prefix_cache, /server_info),
+schedules requests in real time with the simulator's vLLM replica model (`sim/replica.py`,
+cache_model="vllm"), and rejects token ids outside Qwen3's vocabulary as vLLM does.
 
-⚠️ What a dry-run proves, and what it cannot: the PLUMBING, end to end — fingerprints, streaming,
-resets, the restart fallback, counter deltas, the comparison and the verdict. It cannot show that
-vLLM behaves like the model, because here the model IS the engine. That is the GPU run's job. So:
-the `vllm` model must come out EXACT here (anything else is a notebook bug), and the `lru` model
-must visibly miss on W1 (else the comparison could not detect a wrong model).
+A dry-run tests the notebook's plumbing end to end: fingerprints, streaming, resets, the restart
+fallback, counter deltas, the comparison and the verdict. It cannot test whether vLLM behaves like
+the model, because here the model is the engine. So the `vllm` model must match exactly (anything
+else is a notebook bug), and the `lru` model must miss on W1 (otherwise the comparison could not
+detect a wrong model).
 
-`--vllm-src` points the notebook's source audit at a real vLLM package, so its needles are checked
-against real code. Without it, a synthetic package holding just the needles is used.
+`--vllm-src` points the notebook's source audit at a real vLLM package so its needles are checked
+against real code; without it, a synthetic package holding just the needles is used.
 
-Scenarios: A the real setup · B no reset endpoint (restart fallback) · C the override ignored
-(must stop at the capacity check) · D a stale mock already on the port (must refuse to launch).
+Scenarios: A the real setup; B no reset endpoint (restart fallback); C the block override ignored
+(must stop at the capacity check); D a stale mock already on the port (must refuse to launch).
 """
 
 from __future__ import annotations
@@ -46,15 +46,15 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 NOTEBOOK = REPO / "notebooks" / "phase3_calibration.ipynb"
 QWEN3_VOCAB = 151_936
 LE = (0.001, 0.01, 0.1, 1.0, 10.0, 100.0)  # the mock's histogram buckets; the real ones differ
-# vLLM 0.30.0's INTER_TOKEN_LATENCY_BUCKETS (v1/metrics/buckets.py:83-103) — used there for both
-# vllm:inter_token_latency_seconds and vllm:request_time_per_output_token_seconds. Copied exactly:
-# a notebook that reads "share of requests at or under 100 ms per token" off the engine's
-# histogram needs the 0.1 boundary to be where the real engine has it.
+# vLLM 0.30.0's INTER_TOKEN_LATENCY_BUCKETS (v1/metrics/buckets.py:83-103), used there for both
+# vllm:inter_token_latency_seconds and vllm:request_time_per_output_token_seconds. Copied exactly
+# so a notebook that reads the share of requests at or under 100 ms per token off the histogram
+# finds the 0.1 boundary where the real engine has it.
 ITL_LE = (0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0,
           20.0, 40.0, 80.0)
 
 
-# ── the mock engine ───────────────────────────────────────────────────────────────────────────
+# The mock engine.
 
 
 class MockEngine:
@@ -74,10 +74,10 @@ class MockEngine:
             prefill_attn_s=float(os.environ.get("MOCK_PREFILL_ATTN_S", "0")),
             decode_per_ctx_token_s=float(os.environ.get("MOCK_DECODE_PER_CTX_TOKEN_S", "0")),
         )
-        self.itl = [0.0, 0]  # vllm:inter_token_latency_seconds — sum, count
-        self.itl_obs: list[float] = []  # …and every observation, for its buckets
-        # vllm:request_time_per_output_token_seconds — one observation per FINISHED request:
-        # (last token − first token) ÷ (tokens − 1), or 0 for a single token (stats.py:549-562).
+        self.itl = [0.0, 0]  # vllm:inter_token_latency_seconds: sum, count
+        self.itl_obs: list[float] = []  # every observation, for the buckets
+        # vllm:request_time_per_output_token_seconds: one observation per finished request,
+        # (last token - first token) / (tokens - 1), or 0 for a single token (stats.py:549-562).
         self.tpot_obs: list[float] = []
         self.cv = threading.Condition()
         self.replica = self._new_replica()
@@ -311,7 +311,7 @@ def _handler(engine: MockEngine, no_reset: bool, blocks: int):
 
 
 def mock_main(argv: list[str]) -> None:
-    """Stands in for `vllm serve MODEL ...`. Reads only the flags it needs; ignores the rest."""
+    """Stand in for `vllm serve MODEL ...`, reading only the flags it needs."""
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd")
     ap.add_argument("model")
@@ -340,7 +340,7 @@ def mock_main(argv: list[str]) -> None:
     server.serve_forever()
 
 
-# ── the harness ───────────────────────────────────────────────────────────────────────────────
+# The dry-run harness.
 
 
 def _cells(runs_per_workload: int | None) -> list[str]:
@@ -415,7 +415,7 @@ def run_scenario(name: str, vllm_src, env: dict[str, str], runs: int | None, kee
         with contextlib.redirect_stdout(buf):
             for i, src in enumerate(cells):
                 exec(compile(src, f"cell{i}", "exec"), ns)  # noqa: S102 - the point of a dry-run
-    except Exception as e:  # noqa: BLE001 - whatever a cell raises IS the dry-run's finding
+    except Exception as e:  # noqa: BLE001 - whatever a cell raises is the dry-run's finding
         err = f"{type(e).__name__} in code cell {i}: {e}"
     finally:
         with contextlib.suppress(Exception), contextlib.redirect_stdout(io.StringIO()):
@@ -435,7 +435,7 @@ def run_scenario(name: str, vllm_src, env: dict[str, str], runs: int | None, kee
 
 
 def _check_a(r: dict) -> list[str]:
-    """The real setup. The vllm model must be EXACT (it is the engine); lru must miss on W1."""
+    """Scenario A: the vllm model must match exactly (it is the engine); lru must miss on W1."""
     problems = []
     ns = r["ns"]
     runs = ns.get("RUNS", [])
@@ -503,8 +503,8 @@ def main() -> int:
         failed |= not ok
 
     if "D" in todo:
-        # A stale mock already owns the port. Ours must die with "address in use" and the notebook
-        # must refuse to carry on against the stale one.
+        # A stale mock already owns the port. The new one must die with "address in use" and the
+        # notebook must refuse to carry on against the stale one.
         stale = subprocess.Popen(
             [
                 sys.executable,

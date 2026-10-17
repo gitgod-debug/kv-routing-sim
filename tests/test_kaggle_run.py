@@ -1,6 +1,7 @@
-"""scripts/kaggle_run.py starts GPU runs on someone's Kaggle account. What must never go wrong there
-is small and checkable without a network: a push is always private, a refusal stops, waiting ends
-on a final status — and no Kaggle token is ever in this repository.
+"""Offline tests for scripts/kaggle_run.py, which starts GPU runs on a Kaggle account.
+
+A push is always private, a refused push stops, waiting ends on a final status, and no Kaggle token
+is ever in the repository.
 """
 
 from __future__ import annotations
@@ -81,8 +82,8 @@ def test_waiting_ends_on_a_final_status_and_survives_a_dropped_call():
 
 
 def test_after_a_push_the_previous_runs_status_does_not_end_the_wait():
-    """Kaggle may still report the last run as COMPLETE for a moment after a new push. Taking
-    that for this run's end would download the OLD results while the new run spends GPU time."""
+    """Kaggle may report the previous run as COMPLETE for a moment after a push; taking that as
+    this run's end would fetch the old results while the new run is still going."""
     stale = ["KernelWorkerStatus.COMPLETE", "KernelWorkerStatus.COMPLETE"]
     api = _Api(statuses=[*stale, "KernelWorkerStatus.QUEUED", "KernelWorkerStatus.RUNNING",
                          "KernelWorkerStatus.ERROR"])
@@ -112,8 +113,8 @@ def test_the_readable_log_keeps_what_was_printed_and_drops_only_progress_bars():
 
 
 def test_the_runs_own_log_is_read_not_a_log_the_notebook_wrote(tmp_path):
-    """C3's notebook writes the engine's log into its results folder. The first download took
-    THAT for the run's log, because it was the first file ending in .log (2026-10-05)."""
+    """The engine log that C3's notebook writes into its results folder is not taken for the
+    run's own log, though it is the first file ending in .log."""
     rows = [{"stream_name": "stdout", "time": 1.0, "data": "what the notebook printed\n"}]
 
     class Api(_Api):
@@ -130,8 +131,8 @@ def test_the_runs_own_log_is_read_not_a_log_the_notebook_wrote(tmp_path):
 
 
 def test_no_kaggle_token_is_in_the_repository():
-    """A token gives full access to someone's Kaggle account. It lives where the Kaggle tool looks
-    for it (~/.kaggle), never in a tracked file — and the runner neither reads nor prints one."""
+    """A Kaggle token belongs in ~/.kaggle, never in a tracked file, and the runner neither reads
+    nor prints one."""
     hits = subprocess.run(["git", "grep", "-l", "-I", "-E", "KGAT_[0-9a-fA-F]{16,}"], cwd=REPO,
                           capture_output=True, text=True, check=False).stdout.split()
     assert hits == []

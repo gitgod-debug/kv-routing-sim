@@ -95,7 +95,7 @@ def test_the_queued_cost_is_released_at_the_first_token():
     p = _policy()
     p.choose(_state([0, 0, 0, 0]), TURN1, random.Random(0))
     p.observe(1, TURN1)
-    assert p._queued_cost[1] == pytest.approx(0.100)  # 100 new tokens × 1 ms
+    assert p._queued_cost[1] == pytest.approx(0.100)  # 100 new tokens x 1 ms
     p.on_first_token(1, TURN1)
     assert p._queued_cost == [0.0, 0.0, 0.0, 0.0] and p._queued_tokens == [0, 0, 0, 0]
 

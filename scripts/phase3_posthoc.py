@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
-"""Phase 3 POST-HOC diagnostics — written after the results were seen. NOT pre-registered.
+"""Phase 3 post-hoc diagnostics, written after the results were seen (not pre-registered).
 
     python scripts/phase3_posthoc.py [RESULTS_DIR]    # default artifacts/results/phase3_kaggle_t4
 
-`phase3_analyze.py` is the pre-registered analysis and its numbers are the result. This script only
-explains the four things that analysis surfaced, each with a measurement rather than a story — and
-it changes nothing the analysis reported:
+Explains four points in the report of `phase3_analyze.py`, each with a measurement, and changes
+nothing that report states:
 
-  1. The decode step is NOT linear in batch size at batch 1 on this engine: one sequence decodes
-     slower than two. The pre-registered straight-line fit cannot express that (R² 0.58).
-  2. Why W3 was nonetheless predicted well: it ran almost entirely at large batches.
-  3. W1's histogram residual — the shortest-lived blocks — comes from that timing fit, not the
-     cache model: re-run with the MEASURED batch-1 step it mostly closes, and cache counts hold.
-  4. Why the fitted prefill_base_s came out negative (and was clamped to 0).
+  1. Decode step time by batch size against the linear fit, which cannot express that one
+     sequence decodes slower than two (R² 0.58).
+  2. W3's decode concurrency over time, which explains why W3 was still predicted well.
+  3. W1's lifetime histogram with the fitted and with the measured batch-1 decode step: the
+     residual in the shortest-lived blocks comes from the timing fit, not the cache model.
+  4. Why the fitted prefill_base_s came out negative and was clamped to 0.
 
-Writes posthoc.md and posthoc.json into RESULTS_DIR.
+Reads the analysis outputs in RESULTS_DIR and writes posthoc.md and posthoc.json there.
 """
 
 from __future__ import annotations
@@ -50,8 +49,10 @@ def decode_by_batch(res: dict[str, Any], prof: CostProfile) -> dict[str, Any]:
 
 
 def w3_concurrency(res: dict[str, Any]) -> list[dict[str, Any]]:
-    """Time-weighted number of requests between first and last token, from client timestamps.
-    An UPPER bound on the engine's decode batch: a preempted request still counts here."""
+    """Time-weighted count of requests between first and last token, from client timestamps.
+
+    This is an upper bound on the engine's decode batch, since a preempted request still counts.
+    """
     out = []
     for r in (x for x in res["runs"] if x["workload"] == "W3_concurrent" and x["valid"]):
         ev = []
@@ -73,8 +74,11 @@ def w3_concurrency(res: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def w1_histogram_attribution(d, prereg, res, prof: CostProfile, w1_b1_s: float) -> list[dict]:
-    """The W1 lifetime histogram against the model, under the pre-registered fit and under the
-    same fit with only the batch-1 decode step replaced by its measured value."""
+    """W1's block-lifetime histogram, engine against model, under two timing profiles.
+
+    The profiles are the fitted one and the same one with only the batch-1 decode step replaced
+    by its measured value.
+    """
     variants = {
         "pre-registered fit": prof,
         "batch-1 step = measured (post-hoc)": replace(

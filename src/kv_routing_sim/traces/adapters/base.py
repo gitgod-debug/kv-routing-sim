@@ -1,12 +1,7 @@
-"""Shared machinery for trace adapters. A new adapter stays one small file (ADR-004).
+"""Shared machinery for JSONL trace adapters.
 
-Error semantics, decided in ADR-004 and implemented here so every adapter inherits them:
-
-  * A malformed LINE logs and continues, and is counted by reason in `TraceStats`. Real serving logs
-    are dirty; refusing to read one because of a truncated final line would make the tool useless on
-    exactly the input it was built for.
-  * A malformed CONFIG fails loudly at startup. Data is dirty and expected to be; configuration is
-    ours, and a typo there must never produce a plausible wrong number.
+A malformed line is skipped and counted by reason in `TraceStats`, since real serving logs are
+dirty; a malformed configuration fails at startup instead (ADR-004).
 """
 
 from __future__ import annotations
@@ -22,7 +17,7 @@ from ..schema import NormalizedRequest, TraceStats
 
 
 class RecordMapper(Protocol):
-    """Turn one decoded JSON object into the fields we need, or raise to skip it."""
+    """Turn one decoded JSON object into the fields an adapter needs, or raise to skip it."""
 
     def __call__(self, obj: dict[str, Any], index: int) -> dict[str, Any]: ...
 
@@ -42,11 +37,10 @@ def stream_jsonl(
     salt: int = 0,
     stats: TraceStats | None = None,
 ) -> Iterator[NormalizedRequest]:
-    """Stream a JSONL trace into `NormalizedRequest`s. NEVER loads the file into memory.
+    """Stream a JSONL trace as `NormalizedRequest`s without loading the file into memory.
 
-    The prompt is hashed HERE, at the adapter boundary, and discarded immediately (ADR-002). Nothing
-    downstream ever sees prompt text or token ids. That is the memory bound and the privacy
-    property, and it is the reason this function returns a generator rather than a list.
+    The prompt is hashed here and discarded (ADR-002), so nothing downstream sees prompt text or
+    token ids.
     """
     stats = stats if stats is not None else TraceStats()
     first_ts: float | None = None

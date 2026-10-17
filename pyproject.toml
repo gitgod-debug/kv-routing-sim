@@ -26,49 +26,24 @@ classifiers = [
     "Topic :: System :: Benchmark",
 ]
 
-# ─────────────────────────────────────────────────────────────────────────────────────────────
-# The core dependency set is deliberately tiny and CPU-only. See ADR-009.
-#
-# `pip install kv-routing-sim` must never pull a GPU dependency. The user-facing promise is
-# "no GPU dependency for users; GPU only for your own calibration runs" — a simulator that
-# drags in vLLM (and therefore torch, and therefore CUDA wheels) to answer a CPU question has
-# broken its own pitch. The engine lives in the `[calib]` extra, installed only on the
-# calibration box. `kvsim calibrate` needs none of it: it reaches a running engine over HTTP.
-#
-# Versions carry the date they were checked. Confirm no newer release at install time and
-# record what ACTUALLY installed — into docs/07-environment.md and into every results header.
-# See docs/06-methodology.md §3 (reproducibility contract).
-# ─────────────────────────────────────────────────────────────────────────────────────────────
+# The core install is small and CPU-only (ADR-009): `pip install kv-routing-sim` must never pull a
+# GPU dependency. vLLM lives in the `calib` extra for the calibration box; `kvsim calibrate` itself
+# only needs HTTP access to a running engine.
 dependencies = [
-    "pyyaml>=6.0",            # configs: the cost model, workloads, sweeps. The ONLY runtime dependency.
+    "pyyaml>=6.0",            # the cost model, profiles and experiment configs
 ]
-# 2026-09-28: numpy, pydantic and matplotlib left the core. Nothing in the package imported them
-# (the request schema became a slotted dataclass — see traces/schema.py), so they only made the
-# promised small, CPU-only install bigger. numpy and matplotlib live in the `analysis` extra.
 
 [project.optional-dependencies]
-# ── The calibration box only. NOT installed locally, NOT a user dependency. ──────────────────
-# ⚠️ This extra is expected to be installed on the calibration box (Kaggle 2x T4) and nowhere else. Its
-# resolution has NOT been attempted as of 2026-09-20 — recording that honestly, because the
-# sibling project (`colpali-lite`) shipped an extra that turned out not to install at all
-# (`ResolutionImpossible` between optimum and transformers), and the lesson is that an
-# unattempted resolution is an assumption, not a fact.
-#
-# `vllm` is pinned to the version the metric names were verified against: v0.29.0, released
-# 2026-09-09, read from `vllm/v1/metrics/loggers.py`. See ADR-008 — `vllm:prefix_cache_hit_rate`
-# does NOT exist at this version; the hit rate is `vllm:prefix_cache_hits` ÷
-# `vllm:prefix_cache_queries`, two counters.
-# ⛔ Re-check at Phase-0 run time and record the version that actually installed. If the wheel
-# available on that box is not 0.29.0, the metric-name audit must be re-run against ITS
-# loggers.py before any number is trusted — that check is a Phase-0 checkbox, not a formality.
+# For the calibration box only, never a user dependency. vLLM is pinned to the version whose metric
+# names were checked (ADR-008: the hit rate is vllm:prefix_cache_hits / vllm:prefix_cache_queries).
 calib = [
-    "vllm==0.30.0",  # bumped 2026-09-22: v2 ran here and passed every check; v1 ran on 0.29.0
-    "httpx>=0.27",                 # /metrics scraping + the load generator
-    "prometheus-client>=0.20",     # parsing the exposition format, rather than regexing it
+    "vllm==0.30.0",
+    "httpx>=0.27",                 # /metrics scraping and the load generator
+    "prometheus-client>=0.20",     # parses the Prometheus exposition format
 ]
-# Phase 4+: the sweep is embarrassingly parallel across (policy, replica-count, seed)
+# Parallel sweeps across (policy, replica count, seed)
 sweep = ["joblib>=1.4"]
-# The Phase 3 GPU-result analysis (numpy) and the README's figures (matplotlib)
+# Result analysis (numpy) and the README's figures (matplotlib)
 analysis = ["numpy>=1.26", "matplotlib>=3.8"]
 dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.5"]
 
@@ -79,14 +54,13 @@ Changelog = "https://github.com/gitgod-debug/kv-routing-sim/blob/main/CHANGELOG.
 Issues = "https://github.com/gitgod-debug/kv-routing-sim/issues"
 
 [project.scripts]
-# The CLI contract from the spec: `kvsim replay trace.jsonl --policies all --replicas 1-8`
 kvsim = "kv_routing_sim.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
-# The measured T4 profile and the cited cost model travel with the package, so `pip install` users
-# can run `--profile t4-qwen3-4b-vllm0.30.0 --cost-model default` without a clone.
+# The measured T4 profiles and the cited cost model ship with the package, so `--profile <name>` and
+# `--cost-model default` work without a clone.
 [tool.setuptools.package-data]
 kv_routing_sim = ["data/*.yaml", "data/profiles/*.json"]
 
@@ -94,25 +68,16 @@ kv_routing_sim = ["data/*.yaml", "data/profiles/*.json"]
 line-length = 100
 target-version = "py311"
 
-# Notebooks are excluded on purpose. A notebook legitimately breaks rules this config wants for
-# library code: imports live in the cell that needs them (so a cell can be re-run alone), the server
-# log handle is deliberately long-lived across cells rather than scoped to a `with`, and `except
-# Exception` is correct when probing an unfamiliar box where any import or binary may be missing.
-# The notebook is validated instead by compiling every cell and dry-running its logic against a mock
-# engine across five failure scenarios — see the Phase 0 entry in CHECKPOINTS.md.
-# Notebooks anywhere, including executed ones kept as evidence — and `artifacts/`, whose files are
-# raw outputs of runs (a GPU box's generated helper script among them): evidence is kept byte-exact,
-# never reformatted to please a linter.
+# Notebooks keep imports in the cell that needs them and probe unfamiliar machines broadly, so they
+# are not linted as library code; artifacts/ holds raw outputs of runs, kept byte for byte.
 extend-exclude = ["*.ipynb", "artifacts"]
 
 [tool.ruff.lint]
-# E501 is NOT in ruff's default set, so a declared line-length would otherwise be decorative.
-# If the number is in the config, it should be enforced.
+# E501 is not in ruff's default rule set; without it the line length above would not be enforced.
 extend-select = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
-# This file IS notebook content — markdown tables and cell source kept as strings — and a markdown
-# table row cannot be wrapped. The notebook it generates is excluded above for the same reason.
+# Notebook templates: their Markdown tables and cell sources are strings that cannot be wrapped.
 "scripts/_phase3_notebook.py" = ["E501"]
 "scripts/_phase6_notebook.py" = ["E501"]
 "scripts/_c1_notebook.py" = ["E501"]

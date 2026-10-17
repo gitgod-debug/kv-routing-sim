@@ -496,7 +496,7 @@ gets its own entry.
 
 ### 2026-09-28 — ⛔ H6's ranking half RAN: FALSIFIED. The full order moves with the hardware; the winner did not.
 Report: [`artifacts/results/h6_ranking/report.md`](../artifacts/results/h6_ranking/report.md) — 16,800
-runs in 690 s, from a clean tree at `ff2ba87`. The baseline reproduced Phase 4's required-replica
+runs in 690 s, from a clean tree. The baseline reproduced Phase 4's required-replica
 table exactly, so the rescaled regimes are compared with the numbers Phase 4 published.
 
 **As registered: FALSIFIED in all four rescaled regimes.** Every regime has a point with τ-b below
@@ -577,7 +577,7 @@ AgentX (hashes scoped to one session) cannot show it.
 
 ### 2026-09-28 — Phase 5 RAN. H2 is FALSIFIED for both affinity policies; H2b HOLDS.
 Report: [`artifacts/results/phase5_crossover/report.md`](../artifacts/results/phase5_crossover/report.md)
-— 14,592 runs in 570 s, from a clean tree at `3967a56`. The α = 1 guard reproduced Phase 4 exactly.
+— 14,592 runs in 570 s, from a clean tree. The α = 1 guard reproduced Phase 4 exactly.
 
 **A1 — α\* = 16.** Total replicas over both Phase-4 traces: 64 at α = 1 (Phase 4's setting), falling to
 **45 at α = 16**, then rising again (48 at 32, 49 at 64). Even at α\*, balanced affinity needs more
@@ -646,7 +646,7 @@ inversion under rule (i).
 
 ### 2026-09-28 — ✅ H6's crossover half RAN: HOLDS. The flip shifts with the hardware; it never inverts.
 Report: [`artifacts/results/h6_crossover/report.md`](../artifacts/results/h6_crossover/report.md) —
-14,400 runs in 570 s, from a clean tree at `16fcc53`. The t4 regime reproduced Phase 5's H2b table
+14,400 runs in 570 s, from a clean tree. The t4 regime reproduced Phase 5's H2b table
 exactly.
 
 **As registered: HOLDS in all four rescaled regimes.** In none of them does balanced affinity (α\* =
@@ -702,7 +702,7 @@ win on tool-agent too. And every session-sticky number rests on inferred session
 
 ### 2026-09-28 — ⛔ R1 RAN: FALSIFIED on both traces. On real traffic the two winners are within one replica.
 Report: [`artifacts/results/realtrace_mooncake/report.md`](../artifacts/results/realtrace_mooncake/report.md)
-— 1,152 runs in 235 s, from a clean tree at `3f61f9e`; trace sha256s recorded in the results file.
+— 1,152 runs in 235 s, from a clean tree; trace sha256s recorded in the results file.
 
 **As registered: FALSIFIED — and in both directions.** *Tool-agent:* balanced affinity at α\* = 16 never
 needed fewer replicas than session-sticky (tie at 1× and 4×; one more at 2×: 5 vs 4). *Conversation:*
@@ -735,7 +735,7 @@ prefix once prompts outgrow the cache"* is not yet shown on real traffic.
 ### 2026-09-28 — Phase 6 REGISTERED before the GPU run: H2b's mechanism on two live replicas
 Design and rules: [`configs/phase6_sim2real.yaml`](../configs/phase6_sim2real.yaml). Predictions:
 [`artifacts/results/phase6_prereg/predictions.json`](../artifacts/results/phase6_prereg/predictions.json),
-generated from a clean tree at `8951a1e` together with
+generated from a clean tree together with
 [`notebooks/phase6_sim2real.ipynb`](../notebooks/phase6_sim2real.ipynb), which embeds their hash and the
 traces' fingerprints.
 
@@ -789,8 +789,8 @@ in this entry stays *reported, not tested*. The Phase 5 entry above is left as w
 ### 2026-09-28 — C1 REGISTERED before it runs: `kvsim calibrate` on a real GPU
 Design and rules: [`configs/c1_calibrate.yaml`](../configs/c1_calibrate.yaml). Notebook:
 [`notebooks/c1_calibrate_t4.ipynb`](../notebooks/c1_calibrate_t4.ipynb), built by
-`scripts/c1_prepare.py` with the package's wheel **embedded** — built from the clean commit
-`5a34c6d`, sha256 `ac5209ef2899b896…` — so the GPU box runs exactly the committed code. Prediction:
+`scripts/c1_prepare.py` with the package's wheel **embedded** — built from the clean registration
+commit, sha256 `ac5209ef2899b896…` — so the GPU box runs exactly the committed code. Prediction:
 [`artifacts/results/c1_prereg/prediction.json`](../artifacts/results/c1_prereg/prediction.json).
 `scripts/c1_dryrun.py` ran the whole notebook against the mock engine first: C1 held there, as it
 must, since the mock is the model.
@@ -867,7 +867,7 @@ choices, not facts about the traffic, and every number carries them.
 
 ### 2026-09-28 — R2 RAN: HOLDS. With nothing shared across users, sticky and affinity tie — and pure affinity does not collapse.
 Report: [`artifacts/results/realtrace_agentx/report.md`](../artifacts/results/realtrace_agentx/report.md)
-— 576 runs in 177 s, from a clean tree at `cf74aec`; the trace file's sha256 is recorded.
+— 576 runs in 177 s, from a clean tree; the trace file's sha256 is recorded.
 
 **As registered: HOLDS, on both rules.** Session-sticky, balanced affinity (α\* = 16) and pure
 affinity each need **2 T4s at 0.5×, 1× and 2×** — equal at every speed, not merely within one; so
@@ -947,7 +947,7 @@ engine; its *timing* fit is not yet fit for sizing a fleet — the same limit Ph
 ### 2026-09-28 — C2 REGISTERED before it runs: a context-aware timing model, and what would break it
 Design and rules: [`configs/c2_timing.yaml`](../configs/c2_timing.yaml). Notebook:
 [`notebooks/c2_timing_t4.ipynb`](../notebooks/c2_timing_t4.ipynb). The whole analysis:
-`scripts/c2_analyze.py`, committed with the design at `adfada5`, before any GPU run. Part D's traffic
+`scripts/c2_analyze.py`, committed with the design, before any GPU run. Part D's traffic
 and the context-free profile's predictions for it:
 [`artifacts/results/c2_prereg/predictions.json`](../artifacts/results/c2_prereg/predictions.json),
 generated from that clean commit. `scripts/c2_dryrun.py` ran the whole notebook against two mock
@@ -995,7 +995,7 @@ change.
 
 ### 2026-09-30 — C2 RAN: all three registered predictions came true. Context, not CPU.
 Report: [`artifacts/results/c2_kaggle_t4/report.md`](../artifacts/results/c2_kaggle_t4/report.md),
-from the committed `scripts/c2_analyze.py` (unchanged since `adfada5`). The registered notebook ran
+from the committed `scripts/c2_analyze.py` (unchanged since the design was registered). The registered notebook ran
 once (05:33 UTC); predictions, traffic fingerprints and design match the registration; all 56 decode,
 45 prefill, 12 contention and 960 held-out measurements are valid; both engines had 1,537 blocks.
 
@@ -1055,7 +1055,7 @@ an artefact of the context-free model.
 
 ### 2026-09-30 — ⛔ H2b under C2's timing RAN: FALSIFIED. On the validated timing model, prefix routing no longer saves GPUs at 64 prompts.
 Report: [`artifacts/results/h2b_c2/report.md`](../artifacts/results/h2b_c2/report.md) — 6,912 runs in
-319 s at `c0c8b18`. The tree was dirty only by the four registered notebooks deleted from disk and
+319 s. The tree was dirty only by the four registered notebooks deleted from disk and
 an untracked zip, both under `notebooks/` (listed in the results header); every line of code the run
 used is committed.
 
@@ -1261,7 +1261,7 @@ profile**, and the write-up must say so instead of choosing one.
 
 ### 2026-10-05 — C3 RAN: all three hold, as predicted. And a second calibration of the same GPU reverses H2b's verdict.
 Report: [`artifacts/results/c3_kaggle_t4/report.md`](../artifacts/results/c3_kaggle_t4/report.md).
-One run, started through Kaggle's API from the amended notebook at `1598673`, 2,320 s. The analysis
+One run, started through Kaggle's API from the amended notebook, 2,320 s. The analysis
 refuses a run whose predictions, traces or wheel are not the registered ones; these are. The
 pre-flight repaired `torchaudio` before anything was measured.
 
@@ -1343,8 +1343,8 @@ not "until the answer streams at a usable speed".
 ### 2026-10-05 — T1 and T2 REGISTERED before they run: the other half of the SLO, time per output token
 Design and rules: [`configs/tpot_slo.yaml`](../configs/tpot_slo.yaml). Procedure:
 `scripts/t1_itl_check.py`, `scripts/run_t2_grid.py`, `scripts/t2_analyze.py`. All committed before
-either part runs. The measurement itself was added to the simulator first, in its own commit
-(`534f5b9`): every run now records each request's time per output token, and no earlier number
+either part runs. The measurement itself was added to the simulator first, in its own commit:
+every run now records each request's time per output token, and no earlier number
 moved.
 
 **Why.** Every replica count in this project answers "how many GPUs until the *first* token is on
@@ -1370,7 +1370,7 @@ shipped profile (A), and reports the same sum ÷ count.
   the replicas needed grow roughly in proportion to it.
 - ⚠️ **What "registered" means here.** The five measurements were on disk before this was written,
   and I had read three of them (C3's, quoted above). What had never been computed is the
-  simulator's side: it could not measure time per token until `534f5b9`. The prediction is blind;
+  simulator's side: it could not measure time per token before that commit. The prediction is blind;
   the data is not fresh.
 - **Predicted: holds, narrowly.** First-token latency came within 1.41× on this traffic. The run
   at the knee (`K1_half`) is the one that can break it: there the model already sees preemptions
@@ -1432,7 +1432,7 @@ simulator now *shows* p95 time per token in every report and says that it is not
 
 ### 2026-10-05 — ⛔ T1 RAN: DOES NOT HOLD. The per-token model is right off the knee and 1.5–1.7× too slow at it.
 Report: [`artifacts/results/t1_itl/report.md`](../artifacts/results/t1_itl/report.md), generated at
-the registration commit `0be7bec`.
+the registration commit.
 
 **As registered: does not hold — predicted to hold.** The simulator's mean inter-token latency
 against the engine's own counter, profile A, each run replayed at its real send times:
@@ -1484,7 +1484,7 @@ per-token limit, and decode cells with a shared prefix.
 
 ### 2026-10-05 — T2 RAN: all three hold, on all three calibrations. Under a target with both halves the counts double, and "keep each user on one GPU" survives.
 Report: [`artifacts/results/t2_two_part_slo/report.md`](../artifacts/results/t2_two_part_slo/report.md)
-— 41,472 simulator runs, the grids written at the registration commit `0be7bec`. **Guard passed:**
+— 41,472 simulator runs, the grids written at the registration commit. **Guard passed:**
 under the first-token target, on replicas 1–16, each calibration reproduces its committed table
 exactly.
 
@@ -1542,7 +1542,7 @@ one process, started on a clean tree. While B and C were computing I edited othe
 `git_dirty: true` and list those paths. The process had loaded the simulator before the edits, and
 none of those files is imported by a grid run; but that is an argument, and a header cannot show
 it. So 240 random cells of each grid were run again from a clean checkout whose `src/` is
-identical to the registration commit's (`scripts/t2_verify_grid.py`, commit `ae4b483`):
+identical to the registration commit's (`scripts/t2_verify_grid.py`):
 **720 of 720 identical**
 ([`verification.json`](../artifacts/results/t2_two_part_slo/verification.json)). A sample and not
 the whole grid because the full re-run is thirty minutes of every core and the machine was on
@@ -1717,13 +1717,13 @@ Report: [`artifacts/results/c4_kaggle_t4/report.md`](../artifacts/results/c4_kag
 raw: `c4.json`, and `grids.json` for the three rules decided afterwards on a CPU.
 
 **The run.** Kaggle, one Tesla T4, 2026-10-05 16:48 UTC, about 65 minutes; vLLM 0.30.0, Qwen3-4B,
-1,537 blocks. The notebook, the predictions (`818e2c95…`) and the wheel (`36725240…`, built from
-`c5b5d74`) are the registered ones — the analysis checks all three and stops otherwise. The
+1,537 blocks. The notebook, the predictions (`818e2c95…`) and the wheel (`36725240…`, built at
+registration) are the registered ones — the analysis checks all three and stops otherwise. The
 pre-flight repaired `torchaudio` again, before anything was measured. Nothing was invalid: all 24
 micro-benchmark cells valid, 0 preemptions, every shared request reported its 1,360 cached tokens,
 every traffic request has a time per token, the worst send lag was 2 ms. The CPU grids (22,032
-simulator runs, 20 minutes) ran on a clean tree at `7f95146`: two documentation commits after the
-registration; `git diff c5b5d74 7f95146 -- src scripts configs` is empty.
+simulator runs, 20 minutes) ran on a clean tree two documentation commits after the
+registration, neither of which changed anything under `src`, `scripts` or `configs`.
 
 **As registered — predicted: all nine hold. Seven do; E and F2 do not.**
 
@@ -1903,7 +1903,7 @@ to add and nothing to pile up.
 ### 2026-10-06 — R1 and R2 on the validated timing model RAN: R1 falsified again, the two policies within one replica; R2 cannot be tested as designed
 Report: [`artifacts/results/realtrace_ctx/report.md`](../artifacts/results/realtrace_ctx/report.md);
 the probe: `probe.json`; each calibration's own run and the config it was derived with:
-`R1/A/`, `R1/s0/`. 2,304 runs, from a clean tree at `3fd95df` — the commit that fixed the speeds.
+`R1/A/`, `R1/s0/`. 2,304 runs, from a clean tree at the commit that fixed the speeds.
 The same trace files as R1's first run (their sha256s are compared in the tests).
 
 **The probe (round-robin alone, calibration A), and the speeds by the registered rule.**
@@ -2106,8 +2106,8 @@ replicas — p95 TTFT 694 ms for LMetric against 813 for session-sticky; 64 prom
 
 ### 2026-10-06 — R3 RAN: two of four hold. LMetric never needs more replicas than session-sticky, but under the registered target it needs fewer on one calibration only; and pure prefix-affinity does not fail on this trace.
 Registered in the entry above. Runner: `scripts/run_r3.py` →
-[`grid.json`](../artifacts/results/r3_bailian/grid.json) — 5,184 runs from `d189b1a` (the commit
-that fixed the speeds), a clean tree, 3,700 s; every run completed every request. Analysis:
+[`grid.json`](../artifacts/results/r3_bailian/grid.json) — 5,184 runs from the commit that fixed
+the speeds, a clean tree, 3,700 s; every run completed every request. Analysis:
 `scripts/r3_analyze.py`, committed before the run →
 [`report.md`](../artifacts/results/r3_bailian/report.md), `analysis.json`.
 
@@ -2221,7 +2221,7 @@ registered target: 2, 4 and 7 replicas).
 
 ### 2026-10-08 — POST HOC, no GPU: the tool's edge check, on T1's five held-out runs
 Not registered; decides nothing. Script: `scripts/edge_posthoc_t1.py` →
-[`posthoc_edge.md`](../artifacts/results/t1_itl/posthoc_edge.md), from a clean tree at `903ecdd`.
+[`posthoc_edge.md`](../artifacts/results/t1_itl/posthoc_edge.md), from a clean tree.
 
 **What was built.** `kvsim replay` now runs its recommended configuration once more with every
 timing coefficient 5% larger — what two calibrations of one engine differ by (C3) — and says how

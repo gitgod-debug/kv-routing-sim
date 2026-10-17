@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
-"""C2's analysis — committed BEFORE the run, so nothing in it is chosen after seeing a result.
+"""Fit C2's context-aware timing model and apply the rules in configs/c2_timing.yaml.
 
     python scripts/c2_analyze.py      # artifacts/results/c2_kaggle_t4/c2.json -> report.md,
                                       #   analysis.json, fitted_profile.json
 
-The procedure, exactly as configs/c2_timing.yaml registers it:
+The procedure registered in the config:
   1. Decode fit, on every valid part-A rep:   step = d0 + d1·b + d2·S,   S = b·(L + (skip + out)/2)
   2. Prefill fit, on every valid part-B rep:  TTFT − decode(1, c + n) = p0 + p1·n + p2·n·(c + n/2),
      with c the cached tokens the engine reported and n the rest of the prompt.
-  Least squares with every coefficient ≥ 0 (all subsets solved; the feasible one with the least
-  squared error wins). The context-free fit (d2 = p2 = 0) on the same data is reported beside it.
-  3. C2a — step(L 1536, b 8) ÷ step(L 128, b 8), medians over reps, ≥ c2a_min_ratio.
-  4. C2b — median over part C's cells of contended ÷ alone ENGINE-SIDE inter-token latency (medians
-     over reps) ≥ c2b_min_ratio.
-  5. C2c — the fitted model replays each part-D workload on one replica at the times its requests
-     were really sent; its p50 and p95 TTFT must be within c2c_max_factor of the measured ones, for
-     both workloads. Percentiles on both sides by the notebook's nearest-rank rule, over valid
-     requests.
-A rule whose data is missing is UNDECIDED, and an undecided rule does not hold.
-
-Standard library only: CI can run its tests without the [analysis] extra.
+  Both fits are least squares with every coefficient ≥ 0 (every subset is solved, and the feasible
+  one with the least squared error wins). The context-free fit (d2 = p2 = 0) on the same data is
+  reported beside them.
+  3. C2a: step(L 1536, b 8) / step(L 128, b 8), medians over reps, ≥ c2a_min_ratio.
+  4. C2b: the median over part C's cells of contended / alone engine-side inter-token latency
+     (medians over reps) ≥ c2b_min_ratio.
+  5. C2c: the fitted model replays each part-D workload on one replica at the measured send times;
+     its p50 and p95 TTFT must be within c2c_max_factor of the measured ones for both workloads.
+     Percentiles on both sides use the notebook's nearest-rank rule over valid requests.
+A rule whose data is missing is undecided, and an undecided rule does not hold. The decision rules
+are read from the config; this script applies them and tunes nothing. It uses the standard library
+only, so CI can run its tests without the [analysis] extra.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ from kv_routing_sim.traces.generator import AgenticWorkload
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
 
-# ── least squares, coefficients ≥ 0 ─────────────────────────────────────────────────────────────
+# Least squares with every coefficient ≥ 0.
 
 
 def _solve(a: list[list[float]], b: list[float]) -> list[float] | None:
@@ -60,7 +60,9 @@ def _solve(a: list[list[float]], b: list[float]) -> list[float] | None:
 
 def nnls(rows: list[list[float]], y: list[float]) -> tuple[list[float], float]:
     """Least squares with every coefficient ≥ 0, by solving every subset of free coefficients.
-    Exhaustive and deterministic: ties go to the subset enumerated first."""
+
+    Exhaustive and deterministic: ties go to the subset enumerated first.
+    """
     k = len(rows[0])
     best: tuple[float, list[float]] | None = None
     for mask in range(1 << k):
@@ -90,7 +92,7 @@ def r_squared(rows: list[list[float]], y: list[float], coef: list[float]) -> flo
     return 1.0 - res / tot if tot else 1.0
 
 
-# ── the fits ────────────────────────────────────────────────────────────────────────────────────
+# The timing fits.
 
 
 def fit_decode(decode: list[dict], design: dict, with_context: bool) -> dict[str, Any]:
@@ -133,7 +135,7 @@ def profile_from(name: str, dec: dict, pre: dict, e: dict, gpu: str) -> CostProf
     )
 
 
-# ── the rules ───────────────────────────────────────────────────────────────────────────────────
+# The rules.
 
 
 def _median_step(decode: list[dict], L: int, b: int, key: str = "step_s",
@@ -151,7 +153,7 @@ def nearest_rank(sorted_vals: list[float], q: float) -> float | None:
 
 
 def replay(name: str, spec: dict, measured: dict, profile: CostProfile) -> dict[str, Any]:
-    """Part D's workload through the simulator, each request at the time it was really sent."""
+    """Replay a part-D workload on one simulated replica, each request at its measured send time."""
     sent = {r["request_id"]: max(0.0, r["send_offset_s"]) for r in measured["requests"]}
     trace, _ = AgenticWorkload(**spec).generate()
     trace = sorted((dataclasses.replace(q, arrival_ts=sent[q.request_id]) for q in trace),
@@ -240,7 +242,7 @@ def analyze(data: dict, prereg: dict) -> dict[str, Any]:
     return out
 
 
-# ── the report ──────────────────────────────────────────────────────────────────────────────────
+# The report.
 
 
 def _ms(x: float | None) -> str:

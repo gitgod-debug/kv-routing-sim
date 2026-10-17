@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Phase 6's result: two live T4 replicas against the predictions registered before the run.
+"""Phase 6 analysis: two live T4 replicas against the predictions made before the run.
 
     python scripts/phase6_analyze.py      # artifacts/results/phase6_kaggle_t4/ -> report.md
 
-Two runs of the same registered notebook came back, and both are reported:
-  run 1 — 2026-09-28 09:41 UTC: its printed per-run results, read from the executed notebook
-          (`phase6_sim2real_EXECUTED_run1.ipynb`); its JSON was not kept.
-  run 2 — 2026-09-28 15:07 UTC: `phase6.json` and both server logs. S1 and S2 are RECOMPUTED here
-          from its raw per-replica counters, not copied from the notebook's own verdict.
+Reports both runs of the notebook. Run 1's per-run results are parsed from the printed output of
+the executed notebook (phase6_sim2real_EXECUTED_run1.ipynb), because its JSON was not kept. Run 2's
+come from phase6.json, with S1 and S2 recomputed from its raw per-replica counters rather than
+copied from the notebook's verdict; its two server logs feed a post-hoc decode-step estimate. Also
+writes analysis.json.
 
-The registered rules (configs/phase6_sim2real.yaml, docs/09 2026-09-28) are on HIT RATES only:
-S1 — every run within s1_max_relative_error of its prediction; S2 — every pair of policies predicted
-at least s2_min_gap apart comes out in the same order. Latency and preemptions were predicted too
-and are reported beside them, but they were never a registered test.
+The decision rules in configs/phase6_sim2real.yaml apply to hit rates only. S1: every run is within
+s1_max_relative_error of its prediction. S2: every pair of policies predicted at least s2_min_gap
+apart comes out in the same order. Latency and preemptions are reported beside them but are not
+part of the test.
 """
 
 from __future__ import annotations
@@ -30,8 +30,9 @@ OUT = REPO / "artifacts" / "results" / "phase6_kaggle_t4"
 PREREG = REPO / "artifacts" / "results" / "phase6_prereg" / "predictions.json"
 CONFIG = REPO / "configs" / "phase6_sim2real.yaml"
 
-# One printed line per run in the notebook's RUN cell, e.g.
-#   K64  session-sticky  hit 0.8099 (predicted 0.8214, -1.4%) ✅ · requests [220, 260] (...) ·
+# One printed line per run in the notebook's RUN cell, such as the one below, where a pass/fail
+# mark follows the percentage:
+#   K64  session-sticky  hit 0.8099 (predicted 0.8214, -1.4%) · requests [220, 260] (...) ·
 #   preemptions 71 (predicted 0) · p95 TTFT 71525 ms · 0 invalid · send lag ≤ 2 ms
 RUN_LINE = re.compile(
     r"(K\d+)\s+(\S+)\s+hit ([\d.]+) \(predicted [\d.]+, [-+][\d.]+%\) \S+ · "
@@ -76,7 +77,7 @@ def run2(d: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
 
 
 def verdict(runs: dict, pred: dict, cfg: dict) -> dict[str, Any]:
-    """The registered rules, applied to one run's measured hit rates."""
+    """Apply the S1 and S2 rules from the config to one run's measured hit rates."""
     s1 = {f"{w}/{p}": abs(m["hit_rate"] - pred[w][p]["hit_rate"]) / pred[w][p]["hit_rate"]
           for (w, p), m in runs.items()}
     pairs = []
@@ -86,7 +87,7 @@ def verdict(runs: dict, pred: dict, cfg: dict) -> dict[str, Any]:
             for b in pols[i + 1:]:
                 pg = pred[w][a]["hit_rate"] - pred[w][b]["hit_rate"]
                 if abs(pg) < cfg["s2_min_gap"]:
-                    continue  # registered as inside the noise: not tested
+                    continue  # predicted gap within the noise: not tested
                 mg = runs[(w, a)]["hit_rate"] - runs[(w, b)]["hit_rate"]
                 pairs.append({"workload": w, "pair": [a, b], "predicted_gap": round(pg, 4),
                               "measured_gap": round(mg, 4), "same_order": (pg > 0) == (mg > 0)})
@@ -98,8 +99,11 @@ def verdict(runs: dict, pred: dict, cfg: dict) -> dict[str, Any]:
 
 
 def decode_windows() -> list[dict[str, float]]:
-    """POST HOC. 10-second windows in which an engine did no prefill at all (prompt throughput 0)
-    but was decoding: there, running ÷ generation throughput estimates one decode step's time."""
+    """Post hoc: the 10-second stats windows in which an engine decoded without any prefill.
+
+    In those windows (prompt throughput 0), running requests / generation throughput estimates the
+    time of one decode step.
+    """
     rows = []
     for name in ("server_0.log", "server_1.log"):
         for line in (OUT / name).read_text(errors="replace").splitlines():

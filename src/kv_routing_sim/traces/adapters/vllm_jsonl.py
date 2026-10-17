@@ -1,12 +1,8 @@
 """Adapter for vLLM-style JSONL request logs.
 
-vLLM does not emit one canonical log format, so this accepts the field names seen in practice and
-falls back sensibly. Extending it is a one-line change to the alias tuples below — which is the
-point of ADR-004, and why "add a trace adapter" is an honest good-first-issue.
-
-⚠️ Prefer a log carrying `prompt_token_ids`. If only text is present the adapter falls back to
-`approx_token_ids`, whose block boundaries will not line up with the real tokenizer's — a named
-limitation, not a silent one. See `hashing.approx_token_ids`.
+vLLM has no single log format, so each field is read from the first of several names seen in
+practice (the alias tuples below). A log with `prompt_token_ids` is preferred; with text alone,
+`hashing.approx_token_ids` stands in, and its block boundaries will not match the engine's.
 """
 
 from __future__ import annotations

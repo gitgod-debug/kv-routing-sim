@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
-"""C4, post hoc: a reported item the registration listed and the registered analysis left out.
+"""Post hoc: compute each fresh C4 calibration's error on the micro-benchmark cells.
 
     python scripts/c4_posthoc_fresh_cells.py
         # artifacts/results/c4_kaggle_t4/ -> posthoc_fresh_cells.{json,md}
 
-configs/c4_per_token.yaml lists, under "Reported, not tested": "every cell's signed error against
-profile A, and against each fresh fit". scripts/c4_analyze.py — committed before the run and not
-changed since — compares the micro-benchmark cells with profile A only. This script adds the
-other half: each run of `kvsim calibrate`'s own pooled fit, against the same measured cells.
-
-⚠️ WRITTEN AFTER THE RESULTS WERE SEEN. It decides nothing and changes no verdict. The arithmetic
-is the registration's own — `shared_step` and `stall_prediction` are imported from
-scripts/c4_prepare.py, which made profile A's registered numbers with them — and the script stops
-if it cannot reproduce those numbers from profile A first.
+configs/c4_per_token.yaml lists as reported "every cell's signed error against profile A, and
+against each fresh fit"; scripts/c4_analyze.py covers profile A only. This adds each run's pooled
+fit against the same measured cells. It is post hoc, decides nothing and changes no verdict. The
+arithmetic is imported from scripts/c4_prepare.py (`shared_step`, `stall_prediction`), and the
+script stops unless profile A reproduces its registered numbers.
 """
 
 from __future__ import annotations

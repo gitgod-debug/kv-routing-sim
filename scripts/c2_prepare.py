@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""C2's registration: the design checked, part D's traffic fingerprinted, the notebook built.
+"""Prepare the C2 run: check the design, fingerprint part D's traffic, and build the notebook.
 
     python scripts/c2_prepare.py
         # configs/c2_timing.yaml -> artifacts/results/c2_prereg/predictions.json
         #                        -> notebooks/c2_timing_t4.ipynb
 
-What is registered here: the design, part D's traffic (fingerprints, checked against the notebook's
-port of the generator, as Phase 6's was), and what the CONTEXT-FREE profile predicts for part D —
-reported beside the context-aware model, never tested. The context-aware model cannot predict
-anything yet: it is fitted after the run, on parts A and B, by scripts/c2_analyze.py — and that
-script, committed with this one, is the whole of what happens to the numbers.
+The registration records the design, part D's traffic (fingerprints, checked against the
+notebook's port of the generator) and the context-free profile's predictions for part D, which are
+reported beside the context-aware model but not tested. The context-aware model is fitted after
+the run, on parts A and B, by scripts/c2_analyze.py.
 """
 
 from __future__ import annotations
@@ -39,7 +38,7 @@ MAX_BLOCKS = 1300  # of 1,536 usable: a decode cell above this could preempt, an
 
 
 def check_design(cfg: dict[str, Any]) -> None:
-    """Every cell must fit the engine: no decode cell may need preemption, no prompt the max."""
+    """Exit unless every cell fits the engine without preemption and C2a's cells are in the grid."""
     e, d = cfg["engine"], cfg["decode"]
     per = lambda L: math.ceil((L + d["output_tokens"]) / e["block_size"])
     for L, b in [*d["grid"], *cfg["cpu"]["cells"]]:
@@ -84,7 +83,7 @@ def main() -> int:
         assert all(chain_hashes(ids) == r.block_hashes for r, ids in pairs)
     _check_port(workloads, fingerprints, traces)
 
-    # The context-free profile, one replica, at the SCHEDULED times: reported, not tested.
+    # The context-free profile, one replica, at the scheduled times: reported, not tested.
     pred: dict[str, Any] = {"runs": {}}
     for name, pairs in traces.items():
         r = run([q for q, _ in pairs], policy="round-robin", n_replicas=1, seed=0,

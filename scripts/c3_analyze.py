@@ -1,31 +1,27 @@
 #!/usr/bin/env python3
-"""C3's analysis — committed BEFORE the run, so nothing in it is chosen after seeing a result.
+"""Analyse the C3 run against the rules in configs/c3_calibrate.yaml.
 
     python scripts/c3_analyze.py [--grid]
         # artifacts/results/c3_kaggle_t4/ -> report.md, analysis.json
 
-The procedure, exactly as configs/c3_calibrate.yaml registers it:
-  C3a — the command's first run (the first seed): it exits 0; the profile is marked calibrated; the
-        hits and queries its check measured equal the registered prediction; every check request's
-        cached tokens equal the model's; the capacity it read equals the engine log's
-        `GPU KV cache size` ÷ block size. All five, recomputed here from the raw files — not copied
-        from what the notebook printed.
-  C3b — that profile replays every part-2 workload on one replica at the times its requests were
-        really sent — C2c's replay, imported from scripts/c2_analyze.py, not copied. Its p50 and
-        p95 TTFT must be within c3b_max_factor of the measured ones, for every workload.
-  C3c — the p50 and p95 registered for C2's profile (computed before the run, at the scheduled
-        times) must be within c3c_max_factor of the measured ones, for every workload.
-Percentiles on both sides by the notebook's nearest-rank rule; measured ones over valid requests.
-A rule whose data is missing is UNDECIDED, and an undecided rule does not hold.
+  C3a: on the command's first run (the first seed), all five hold, recomputed from the raw files:
+       it exits 0; the profile is marked calibrated; the check's hits and queries equal the
+       registered prediction; every check request's cached tokens equal the model's; and the
+       capacity it read equals the engine log's `GPU KV cache size` / block size.
+  C3b: that profile replays every part-2 workload on one replica at the measured send times
+       (C2c's replay, imported from scripts/c2_analyze.py); its p50 and p95 TTFT must be within
+       c3b_max_factor of the measured ones for every workload.
+  C3c: the p50 and p95 registered for C2's profile (computed at the scheduled times) must be within
+       c3c_max_factor of the measured ones for every workload.
+Percentiles use the notebook's nearest-rank rule, over valid requests on the measured side. A rule
+whose data is missing is undecided, and an undecided rule does not hold. The decision rules are
+read from the config; this script applies them and tunes nothing.
 
-Reported, not tested (all listed in the config before the run): the command's second run and what
-its profile predicts; the coefficients against C2's fit; C2's profile at the real send times; C2's
-own session's measurements of the two workloads it shares; and, with --grid, H2b-C2's registered
-grid re-run on the command's profile against the committed table (a few minutes of CPU).
-
-Amended 2026-10-05, before any measurement existed (docs/09): the report also states the software
-the run used, beside C2's, and what the notebook's pre-flight repaired — Kaggle's image changed
-between the two sessions, and C3c compares across them. A line of reporting; no rule is touched.
+Reported, not tested: the command's second run and its predictions, the coefficients against C2's
+fit, C2's profile at the measured send times, C2's own measurements of the two shared workloads,
+the software on the box beside C2's (C3c compares across the two sessions), any pre-flight
+repairs, and, with --grid, H2b-C2's grid re-run on the command's profile against the committed
+table (a few minutes of CPU).
 """
 
 from __future__ import annotations
@@ -43,7 +39,7 @@ import yaml
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import c2_analyze as c2  # the registered replay, percentile and factor: imported, never copied
+import c2_analyze as c2  # C2c's replay, percentile rule and factor
 
 from kv_routing_sim.sim.cost_model import load_profile
 
@@ -60,11 +56,11 @@ C2_RUN = REPO / "artifacts" / "results" / "c2_kaggle_t4" / "c2.json"
 H2B = REPO / "artifacts" / "results" / "h2b_c2" / "h2b_c2.json"
 
 
-# ── C3a: one run of the command, from the raw files ─────────────────────────────────────────────
+# C3a: one run of the command, from the raw files.
 
 
 def log_blocks(results: pathlib.Path, block_size: int) -> int | None:
-    """The capacity the ENGINE logged at start-up, in blocks. None if the line is not there."""
+    """The capacity the engine logged at start-up, in blocks; None if the line is missing."""
     log = results / "server_0.log"
     m = re.search(r"GPU KV cache size: ([\d,]+) tokens",
                   log.read_text(errors="replace") if log.exists() else "")
@@ -128,7 +124,7 @@ def _software_line(sw: dict) -> str | None:
     return " · ".join(parts)
 
 
-# ── C3b and C3c: the held-out traffic ───────────────────────────────────────────────────────────
+# C3b and C3c: the held-out traffic.
 
 
 def measured(m: dict) -> dict[str, Any]:
@@ -210,7 +206,7 @@ def analyze(data: dict, prereg: dict, results: pathlib.Path) -> dict[str, Any]:
     out["c2_fit"] = {key: getattr(c2_profile, key) for _, key, *_ in COEFFICIENTS}
     out["predicted_outcomes"] = cfg["predictions"]
     out["software"] = software(data)
-    if C2_RUN.exists():  # reported: the box C2's profile was fitted on — C3c compares across them
+    if C2_RUN.exists():  # reported: C2's software, since C3c compares across the two sessions
         out["c2_software"] = software(json.loads(C2_RUN.read_text()))
     if C2_SESSION.exists():  # reported: what C2's own session measured on the shared workloads
         out["c2_session"] = {r["workload"]: {q: r["measured"][f"ttft_{q}_ms"]
@@ -219,18 +215,21 @@ def analyze(data: dict, prereg: dict, results: pathlib.Path) -> dict[str, Any]:
     return out
 
 
-# ── reported with --grid: does a second calibration give the same GPU counts? ───────────────────
+# Reported with --grid: H2b-C2's grid on the command's profile.
 
 
 def _sticky_best(req: dict, not_met: int) -> int:
-    """(K, load) points where session-sticky needs the fewest replicas or ties for them."""
+    """The number of (K, load) points where session-sticky needs the fewest replicas, or ties."""
     return sum(1 for by_load in req.values() for r in by_load.values()
                if r["session-sticky"] == min(r.values()))
 
 
 def grid(results: pathlib.Path, seed: int) -> dict[str, Any]:
-    """H2b-C2's registered grid — scripts/run_h2b_c2.py, its config unchanged but for the profile —
-    on the profile the command wrote, compared with the committed table (C2's profile)."""
+    """Re-run H2b-C2's grid on the command's profile and compare it with the committed table.
+
+    The grid is scripts/run_h2b_c2.py with its config unchanged except for the profile; the
+    committed table was made with C2's profile.
+    """
     profile = results / f"calibrated_profile_seed{seed}.json"
     out = results / "h2b_grid"
     out.mkdir(exist_ok=True)
@@ -264,7 +263,7 @@ def grid(results: pathlib.Path, seed: int) -> dict[str, Any]:
     }
 
 
-# ── the report ──────────────────────────────────────────────────────────────────────────────────
+# The report.
 
 
 def _pair(d: dict | None) -> str:

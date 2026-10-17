@@ -1,34 +1,9 @@
-"""Synthetic agentic traffic — the workload this project exists to reason about.
+"""Synthetic agentic traffic, in which each turn's prompt extends the previous turn's.
 
-WHY THIS SHAPE (docs/03-background-concepts.md §3): an agent re-sends the system prompt, the tool
-definitions and the whole conversation on every turn. So turn N's prompt is literally a PREFIX of
-turn N+1's, and a fixed system prompt is shared across every session on the fleet. Prefix sharing is
-most of the workload rather than an edge case, which is why routing decides the answer here and not
-on single-turn chat traffic.
-
-Two kinds of sharing exist and they are NOT the same thing — the distinction is the whole reason
-session-sticky and prefix-affinity routing diverge:
-
-  * CROSS-SESSION sharing — the system prompt + tool definitions, identical for every user on the
-    fleet. Only a prefix-aware router can exploit this. Session-stickiness is blind to it.
-  * WITHIN-SESSION sharing — a session's own conversation history. Either router exploits this.
-
-`prefix_sharing_ratio` controls the first one, and it is the x-axis of the H2 crossover.
-
-⚠️ THE KNOB IS A TARGET, NOT A RESULT. The achieved ratio depends on how long sessions actually run,
-so `generate()` MEASURES what it produced and returns it alongside. Reporting the requested value as
-though it were the observed one would be exactly the kind of quiet substitution this project claims
-not to make.
-
-⭐ HOW MANY DIFFERENT SHARED PREFIXES (added 2026-09-28, for H2b). Until this date every generated
-trace had ONE system prompt for the whole fleet. One prompt of 85 blocks fits in every replica's
-cache many times over, so every policy ends up caching it everywhere, and routing cannot win by
-deciding where it lives — which is why session-sticky beat every prefix-aware policy in Phase 4.
-Real fleets serve many tenants and agents, each with its own long prompt. `n_shared_prefixes` = K
-distinct system prompts, and each session draws one with Zipf popularity (exponent
-`prefix_zipf_s`) from its OWN random stream. With K = 1 (the default) no draw is made at all, so
-every earlier trace is reproduced byte for byte — tests/test_phase3_prereg.py pins one by
-fingerprint.
+An agent re-sends the system prompt, the tool definitions and the whole conversation every turn.
+`prefix_sharing_ratio` targets the sharing across sessions (system prompt and tools), which only a
+prefix-aware router can exploit, as distinct from a session's own history; the achieved ratio
+depends on how sessions run, so `generate()` measures and reports it.
 """
 
 from __future__ import annotations
@@ -44,21 +19,19 @@ from .hashing import (
 )
 from .schema import NormalizedRequest
 
-# Token-id namespaces, kept disjoint so a "shared" token can never collide with a private one and
-# manufacture sharing that the workload does not actually have.
+# Token-id namespaces, kept disjoint so a shared token can never collide with a private one and
+# create sharing the workload does not have.
 _SHARED_BASE = 0
 _PREFIX_STRIDE = 100_000  # shared prefix k lives at [k * stride, k * stride + length)
 _SESSION_BASE = 10_000_000
 _TURN_BASE = 500_000_000
 MAX_SHARED_PREFIXES = _SESSION_BASE // _PREFIX_STRIDE  # 100: the namespaces must stay disjoint
 
-# ⚠️ Those raw ids are far outside any real vocabulary, and a live engine REJECTS them. Found while
-# building the Phase-3 notebook, 2026-09-22: the generator had only ever fed the simulator, which
-# just hashes. So by default every raw id is mapped into ENGINE_SAFE_IDS. Qwen3's vocabulary is
-# 151,936 with special tokens at 151,643-151,668; [1000, 100000) is ordinary text tokens there and
-# in every mainstream tokenizer. The map is applied HERE, in the one generator, so the simulator and
-# the engine see byte-identical ids. Accidental sharing needs all 16 ids of a block to collide at
-# once — ~(1/99,000)^16 per pair of blocks, i.e. never.
+# The raw ids are far outside any real vocabulary and a live engine rejects them, so by default each
+# is mapped into ENGINE_SAFE_IDS: ordinary text tokens in Qwen3 (whose special tokens start at
+# 151,643) and in every mainstream tokenizer. The map is applied here so the simulator and the
+# engine see identical ids. Accidental sharing would need all 16 ids of a block to collide, about
+# (1/99,000)^16 per pair of blocks.
 ENGINE_SAFE_IDS = (1000, 100_000)
 _MIX_MUL, _MIX_ADD, _MASK64 = 0x9E3779B97F4A7C15, 0x632BE59BD9B4E019, 0xFFFFFFFFFFFFFFFF
 
@@ -71,9 +44,9 @@ def _to_engine_id(raw: int, low: int, high: int) -> int:
 class AgenticWorkload:
     """Generates multi-turn agentic traffic with a controllable cross-session sharing ratio.
 
-    Every field is explicit; nothing is hidden in a default that a reader cannot see. The config
-    that produced a trace is committed, and a trace is reproduced from (config + seed) rather than
-    shipped as data (docs/06-methodology.md §1).
+    A trace is reproduced from its parameters and seed rather than shipped as data. With
+    `n_shared_prefixes` = K > 1, each session draws one of K distinct system prompts with Zipf
+    popularity (exponent `prefix_zipf_s`).
     """
 
     def __init__(
@@ -129,11 +102,10 @@ class AgenticWorkload:
             )
 
     def _solve_shared_tokens(self) -> int:
-        """Pick the shared-span length that hits the target ratio at the MEAN prompt length.
+        """Return the shared-prefix length that hits the target ratio at the mean prompt length.
 
-        A session's prompt grows every turn, so the instantaneous ratio falls as the conversation
-        runs. We solve at the mean so the knob means something stable, and then measure what
-        actually came out.
+        A session's prompt grows every turn, so the ratio falls as a conversation runs; solving at
+        the mean keeps the parameter stable, and `generate()` reports what was achieved.
 
             mean_private = session_context + user_turn + mean_history
             shared       = r/(1-r) * mean_private
@@ -152,10 +124,10 @@ class AgenticWorkload:
         return [base + i for i in range(self.shared_prefix_tokens)]
 
     def prefix_assignment(self) -> list[int]:
-        """Which shared prefix each session sends, by session index.
+        """Return which shared prefix each session sends, by session index.
 
-        Drawn from its OWN random stream, and only when K > 1: with one prefix nothing is drawn,
-        so the arrival times — and every earlier trace — are unchanged.
+        The draw uses its own random stream and is made only when there is more than one prefix, so
+        a single-prefix trace does not depend on it.
         """
         if self.n_shared_prefixes == 1:
             return [0] * self.n_sessions
@@ -165,11 +137,11 @@ class AgenticWorkload:
         return rng.choices(ks, weights=weights, k=self.n_sessions)
 
     def generate(self) -> tuple[list[NormalizedRequest], dict[str, object]]:
-        """Produce the trace and a report of what was ACTUALLY produced."""
+        """Return the trace and a report of what was actually produced."""
         requests = list(self._iter_requests())
         requests.sort(key=lambda r: r.arrival_ts)
-        # TWO different numbers, reported separately because they answer different questions.
-        # Cross-session is the one the knob controls and the one routing turns on.
+        # Two different measures. Cross-session sharing is the one the knob controls and the one
+        # routing depends on.
         achieved_cross = cross_session_sharing_ratio(
             (r.block_hashes, r.session_id) for r in requests
         )
@@ -192,8 +164,8 @@ class AgenticWorkload:
             "seed": self.seed,
         }
         if self.n_shared_prefixes > 1:
-            # Only for K > 1, so that every earlier trace's report is unchanged too. The working
-            # set is what a replica must hold to serve every prefix the trace actually used.
+            # Only with several prefixes, so a single-prefix report keeps its keys. The working set
+            # is what a replica must hold to serve every prefix the trace used.
             used = len(set(self.prefix_assignment()))
             prefix_blocks = self.shared_prefix_tokens // self.block_size
             report.update({
@@ -206,11 +178,11 @@ class AgenticWorkload:
         return requests, report
 
     def write_jsonl(self, path: str) -> dict[str, object]:
-        """Write the trace as vLLM-style JSONL carrying the REAL token ids.
+        """Write the trace as vLLM-style JSONL with the real token ids.
 
-        The in-memory `NormalizedRequest` deliberately drops token ids (ADR-002), so writing a
-        trace regenerates them from the same loop. The ids are what a live engine will be sent, so
-        they are engine-safe by default (`token_id_range`).
+        `NormalizedRequest` drops token ids (ADR-002), so writing a trace regenerates them from the
+        same loop. They are what a live engine will be sent, so they are engine-safe by default
+        (`token_id_range`).
         """
         import json
 
@@ -235,18 +207,18 @@ class AgenticWorkload:
         return report
 
     def iter_with_tokens(self) -> Iterator[tuple[NormalizedRequest, list[int]]]:
-        """Public: every request with the exact token ids an engine must be sent, arrival-sorted."""
+        """Return every request with the token ids an engine must be sent, in arrival order."""
         return iter(sorted(self._iter_with_tokens(), key=lambda pair: pair[0].arrival_ts))
 
     def _iter_with_tokens(self) -> Iterator[tuple[NormalizedRequest, list[int]]]:
-        """THE generation loop. Every other view of the trace is derived from this one."""
+        """The generation loop; every other view of the trace derives from it."""
         rng = random.Random(self.seed)
         prefixes = [self._shared_tokens(k) for k in range(self.n_shared_prefixes)]
         assignment = self.prefix_assignment()
         remap = self.token_id_range
         clock = 0.0
         for s in range(self.n_sessions):
-            # Poisson arrivals => exponential gaps between session starts.
+            # Poisson arrivals: exponential gaps between session starts.
             clock += rng.expovariate(self.arrival_rate)
             shared = prefixes[assignment[s]]
             session_id = f"s{s}"
@@ -256,7 +228,7 @@ class AgenticWorkload:
             for turn in range(self.turns_per_session):
                 turn_base = _TURN_BASE + s * 100_000 + turn * 1_000
                 user = [turn_base + i for i in range(self.user_turn_tokens)]
-                # The real agentic structure: turn N's full prompt is a prefix of turn N+1's.
+                # Turn N's full prompt is a prefix of turn N+1's.
                 raw = shared + private + history + user
                 ids = [_to_engine_id(x, *remap) for x in raw] if remap else raw
                 yield (

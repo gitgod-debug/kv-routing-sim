@@ -49,7 +49,7 @@ where it matters, and `kvsim calibrate` with its new repeats. Registered before 
 (a private notebook on the T4 ×2 machine, internet on; see C3's section below for running by hand).
 Then, with no GPU: `python scripts/c4_grids.py` (20 minutes) and `python scripts/c4_analyze.py`.
 
-The notebook carries the package's own wheel (built from commit `c5b5d74`) and C3's pre-flight.
+The notebook carries the package's own wheel (built at registration) and C3's pre-flight.
 
 ## ✅ C3 — ran on 2026-10-05: all three registered rules hold
 
@@ -91,7 +91,7 @@ Results are saved after every part: if a cell stops with ⛔, the zip is still t
 **once**; a second run is a second experiment and needs a dated entry in `docs/09-hypotheses.md`
 first.
 
-The notebook carries the package's own wheel (built from commit `016d167`), so the GPU box runs
+The notebook carries the package's own wheel (built at registration), so the GPU box runs
 exactly the committed code and needs no copy of this repo. It decides nothing: it measures, and
 `scripts/c3_analyze.py` — committed before the run — decides.
 

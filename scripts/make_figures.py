@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""The README's figure, drawn from the committed demo grid on the validated timing model.
+"""Draw the README's figure from the demo grid.
 
     python scripts/make_figures.py  # -> docs/figures/flip-*.svg and paper/figures/flip.pdf
 
-Needs the [analysis] extra (matplotlib). It reads `artifacts/results/demo_grid_ctx.json`, which
-`scripts/build_grid.py --source h2b_c2` writes only when it reproduces the registered re-test's
-table (H2b on C2's context-aware T4 model) exactly, so the figure shows the experiment's numbers and
-runs nothing itself. Same grid in, same bytes out. (Until 2026-09-30 it drew `demo_grid.json`, the
-context-free model's grid — whose "flip" the re-test falsified.)
+Needs the [analysis] extra (matplotlib). Reads artifacts/results/demo_grid_ctx.json, which
+`scripts/build_grid.py --source h2b_c2` writes only when it reproduces the H2b table on C2's
+context-aware T4 profile exactly, so the figure runs no simulation itself. The same grid gives the
+same bytes.
 
-Left: the fewest T4s that hold the 2 s p95 TTFT target, as distinct tenant prompts multiply.
-Right: the prefix-cache hit rate on a fixed fleet — the mechanism behind the left panel.
+Left panel: the fewest T4s that hold the 2 s p95 TTFT SLO as the number of distinct tenant
+prompts grows. Right panel: the prefix-cache hit rate on a fixed fleet, which drives the left one.
 """
 
 from __future__ import annotations
@@ -29,7 +28,7 @@ GRID = REPO / "artifacts" / "results" / "demo_grid_ctx.json"
 OUT = REPO / "docs" / "figures"
 PAPER = REPO / "paper" / "figures" / "flip.pdf"  # the preprint's copy: pdfLaTeX does not read SVG
 LOAD = 2  # sessions/s: the README table's column
-REPLICAS = 8  # the fleet the hit rates are read on, as in the re-test's report
+REPLICAS = 8  # fleet size for the hit-rate panel, as in the h2b_c2 report
 
 THEMES = {
     "light": {"fg": "#1d1d1b", "muted": "#5f5d57", "grid": "#dedad2"},
@@ -51,7 +50,7 @@ def _series(grid: dict[str, Any]) -> list[tuple[str, str, str, str]]:
 
 
 def _not_met(grid: dict[str, Any]) -> int:
-    """Drawn one above the largest fleet: no replica count in the grid holds the target."""
+    """The value used when no replica count in the grid holds the SLO: one above the largest."""
     return max(grid["axes"]["replicas"]) + 1
 
 

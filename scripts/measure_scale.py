@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""What breaks at 10× and 100×? Measured, for the README's named section.
+"""Measure generation time, simulation time and peak RSS at 10× and 100× the base workload.
 
     python scripts/measure_scale.py                # -> artifacts/results/scale/
     python scripts/measure_scale.py --report-only  # re-render report.md from scale.json, no runs
 
-Each case runs in a FRESH process, so its peak RSS is its own. Base = Phase 4's session shape
+Each case runs in a fresh process, so its peak RSS is its own. The base is Phase 4's session shape
 (200 sessions × 4 turns, sharing 0.8) on the calibrated T4 profile. Scaling the trace keeps the
-arrival rate, so a 10× trace simply lasts 10× longer; scaling the fleet scales the arrival rate with
-it, so each replica sees the same load.
+arrival rate, so a 10× trace lasts 10× longer; scaling the fleet scales the arrival rate with it,
+so each replica sees the same load.
 """
 
 from __future__ import annotations

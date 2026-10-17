@@ -1,9 +1,8 @@
-"""The pre-check that changed `kvsim calibrate`'s design must stay reproducible.
+"""Pins the post hoc pre-check (scripts/c3_precheck.py) on C2's recorded data.
 
-scripts/c3_precheck.py asked — post hoc, on C2's recorded data, with no GPU — whether the cells the
-command measures would have been enough. They were not: fitted on cold prompts only, the model put a
-held-out p95 off by 5.7–7.2×. That is why the command now times prefill after a cached prefix, and
-the claim is in its docstring and the README, so the numbers behind it are pinned here.
+Fitted on cold prompts only, the model misses a held-out p95 by 5.7 to 7.2x; with prefill also
+timed after a cached prefix, it stays within 2x. This result is why `kvsim calibrate` measures
+both kinds of prefill cell.
 """
 
 from __future__ import annotations
@@ -27,7 +26,7 @@ def test_the_pre_check_that_changed_the_commands_design_reproduces():
         "with_cached_prefix"]
     data = json.loads((pre.RESULTS / "c2.json").read_text())
     prereg = json.loads(pre.PREREG.read_text())
-    for want in (committed["rows"][0], committed["rows"][2]):  # one of each kind: seconds, not all
+    for want in (committed["rows"][0], committed["rows"][2]):  # one row of each kind, for speed
         got = pre.one(data, prereg, want["prefill_cells"],
                       want["prefill_cells"] == "with_cached_prefix", want["decode_rep"])
         assert got["fit"] == pytest.approx(want["fit"])

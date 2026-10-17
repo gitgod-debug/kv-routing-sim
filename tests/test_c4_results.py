@@ -1,9 +1,8 @@
-"""C4's committed result must come out of the committed raw files, through the registered analysis.
+"""Pins C4's registered result (configs/c4_per_token.yaml): the registered analysis of the
+committed raw files must give the committed verdicts and the numbers the docs quote.
 
-C4 (configs/c4_per_token.yaml, registered 2026-10-05, run on a Kaggle T4 the same day): the
-per-token model where it matters. Seven of its nine rules hold; E and F2 do not — both had been
-predicted to. The numbers pinned here are the ones the README, CHECKPOINTS and
-docs/09-hypotheses.md quote; if a later change to the simulator moves one, this fails first.
+C4 tests the per-token model on a T4. Seven of its nine rules hold; E and F2, predicted to hold,
+do not.
 """
 
 from __future__ import annotations
@@ -91,14 +90,14 @@ def test_the_shared_prefix_cells_the_write_up_quotes(analysis):
     assert analysis["decode"]["fitted_max_summed_context"] == 20_200
     assert {b: round(c["measured_step_s"] * 1e3, 1) for b, c in cells.items()} == {
         8: 81.3, 12: 102.7, 16: 122.2, 32: 207.0, 64: 342.3, 96: 494.1, 128: 634.1}
-    # Profile A against the measurement: +3% up to 2.3× the fitted range, +12 to +15% beyond.
+    # Profile A against the measurement: +3% up to 2.3x the fitted range, +12 to +15% beyond.
     assert {b: round((c["predicted_over_measured"] - 1) * 100) for b, c in cells.items()} == {
         8: 2, 12: 2, 16: 3, 32: 3, 64: 12, 96: 13, 128: 15}
     assert analysis["d1b"]["cells_tested"] == [16, 32, 64, 96, 128]
     worst = max(cells[b]["factor"] for b in analysis["d1b"]["cells_tested"])
     assert round(worst, 2) == 1.15 and worst < analysis["d1b"]["max_factor"] == 1.25
     assert round(cells[128]["summed_context"] / 20_200, 1) == 9.2
-    # Sharing a prefix costs nothing by itself: a little LESS than unique prompts.
+    # Sharing a prefix costs nothing by itself: a little less than unique prompts.
     controls = {c["b"]: c for c in analysis["decode"]["controls"]}
     assert [round((controls[b]["shared_over_unique"] - 1) * 100) for b in (8, 12)] == [-3, -4]
     assert all(c["factor"] < 1.05 for c in controls.values())
@@ -137,13 +136,13 @@ def test_the_traffic_numbers_the_write_up_quotes(analysis):
     assert [round(x, 2) for x in fresh] == [1.14, 1.16, 1.16]
 
 
-# ── the two rules decided in the simulator ──────────────────────────────────────────────────────
+# Rules E and F, decided in the simulator
 
 
 def test_the_grids_are_the_registered_design_from_a_clean_tree():
     assert GRIDS["git_dirty"] is False and GRIDS["n_runs"] == 22_032
-    # Run at a later commit than the registration (c5b5d74): documentation only in between —
-    # `git diff c5b5d74 7f95146 -- src scripts configs` is empty.
+    # Run at a later commit than the registration; the commits in between changed nothing under
+    # src, scripts or configs.
     assert GRIDS["git_sha"] == "7f95146"
     runs = [f"s{s}" for s in "012"]
     assert GRIDS["fit_ids"] == sorted(["A", *runs, *(f"{r}r{i}" for r in runs for i in range(3))])
@@ -178,7 +177,7 @@ def test_a_stored_cell_is_what_the_simulator_gives(name, fit, k, load, policy, a
 
 
 def test_one_runs_spread_does_not_cover_another_runs_count(analysis):
-    """E, predicted to hold: it does not. 82.4% against the 90% needed."""
+    """E, predicted to hold, does not: coverage is 82.4% against the 90% required."""
     e = analysis["e"]
     assert e["runs"] == {"s0": 4, "s1": 4, "s2": 4}  # each run: its pooled fit and three repeats
     assert (e["covered"], e["cases"]) == (178, 216)
@@ -190,7 +189,7 @@ def test_one_runs_spread_does_not_cover_another_runs_count(analysis):
     far = [m for m in misses if not m["range"][0] - 1 <= m["count"] <= m["range"][1] + 1]
     assert len(far) == 11
     # The two runs taken back to back agree with each other; the run an hour earlier does not
-    # agree with them — which no run's own repeats can know.
+    # agree with them, which no run's own repeats can detect.
     by_pair = {}
     for m in misses:
         by_pair[(m["range_from"], m["other"])] = by_pair.get((m["range_from"], m["other"]), 0) + 1
@@ -203,9 +202,8 @@ def test_one_runs_spread_does_not_cover_another_runs_count(analysis):
 
 
 def test_the_64_prompt_question_on_the_fresh_calibrations(analysis):
-    """F1 holds: the first-token hint repeats. F2, predicted to hold, does not: under both halves
-    balanced affinity needs one replica fewer than session-sticky at more than two loads, on two
-    of the three fits."""
+    """F1 holds and F2 does not: under both halves, balanced affinity needs one replica fewer than
+    session-sticky at more than two loads on two of the three fits."""
     f1 = analysis["f1"]["by_fit"]
     assert [(f1[f]["sticky"], f1[f]["weight_1"]) for f in ("s0", "s1", "s2")] == [
         (9, 8), (10, 7), (10, 8)]
@@ -218,7 +216,7 @@ def test_the_64_prompt_question_on_the_fresh_calibrations(analysis):
     two = analysis["prompts64"]["tables"]["two_part"]
     assert [two[f]["2"][STICKY] for f in ("s0", "s1", "s2")] == [13, 14, 15]
     assert [two[f]["2"][BAL16] for f in ("s0", "s1", "s2")] == [13, 15, 14]
-    # Every difference between the two under both halves is exactly one replica.
+    # Where the two differ under both halves, they differ by exactly one replica.
     gaps = {abs(two[f][ld][STICKY] - two[f][ld][BAL16]) for f in two for ld in two[f]}
     assert gaps == {0, 1}
     first = analysis["prompts64"]["tables"]["first_token"]
@@ -227,13 +225,13 @@ def test_the_64_prompt_question_on_the_fresh_calibrations(analysis):
 
 
 def test_the_post_hoc_table_reproduces_and_starts_from_the_registered_numbers(analysis):
-    """Post hoc, and labelled so: each fresh fit against the micro-benchmark cells — a reported
-    item the registration listed and the registered analysis computed for profile A only."""
+    """Post hoc: each fresh fit against the micro-benchmark cells, which the registered analysis
+    computed for profile A only."""
     cfg = PREREG["config"]
     fits = {"A": load_profile(REPO / cfg["profile"])}
     for seed in cfg["calibrate"]["seeds"]:
         fits[f"s{seed}"] = load_profile(RESULTS / f"calibrated_profile_seed{seed}.json")
-    out = posthoc.compute(analysis, PREREG, fits)  # stops if A does not give its registration
+    out = posthoc.compute(analysis, PREREG, fits)  # stops if A does not reproduce its registration
     committed = json.loads((RESULTS / "posthoc_fresh_cells.json").read_text())
     assert committed["post_hoc"] is True
     assert json.loads(json.dumps(out)) == committed

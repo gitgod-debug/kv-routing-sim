@@ -1,11 +1,7 @@
-"""The Pareto frontier over (hit rate, p95 TTFT, cost) and the recommendation that comes out of it.
+"""Run results as comparable points, and their Pareto frontier over hit rate, p95 TTFT and cost.
 
-The frontier is the honest output: there is no single best configuration, only a set where nothing
-is better on every axis at once. The RECOMMENDATION is what turns that into something actionable —
-apply the SLO as a hard constraint, then minimise cost among what is left. Vidur sizes without
-seeing the cache; Frontier sees the cache but hands you a configuration space rather than an answer.
-(Until 2026-10-05 this said no competitor produces that step. NVIDIA's `aisimulate recommend` does,
-for Dynamo's router — docs/04-prior-art.md §2a.)
+Usually no configuration is best on all three axes; `recommend.py` picks one from these points by
+applying the SLO and then minimising cost.
 """
 
 from __future__ import annotations
@@ -84,7 +80,7 @@ def to_point(result: RunResult, cost: CostModel | None) -> Point:
 
 
 def frontier(points: list[Point]) -> list[Point]:
-    """Non-dominated set: maximise hit rate, minimise p95 TTFT, minimise cost.
+    """Return the non-dominated points: maximise hit rate, minimise p95 TTFT and cost.
 
     A point is dominated if another is at least as good on all three and strictly better on one.
     """

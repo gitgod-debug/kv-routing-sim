@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""Phase 5 — the crossover: A1 (the alpha sweep), H2 (as registered) and H2b (new), in that order.
+"""Phase 5: the alpha sweep (A1), then H2 and H2b with alpha fixed by A1's rule.
 
     python scripts/run_phase5.py
-        # configs/phase5_crossover.yaml -> artifacts/results/phase5_crossover/
 
-The design and every decision rule were committed before any of this ran (the config, plus a dated
-entry in docs/09-hypotheses.md). A1 runs first and picks alpha* by the registered rule; alpha* is
-then FIXED for H2 and H2b. This script chooses nothing after seeing a result.
+Reads configs/phase5_crossover.yaml and writes artifacts/results/phase5_crossover/. The decision
+rules come from the config; the script applies them and tunes nothing.
 
-Tier (ADR-010): the profile is calibrated — Phase 3's fitted T4 timings — so milliseconds and rupees
-are T4 figures. The traffic is generated, not real, and there is one model.
+ADR-010 tier: the profile holds Phase 3's fitted T4 timings, so milliseconds and rupees are T4
+figures. The traffic is generated and there is one model.
 """
 
 from __future__ import annotations
@@ -47,9 +45,6 @@ def label(policy: str, alpha: float | None) -> str:
     return policy if alpha is None else f"{policy}@{alpha:g}"
 
 
-# ── one run, in a worker process ──────────────────────────────────────────────────────────────
-
-
 @lru_cache(maxsize=1)
 def _cfg() -> dict[str, Any]:
     return yaml.safe_load(_CONFIG_PATH.read_text())
@@ -61,7 +56,7 @@ def _phase4() -> dict[str, Any]:
 
 
 def _spec(tid: tuple) -> dict[str, Any]:
-    """Generator arguments for one trace id. Every trace here is (config + seed), never data."""
+    """Generator arguments for one trace id; every trace is generated from config and seed."""
     kind, value = tid
     if kind == "phase4":
         return dict(_phase4()["traces"][value])
@@ -95,7 +90,7 @@ def _job(key: tuple) -> tuple:
     r = run(trace, policy=policy, n_replicas=n, seed=seed, profile=_profile(),
             cache_model=_cfg()["cache_model"], policy_kwargs=kwargs, record_per_request=keep)
     by_session = None
-    if keep:  # per-session TTFTs: the paired bootstrap's raw material (sessions are the unit)
+    if keep:  # per-session TTFTs for the paired bootstrap (sessions are the unit)
         sid = {q.request_id: q.session_id for q in trace}
         by_session = {}
         for rid, v in r.per_request.items():
@@ -133,9 +128,6 @@ def _required(agg: dict, tid: tuple, load: float, policy: str, alpha: float | No
               replicas: list[int]) -> int:
     met = (n for n in sorted(replicas) if agg[(tid, load, policy, alpha, n)].meets_slo)
     return next(met, NOT_MET)
-
-
-# ── the decision rules ────────────────────────────────────────────────────────────────────────
 
 
 def _h2_map(sessions: dict, pol: tuple, n: int, sharing: list[float], loads: list[float],
@@ -200,12 +192,12 @@ def main() -> int:
     sys.path.insert(0, str(REPO / "scripts"))
     from _spike_common import results_header
 
-    # Taken BEFORE the runs: the header must describe the tree that produced the numbers.
+    # Taken before the runs, so the header describes the tree that produced the numbers.
     payload = results_header("scripts/run_phase5.py", seed=0, hardware_path="cpu-only",
                              extra={"config": cfg})
     t0 = time.time()
 
-    # ── A1: the alpha sweep on Phase 4's traces ──
+    # A1: the alpha sweep on Phase 4's traces.
     names = list(_phase4()["traces"])
     a_jobs = [(("phase4", nm), ld, BAL, al, n, s, False) for nm in names for ld in loads
               for al in a["values"] for n in replicas for s in a["seeds"]]
@@ -215,7 +207,7 @@ def main() -> int:
     p4 = None
     if a.get("phase4_results"):
         p4 = json.loads((REPO / a["phase4_results"]).read_text())["required_replicas"]
-        if 1 in a["values"]:  # Guard (registered): alpha = 1 is Phase 4's policy, exactly.
+        if 1 in a["values"]:  # Guard: alpha = 1 must reproduce Phase 4's policy exactly.
             for nm in names:
                 for ld in loads:
                     want = p4[nm][str(ld)][BAL]
@@ -231,7 +223,7 @@ def main() -> int:
     alpha_star = min(a["values"], key=lambda al: (totals[al], al))
     print(f"A1: alpha* = {alpha_star:g} (total replicas {totals[alpha_star]})")
 
-    # ── H2 and H2b, with alpha* fixed ──
+    # H2 and H2b, with alpha* fixed.
     variants = [(p, None) for p in reported] + [(BAL, alpha_star)]
     tested = {(LL, None), (P2C, None), ("radix-affinity", None), (BAL, alpha_star)}
 
@@ -249,7 +241,7 @@ def main() -> int:
     n_runs = len(a_jobs) + len(h2_jobs) + len(h2b_jobs)
     print(f"{n_runs} runs in {runtime:.0f}s on {args.workers} workers")
 
-    # H2 — the win maps, per affinity policy and replica count
+    # H2: the win maps, per affinity policy and replica count.
     h2_out: dict[str, Any] = {}
     for pol in (("radix-affinity", None), (BAL, alpha_star)):
         per_n = {str(n): _h2_map(sessions, pol, n, h2["sharing"], loads,
@@ -266,7 +258,7 @@ def main() -> int:
     h2_req = {label(p, al): {f"{r}@{ld}": _required(agg, ("h2", r), ld, p, al, replicas)
                              for r in h2["sharing"] for ld in loads} for p, al in variants}
 
-    # H2b — the working set
+    # H2b: replicas needed as the prompts' working set grows with K.
     usable = _profile().kv_cache_blocks - 1
     rb = {str(k): {str(ld): {label(p, al): _required(agg, ("h2b", k), ld, p, al, replicas)
                              for p, al in variants + oracle} for ld in loads} for k in ks}
@@ -282,7 +274,7 @@ def main() -> int:
             if win_b[(k1, ld)] == "affinity" and win_b[(k2, ld)] == "sticky"]
     best_alpha = {str(k): {str(ld): min(a["values"], key=lambda al, k=k, ld=ld: (
         rb[str(k)][str(ld)][label(BAL, al)], al)) for ld in loads} for k in ks}
-    n_hit = 4 if 4 in replicas else max(replicas)  # the registered config sweeps 1-8, so: 4
+    n_hit = 4 if 4 in replicas else max(replicas)  # the config sweeps 1-8, so 4
 
     def hit(k: int, ld: float, p: str, al: float | None) -> float:
         return round(agg[(("h2b", k), ld, p, al, n_hit)].hit_rate, 4)

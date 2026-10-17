@@ -1,25 +1,8 @@
-"""The normalized request record — the one type every adapter emits.
+"""The normalized request record that every adapter emits, and the stats an adapter reports.
 
-⚠️ AMENDMENT TO ADR-004, 2026-09-20: this is a `@dataclass(slots=True, frozen=True)`, NOT a pydantic
-model as that ADR originally said. Recorded here rather than silently contradicted.
-
-Why the change: `NormalizedRequest` is the hot path. A 1M-request sweep constructs a million of them
-and the sim holds the in-flight ones, so per-instance cost is a memory-ceiling question — and the
-ceiling is something this project promises to state ("what breaks at 10x and 100x").
-
-MEASURED on this box, 2026-09-20, 100k instances under tracemalloc — not estimated:
-
-    dataclass(slots=True, frozen=True)    159 bytes    0.81 us to construct
-    pydantic BaseModel                  1,215 bytes    1.15 us
-                                         7.65x          1.43x
-
-⚠️ The construction-speed difference is small and is NOT the reason. **Memory is.** At 1M requests
-that is 152 MiB versus 1,159 MiB for the records alone, on a box with ~7 GB available — the
-difference between a sweep that fits and one that does not.
-
-**Pydantic is still used where ADR-004 wanted it — for CONFIGS** (`configs/*.yaml`): parsed once,
-must fail loudly on a typo, and not on any hot path. Validation belongs where the cost is
-paid once, not a million times.
+`NormalizedRequest` is a slotted frozen dataclass rather than a pydantic model because a sweep may
+construct millions of them: about 160 bytes per instance against about 1.2 KB, which at a million
+requests is the difference between roughly 150 MiB and 1.1 GiB.
 """
 
 from __future__ import annotations
@@ -35,9 +18,8 @@ SCHEMA_VERSION = 1
 class NormalizedRequest:
     """One request, as every adapter must produce it.
 
-    `block_hashes` carries the request's prompt as a chain of BLOCK HASHES and nothing else — no
-    token ids, no text (ADR-002). This is the memory bound and also the privacy property: a user's
-    trace can be replayed without their prompt text ever entering the simulator or an artifact.
+    The prompt is carried only as a chain of block hashes, with no token ids or text (ADR-002), so a
+    trace can be replayed without its prompt text entering the simulator or any output.
     """
 
     request_id: str
@@ -56,10 +38,10 @@ class NormalizedRequest:
 
 @dataclass(slots=True)
 class TraceStats:
-    """What an adapter saw while reading. Travels into the results header.
+    """What an adapter saw while reading, recorded in the results header.
 
-    `skipped_lines` exists because a run that silently dropped 12% of its input is a different run
-    from one that read all of it, and the results file must say which it was (ADR-004).
+    Skipped lines are counted by reason, so a results file says how much of its input was dropped
+    (ADR-004).
     """
 
     schema_version: int = SCHEMA_VERSION

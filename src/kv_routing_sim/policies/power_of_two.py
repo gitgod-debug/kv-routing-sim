@@ -1,9 +1,7 @@
-"""Power-of-two-choices: sample two replicas, take the less loaded.
+"""Power-of-two choices: sample two replicas and take the less loaded.
 
-Why it exists in the grid: it gets most of least-loaded's balance while needing load information
-about only two replicas instead of all N — which is why real load balancers use it at scale. H6
-predicts it sits BETWEEN round-robin and least-loaded, and that its crossover with prefix-affinity
-happens at a higher load than least-loaded's.
+It gets most of least-loaded's balance from the load of only two replicas, which is why load
+balancers use it at scale.
 """
 
 from __future__ import annotations

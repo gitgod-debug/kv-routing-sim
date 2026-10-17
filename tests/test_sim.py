@@ -1,4 +1,4 @@
-"""The simulator end to end, including the property test the spec names by hand."""
+"""End-to-end tests for the simulator, including the spec's prefix-affinity property test."""
 
 from __future__ import annotations
 
@@ -49,12 +49,8 @@ def test_runs_are_reproducible_given_a_seed():
 
 
 def test_prefix_affinity_never_loses_to_round_robin_on_perfectly_shared_prefixes():
-    """The property test named in the spec's test matrix.
-
-    When every request is the identical prompt, routing by prefix cannot do worse than round-robin
-    on hit rate. If it ever does, the cache model or the policy is broken — and no calibration
-    against a live engine would reveal it, because both would be wrong in the same direction.
-    """
+    """The spec's property test: when every request is the same prompt, prefix routing cannot have
+    a lower hit rate than round-robin."""
     blocks = tuple(range(1, 21))
     trace = [
         NormalizedRequest(f"r{i}", i * 0.05, blocks, 320, 8, f"s{i}") for i in range(200)
@@ -64,19 +60,14 @@ def test_prefix_affinity_never_loses_to_round_robin_on_perfectly_shared_prefixes
     assert aff.hit_rate >= rr.hit_rate
 
 
-# A cache the traces below can never fill: the precondition the property needs (next two tests).
+# A cache the traces below can never fill: the precondition the property needs.
 ROOMY = dataclasses.replace(SMALL, name="test-roomy", kv_cache_blocks=20_000, max_num_seqs=256)
 
 
 @pytest.mark.parametrize("case", range(24))
 def test_prefix_affinity_never_loses_to_round_robin_without_memory_pressure(case):
-    """The spec's property, restated after Phase 4: it holds WITHOUT memory pressure, on any trace.
-
-    With a cache that never fills and sessions arriving far apart, routing each request to the
-    replica holding its longest cached prefix gets it every hit an earlier request made possible,
-    so it cannot fall below round-robin — not only on identical prompts. Checked on 24 generated
-    workloads: sharing 0 to 0.95, one to sixteen tenant prompts, one to five turns, 2-6 replicas.
-    """
+    """Without memory pressure the property holds on any trace: prefix routing gets every hit an
+    earlier request made possible, so it cannot fall below round-robin."""
     rng = random.Random(case)
     trace, _ = AgenticWorkload(
         n_sessions=rng.randint(4, 30),
@@ -86,8 +77,8 @@ def test_prefix_affinity_never_loses_to_round_robin_without_memory_pressure(case
         arrival_rate=0.2,
         seed=case,
     ).generate()
-    # Every distinct block the trace can ever put in a cache — its prompt blocks, plus each
-    # request's own output blocks — fits on one replica at once, so nothing is ever evicted.
+    # Every distinct block the trace can ever put in a cache (its prompt blocks, plus each
+    # request's own output blocks) fits on one replica at once, so nothing is ever evicted.
     ever = len({h for q in trace for h in q.block_hashes})
     ever += sum(q.output_tokens // ROOMY.block_size + 1 for q in trace)
     assert ever < ROOMY.kv_cache_blocks
@@ -99,13 +90,8 @@ def test_prefix_affinity_never_loses_to_round_robin_without_memory_pressure(case
 
 
 def test_the_property_needs_its_precondition():
-    """Under memory pressure the property FAILS, as Phase 4 measured — pinned so it stays visible.
-
-    Phase 4's high-sharing trace at 4 sessions/s on 5 calibrated T4s: pure prefix-affinity sends
-    every session to the replica holding the shared prompt, that replica runs out of blocks and
-    preempts, and its hit rate ends below round-robin's (0.815 against 0.832 over five seeds). If a
-    change ever makes this pass the other way, the cache model's pressure behaviour has changed.
-    """
+    """Under memory pressure the property fails: on Phase 4's high-sharing trace at 4 sessions/s on
+    five T4s, pure prefix-affinity overloads one replica and ends below round-robin's hit rate."""
     repo = pathlib.Path(__file__).resolve().parents[1]
     p4 = yaml.safe_load((repo / "configs" / "phase4_sweep.yaml").read_text())
     trace, _ = AgenticWorkload(**p4["traces"]["high_sharing"], arrival_rate=4.0).generate()
@@ -122,10 +108,7 @@ def test_the_property_needs_its_precondition():
 
 
 def test_more_replicas_dilute_the_cache_under_round_robin():
-    """Scattering a shared prefix across more caches lowers the hit rate.
-
-    This is the reason routing matters at all.
-    """
+    """Scattering a shared prefix across more caches lowers the hit rate."""
     trace = _trace(prefix_sharing_ratio=0.8)
     one = run(trace, policy="round-robin", n_replicas=1, profile=SMALL)
     eight = run(trace, policy="round-robin", n_replicas=8, profile=SMALL)
@@ -163,9 +146,8 @@ def test_a_bad_policy_name_fails_before_any_work():
         run(_trace(), policy="nonsense", n_replicas=2, profile=SMALL)
 
 
-# ── the vLLM cache model under pressure: admission control and preemption ──────────────────────
-# v1/v2 never filled the cache and sent one request at a time, so none of this was exercised by a
-# live engine yet. These pin the model to vLLM's SCHEDULER rules (scheduler.py @ v0.30.0) instead.
+# The vLLM cache model under memory pressure: admission control and preemption, pinned to the
+# scheduler rules of vLLM v0.30.0 (scheduler.py).
 
 
 TINY = CostProfile(
@@ -181,7 +163,7 @@ TINY = CostProfile(
 
 
 def _drive(replica: Replica, requests, max_steps=20_000):
-    """Step a replica to completion, checking the pool's invariants after EVERY step."""
+    """Step a replica to completion, checking the pool's invariants after every step."""
     for r in requests:
         replica.enqueue(r)
     now, done, steps = 0.0, [], 0
@@ -197,9 +179,8 @@ def _drive(replica: Replica, requests, max_steps=20_000):
 
 
 def test_vllm_admission_waits_for_memory_instead_of_overcommitting():
-    """A waiting request that does not fit STOPS admission (scheduler.py:1172-1178). Here each
-    request needs 5 blocks and the pool has 24, so at most 4 can ever run at once — never the 8
-    that max_num_seqs would allow."""
+    """A waiting request that does not fit stops admission (scheduler.py:1172-1178), so with 5
+    blocks per request and 24 in the pool at most 4 run at once, not the 8 max_num_seqs allows."""
     rep = Replica(0, TINY, cache_model="vllm")
     reqs = [NormalizedRequest(f"r{i}", 0.0, tuple(range(i * 10, i * 10 + 4)), 70, 3, f"s{i}")
             for i in range(12)]
@@ -223,14 +204,14 @@ def test_vllm_preempts_under_decode_pressure_and_every_request_still_completes()
     assert rep.preemptions > 0  # the scenario only means something if preemption really happened
     assert all(s.first_token_ts >= 0 for s in done)
     assert all(s.tokens_emitted == 90 for s in done)
-    # A resumed request's lookup goes to the SEPARATE counters, as vLLM's stats do.
+    # A preempted request's later lookups go to separate counters, as in vLLM's stats.
     assert rep.pool.preempted_queries > 0
     assert rep.pool.queries == sum(r.prompt_tokens for r in reqs)  # first lookups only
 
 
 def test_vllm_invariants_hold_under_concurrent_shared_prefix_traffic():
-    """Agentic traffic on a pool that is far too small: shared prefixes, eviction, preemption —
-    and after every single step, no block is double-booked or stranded."""
+    """Agentic traffic on a pool far too small (shared prefixes, eviction, preemption) never leaves
+    a block double-booked or stranded after any step."""
     trace, _ = AgenticWorkload(n_sessions=30, turns_per_session=4, seed=0,
                                prefix_sharing_ratio=0.6).generate()
     big = CostProfile(
@@ -246,15 +227,15 @@ def test_vllm_invariants_hold_under_concurrent_shared_prefix_traffic():
 
 
 def test_vllm_refuses_a_request_that_could_never_fit():
-    """vLLM refuses to START when one max-length request cannot fit — the exact error the v1 spike
-    hit. Deadlocking mid-run would be the alternative."""
+    """Like vLLM, the run refuses to start when one max-length request cannot fit, rather than
+    deadlock mid-run."""
     huge = NormalizedRequest("huge", 0.0, tuple(range(100)), 1600, 200, "s")
     with pytest.raises(ValueError, match="vLLM would refuse to start"):
         run([huge], policy="round-robin", n_replicas=1, profile=TINY, cache_model="vllm")
 
 
 def test_lru_model_never_preempts_and_never_blocks():
-    """The ablation baseline stays exactly what it was: no memory-based admission, no preemption."""
+    """The LRU ablation baseline has no memory-based admission and no preemption."""
     rep = Replica(0, TINY, cache_model="lru")
     reqs = [NormalizedRequest(f"r{i}", 0.0, tuple(range(i * 10, i * 10 + 4)), 70, 3, f"s{i}")
             for i in range(12)]
@@ -274,8 +255,8 @@ def test_both_models_complete_every_request_on_agentic_traffic(cache_model):
 
 
 def test_context_terms_follow_the_stated_formulas():
-    """prefill(n, c) = base + per_token·n + attn·n·(c + n/2); decode(b, S) = base + per_seq·b +
-    per_ctx·S. And with both context terms at zero, exactly the old context-free model."""
+    """prefill(n, c) = base + per_token*n + attn*n*(c + n/2); decode(b, S) = base + per_seq*b +
+    per_ctx*S. With both context terms at zero, this is the context-free model."""
     p = dataclasses.replace(SMALL, prefill_attn_s=1e-8, decode_per_ctx_token_s=2e-6)
     assert p.prefill_s(100, 400) == pytest.approx(0.001 + 0.00001 * 100 + 1e-8 * 100 * 450)
     assert p.decode_s(4, 2_000) == pytest.approx(0.002 + 0.0001 * 4 + 2e-6 * 2_000)
@@ -286,7 +267,7 @@ def test_context_terms_follow_the_stated_formulas():
 
 def test_long_contexts_cost_more_only_with_the_context_term():
     """The same requests with long prompts run slower than with short ones when the profile has a
-    context term — and cost exactly the same per step without one (the decode side)."""
+    context term, and cost exactly the same per step without one (the decode side)."""
     def trace(prompt_tokens):
         blocks = prompt_tokens // 16
         return [NormalizedRequest(f"r{i}", 0.0, tuple(range(i * 10_000, i * 10_000 + blocks)),
@@ -302,7 +283,7 @@ def test_long_contexts_cost_more_only_with_the_context_term():
     assert ctx[0] > flat[0]
 
 
-# ── the second latency: time per output token ────────────────────────────────────────────────
+# Time per output token
 
 # Round numbers, so every expected value below can be worked out by hand.
 STEPPY = CostProfile(name="steppy", prefill_base_s=0.0, prefill_per_token_s=0.001,
@@ -323,11 +304,11 @@ def test_a_lone_requests_time_per_token_is_its_decode_step():
 
 
 def test_another_requests_prefill_stalls_the_tokens_of_everyone_decoding():
-    """THE mechanism a first-token SLO cannot see. B arrives while A decodes; the step that
-    prefills B (48 ms) also carries A's next token, so that gap of A's is 62 ms, not 12.
+    """B's prefill (48 ms) shares a step with A's next token, so that gap of A's is 62 ms, not 12;
+    a first-token SLO cannot see this.
 
-        A: first token at 44 ms; gaps 12, 62 (B's prefill + a step of two), 14, 14 → 25.5 ms/token
-        B: sent at 50 ms, first token at 118 ms (TTFT 68); gaps 14, 14 → 14 ms/token
+        A: first token at 44 ms; gaps 12, 62 (B's prefill + a step of two), 14, 14 -> 25.5 ms/token
+        B: sent at 50 ms, first token at 118 ms (TTFT 68); gaps 14, 14 -> 14 ms/token
     """
     a = NormalizedRequest("a", 0.0, (1, 2), 32, 5, "sa")
     b = NormalizedRequest("b", 0.050, (7, 8, 9), 48, 3, "sb")
@@ -362,9 +343,8 @@ def test_a_single_token_request_has_no_time_per_token():
 
 
 def test_a_stall_while_preempted_is_inside_the_time_per_token():
-    """vLLM's decode interval runs "from first NEW_TOKEN to last NEW_TOKEN. Any preemptions during
-    decode are included" (stats.py:549-551). Same here: on a pool too small for six long outputs,
-    the requests that were preempted waited between two of their tokens — and it shows."""
+    """As in vLLM (stats.py:549-551), time spent preempted during decode counts toward the
+    request's TPOT."""
     reqs = [NormalizedRequest(f"r{i}", 0.0, tuple(range(i * 10, i * 10 + 2)), 40, 90, f"s{i}")
             for i in range(6)]
     r = run(reqs, policy="round-robin", n_replicas=1, profile=TINY, record_per_request=True)
@@ -373,17 +353,16 @@ def test_a_stall_while_preempted_is_inside_the_time_per_token():
     spared = [v["tpot_ms"] for v in r.per_request.values() if not v["preemptions"]]
     assert hit and spared
     # No single step here is longer than one full recomputation plus a step of six (~4 ms); a
-    # preempted request's MEAN gap is still above every unpreempted one's.
+    # preempted request's mean gap is still above every unpreempted one's.
     assert min(hit) > max(spared)
-    # Two accountings of the same time agree: Σ per-request (TPOT × gaps) = the counters' sum.
+    # Two accountings agree: summed per-request TPOT x gaps equals the counters' sum.
     total = sum(v["tpot_ms"] * 89 for v in r.per_request.values()) / 1000.0
     assert total == pytest.approx(r.itl_sum_s) and r.itl_count == 6 * 89
 
 
 def test_time_per_token_respects_warm_up_and_ttft_does_not_move():
-    """TPOT is a new measurement, not a change to an old one: TTFT, hit rate and the makespan of a
-    run are exactly what they were. And the warm-up rule that hides early requests' TTFT hides
-    their TPOT too, while the engine-style counters — like the cache's — count the whole run."""
+    """Warm-up drops early requests' TPOT as it does their TTFT, while the engine-style counters,
+    like the cache's, count the whole run."""
     trace = _trace()
     r = run(trace, policy="session-sticky", n_replicas=2, profile=SMALL, warmup_requests=25)
     assert len(r.tpot_ms) == len(r.ttft_ms) == len(trace) - 25

@@ -1,4 +1,4 @@
-"""Adapter for Mooncake FAST'25 traces — real serving traffic as block hashes, with no text at all.
+"""Adapter for Mooncake FAST'25 traces: real serving traffic as block hashes, with no text.
 
 The format (kvcache-ai/Mooncake, `FAST25-release/README.md`) is one JSON object per line:
 
@@ -7,27 +7,9 @@ The format (kvcache-ai/Mooncake, `FAST25-release/README.md`) is one JSON object 
     output_length  generated tokens
     hash_ids       remapped prefix-block hashes; block size 512 tokens; identical ids = reusable KV
 
-⚠️ THREE THINGS THIS ADAPTER DOES THAT CHANGE WHAT A RESULT MEANS — each is a parameter, and
-each must be stated next to any number produced from it:
-
-1. BLOCK SIZE. The trace hashes 512-token blocks; vLLM, and this simulator, cache 16-token
-   blocks. Each trace block is expanded into sub-block hashes derived from its id, so sharing is
-   exact at the trace's granularity — and at nothing finer. Two prompts that share 700 tokens
-   share one trace block here (512 tokens), not 43 vLLM blocks: coarse blocks under-count
-   partial-prefix hits.
-2. TOKEN SCALE. `token_scale` shrinks every token count by one factor (1/16: a 512-token block
-   becomes 32 tokens, two of our blocks). The sharing STRUCTURE — which requests share which
-   blocks — is kept exactly; the sizes shrink, so prompts of up to 126K tokens fit a profile
-   calibrated on ≤ 2K. A scaled replay is a statement about structure. On a fixed cache it also
-   stands for a proportionally BIGGER cache: 1/16 of the trace on one T4's cache is the whole
-   trace on a 16× larger one.
-3. SESSIONS. The trace has none. With `infer_sessions`, a request whose prompt extends an earlier
-   request's full blocks joins that request's session — an agent re-sends its history every
-   turn. A shared system prompt looks like a history too, so a prefix that `hot_fanout` or more
-   different next blocks follow is treated as a shared prompt, never as a conversation. (On the
-   tool-agent trace three such prompts are followed by 3,335-8,894 different blocks; no other
-   block by more than 15.) It is an inference, and every result that depends on it — anything
-   about session-sticky — says so.
+The trace hashes 512-token blocks while the simulator caches 16-token blocks, so each trace block is
+expanded into sub-block hashes derived from its id. Sharing is exact at the trace's granularity and
+invisible below it: two prompts sharing 700 tokens share one trace block (512 tokens) here.
 """
 
 from __future__ import annotations
@@ -47,14 +29,13 @@ TRACE_BLOCK_TOKENS = 512  # FAST25-release/README.md: "The block size is 512 tok
 
 
 def _sub_hash(trace_id: int, j: int) -> int:
-    """The j-th 16-token block inside trace block `trace_id`. The trace's ids already identify the
-    whole prefix up to them, so (id, j) is enough to make equal prefixes hash equal."""
+    """Hash sub-block j of trace block `trace_id`; the trace id already identifies the prefix."""
     data = trace_id.to_bytes(8, "big") + j.to_bytes(4, "big")
     return int.from_bytes(hashlib.blake2b(data, digest_size=8, person=b"mooncake").digest(), "big")
 
 
 def _rows(path: str | Path, stats: TraceStats | None) -> Iterator[tuple[int, dict]]:
-    """Valid rows, streamed; malformed ones counted by reason (ADR-004), never fatal."""
+    """Yield valid rows; malformed ones are counted by reason (ADR-004) and skipped."""
     with open_maybe_gzip(path) as fh:
         for index, line in enumerate(fh):
             line = line.strip()
@@ -89,7 +70,8 @@ def _hot_prefixes(path: str | Path, hot_fanout: int) -> set[int]:
     """Blocks followed by `hot_fanout` or more different next blocks: shared prompts, not histories.
 
     A first pass over the file. Memory is one small set per distinct block id, capped at the
-    threshold — bounded by the trace's number of distinct blocks, never by its number of requests.
+    threshold, so it is bounded by the trace's number of distinct blocks, never by its number of
+    requests.
     """
     children: dict[int, set[int]] = {}
     hot: set[int] = set()
@@ -115,8 +97,21 @@ def read(
     stats: TraceStats | None = None,
     **_: object,
 ) -> Iterator[NormalizedRequest]:
-    """Stream a Mooncake trace as `NormalizedRequest`s. See the module docstring for the three
-    parameters that change what a replay means."""
+    """Stream a Mooncake trace as `NormalizedRequest`s.
+
+    Args:
+        token_scale: Factor applied to every token count; at 1/16 a 512-token block becomes 32
+            tokens, two simulator blocks. Which requests share which blocks is kept exactly while
+            sizes shrink, and on a fixed cache a scaled replay also stands for a proportionally
+            larger cache.
+        infer_sessions: The trace has no sessions. When set, a request whose prompt extends an
+            earlier request's full blocks joins that request's session, since an agent re-sends its
+            history every turn. This is an inference, and results about session-sticky routing
+            depend on it.
+        hot_fanout: A block followed by this many different next blocks or more is a shared prompt,
+            never a conversation history. On the tool-agent trace three shared prompts are followed
+            by 3,335-8,894 different blocks, and no other block by more than 15.
+    """
     scaled_block = TRACE_BLOCK_TOKENS * token_scale
     per_block = scaled_block / block_size
     if token_scale <= 0 or per_block < 1 or per_block != int(per_block):
@@ -140,8 +135,8 @@ def read(
 
         session = None
         if infer_sessions:
-            # The longest earlier request whose full blocks this prompt starts with — never through
-            # a shared prompt, which thousands of unrelated requests also start with.
+            # The longest earlier request whose full blocks this prompt starts with, never matched
+            # through a shared prompt, which thousands of unrelated requests also start with.
             for pos in range(len(ids) - 2, -1, -1):
                 s = registered.get(ids[pos])
                 if s is not None and ids[pos] not in hot:

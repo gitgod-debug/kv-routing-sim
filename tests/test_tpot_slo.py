@@ -1,8 +1,7 @@
-"""T1 and T2 (configs/tpot_slo.yaml) — their analysis, tested before either part runs.
+"""Tests for the T1 and T2 analyses (configs/tpot_slo.yaml) on a made-up engine and hand-written
+grids.
 
-Nothing here touches the held-out runs or the three calibrations the registered parts use: the
-"engine" is a made-up profile, and the grids are written by hand. So these tests can show that the
-procedure is right, and cannot show any part of its answer.
+They check the procedure only; none of the registered runs or calibrations is used.
 """
 
 from __future__ import annotations
@@ -35,7 +34,7 @@ def _load(name: str):
 t1 = _load("t1_itl_check")
 t2 = _load("t2_analyze")
 
-# ── T1: the engine is a known profile, so a correct check must say "factor 1" ────────────────
+# T1: the engine is a known profile, so a correct check gives factor 1
 
 SPEC = {"n_sessions": 12, "turns_per_session": 3, "session_context_tokens": 150,
         "user_turn_tokens": 40, "assistant_turn_tokens": 60, "output_tokens": 16,
@@ -104,7 +103,7 @@ def test_t1_without_a_measurement_is_undecided_never_passed(tmp_path):
     assert "UNDECIDED" in t1.markdown(a, {"date_utc": "x", "git_sha": "y", "git_dirty": False})
 
 
-# ── T2: replica counts and rules, on grids written by hand ───────────────────────────────────
+# T2: replica counts and rules, on grids written by hand
 
 POLS = ["session-sticky", "radix-affinity-balanced@16", "radix-affinity-balanced@1",
         "round-robin", "least-loaded", "radix-affinity"]
@@ -122,7 +121,7 @@ def _cell(first_ok: int, both_ok: int, n: int = 6) -> dict:
 
 
 def _grid(counts: dict[str, tuple[int, int]], n: int = 6) -> dict:
-    """One calibration: prompts 1 and 64 × loads 1 and 2, every point with the same counts."""
+    """One calibration: prompts 1 and 64 x loads 1 and 2, every point with the same counts."""
     cells = {k: {ld: {p: _cell(*counts[p], n=n) for p in POLS} for ld in ("1", "2")}
              for k in ("1", "64")}
     return {"axes": {"replicas": list(range(1, n + 1)), "policies": POLS, "prompts": [1, 64],
@@ -197,7 +196,7 @@ def test_the_three_rules_on_a_grid_where_all_hold():
 
 
 def test_one_calibration_is_enough_to_fail_a_rule():
-    """C3's lesson, built into the rules: each must hold on EVERY calibration."""
+    """Each rule must hold on every calibration."""
     grid = _grid(BASE)
     other = _grid({**BASE, "round-robin": (3, 3)})  # here round-robin needs 3, sticky 4
     a = t2.analyze(CFG, {"A": grid, "B": other},
@@ -219,7 +218,7 @@ def test_a_point_where_nothing_holds_is_a_tie_and_is_counted():
     grid = _grid(never)
     a = t2.analyze(CFG, {"A": grid, "B": grid}, {"A": _committed(grid), "B": _committed(grid)})
     assert a["t2a"]["holds"] and a["t2a"]["by_calibration"]["A"]["none_holds"] == 2
-    # …and with no point where sticky's count is defined under both targets, T2c is UNDECIDED.
+    # With no point where sticky's count is defined under both targets, T2c is undecided.
     assert not a["t2c"]["decided"] and not a["t2c"]["holds"]
     assert "UNDECIDED" in t2.markdown(a, {"A": grid, "B": grid})
 
@@ -229,11 +228,11 @@ def test_h2bs_rules_are_applied_unchanged_for_the_record():
            "64": {"1": {t2.STICKY: 6, t2.BAL: 5}, "2": {t2.STICKY: 9, t2.BAL: 9}}}
     assert t2.h2b_rules(tab) == {"affinity_wins_at_k_min": [], "affinity_wins_at_k_max": ["1"],
                                  "reversals": [], "holds": True}
-    tab["1"]["1"][t2.BAL] = 1  # affinity wins with ONE prompt: rule (a) fails
+    tab["1"]["1"][t2.BAL] = 1  # affinity wins with one prompt: rule (a) fails
     assert not t2.h2b_rules(tab)["holds"]
 
 
-# ── the grid runner, end to end on a design that is not the registered one ───────────────────
+# The grid runner, end to end on a design that is not the registered one
 
 
 def test_the_grid_runner_writes_what_the_analysis_reads(tmp_path):
@@ -251,7 +250,7 @@ def test_the_grid_runner_writes_what_the_analysis_reads(tmp_path):
     cfg = {"t2": {"h2b_config": str(tmp_path / "h2b.yaml"), "replicas_max": 3,
                   "calibrations": {"X": {"profile": str(tmp_path / "toy.json")}}}}
     (tmp_path / "t.yaml").write_text(yaml.safe_dump(cfg))
-    # As it is really run — its own process — so its worker pool is not forked from pytest's.
+    # Run in its own process, as in real use, so its worker pool is not forked from pytest's.
     subprocess.run([sys.executable, str(REPO / "scripts" / "run_t2_grid.py"), "--config",
                     str(tmp_path / "t.yaml"), "--out", str(tmp_path / "out"), "--workers", "2"],
                    check=True, capture_output=True, cwd=REPO)

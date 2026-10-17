@@ -212,7 +212,7 @@ measured exactly that, with nine rules and nine predictions committed before it 
 
 | Claim | Proof |
 |---|---|
-| Nine rules and predictions, committed before the run | [`configs/c4_per_token.yaml`](../configs/c4_per_token.yaml) at commit `c5b5d74`; the notebook carries the wheel built from that commit |
+| Nine rules and predictions, committed before the run | [`configs/c4_per_token.yaml`](../configs/c4_per_token.yaml), registered first; the notebook carries the wheel built from the registered code |
 | Seven hold, two do not; every number above | [`c4_kaggle_t4/report.md`](../artifacts/results/c4_kaggle_t4/report.md), written by the registered script |
 | The explanation of T1, written before the run | [`09-hypotheses.md`](09-hypotheses.md), "C4 REGISTERED", the paragraph on D1b |
 | 82% against the 90% needed; 97% for the two runs taken back to back, 75% against the earlier one | the same report, section E · `tests/test_c4_results.py` |

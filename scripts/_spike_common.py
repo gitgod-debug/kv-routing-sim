@@ -1,21 +1,10 @@
-"""Shared helpers for the Phase 0 spike scripts.
+"""Shared helpers for the spike scripts: the results-file header and the writers.
 
-Spikes are throwaway measurements, but they still obey the reproducibility contract in
-`docs/06-methodology.md` §3: every results file carries date, git SHA, seed, hardware and package
-versions, so a number can always be traced back to the machine and the code that produced it.
-
-Naming: spike scripts are `spike_*.py`. The `run_*.py` scripts that regenerate README tables come in
-Phase 1 and are held to a stricter standard (seeded, config-driven, byte-identical on re-run).
-
-Adapted from the sibling project `colpali-economics` so both repos' artifacts read the same way.
-Two fields are new here, and both exist because of ADR-005:
-
-  * `hardware.compute_capability` — a T4 and a GTX 1650 are both 7.5, an A100 is 8.0, an H100
-    is 9.0, and which one produced a number decides whether bf16/FP8 and the FlashAttention
-    backend were in play at all. A results file that does not say is not interpretable.
-  * `hardware_path` — single-replica / MIG / memory-split. TTFT percentiles from the memory-split
-    fallback are contaminated by test-rig SM contention and must never be attributed to a routing
-    policy, so the path travels with every number rather than living in someone's memory.
+Every results file starts with a header of date, git SHA, seed, hardware and package versions
+(docs/06-methodology.md §3). Two header fields come from ADR-005: `hardware.compute_capability`
+decides whether bf16/FP8 and the FlashAttention backend were available, and `hardware_path`
+records whether the memory-split fallback was used, whose TTFT percentiles include test-rig SM
+contention and must not be attributed to a routing policy.
 """
 
 from __future__ import annotations
@@ -34,7 +23,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RESULTS_DIR = REPO_ROOT / "artifacts" / "results"
 
-# Recorded in every header. Pinned identities matter more than breadth here.
+# Package versions recorded in every header.
 TRACKED_PACKAGES = (
     "vllm",
     "torch",
@@ -45,13 +34,11 @@ TRACKED_PACKAGES = (
     "matplotlib",
 )
 
-# The valid values for `hardware_path`. See ADR-005 for what each one permits reporting.
+# Valid values for `hardware_path`. ADR-005 says which numbers each one permits reporting.
 HARDWARE_PATHS = ("single-replica", "multi-gpu", "mig", "memory-split", "cpu-only")
 
-# What can change a number: the package, the scripts, the configs, the notebooks and the pins. A
-# change anywhere else — docs, or the untracked personal notes kept beside the build — cannot, so it
-# does not make a result "dirty". Counting those would mark every header dirty, and a flag that is
-# always on tells a reader nothing.
+# Only these paths can change a number, so only changes under them mark a header dirty. Counting
+# docs or untracked notes elsewhere in the tree would leave the flag always on.
 PROVENANCE_PATHS = ("src", "scripts", "configs", "notebooks", "pyproject.toml")
 
 
@@ -64,8 +51,8 @@ def _git(*args: str, strip: bool = True) -> str:
             timeout=10,
             check=False,  # a missing git or a non-repo is reported as "unknown", never fatal
         )
-        # `status --porcelain` lines START with a meaningful space (" D" = deleted, unstaged):
-        # those callers keep the leading whitespace.
+        # `status --porcelain` lines start with a meaningful space (" D" = deleted, unstaged),
+        # so those callers keep the leading whitespace.
         return out.stdout.strip() if strip else out.stdout.rstrip()
     except (OSError, subprocess.SubprocessError):
         return ""
@@ -82,10 +69,10 @@ def _package_versions() -> dict[str, str]:
 
 
 def _nvidia_smi_query(fields: str) -> list[str]:
-    """Query nvidia-smi for one row per GPU. Returns [] if it is not there or fails.
+    """Query nvidia-smi for one row per GPU; return [] if it is missing or fails.
 
-    Read through nvidia-smi rather than torch because the spike scripts run on a box where the
-    driver and MIG topology are the thing under test, and torch may not be importable yet.
+    Uses nvidia-smi rather than torch because the driver and MIG topology are what the spikes
+    test, and torch may not be importable yet.
     """
     try:
         out = subprocess.run(
@@ -103,7 +90,7 @@ def _nvidia_smi_query(fields: str) -> list[str]:
 
 
 def _mig_instances() -> list[str]:
-    """MIG instance UUIDs, if MIG is enabled. Empty list is a valid, meaningful answer."""
+    """MIG instance UUIDs if MIG is enabled, else an empty list."""
     try:
         out = subprocess.run(
             ["nvidia-smi", "-L"], capture_output=True, text=True, timeout=15, check=False
@@ -154,8 +141,7 @@ def _hardware() -> dict[str, Any]:
 def peak_rss_gib() -> float:
     """Peak resident set size of this process, in GiB.
 
-    `ru_maxrss` is kilobytes on Linux (bytes on macOS). This project's hardware is Linux, and the
-    unit is named in the key so a reader never has to guess.
+    `ru_maxrss` is in kilobytes on Linux (bytes on macOS); this assumes Linux.
     """
     return round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024**2, 3)
 
@@ -166,16 +152,11 @@ def results_header(
     hardware_path: str = "single-replica",
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """The header every results file starts with (docs/06-methodology.md §3).
+    """Return the header every results file starts with (docs/06-methodology.md §3).
 
-    `git_dirty` is recorded because a number produced from an uncommitted tree is not
-    re-derivable, and the file should say so rather than imply otherwise. It looks only at
-    `PROVENANCE_PATHS` — tracked changes AND untracked files there — because those are the only
-    paths whose state can change a number.
-
-    `hardware_path` is required by ADR-005: it decides which numbers in the file may be reported.
-    An unrecognised value raises, because silently accepting a typo here would let a contaminated
-    TTFT percentile look like a clean one.
+    `git_dirty` records whether tracked or untracked files under `PROVENANCE_PATHS` differ from
+    HEAD, in which case the numbers cannot be re-derived from a commit. `hardware_path` (ADR-005)
+    decides which numbers may be reported, so an unknown value raises instead of passing a typo.
     """
     if hardware_path not in HARDWARE_PATHS:
         raise ValueError(f"hardware_path must be one of {HARDWARE_PATHS}, got {hardware_path!r}")
@@ -192,7 +173,7 @@ def results_header(
         "packages": _package_versions(),
     }
     if status:
-        # WHICH paths were uncommitted, so a reader can tell a deleted notebook from edited code.
+        # Which paths were uncommitted, so a reader can tell a deleted notebook from edited code.
         header["git_dirty_paths"] = status.splitlines()[:50]
     if extra:
         header.update(extra)
@@ -208,10 +189,10 @@ def write_results(filename: str, payload: dict[str, Any]) -> Path:
 
 
 def write_raw(filename: str, text: str) -> Path:
-    """Commit a raw artifact verbatim — e.g. a /metrics scrape.
+    """Write a raw artifact, such as a /metrics scrape, verbatim to artifacts/results/.
 
-    The parsed summary is what we read; the raw scrape is what makes the parse falsifiable. The
-    Calibration Report commits both, and this is why (`docs/06-methodology.md` §4).
+    Keeping the raw text beside the parsed summary lets the parse be checked
+    (docs/06-methodology.md §4).
     """
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     path = RESULTS_DIR / filename

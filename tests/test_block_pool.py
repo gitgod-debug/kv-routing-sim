@@ -1,7 +1,7 @@
-"""The vLLM-faithful block pool. Every test names the vLLM v0.30.0 line it pins.
+"""Tests for the block pool that reproduces vLLM v0.30.0's prefix cache.
 
-If one of these fails, the pool has drifted from the engine's documented algorithm — which is a bug
-in the pool, never a reason to edit the test.
+Each test cites the vLLM source line it pins. A failure means the pool has drifted from vLLM's
+algorithm, so fix the pool rather than the test.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from kv_routing_sim.cache.block_pool import VllmBlockPool, max_hit_blocks
 
 BS = 16
 
-# ⚠️ vLLM reserves ONE block as the null block (block_pool.py:193), so `VllmBlockPool(n)` has n - 1
+# vLLM reserves one block as the null block (block_pool.py:193), so `VllmBlockPool(n)` has n - 1
 # usable. Pool sizes below are written as `usable + 1` so each test states the capacity it means.
 
 
@@ -24,11 +24,11 @@ def _admit(pool: VllmBlockPool, rid: str, hashes: tuple[int, ...], tokens: int, 
     return hit
 
 
-# ── lookup rules (shared by both cache models) ─────────────────────────────────────────────────
+# Lookup rules, shared by both cache models
 
 
 def test_fully_cached_aligned_prompt_recomputes_its_last_block():
-    """kv_cache_manager.py:295 — max_cache_hit_length = num_tokens - 1, floored to a block."""
+    """kv_cache_manager.py:295: max_cache_hit_length = num_tokens - 1, floored to a block."""
     assert max_hit_blocks(512, BS) == 31
     assert max_hit_blocks(513, BS) == 32
     assert max_hit_blocks(16, BS) == 0  # a single-block prompt can never hit
@@ -38,12 +38,12 @@ def test_fully_cached_aligned_prompt_recomputes_its_last_block():
     prefix = tuple(range(32))
     _admit(pool, "a", prefix, 512)
     pool.free("a")
-    assert len(pool.lookup(prefix, 512)) == 31  # not 32 — the whole last block is recomputed
+    assert len(pool.lookup(prefix, 512)) == 31  # not 32: the whole last block is recomputed
     assert len(pool.lookup(prefix, 513)) == 32
 
 
 def test_lookup_stops_at_first_miss_and_finds_free_blocks():
-    """stm.py find_longest_cache_hit: longest PREFIX; cached blocks are found even when free."""
+    """find_longest_cache_hit matches the longest prefix and finds cached blocks even when free."""
     pool = VllmBlockPool(100, BS)
     _admit(pool, "a", (1, 2, 3, 4), 4 * BS + 1)
     pool.free("a")  # ref 0, but hashes kept: freed is not evicted
@@ -51,13 +51,12 @@ def test_lookup_stops_at_first_miss_and_finds_free_blocks():
     assert len(pool.lookup((1, 2, 9, 4), 4 * BS + 1)) == 2  # stops at the first miss
 
 
-# ── the free queue ─────────────────────────────────────────────────────────────────────────────
+# Free queue order
 
 
 def test_blocks_are_freed_tail_first_so_the_tail_is_evicted_first():
-    """single_type_kv_cache_manager.py:580 — "Free blocks in reverse order so that the tail blocks
-    are freed first." With the pool full of one request's freed blocks, the next allocation takes
-    the TAIL, and the shared head survives — the opposite of plain LRU."""
+    """single_type_kv_cache_manager.py:580 frees blocks in reverse order, so eviction takes the tail
+    and the shared head survives, unlike plain LRU."""
     pool = VllmBlockPool(4 + 1, BS)
     _admit(pool, "a", (10, 11, 12, 13), 4 * BS)  # exactly 4 full blocks, all cached
     pool.free("a")
@@ -68,19 +67,18 @@ def test_blocks_are_freed_tail_first_so_the_tail_is_evicted_first():
 
 
 def test_uncached_blocks_are_reused_first_lifo():
-    """block_pool.py:789 — "LIFO reuse of non-cached blocks"; prepended to the front."""
+    """block_pool.py:789: uncached blocks are prepended to the free queue and reused first."""
     pool = VllmBlockPool(6 + 1, BS)
     _admit(pool, "a", (1, 2), 2 * BS + 5)  # 2 cached blocks + 1 partial (no hash)
     pool.free("a")
-    # The partial block is at the FRONT, so the next allocation recycles it — not a cached block.
+    # The partial block is at the front, so the next allocation recycles it, not a cached block.
     _admit(pool, "b", (), BS)
     assert pool.is_cached(1) and pool.is_cached(2)
     assert pool.real_evictions == 0
 
 
 def test_cached_blocks_are_evicted_fifo_by_free_time():
-    """block_pool.py:792 — "FIFO reuse of cached blocks for LRU eviction behavior": the request
-    freed FIRST is evicted first."""
+    """block_pool.py:792: cached blocks are reused FIFO, in the order their requests were freed."""
     pool = VllmBlockPool(4 + 1, BS)
     _admit(pool, "old", (1, 2), 2 * BS)
     _admit(pool, "new", (3, 4), 2 * BS)
@@ -104,12 +102,12 @@ def test_a_hit_moves_a_block_to_the_back():
     assert pool.is_cached(1) and pool.is_cached(2)
 
 
-# ── reference counts ───────────────────────────────────────────────────────────────────────────
+# Reference counts
 
 
 def test_blocks_in_use_cannot_be_evicted():
-    """Only ref_cnt == 0 blocks are in the free queue (block_pool.py `free_blocks`). A running
-    request's blocks are pinned: allocation FAILS rather than evicting them."""
+    """Only ref_cnt == 0 blocks are in the free queue (block_pool.py `free_blocks`), so allocation
+    fails rather than evict a running request's blocks."""
     pool = VllmBlockPool(4 + 1, BS)
     _admit(pool, "running", (1, 2, 3, 4), 4 * BS)  # all 4 blocks held
     assert not pool.can_admit([], BS)
@@ -129,7 +127,7 @@ def test_shared_block_is_freed_only_when_its_last_user_finishes():
 
 
 def test_admission_counts_free_hit_blocks_against_capacity():
-    """Hitting a FREE block pulls it out of the free queue, so it cannot also back a new block."""
+    """Hitting a free block pulls it out of the free queue, so it cannot also back a new block."""
     pool = VllmBlockPool(3 + 1, BS)
     _admit(pool, "a", (1, 2), 2 * BS)
     pool.free("a")  # 3 free, two of them cached
@@ -138,7 +136,7 @@ def test_admission_counts_free_hit_blocks_against_capacity():
     assert not pool.can_admit(hit, 3 * BS + 1)  # 2 new + 2 hit-from-free > 3 free
 
 
-# ── capacity and decode ────────────────────────────────────────────────────────────────────────
+# Capacity and decode growth
 
 
 def test_capacity_includes_partial_and_decode_blocks():
@@ -154,7 +152,7 @@ def test_capacity_includes_partial_and_decode_blocks():
 
 
 def test_full_decode_blocks_are_cached():
-    """kv_cache_manager.py:595-599 caches up to request.num_tokens, which INCLUDES output."""
+    """kv_cache_manager.py:595-599 caches up to request.num_tokens, which includes output tokens."""
     pool = VllmBlockPool(100, BS)
     _admit(pool, "a", tuple(range(2)), 2 * BS)
     cached_before = len(pool._by_hash)
@@ -163,13 +161,13 @@ def test_full_decode_blocks_are_cached():
 
 
 def test_grow_fails_when_no_block_is_free():
-    """The caller must then preempt (scheduler.py:726-800)."""
+    """When grow() fails, the caller must preempt (scheduler.py:726-800)."""
     pool = VllmBlockPool(2 + 1, BS)
     _admit(pool, "a", (1,), BS + 1)  # 2 blocks
     assert not pool.grow("a", 2 * BS + 1, 0.0)
 
 
-# ── preemption accounting ──────────────────────────────────────────────────────────────────────
+# Preemption accounting
 
 
 def test_preempted_lookups_go_to_separate_counters():
@@ -186,18 +184,18 @@ def test_a_preempted_request_can_rehit_its_own_decode_blocks():
     pool = VllmBlockPool(100, BS)
     _admit(pool, "a", (1, 2), 2 * BS)
     pool.grow("a", 3 * BS + 1, 0.0)  # one full decode block, plus one more token
-    pool.free("a")  # preempted — chain kept, not forgotten
+    pool.free("a")  # preempted: the chain is kept
     chain = pool.chain_for("a", (1, 2))
     assert len(chain) == 3  # two prompt blocks + one decode block
     assert len(pool.lookup(chain, 3 * BS + 1)) == 3
 
 
-# ── eviction events, by vLLM's own rule ────────────────────────────────────────────────────────
+# Eviction events, by vLLM's rule
 
 
 def test_recycling_an_uncached_block_is_reported_as_an_eviction():
-    """block_pool.py:739 fires the event before the hash check at 741 — the quirk we reproduce so
-    H4 compares like with like."""
+    """block_pool.py:739 fires the eviction event before the hash check at 741; the pool does the
+    same so that H4 compares like with like."""
     pool = VllmBlockPool(10, BS, track_block_metrics=True)
     _admit(pool, "a", (1,), BS + 1, now=0.0)  # block 0 cached, block 1 partial
     pool.free("a")
@@ -212,7 +210,7 @@ def test_recycling_an_uncached_block_is_reported_as_an_eviction():
 
 
 def test_reuse_gaps_keep_only_the_last_four_accesses():
-    """kv_cache_metrics.py:24 — deque(maxlen=4): at most three gaps per block."""
+    """kv_cache_metrics.py:24 keeps deque(maxlen=4), so a block has at most three reuse gaps."""
     pool = VllmBlockPool(3 + 1, BS, track_block_metrics=True)
     _admit(pool, "a", (1,), BS, now=0.0)
     pool.free("a")
@@ -223,20 +221,15 @@ def test_reuse_gaps_keep_only_the_last_four_accesses():
     _admit(pool, "evictor", (), 3 * BS, now=10.0)  # takes every block, block 1's included
     ev = [e for e in pool.eviction_events if e.was_cached]
     assert len(ev) == 1
-    assert ev[0].reuse_gaps_s == (1.0, 1.0, 1.0)  # only the LAST four accesses: t = 3, 4, 5, 6
+    assert ev[0].reuse_gaps_s == (1.0, 1.0, 1.0)  # only the last four accesses: t = 3, 4, 5, 6
 
 
-# ── the invariant ──────────────────────────────────────────────────────────────────────────────
+# Pool-wide invariants
 
 
 def test_no_block_is_ever_stranded_under_random_traffic():
-    """⭐ Freeing tail-first + the prefix rule means a parent is never evicted before its child, so
-    the pool never strands a block. A failure here is a bug in block_pool.py.
-
-    For calibration of expectations: plain LRU on this same traffic strands at most ONE block of 64
-    (measured 2026-09-22) — its head-first eviction strands briefly, not constantly, because a
-    chain's tail is next in line once its head goes. The invariant is exact, but it is not by itself
-    evidence of a large accuracy difference."""
+    """Tail-first freeing and the prefix rule never evict a parent before its child, so no block is
+    ever stranded."""
     rng = random.Random(0)
     pool = VllmBlockPool(64, BS)
     prefixes = [tuple(rng.randrange(10**9) for _ in range(rng.randint(1, 12))) for _ in range(40)]
@@ -253,12 +246,12 @@ def test_no_block_is_ever_stranded_under_random_traffic():
             live.append(rid)
         assert pool.stranded_hashes() == [], f"stranded after step {i}"
     pool.check_consistency()
-    assert pool.real_evictions > 100  # the test only means something if eviction really happened
+    assert pool.real_evictions > 100  # the check is meaningful only if eviction happened
 
 
 def test_one_block_is_reserved_as_the_null_block():
-    """block_pool.py:193 — `self.null_block = self.free_block_queue.popleft()`. With
-    `--num-gpu-blocks-override 1024` the engine has 1,023 usable blocks, and so must we."""
+    """block_pool.py:193 reserves a null block, so `--num-gpu-blocks-override 1024` leaves 1,023
+    usable blocks."""
     pool = VllmBlockPool(1024, BS)
     assert pool.usable_blocks == 1023
     assert pool.num_free == 1023

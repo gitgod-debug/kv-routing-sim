@@ -1,23 +1,17 @@
 #!/usr/bin/env python3
-"""Prepare Phase 3: the trace, the pre-registered predictions, and the notebook — from ONE config.
+"""Prepare Phase 3: the trace, the predictions and the notebook, all from one config.
 
     python scripts/phase3_prepare.py
 
-Writes, all stamped with one fingerprint (sha256 of every token id the notebook will send):
-  artifacts/results/phase3_prereg/predictions.json   ← commit this BEFORE the GPU run
-  notebooks/phase3_calibration.ipynb                 ← the trace and predictions are embedded in it
+Reads configs/phase3_workloads.yaml and writes two files stamped with one fingerprint (sha256 of
+every token id the notebook will send):
+  artifacts/results/phase3_prereg/predictions.json   (committed before the GPU run)
+  notebooks/phase3_calibration.ipynb                 (embeds the trace and the predictions)
 
-⭐ Why one script: the notebook must send EXACTLY the trace the predictions were computed on. If the
-trace lived in one place and the predictions in another, a regenerated trace could silently diverge
-from the numbers it is compared against. Here it cannot: the notebook re-checks the fingerprint of
-the trace it carries, and the hash of the predictions it carries, before it sends a single request.
-
-⭐ And why the notebook never generates anything: it only SENDS token ids produced by this repo's
-one generator. A second implementation inside the notebook would drift from the first — the reason
-ADR-011 forbids re-implementing the cache model in JavaScript.
-
-Nothing here is fitted. The two cache models run exactly as committed; their predictions are
-whatever they are.
+One script writes both so the notebook sends exactly the trace the predictions were computed on:
+before sending any request, the notebook re-checks the fingerprint of the trace and the hash of
+the predictions it carries. The notebook only sends token ids made by the repository's generator
+and generates nothing itself. Nothing here is fitted; both cache models run as committed.
 """
 
 from __future__ import annotations
@@ -68,10 +62,11 @@ def sha256(obj: Any) -> str:
 
 
 def profile(cfg: dict[str, Any], *, slow: float = 1.0) -> CostProfile:
-    """The config's capacity and limits on the UNCALIBRATED T4 timings, every timing x `slow`.
+    """The config's capacity and limits on the uncalibrated T4 timings, each timing times `slow`.
 
-    Sequential counts must not move when `slow` does — `predict_sequential` checks that they don't,
-    and that check is what makes them pre-registrable as exact integers."""
+    `predict_sequential` checks that sequential counts do not change with `slow`, which is what
+    allows them to be predicted as exact integers.
+    """
     e, u = cfg["engine"], UNCALIBRATED_DEFAULT
     return replace(
         u,
@@ -91,8 +86,10 @@ def build_trace(cfg: dict[str, Any]) -> list[tuple[NormalizedRequest, list[int]]
 
 
 def sweep_prompts(cfg: dict[str, Any]) -> list[list[int]]:
-    """The decode-sweep prompts: random engine-safe ids, sharing nothing with the trace (a shared
-    16-token block would need 16 simultaneous collisions in a 99,000-id range)."""
+    """The decode-sweep prompts: random engine-safe ids that share no block with the trace.
+
+    A shared 16-token block would need 16 simultaneous collisions in a 99,000-id range.
+    """
     c = cfg["calibration"]["decode_batch_sweep"]
     rng = random.Random(c["seed"])
     lo, hi = ENGINE_SAFE_IDS
@@ -140,16 +137,16 @@ def _counts(r: RunResult, model: str) -> dict[str, Any]:
     if model == "vllm":
         ev = r.eviction_events
         out |= {
-            # What the engine's three kv_block_* histograms should COUNT, by vLLM's own rule: an
-            # event on EVERY recycled tracked block, cached or not (block_pool.py:739 vs 741).
+            # What the engine's three kv_block_* histograms should count, by vLLM's own rule: an
+            # event on every recycled tracked block, cached or not (block_pool.py:739 vs 741).
             "hist_lifetime_count": len(ev),
             "hist_idle_count": len(ev),
             "hist_reuse_gap_count": sum(len(e.reuse_gaps_s) for e in ev),
             "hist_events_on_cached_blocks": sum(1 for e in ev if e.was_cached),
         }
     else:
-        # None, not 0: the lru model has no eviction events, so it makes NO prediction here. A 0
-        # would be a prediction — and a guaranteed-false one.
+        # None, not 0: the lru model has no eviction events, so it makes no prediction here; a 0
+        # would be a prediction, and a certainly wrong one.
         out |= dict.fromkeys(("hist_lifetime_count", "hist_idle_count", "hist_reuse_gap_count"))
     return out
 
@@ -162,8 +159,8 @@ def predict_sequential(cfg, reqs: list[NormalizedRequest], out: int) -> dict[str
     preds: dict[str, Any] = {}
     for model in ("vllm", "lru"):
         a = _replay(cfg, reqs, out, model, sequential=True)
-        # ⭐ The self-check that makes these numbers pre-registrable: sequential counts must be
-        # TIMING-INDEPENDENT. Recompute with every timing 10x slower; demand identical counts.
+        # Sequential counts must not depend on timing: recompute with every timing 10x slower and
+        # require identical counts.
         b = _replay(cfg, reqs, out, model, slow=10.0, sequential=True)
         ca = _counts(a, model)
         if ca != _counts(b, model) or _cached(a) != _cached(b):
@@ -171,12 +168,12 @@ def predict_sequential(cfg, reqs: list[NormalizedRequest], out: int) -> dict[str
         ca["per_request_cached_tokens"] = _cached(a)
         preds[model] = ca
 
-    # ⭐ The pre-registered ALTERNATIVE. vLLM's source says a request commits prompt + output - 1
-    # tokens (the last sampled token is never fed back in; kv_cache_manager.py `allocate_slots` caps
+    # The alternative prediction. vLLM's source says a request commits prompt + output - 1 tokens
+    # (the last sampled token is never fed back in; kv_cache_manager.py `allocate_slots` caps
     # caching at `request.num_tokens`, and the async scheduler's catch-up in
-    # `_update_request_with_output` reaches the same count before the request is freed). If the
-    # engine instead committed ONE MORE token, this is what it would show — so an off-by-one is
-    # diagnosed by the run itself, not argued about afterwards.
+    # `_update_request_with_output` reaches the same count before the request is freed). This is
+    # what the engine would show if it committed one more token, so the run itself can detect an
+    # off-by-one.
     alt = _replay(cfg, reqs, out + 1, "vllm", sequential=True)
     ca = _counts(alt, "vllm")
     ca["per_request_cached_tokens"] = _cached(alt)
@@ -197,8 +194,8 @@ def predict_concurrent(cfg, reqs: list[NormalizedRequest], out: int) -> dict[str
     if not (lru.hit_rate == lru_slow.hit_rate == lru_seq.hit_rate):
         raise SystemExit("⛔ the lru model's concurrent hit rate depends on timing")
 
-    # The vllm model's concurrent behaviour IS timing-dependent, so register only what survives a
-    # 4x bracket around the uncalibrated profile — a claim that flips inside the bracket is not one.
+    # The vllm model's concurrent behaviour depends on timing, so a claim is made only if it holds
+    # across a 4x bracket (0.5x to 2x) around the uncalibrated profile.
     bracket = {s: _replay(cfg, reqs, out, "vllm", slow=s, sequential=False) for s in (0.5, 1, 2)}
     preempts = {f"x{s:g}": r.preemptions for s, r in bracket.items()}
     vllm_claim: dict[str, Any] = {"preemptions_by_timing_scale": preempts}
@@ -300,9 +297,10 @@ DECISION_RULES = {
 
 
 def make_predictions(cfg: dict[str, Any], *, verbose: bool = False):
-    """Everything pre-registered, from the config alone: (trace, prompts, fingerprint, predictions).
+    """Compute (trace, prompts, fingerprint, predictions) from the config alone.
 
-    Deterministic — tests/test_phase3_prereg.py recomputes it and demands the committed file."""
+    Deterministic: tests/test_phase3_prereg.py recomputes it and compares with the committed file.
+    """
     trace = build_trace(cfg)
     prompts = sweep_prompts(cfg)
     fp = fingerprint(trace, prompts)
@@ -332,8 +330,8 @@ def make_predictions(cfg: dict[str, Any], *, verbose: bool = False):
                 f"  {name:14s} lru: 0 preemptions, hit {c['lru']['hit_rate']:.4f} | vllm: "
                 f"preemptions {c['vllm']['preemptions']} {c['vllm']['preemptions_by_timing_scale']}"
             )
-        # How many requests END on a block boundary (prompt + output - 1 tokens). Only those could
-        # be affected by an off-by-one in the final-token rule; reported, so it is visible.
+        # Requests that end on a block boundary (prompt + output - 1 tokens). Only those can be
+        # affected by an off-by-one in the final-token rule.
         on_boundary = sum(1 for r in reqs if (r.prompt_tokens + out - 1) % bs == 0)
         workloads[name] = {
             "mode": w["mode"],

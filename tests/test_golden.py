@@ -1,13 +1,10 @@
-"""Golden-file test: a small sweep, end to end, against numbers committed in tests/golden/.
+"""Golden-file test: a small end-to-end sweep against numbers committed in tests/golden/.
 
-Every other test checks one piece. This one pins the whole chain — the generator and its
-hashing, the vLLM block-pool model, four policies and their tie-breaking, the event loop, the
-calibrated T4 profile, the cost model and the recommendation — to numbers a reviewer can read. A
-change anywhere in that chain that moves a result fails here, on purpose: either it is a bug, or
-it is deliberate and the file is regenerated in the same commit, where the diff shows exactly
-which numbers moved.
+It pins the whole chain (generator and hashing, block-pool model, four policies and their
+tie-breaking, event loop, calibrated T4 profile, cost model and recommendation). A deliberate change
+regenerates the file in the same commit, so the diff shows which numbers moved:
 
-    KVSIM_UPDATE_GOLDEN=1 pytest tests/test_golden.py      # regenerate; then read the diff
+    KVSIM_UPDATE_GOLDEN=1 pytest tests/test_golden.py
 """
 
 from __future__ import annotations

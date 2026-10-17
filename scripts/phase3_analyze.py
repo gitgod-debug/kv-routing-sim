@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Phase 3's pre-registered analysis: the Real-Engine Calibration Report, from a GPU run.
+"""Phase 3 analysis: the Real-Engine Calibration Report from a GPU run's results.
 
     python scripts/phase3_analyze.py [RESULTS_DIR]    # default artifacts/results/phase3_kaggle_t4
 
-Follows `analysis_procedure` in artifacts/results/phase3_prereg/predictions.json, step by step, and
-nothing else. The ONLY thing fitted is the timing model — and never against W3, which it then
-predicts. The cache models are not touched: their predictions were committed before the run.
-
-Writes into RESULTS_DIR: calibration_report.json, calibration_report.md, fitted_profile.json.
-Refuses to run if the results were not produced by a notebook carrying the committed predictions.
+Follows `analysis_procedure` in artifacts/results/phase3_prereg/predictions.json step by step. Only
+the timing model is fitted, and never on W3, which it then predicts; the cache models' predictions
+are used as committed. Writes calibration_report.json, calibration_report.md and
+fitted_profile.json into RESULTS_DIR. Stops if the results were not produced by a notebook
+carrying the committed predictions.
 """
 
 from __future__ import annotations
@@ -42,7 +41,7 @@ HIST_FAMILIES = {
 }
 
 
-# ── loading and provenance (procedure step 1) ─────────────────────────────────────────────────
+# Step 1: load the results and check their provenance.
 
 
 def load_results(d: pathlib.Path) -> dict[str, Any]:
@@ -60,7 +59,7 @@ def load_results(d: pathlib.Path) -> dict[str, Any]:
 
 
 def verify(prereg: dict[str, Any], res: dict[str, Any]) -> list[str]:
-    """The run must have compared against exactly what was committed."""
+    """Check that the run used the committed trace, predictions and engine capacity."""
     notes = []
     for key in ("trace_fingerprint_sha256", "predictions_sha256"):
         if key in res and res[key] != prereg[key]:
@@ -78,7 +77,7 @@ def verify(prereg: dict[str, Any], res: dict[str, Any]) -> list[str]:
     return notes
 
 
-# ── step 2 + 3: sequential counts, exact ──────────────────────────────────────────────────────
+# Steps 2 and 3: sequential counts, compared exactly.
 
 
 def sequential(prereg: dict[str, Any], runs: list[dict[str, Any]]) -> dict[str, Any]:
@@ -123,7 +122,7 @@ def sequential(prereg: dict[str, Any], runs: list[dict[str, Any]]) -> dict[str, 
     return out
 
 
-# ── step 4: the timing fit — never against W3 ─────────────────────────────────────────────────
+# Step 4: the timing fit, which never uses W3.
 
 
 def ols(x: list[float], y: list[float]) -> dict[str, float]:
@@ -151,8 +150,8 @@ def fit_timing(res: dict[str, Any], prereg: dict[str, Any]) -> tuple[CostProfile
                 xs.append(q["prompt_tokens"] - q["cached_tokens"])
                 ys.append(q["ttft_ms"] / 1e3)
     pre = ols(xs, ys)
-    # The simulator emits the first token at the END of the step that prefills — so a lone
-    # request's TTFT is prefill(uncached) + decode(1). The intercept holds both fixed costs.
+    # The simulator emits the first token at the end of the step that prefills, so a lone
+    # request's TTFT is prefill(uncached) + decode(1): the intercept holds both fixed costs.
     prefill_base_raw = pre["intercept"] - (decode_base + decode_per_seq)
     notes = []
     prefill_base = prefill_base_raw
@@ -184,11 +183,11 @@ def fit_timing(res: dict[str, Any], prereg: dict[str, Any]) -> tuple[CostProfile
     return prof, fit
 
 
-# ── step 5: W3, predicted by the fitted profile ───────────────────────────────────────────────
+# Step 5: W3, predicted by the fitted profile.
 
 
 def _requests_at(prereg, run_record: dict[str, Any], out: int):
-    """The trace, with each request arriving exactly when the notebook really sent it."""
+    """The trace, with each request arriving when the notebook actually sent it."""
     sent = {q["request_id"]: max(0.0, q["send_offset_s"]) for q in run_record["requests"]}
     reqs = [r for r, _ in build_trace(prereg["config"])]
     return sorted((replace(r, arrival_ts=sent[r.request_id], output_tokens=out) for r in reqs),
@@ -241,7 +240,7 @@ def w3(prereg, res, prof: CostProfile) -> dict[str, Any]:
     return {"workload": name, "per_run": rows, "summary": summary}
 
 
-# ── step 6: H4, the histograms ────────────────────────────────────────────────────────────────
+# Step 6: H4, the eviction histograms.
 
 
 def _buckets(text: str, family: str) -> dict[float, float]:
@@ -255,8 +254,11 @@ def _buckets(text: str, family: str) -> dict[float, float]:
 
 
 def histograms(d: pathlib.Path, prereg, res, prof: CostProfile) -> dict[str, Any]:
-    """Engine bucket deltas vs the vllm model's events, the model re-run at the real send times
-    with the fitted profile (sequential counts do not depend on timing; lifetimes do)."""
+    """Compare the engine's histogram bucket deltas with the vllm model's eviction events.
+
+    The model is re-run at the real send times with the fitted profile: sequential counts do not
+    depend on timing, but block lifetimes do.
+    """
     out = {}
     for r in res["runs"]:
         if not r["valid"] or r["mode"] != "sequential":
@@ -294,7 +296,7 @@ def histograms(d: pathlib.Path, prereg, res, prof: CostProfile) -> dict[str, Any
     return out
 
 
-# ── the report ────────────────────────────────────────────────────────────────────────────────
+# The Markdown report.
 
 
 def _num(x: float) -> str:

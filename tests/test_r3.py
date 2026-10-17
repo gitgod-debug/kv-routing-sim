@@ -1,5 +1,7 @@
-"""R3's plumbing: the grid runner on a made-up trace in the Qwen-Bailian format. Nothing here is
-R3's registered design or says anything about its result."""
+"""Tests for R3's grid runner and analysis on made-up data, and checks on its registered design.
+
+The made-up trace is in the Qwen-Bailian format; nothing here says anything about R3's result.
+"""
 
 from __future__ import annotations
 
@@ -83,7 +85,7 @@ def design(tmp_path):
 
 
 def _run(tmp_path, *extra):
-    # As it is really run — its own process — so its worker pool is not forked from pytest's.
+    # Run in its own process, as in real use, so its worker pool is not forked from pytest's.
     return subprocess.run([sys.executable, str(REPO / "scripts" / "run_r3.py"), "--config",
                            str(tmp_path / "r3.yaml"), "--workers", "2", *extra],
                           check=True, capture_output=True, text=True, cwd=REPO)
@@ -164,7 +166,7 @@ def test_structure_separates_a_sessions_own_reuse_from_reuse_across_sessions():
     assert s["reusable_from_the_same_session"] == round(6 / 20, 4)
 
 
-# ── the analysis, on grids written by hand ──────────────────────────────────────────────────────
+# The analysis, on grids written by hand
 
 an = _load("r3_analyze")
 
@@ -217,7 +219,7 @@ def test_a_count_is_the_fewest_replicas_on_which_every_seed_meets_the_target():
 def test_the_four_rules_where_all_hold():
     d = _decide({"A": {"1": ALL_HOLD, "2": {**ALL_HOLD, "lmetric": 3}}, "B": {"1": ALL_HOLD}})
     assert all(d[k]["decided"] and d[k]["holds"] for k in ("r3a", "r3b", "r3c", "r3d"))
-    assert d["r3a"]["by_calibration"]["A"]["fewer_at"] == ["1"]  # tied at 2×, fewer at 1×
+    assert d["r3a"]["by_calibration"]["A"]["fewer_at"] == ["1"]  # tied at 2x, fewer at 1x
 
 
 def test_r3a_needs_lmetric_never_above_sticky_and_below_it_somewhere():
@@ -288,7 +290,7 @@ def test_the_analysis_refuses_a_grid_from_another_design_and_writes_a_report(des
     assert bad.returncode != 0 and "different `speeds`" in bad.stderr
 
 
-# ── the registered design (configs/r3_bailian.yaml) ─────────────────────────────────────────────
+# The registered design (configs/r3_bailian.yaml)
 
 R3_CFG = yaml.safe_load((REPO / "configs" / "r3_bailian.yaml").read_text())
 

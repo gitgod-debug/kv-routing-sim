@@ -1,5 +1,5 @@
-"""LMetric (OSDI '26), and the two things a policy like it needs from the simulator: the engine's
-cache events, and word of when a request's first token and last token happen."""
+"""Tests for LMetric (OSDI '26) and the two things it needs from the simulator: the engine's cache
+events, and notice of when each request's first and last tokens happen."""
 
 from __future__ import annotations
 
@@ -48,12 +48,12 @@ def _dispatch(n=4) -> LMetric:
     return p
 
 
-# ── the registry ────────────────────────────────────────────────────────────────────────────────
+# The registry
 
 
 def test_all_is_still_the_seven_policies_of_the_registered_sweeps():
-    """Phase 4's design says `policies: all`, and H6 re-runs it against Phase 4's stored table. A
-    policy added later must not change what that word means."""
+    """`policies: all` in Phase 4's design, which H6 reruns against a stored table, must still mean
+    the seven original policies."""
     assert len(policies.ALL) == 7 and "lmetric" not in policies.ALL
     assert "lmetric" in policies.REGISTRY
     design = yaml.safe_load((REPO / "configs" / "phase4_sweep.yaml").read_text())
@@ -61,18 +61,18 @@ def test_all_is_still_the_seven_policies_of_the_registered_sweeps():
     assert policies.resolve("lmetric,round-robin") == ["lmetric", "round-robin"]
 
 
-# ── the score ───────────────────────────────────────────────────────────────────────────────────
+# The score
 
 
 def test_lmetric_is_the_authors_formula():
-    """blitz-router: `Select min by prefill_tokens(req, sctx) · (sctx.bs + 1)`, with
+    """blitz-router: `Select min by prefill_tokens(req, sctx) * (sctx.bs + 1)`, with
     prefill_tokens = queued + new and bs = running + queued."""
     p = _dispatch(3)
     p._queued_tokens = [0, 500, 40]  # prefill already committed to each replica
     # Nobody holds the prefix: 100 new tokens everywhere.
-    #   replica 0: (0 + 100) × (2 + 3 + 1) = 600
-    #   replica 1: (500 + 100) × (0 + 0 + 1) = 600
-    #   replica 2: (40 + 100) × (1 + 2 + 1) = 560   <- the minimum
+    #   replica 0: (0 + 100) * (2 + 3 + 1) = 600
+    #   replica 1: (500 + 100) * (0 + 0 + 1) = 600
+    #   replica 2: (40 + 100) * (1 + 2 + 1) = 560   <- the minimum
     assert p.new_tokens(_state([2, 0, 1], [3, 0, 2]), REQ) == [100, 100, 100]
     assert p.choose(_state([2, 0, 1], [3, 0, 2]), REQ, random.Random(0)) == 2
 
@@ -83,12 +83,12 @@ def test_a_cached_prefix_lowers_the_score_and_load_can_outweigh_it():
     p.observe(3, REQ)  # replica 3 now holds the prompt, and has its prefill queued
     p.on_first_token(3, REQ)  # ... which is done
     again = NormalizedRequest("r2", 1.0, REQ.block_hashes, 100, 20, "sess-B")
-    # Six blocks are cached there, so 100 − 96 = 4 new tokens against 100 anywhere else.
+    # Six blocks are cached there, so 100 - 96 = 4 new tokens against 100 anywhere else.
     assert p.new_tokens(_state([0, 0, 0, 0]), again) == [100, 100, 100, 4]
     assert p.choose(_state([0, 0, 0, 0]), again, random.Random(0)) == 3
-    # 4 × (bs + 1) passes 100 × 1 once that replica holds 25 requests and another is idle.
-    assert p.choose(_state([0, 9, 9, 23]), again, random.Random(0)) == 3  # 4 × 24 = 96 < 100
-    assert p.choose(_state([0, 9, 9, 25]), again, random.Random(0)) == 0  # 4 × 26 = 104 > 100
+    # 4 * (bs + 1) passes 100 * 1 once that replica holds 25 requests and another is idle.
+    assert p.choose(_state([0, 9, 9, 23]), again, random.Random(0)) == 3  # 4 * 24 = 96 < 100
+    assert p.choose(_state([0, 9, 9, 25]), again, random.Random(0)) == 0  # 4 * 26 = 104 > 100
 
 
 def test_the_last_token_is_never_counted_as_cached():
@@ -133,7 +133,7 @@ def test_lmetric_has_no_weight_to_set():
     assert policies.build("lmetric", 4, load_penalty=16).load_penalty == 0.0  # ignored, not used
 
 
-# ── in the simulator ────────────────────────────────────────────────────────────────────────────
+# In the simulator
 
 
 def _traffic(**kw):
@@ -155,14 +155,13 @@ def test_lmetric_completes_every_request_and_is_reproducible(index):
 
 
 def test_lmetric_follows_the_cache_while_idle_and_spreads_under_load():
-    """Pure prefix-affinity sends every session to the replica that holds the prompt (H2). The
-    product does the same while that replica is idle — there is nothing to balance — and stops
-    once its batch has grown enough for an idle replica's score to pass it."""
+    """Like pure prefix-affinity (H2), LMetric follows the cached prompt while its replica is idle,
+    but spreads once that replica's batch makes an idle replica score lower."""
     trace = _traffic()
     # Fast engine: every request is done before the next arrives. Following the cache is right.
     idle = run(trace, policy="lmetric", n_replicas=4, seed=0, profile=SMALL)
     assert max(idle.per_replica_requests) == len(trace)
-    # The same traffic on an engine 50× slower: requests overlap, and batches build up.
+    # The same traffic on an engine 50x slower: requests overlap, and batches build up.
     slow = dataclasses.replace(SMALL, prefill_per_token_s=0.0005, decode_base_s=0.05)
     pure = run(trace, policy="radix-affinity", n_replicas=4, seed=0, profile=slow)
     lm = run(trace, policy="lmetric", n_replicas=4, seed=0, profile=slow)
@@ -181,11 +180,12 @@ def test_the_event_view_needs_the_vllm_cache_model():
     assert r.completed == len(trace)
 
 
-# ── what the simulator tells a policy that asks ─────────────────────────────────────────────────
+# Events and cache views offered to policies that ask for them
 
 
 class _Recorder(RoundRobin):
-    """Round-robin, but it listens: every event, and how many it had heard at each arrival."""
+    """Round-robin that records every event and, at each arrival, how many first tokens it had
+    heard of."""
 
     name = "test-recorder"
     wants_events = True
@@ -231,8 +231,8 @@ def test_a_listening_policy_hears_each_request_once_and_when_it_happens(recorder
     # ... its first token before its last,
     order = {(e[0], e[1]): n for n, e in enumerate(log)}
     assert all(order[("first", i)] <= order[("finish", i)] for i in ids)
-    # ... and AT THE TIME IT HAPPENS: at each arrival the router has heard of exactly the first
-    # tokens that came earlier — never of one still inside a running step.
+    # ... and at the time it happens: at each arrival the router has heard of exactly the first
+    # tokens that came earlier, never of one still inside a running step.
     first_at = {q.request_id: q.arrival_ts + r.per_request[q.request_id]["ttft_ms"] / 1000.0
                 for q in trace}
     arrivals = {q.request_id: q.arrival_ts for q in trace}

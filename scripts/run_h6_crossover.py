@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""H6's crossover half: does H2b's flip survive a change of hardware?
+"""H6, crossover half: whether H2b's flip holds when the hardware changes.
 
     python scripts/run_h6_crossover.py
         # configs/h6_crossover.yaml -> artifacts/results/h6_crossover/
 
-Registered before it ran (the config, plus a dated entry in docs/09-hypotheses.md). It re-runs
-Phase 5's H2b grid — K tenant prompts × load × replicas — under the five cost regimes of H6's
-ranking half, and checks, regime by regime, that the flip from session-sticky to prefix-affinity
-may shift but does not invert. This script chooses nothing after seeing a result.
+Re-runs Phase 5's H2b grid (K tenant prompts × load × replicas) under the cost regimes of H6's
+ranking half and checks, regime by regime, that the flip from session-sticky to prefix-affinity
+may shift but does not invert. The decision rules come from the config; this script applies
+them and tunes nothing.
 
-Tier (ADR-010): only the t4 regime is a measured profile; the rescaled ones describe no real GPU.
+ADR-010 tier: only the t4 regime is a measured profile; the rescaled ones describe no real GPU.
 """
 
 from __future__ import annotations
@@ -43,9 +43,6 @@ BAL, STICKY = "radix-affinity-balanced", "session-sticky"
 
 def label(policy: str, alpha: float | None) -> str:
     return policy if alpha is None else f"{policy}@{alpha:g}"
-
-
-# ── one run, in a worker process ──────────────────────────────────────────────────────────────
 
 
 @lru_cache(maxsize=1)
@@ -113,9 +110,6 @@ def _init_worker(config_path: str) -> None:
     _regimes.cache_clear()
 
 
-# ── the procedure ─────────────────────────────────────────────────────────────────────────────
-
-
 def main() -> int:
     global _CONFIG_PATH
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
@@ -141,7 +135,7 @@ def main() -> int:
     sys.path.insert(0, str(REPO / "scripts"))
     from _spike_common import results_header
 
-    # Taken BEFORE the runs: the header must describe the tree that produced the numbers.
+    # Taken before the runs, so the header describes the tree that produced the numbers.
     payload = results_header("scripts/run_h6_crossover.py", seed=0, hardware_path="cpu-only",
                              extra={"config": cfg})
 
@@ -168,7 +162,7 @@ def main() -> int:
     req = {g: {str(k): {str(ld): {label(p, al): required(g, k, ld, p, al) for p, al in pols}
                         for ld in loads} for k in ks} for g in regimes}
 
-    # Guard (registered): the t4 regime is Phase 5's H2b, exactly.
+    # Guard: the t4 regime must reproduce Phase 5's H2b table exactly.
     if p5_results is not None:
         want = p5_results["h2b"]["required_replicas"]
         for k in ks:

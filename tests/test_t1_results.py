@@ -1,8 +1,7 @@
-"""T1's committed result must come out of the committed raw files — verdict, factors and all.
+"""Pins T1's registered result (configs/tpot_slo.yaml) to the committed raw files.
 
-T1 (configs/tpot_slo.yaml, registered 2026-10-05) did NOT hold: the simulator's mean inter-token
-latency is within 1.07× of the engine's on three held-out runs and 1.5–1.7× too slow on the two at
-the knee. The README and docs/09 quote those numbers; this keeps them tied to their source.
+T1 does not hold: the simulator's mean inter-token latency is within 1.07x of the engine's on three
+held-out runs and 1.5 to 1.7x too slow on the two at the knee.
 """
 
 from __future__ import annotations
@@ -51,7 +50,7 @@ def test_the_registered_verdict_reproduces_and_it_is_a_failure(analysis):
 
 
 def test_the_two_groups_the_write_up_describes(analysis):
-    """Within 1.07× off the knee; 1.5–1.7× too SLOW at it — on every profile, in both sessions."""
+    """Within 1.07x off the knee and 1.5 to 1.7x too slow at it, on every profile and session."""
     rows = {(r["session"], r["workload"]): r for r in analysis["runs"]}
     assert len(rows) == 5
     knee = [r for (_, w), r in rows.items() if w == "K1_half"]
@@ -77,7 +76,7 @@ def test_the_two_groups_the_write_up_describes(analysis):
 
 
 def test_the_post_hoc_range_numbers_reproduce():
-    """POST HOC (scripts/t1_posthoc_range.py): at the knee the model decodes 97% of its tokens in
+    """Post hoc (scripts/t1_posthoc_range.py): at the knee the model decodes 97% of its tokens in
     batches whose summed context is far beyond anything a calibration cell measured."""
     post = _load("t1_posthoc_range")
     fitted = post.fitted_range()

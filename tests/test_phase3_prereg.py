@@ -1,9 +1,7 @@
-"""The Phase 3 pre-registration must stay reproducible from the committed code — and the notebook
-must carry exactly what was committed.
+"""Pins the Phase 3 registration, which scripts/phase3_prepare.py generates.
 
-If a model change moves any prediction, these fail. That is the point: a pre-registered number may
-only change by a deliberate, dated re-registration (re-run scripts/phase3_prepare.py, commit, and
-say why in docs/09-hypotheses.md) — never silently, and never after the GPU run has been seen.
+The predictions must reproduce from the committed code, and the notebook must carry exactly the
+registered trace and predictions, so a model change that moves a prediction fails here.
 """
 
 from __future__ import annotations
@@ -59,15 +57,15 @@ def test_the_notebook_carries_exactly_the_committed_trace_and_predictions():
 
 
 def test_every_id_the_notebook_sends_is_inside_a_real_vocabulary():
-    """The generator's raw ids were once far outside any vocabulary; a live engine rejects them."""
+    """A live engine rejects token ids outside its vocabulary."""
     trace, prompts, _, _ = prep.make_predictions(PREREG["config"])
     ids = [t for _, seq in trace for t in seq] + [t for p in prompts for t in p]
     assert 1000 <= min(ids) and max(ids) < 100_000
 
 
 def test_the_design_discriminates_and_has_a_control():
-    """W1 must separate the two models; W2 must not — otherwise the experiment cannot tell which is
-    right, or cannot tell a model error from an accounting error."""
+    """W1 must separate the two cache models, and W2, the control, must not, so that a model error
+    can be told apart from an accounting error."""
     w = PREREG["predictions"]["workloads"]
     w1, w2 = w["W1_long"]["predictions"], w["W2_short"]["predictions"]
     assert abs(w1["vllm"]["hit_rate"] - w1["lru"]["hit_rate"]) > 0.05

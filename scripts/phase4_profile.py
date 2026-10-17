@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""The T4 profile Phase 4 sweeps on: Phase 3's FITTED timings + the engine's own NATURAL capacity.
+"""The T4 profile for Phase 4: Phase 3's fitted timings with the engine's natural KV capacity.
 
-    python scripts/phase4_profile.py      → configs/profiles/t4-qwen3-4b-vllm0.30.0.json
+    python scripts/phase4_profile.py      # -> configs/profiles/t4-qwen3-4b-vllm0.30.0.json
 
-Phase 3 forced the cache down to 512 blocks so that its predictions could be exact. A deployment of
-the same engine would not. Before applying the override, the engine computed the capacity it would
-have used by itself, and logged it:
+Phase 3 forced the cache down to 512 blocks so its predictions could be exact. Before applying the
+override, the engine logged the capacity it would have used by itself:
 
     Overriding num_gpu_blocks=1537 with num_gpu_blocks_override=512
 
-That is what one T4 really offers Qwen3-4B with these flags — read from the engine, not estimated.
-(`cache/capacity.py`'s arithmetic says ~2,394 for the same card and utilization: 56% too many,
-because vLLM also reserves memory for activations and CUDA graphs. Read it from the engine.)
-
-Timing does not depend on how many blocks exist, so the fitted timings carry over unchanged. The
-capacity DOES depend on the flags, so they are recorded with it.
+The capacity is read from that line in artifacts/results/phase3_kaggle_t4/server_engine.log, not
+from `cache/capacity.py`, whose estimate for the same card and utilization (about 2,394 blocks) is
+56% too high because vLLM also reserves memory for activations and CUDA graphs. Timings do not
+depend on the number of blocks, so the fitted ones carry over unchanged; the capacity depends on
+the engine flags, so they are recorded with it.
 """
 
 from __future__ import annotations

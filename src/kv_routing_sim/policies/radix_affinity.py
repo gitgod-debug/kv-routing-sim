@@ -1,35 +1,9 @@
-"""Radix prefix-affinity: route by LONGEST ACTUAL PREFIX MATCH. The policy this project is about.
+"""Radix prefix affinity: route each request to the replica with the longest matching prefix.
 
-⭐ THE FIDELITY DECISION, AND IT IS THE MOST IMPORTANT ONE IN THE POLICY LAYER.
-
-This router does NOT read the replicas' caches. It keeps its OWN map of block -> replica, built
-only from what it has dispatched — the DISPATCH VIEW of policies/base.py: the approximate mode of
-Dynamo's router, and the tree most small open-source routers keep. Two consequences, both
-deliberate:
-
-  * Its view DRIFTS. When a replica evicts a block, this router does not find out. It keeps routing
-    to a replica that no longer has the prefix, and the hit it predicted does not happen. That drift
-    is real for a router of this kind, and it is part of what the calibration has to reproduce.
-  * ⛔ This policy must not peek at the true caches: its numbers would then be another router's.
-
-⚠️ CORRECTED 2026-10-05. This docstring said the dispatch view is "exactly as SGLang's router and
-Dynamo's KV-aware router do", and that a view of the true caches "would be pure fiction". Dynamo's
-default is the opposite — its KvIndexer is "a prefix tree built from worker-reported KV events" —
-and so is the LMetric authors' router. For those the true view is the real one, late by an event
-(docs/04-prior-art.md §2a). `policies/lmetric.py` can use either; this policy uses only its own.
-
-⭐ AND A BLOCK LIVES ON MANY REPLICAS AT ONCE. The map is block -> SET of replicas, not
-block -> one replica. Each replica that serves a prefix caches its OWN copy, so after a shared
-system prompt has been served by three replicas, all three hold it and all three are valid targets.
-
-That is not a detail. Modelling ownership as exclusive makes `observe()` overwrite the owner on
-every re-route, so the "who has the system prompt" answer flips constantly and the router thrashes —
-measured here before the fix, it scored a LOWER hit rate than round-robin, i.e. worse than not
-trying. The set is stored as a BITMASK in one int: compact enough for millions of blocks, and O(1)
-to test.
-
-The map is bounded, because a real router's is: a process with finite memory, not an index of the
-fleet.
+The router does not read the replicas' caches. It keeps its own map of block hash to the set of
+replicas believed to hold it, built from what it has dispatched, so its view drifts when a
+replica evicts a block. A block may live on several replicas at once; the map stores that set
+as a bitmask and is LRU-bounded, as a real router's memory is.
 """
 
 from __future__ import annotations
@@ -56,9 +30,8 @@ class RadixAffinity(RoutingPolicy):
         # block hash -> bitmask of replicas believed to hold it. LRU-bounded.
         self._owners: OrderedDict[int, int] = OrderedDict()
         self.router_map_blocks = router_map_blocks
-        # 0.0 = pure locality. A weighted-sum router uses matched_blocks - alpha * backlog; leaving
-        # the knob at 0 keeps this policy a CLEAN statement of locality, so the H2 crossover
-        # measures locality-vs-load rather than a blend that has already been tuned against it.
+        # 0.0 is pure locality, so this policy measures locality alone. A positive value scores
+        # matched_blocks - load_penalty * outstanding, as a weighted-sum router does.
         self.load_penalty = load_penalty
 
     def _match_len(self, replica: int, blocks: tuple[int, ...]) -> int:
@@ -74,7 +47,7 @@ class RadixAffinity(RoutingPolicy):
         if not request.block_hashes:
             return argmin_random(state.all_outstanding(), rng)
 
-        # Only replicas holding the FIRST block can match anything: stop-at-first-miss means a
+        # Only replicas holding the first block can match anything: stop-at-first-miss means a
         # match that does not start at block 0 is worth nothing.
         first_owners = self._owners.get(request.block_hashes[0], 0)
         if first_owners == 0:
@@ -102,12 +75,12 @@ class RadixAffinity(RoutingPolicy):
 
         if len(candidates) == 1:
             return candidates[0]
-        # Among equally-good matches, prefer the least loaded — then coin-flip.
+        # Among equally good matches, prefer the least loaded, then break ties at random.
         loads = [state.outstanding(i) for i in candidates]
         return candidates[argmin_random(loads, rng)]
 
     def observe(self, replica: int, request: NormalizedRequest) -> None:
-        """Record that `replica` now holds these blocks — ADDING to the set, never replacing it."""
+        """Record that `replica` now holds these blocks, adding to each block's set of holders."""
         bit = 1 << replica
         for h in request.block_hashes:
             if h in self._owners:

@@ -1,5 +1,4 @@
-"""Adapter for the Qwen-Bailian traces — production traffic from Alibaba's Qwen service, as block
-hashes, with real sessions and no text at all.
+"""Adapter for the Qwen-Bailian traces: Alibaba Qwen production traffic as block hashes, no text.
 
 The format (alibaba-edu/qwen-bailian-usagetraces-anon, `README.md`; Apache-2.0) is one JSON object
 per line:
@@ -12,32 +11,12 @@ per line:
     turn             the turn number within the session
     hash_ids         salted hashes of the prompt's 16-token blocks, remapped to small integers
 
-These are the traces LMetric (OSDI '26) was evaluated on (docs/04-prior-art.md §2a).
-
-⚠️ FOUR THINGS THIS ADAPTER DOES THAT CHANGE WHAT A RESULT MEANS — each is a parameter or a
-counted event, and each must be stated next to any number produced from it:
-
-1. SESSIONS ARE THE TRACE'S OWN. A request belongs to the session of the request at the root of
-   its `parent_chat_id` chain. Nothing is inferred (Mooncake's sessions are; AgentX's are real
-   too). Sessions here are of very unequal size — most are one request, a few are dozens — which
-   generated traffic is not, and which is what session-sticky routing is known to handle badly.
-2. THE HASHES ARE CHAINED HERE. The trace hashes each block by itself; a cached prefix is a run of
-   blocks from the start of the prompt. So block j's hash is made from block j−1's hash and the
-   trace ids it covers: equal prefixes hash equal, and nothing else does.
-3. TOKEN SCALE. `token_scale` = 1/k shrinks every token count k-fold: one 16-token block of the
-   replay stands for k trace blocks in a row (k × 16 real tokens), and is shared only if all k are.
-   The sharing STRUCTURE is kept at that granularity — a system prompt shorter than k × 16 tokens
-   is not seen — and the sizes shrink, so prompts of up to 26K tokens fit a profile calibrated on
-   ≤ 2K. On a fixed cache a scaled replay also stands for a k-times BIGGER cache.
-4. THE ENGINE'S LENGTH LIMIT. With `max_total_tokens` (the engine's `max_model_len`), a request
-   whose scaled prompt alone reaches it is dropped and counted (`prompt_too_long`) — the engine
-   would refuse it — and one whose prompt and output together exceed it has its output cut to fit,
-   as the engine would stop it; `outputs_capped(stats)` says how many.
-
-⚠️ AND ONE THING IT CANNOT DO. A follow-up re-sends its parent's answer inside its prompt, and a
-real engine has that answer's blocks cached. The simulator does not know what an answer's blocks
-will hash to, so a follow-up hits its parent's PROMPT here and recomputes the answer. That
-under-counts reuse within a session, for every policy that keeps a session in one place.
+A request belongs to the session at the root of its `parent_chat_id` chain; sessions are the trace's
+own and vary widely in size. The trace hashes each block on its own, so the adapter chains them: a
+replay block's hash covers the previous block's hash and the trace ids it spans, so equal prefixes,
+and only those, hash equal. A follow-up's prompt contains its parent's answer, whose block hashes
+are unknown here, so it can hit only the parent's prompt and reuse within a session is
+under-counted.
 """
 
 from __future__ import annotations
@@ -75,8 +54,18 @@ def read(
     stats: TraceStats | None = None,
     **_: object,
 ) -> Iterator[NormalizedRequest]:
-    """Stream a Qwen-Bailian trace as `NormalizedRequest`s. See the module docstring for the
-    parameters that change what a replay means."""
+    """Stream a Qwen-Bailian trace as `NormalizedRequest`s.
+
+    Args:
+        block_size: Must equal the trace's 16-token blocks.
+        token_scale: 1/k for a whole number k. Every token count shrinks k-fold, and one replay
+            block stands for k trace blocks in a row, shared only if all k are; a system prompt
+            shorter than k x 16 tokens is not seen. On a fixed cache a scaled replay also stands for
+            a k-times larger cache.
+        max_total_tokens: The engine's `max_model_len`. A request whose scaled prompt alone reaches
+            it is dropped and counted as `prompt_too_long`; one whose prompt and output together
+            exceed it has its output cut to fit, as the engine would stop it (see `outputs_capped`).
+    """
     if block_size != TRACE_BLOCK_TOKENS:
         raise ValueError(
             f"the trace hashes {TRACE_BLOCK_TOKENS}-token blocks; a replay with {block_size}-token "
@@ -130,7 +119,7 @@ def read(
                     output_tokens = max_total_tokens - prompt_tokens
                     stats.skip_reasons[_CAPPED] = stats.skip_reasons.get(_CAPPED, 0) + 1
 
-            # Only FULL trace blocks can be shared, and only whole groups of k of them make a
+            # Only full trace blocks can be shared, and only whole groups of k of them make a
             # block of the replay; never more blocks than the scaled prompt has.
             full = n_in // TRACE_BLOCK_TOKENS
             n_blocks = min(full // k, prompt_tokens // block_size)

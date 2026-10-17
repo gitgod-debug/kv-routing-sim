@@ -9,7 +9,7 @@ done about each. Each was checked against that project's `main` on the date give
 **Status (2026-10-06): not yet reported upstream.** The fix is in this folder,
 [`guidellm-add-special-tokens.patch`](guidellm-add-special-tokens.patch), made against guidellm
 `main` at `246f3b0` (five days after v0.8.0).
-*Re-checked 2026-10-18 against `main` at `5164c73`:* the function is unchanged and the patch applies;
+*Re-checked on 2026-10-18 against guidellm's current `main`:* the function is unchanged and the patch applies;
 the trace tests go from 191 to 192 passing; the numbers below reproduce with transformers 5.20.1 and
 come out 2,048 / 1,536 / 256 with the patch; the new test fails without the source change. Draft pull
 request #1222 still encodes the same way, now at two sites.

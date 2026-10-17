@@ -1,7 +1,9 @@
-"""R1 and R2 on the validated timing model (configs/realtrace_ctx.yaml): the wrapper's own logic.
-It derives a config, applies the registered speed rule to a round-robin probe, and puts verdicts
-side by side. Everything about a policy is decided by scripts/run_realtrace.py, R1's and R2's own
-procedure, which this does not change."""
+"""Tests for the wrapper that reruns R1 and R2 on the validated timing model
+(configs/realtrace_ctx.yaml).
+
+It derives each config, applies the registered speed rule to a round-robin probe, and sets the
+verdicts side by side; the policies themselves are run by scripts/run_realtrace.py unchanged.
+"""
 
 from __future__ import annotations
 
@@ -70,12 +72,12 @@ def test_the_speed_rule_is_the_highest_held_speed_and_the_two_below_it():
     # R1 on the first model: round-robin needed 4, 5, 8 and 5, 5, 8 at 1x, 2x, 4x.
     first = _needs(toolagent=[2, 3, 4, 5, 8], conversation=[3, 4, 5, 5, 8])
     assert rc.choose_speeds(probe, first) == [1, 2, 4]
-    # A speed counts only if EVERY trace of the test holds there.
+    # A speed counts only if every trace of the test holds there.
     assert rc.choose_speeds(probe, _needs(a=[2, 3, 4, 5, 8], b=[3, 4, 5, None, None])) == [
         0.25, 0.5, 1]
     assert rc.choose_speeds(probe, _needs(a=[2, 3, None, None, None])) == [0.25, 0.5]
     assert rc.choose_speeds(probe, _needs(a=[7, None, None, None, None])) == [0.25]
-    # Held nowhere: untestable as designed. Nothing is changed to rescue it.
+    # Held nowhere: untestable as designed, so no speeds are chosen.
     assert rc.choose_speeds(probe, _needs(a=[None] * 5)) == []
     assert rc.choose_speeds(probe, {}) == []
 

@@ -1,43 +1,26 @@
-"""A faithful model of vLLM's KV block pool — the `cache_model="vllm"` path.
+"""A model of vLLM's KV block pool, the default cache model (`cache_model="vllm"`).
 
-⭐ EVERY BEHAVIOUR BELOW CITES THE vLLM LINE IT IMPLEMENTS — that is the rule for editing this file.
-Citations are to the `v0.30.0` tag. This module implements the engine's documented algorithm, read
-from its source; it is NOT tuned against measurements. The difference matters: a model adjusted
-until it matches the data proves nothing, while a model that implements the published algorithm and
-THEN matches is evidence (ADR-002, amendment 2026-09-22).
+It behaves differently from the plain LRU of `block_trie.py` once the cache fills, which is the
+regime where routing matters. Each behaviour implements the vLLM source it cites, at the v0.30.0
+tag, and is not tuned against measurements (ADR-002):
 
-Why it exists: `BlockCache` (`cache_model="lru"`, kept unchanged as the ablation baseline) is a
-plain LRU touched head-to-tail. vLLM's pool differs in ways invisible until the cache fills —
-which is exactly the regime where routing matters:
+    frees a finished request's blocks tail first        single_type_kv_cache_manager.py:580
+    only blocks with ref_cnt 0 are evictable            block_pool.py `free_blocks`, `touch`
+    uncached blocks are reused first (prepended, LIFO)  block_pool.py:789, `prepend_n`
+    cached blocks are reused last (appended, FIFO)      block_pool.py:792, `append_n`
+    capacity includes partial and decode blocks         block_pool.py `get_new_blocks`
+    full decode blocks are cached too                   kv_cache_manager.py:595-599
+    a fully cached prompt still recomputes a block      kv_cache_manager.py:295
+    an eviction event fires on any recycle              block_pool.py:739, before the check at 741
+    one block is reserved as the null block             block_pool.py:193
 
-  vLLM does                                             source (v0.30.0)
-  ----------------------------------------------------  ----------------------------------------
-  frees a finished request's blocks TAIL-FIRST          single_type_kv_cache_manager.py:580
-  only ref_cnt == 0 blocks are evictable (pinning)      block_pool.py `free_blocks`, `touch`
-  uncached blocks reused first, LIFO (prepended)        block_pool.py:789, `prepend_n`
-  cached blocks reused last, FIFO (appended)            block_pool.py:792, `append_n`
-  capacity includes partial and decode blocks           block_pool.py `get_new_blocks`
-  full DECODE blocks are cached too                     kv_cache_manager.py:595-599
-  a fully cached prompt still recomputes a block        kv_cache_manager.py:295
-  eviction events fire on ANY recycle                   block_pool.py:739 (before the check at 741)
-  ONE block is reserved as the null block, never used   block_pool.py:193
-
-⭐ AN INVARIANT THIS PRODUCES, checked by a property test: a cached block's parent is never evicted
-before the block itself. Freeing is tail-first, and a hit on a child always touches its parent too
-(the prefix rule), so a parent always sits at or behind its children in the free queue. vLLM
-therefore does not strand blocks the way plain LRU does. A stranded block here means a bug here.
-
-⚠️ ASSUMPTIONS — not verified against a live engine, named so Phase 3 can test them:
-  * Hashes are committed at SCHEDULING time (`cache_blocks` runs inside `allocate_slots`), so a
-    request admitted later in the same step can hit blocks an earlier one is about to compute. The
-    lookup is a plain hash-map check (block_pool.py `get_cached_block`) and nothing found in the
-    scheduler prevents it. A concurrent workload will confirm or refute this.
-  * Decode-block hashes are unique per request. In vLLM two identical prompts at temperature 0
-    produce identical output blocks, hence identical hashes. In an OPEN-LOOP replay no later prompt
-    contains those tokens, so only the same request resuming after preemption can hit them — for
-    which a per-request hash is exact.
-  * No chunked prefill and no token budget: a prompt is allocated in one step. That affects TTFT
-    under load more than it affects hit rate.
+Assumptions not yet checked against a live engine:
+  * Hashes are committed at scheduling time (`cache_blocks` runs inside `allocate_slots`), so a
+    request admitted later in the same step can hit blocks an earlier one is about to compute.
+  * Decode-block hashes are unique per request. In an open-loop replay no later prompt contains a
+    request's output tokens, so only the same request, after preemption, can hit those blocks.
+  * There is no chunked prefill and no token budget: a prompt is allocated in one step. This affects
+    TTFT under load more than hit rate.
 """
 
 from __future__ import annotations
@@ -49,14 +32,11 @@ from dataclasses import dataclass, field
 
 
 def max_hit_blocks(num_tokens: int, block_size: int) -> int:
-    """How many full blocks a lookup may hit — vLLM's rule, applied by BOTH cache models.
+    """Return how many full blocks a lookup may hit, by vLLM's rule; both cache models apply it.
 
-    kv_cache_manager.py:290-295: "When all tokens hit the cache, we must recompute the last token to
-    obtain logits. Thus, set max_cache_hit_length to prompt_length - 1. This can trigger
-    recomputation of an entire block, rather than just the single last token, because
-    allocate_slots() requires num_computed_tokens to be block-size aligned."
-
-    So a fully cached 512-token prompt hits 31 blocks (496 tokens), not 32.
+    When every prompt token is cached, vLLM still recomputes the last token to obtain logits, and
+    because computed tokens must be block-aligned it recomputes that whole block
+    (kv_cache_manager.py:290-295). A fully cached 512-token prompt hits 31 blocks, not 32.
     """
     return max(0, num_tokens - 1) // block_size
 
@@ -67,68 +47,70 @@ def _h64(data: bytes) -> int:
 
 @dataclass(slots=True)
 class _BlockMetrics:
-    """kv_cache_metrics.py `BlockMetricsState`, in simulated time."""
+    """kv_cache_metrics.py `BlockMetricsState`: per-block metrics, in simulated time."""
 
     birth: float
     last_access: float
-    # kv_cache_metrics.py:24 — only the last FOUR accesses are kept ("Bounded to prevent
-    # unbounded growth"), so at most three reuse gaps per block, biased toward the end of its life.
+    # Only the last four accesses are kept (kv_cache_metrics.py:24), so at most three reuse gaps
+    # per block, biased toward the end of its life.
     history: deque[float] = field(default_factory=lambda: deque(maxlen=4))
 
 
 @dataclass(frozen=True, slots=True)
 class EvictionEvent:
-    """One `KVCacheEvictionEvent` — what feeds the three `vllm:kv_block_*` histograms."""
+    """One `KVCacheEvictionEvent`, the record behind the three `vllm:kv_block_*` histograms."""
 
     lifetime_s: float
     idle_s: float
     reuse_gaps_s: tuple[float, ...]
-    # True only for a REAL eviction. vLLM emits the event either way (block_pool.py:739).
+    # True only for a real eviction; vLLM emits the event either way (block_pool.py:739).
     was_cached: bool
 
 
 class VllmBlockPool:
     """One replica's KV block pool, with vLLM's free-queue order, reference counts and eviction.
 
-    The free queue is an OrderedDict of block ids, front = next to be reused. vLLM hand-rolls a
-    doubly linked list for O(1) removal from the middle (kv_cache_utils.py:246); an OrderedDict
-    gives the same O(1) popleft, append, prepend and remove.
+    The free queue is an OrderedDict of block ids whose front is the next block to be reused. vLLM
+    hand-rolls a doubly linked list for O(1) removal from the middle (kv_cache_utils.py:246); an
+    OrderedDict gives the same O(1) popleft, append, prepend and remove.
     """
 
     def __init__(
         self, num_blocks: int, block_size: int = 16, track_block_metrics: bool = False
     ) -> None:
-        """`num_blocks` is vLLM's `num_gpu_blocks` — what `--num-gpu-blocks-override` sets and what
-        the engine's log reports. ONE of those is the null block (below), so `num_blocks - 1` are
-        usable."""
+        """Create a pool with every usable block free.
+
+        Args:
+            num_blocks: vLLM's `num_gpu_blocks`, as set by `--num-gpu-blocks-override` and reported
+                in the engine's log. One of them is the null block, so `num_blocks - 1` are usable.
+        """
         if num_blocks <= 1:
             raise ValueError(f"num_blocks must be > 1 (one is the null block), got {num_blocks}")
         self.num_blocks = num_blocks
         self.block_size = block_size
 
-        # kv_cache_utils.py:255 — "The queue is ordered by block ID in the beginning."
+        # The free queue starts ordered by block id (kv_cache_utils.py:255).
         self._free: OrderedDict[int, None] = OrderedDict((b, None) for b in range(num_blocks))
-        # block_pool.py:193 — `self.null_block = self.free_block_queue.popleft()`: block 0 is
-        # reserved as a placeholder and never allocated. Invisible while the cache has room;
-        # with a deliberately small cache it moves every prediction by a block.
+        # Block 0 is reserved as the null block and never allocated (block_pool.py:193). It only
+        # shows with a small cache, where it moves every prediction by one block.
         self.null_block, _ = self._free.popitem(last=False)
         self._ref = [0] * num_blocks
         self._hash: list[int | None] = [None] * num_blocks
         # cached hash -> its parent's hash, for the no-stranding invariant
         self._parent: dict[int, int | None] = {}
         # hash -> the block ids holding it. vLLM allows duplicates and returns the first
-        # (block_pool.py `get_cached_block`: "If there are duplicated blocks, we return the first").
+        # (block_pool.py `get_cached_block`).
         self._by_hash: dict[int, dict[int, None]] = {}
 
         # Per request: its block table, how many of those blocks are committed (hashed), and the
-        # hash chain it has built — kept across preemption so a resumed request can re-hit it.
+        # hash chain it has built, kept across preemption so the request can hit it again.
         self._req_blocks: dict[str, list[int]] = {}
         self._req_committed: dict[str, int] = {}
         self._req_chain: dict[str, list[int]] = {}
 
-        # Counters in TOKENS, as vLLM counts (ADR-008). Preempted re-lookups are kept separate,
-        # exactly as vllm/v1/metrics/stats.py `PrefixCacheStats.record` does: the Prometheus
-        # counters we calibrate against exclude them.
+        # Counters in tokens, as vLLM counts (ADR-008). Lookups by preempted requests are kept
+        # separate, as vllm/v1/metrics/stats.py `PrefixCacheStats.record` does, because the
+        # Prometheus prefix-cache counters exclude them.
         self.queries = 0
         self.hits = 0
         self.preempted_queries = 0
@@ -138,8 +120,6 @@ class VllmBlockPool:
         self.track_block_metrics = track_block_metrics
         self._metrics: dict[int, _BlockMetrics] = {}
         self.eviction_events: list[EvictionEvent] = []
-
-    # ── views ─────────────────────────────────────────────────────────────────────────────────
 
     @property
     def num_free(self) -> int:
@@ -160,16 +140,20 @@ class VllmBlockPool:
         return list(self._req_blocks.get(request_id, []))
 
     def chain_for(self, request_id: str, prompt_hashes: Sequence[int]) -> Sequence[int]:
-        """The hashes to look up: a preempted request's own persisted chain (prompt + decode
-        blocks — `_preempt_request` keeps the tokens and frees only the KV), else the prompt's."""
+        """Return the hashes to look up: a preempted request's own chain, else the prompt's.
+
+        vLLM's `_preempt_request` keeps a request's tokens and frees only its KV, so after
+        preemption the request looks up its prompt and decode blocks.
+        """
         return self._req_chain.get(request_id) or prompt_hashes
 
-    # ── lookup ────────────────────────────────────────────────────────────────────────────────
-
     def lookup(self, block_hashes: Sequence[int], num_tokens: int) -> list[int]:
-        """Longest cached prefix, as block ids. Stops at the first miss; capped by
-        `max_hit_blocks` (stm.py `FullAttentionManager.find_longest_cache_hit`,
-        kv_cache_manager.py:295). Blocks are found whether in use or free — the map holds both."""
+        """Return the longest cached prefix as block ids.
+
+        Stops at the first miss, as `FullAttentionManager.find_longest_cache_hit` does in
+        single_type_kv_cache_manager.py, and at the `max_hit_blocks` cap (kv_cache_manager.py:295).
+        Blocks are found whether they are in use or free.
+        """
         limit = min(len(block_hashes), max_hit_blocks(num_tokens, self.block_size))
         hit: list[int] = []
         for h in block_hashes[:limit]:
@@ -180,7 +164,10 @@ class VllmBlockPool:
         return hit
 
     def record_lookup(self, num_tokens: int, hit_blocks: int, preempted: bool) -> None:
-        """stats.py `PrefixCacheStats.record`: preempted requests go to separate counters."""
+        """Count a lookup, in tokens.
+
+        Lookups by preempted requests go to separate counters (stats.py `PrefixCacheStats.record`).
+        """
         hit_tokens = hit_blocks * self.block_size
         if preempted:
             self.preempted_queries += num_tokens
@@ -189,16 +176,14 @@ class VllmBlockPool:
             self.queries += num_tokens
             self.hits += hit_tokens
 
-    # ── allocation ────────────────────────────────────────────────────────────────────────────
-
     def blocks_needed(self, num_tokens: int) -> int:
         return -(-num_tokens // self.block_size)  # ceil
 
     def can_admit(self, hit_blocks: Sequence[int], num_tokens: int) -> bool:
-        """Would `admit` succeed? vLLM's `allocate_slots` check.
+        """Return whether `admit` would succeed, as vLLM's `allocate_slots` checks it.
 
-        Hitting a block that is currently FREE pulls it out of the free queue (block_pool.py
-        `touch`), so it can no longer serve a new allocation — it counts against the free pool too.
+        A hit on a free block takes it out of the free queue (block_pool.py `touch`), so it counts
+        against the free pool as well.
         """
         new = self.blocks_needed(num_tokens) - len(hit_blocks)
         evictable_hits = sum(1 for b in hit_blocks if self._ref[b] == 0)
@@ -214,8 +199,9 @@ class VllmBlockPool:
     ) -> bool:
         """Allocate a request's blocks for `num_tokens` and commit its full blocks.
 
-        kv_cache_manager.py `allocate_slots`: touch the hit blocks, get the new ones, then
-        `cache_blocks` up to the tokens computed this step (lines 595-599). False if no room.
+        As kv_cache_manager.py `allocate_slots` does: touch the hit blocks, get new ones, then
+        `cache_blocks` up to the tokens computed this step (lines 595-599). Returns False if there
+        is no room.
         """
         if not self.can_admit(hit_blocks, num_tokens):
             return False
@@ -230,9 +216,9 @@ class VllmBlockPool:
         return True
 
     def grow(self, request_id: str, num_tokens: int, now: float) -> bool:
-        """A decode step: make room for `num_tokens` total and commit newly full blocks.
+        """Grow a request to `num_tokens` for a decode step and commit newly full blocks.
 
-        False means no free block: the caller must preempt (scheduler.py:726-800).
+        Returns False when no block is free; the caller must then preempt (scheduler.py:726-800).
         """
         blocks = self._req_blocks[request_id]
         need = self.blocks_needed(num_tokens) - len(blocks)
@@ -244,11 +230,11 @@ class VllmBlockPool:
         return True
 
     def free(self, request_id: str) -> None:
-        """Return a finished or preempted request's blocks. Hashes are KEPT: freed is not evicted.
+        """Release a finished or preempted request's blocks; their hashes stay cached.
 
-        single_type_kv_cache_manager.py:580 — "Free blocks in reverse order so that the tail blocks
-        are freed first." block_pool.py:770-799 — ref_cnt drops; at zero an uncached block is
-        PREPENDED (reused first, LIFO) and a cached block is APPENDED (evicted last, FIFO).
+        Blocks are freed tail first (single_type_kv_cache_manager.py:580). When ref_cnt reaches 0,
+        an uncached block is prepended to the free queue and reused first, and a cached block is
+        appended and evicted last (block_pool.py:770-799).
         """
         evict_first: list[int] = []
         evict_last: list[int] = []
@@ -256,7 +242,7 @@ class VllmBlockPool:
             self._ref[b] -= 1
             if self._ref[b] == 0:
                 (evict_first if self._hash[b] is None else evict_last).append(b)
-        # prepend_n keeps list order — evict_first[0] becomes the new front (kv_cache_utils.py:411)
+        # prepend_n keeps list order: evict_first[0] becomes the new front (kv_cache_utils.py:411)
         for b in reversed(evict_first):
             self._free[b] = None
             self._free.move_to_end(b, last=False)
@@ -265,10 +251,8 @@ class VllmBlockPool:
         self._req_committed.pop(request_id, None)
 
     def forget(self, request_id: str) -> None:
-        """Drop a FINISHED request's hash chain. A preempted one keeps it, to re-hit on resume."""
+        """Drop a finished request's hash chain; a preempted request keeps its chain."""
         self._req_chain.pop(request_id, None)
-
-    # ── internals ─────────────────────────────────────────────────────────────────────────────
 
     def _touch(self, blocks: Sequence[int], now: float) -> None:
         """block_pool.py `touch`: a free block that is hit leaves the free queue; ref_cnt += 1."""
@@ -282,7 +266,7 @@ class VllmBlockPool:
                 m.history.append(now)
 
     def _get_new_blocks(self, n: int, now: float) -> list[int]:
-        """block_pool.py `get_new_blocks`: pop from the FRONT, evict, allocate."""
+        """block_pool.py `get_new_blocks`: pop from the front, evict, allocate."""
         out: list[int] = []
         for _ in range(n):
             b, _ = self._free.popitem(last=False)
@@ -294,13 +278,12 @@ class VllmBlockPool:
         return out
 
     def _maybe_evict(self, b: int, now: float) -> None:
-        """block_pool.py `_maybe_evict_cached_block`, INCLUDING its ordering quirk.
+        """block_pool.py `_maybe_evict_cached_block`, including its ordering quirk.
 
-        Line 739 records the metrics event BEFORE line 741 checks whether the block held a hash, so
-        recycling a block that never held a cached prefix is still reported as an "eviction". We do
-        the same, deliberately: H4 compares our events against the engine's histograms, and that is
-        only fair if both sides count by the same rule. (Already reported upstream, with a fix:
-        vLLM pull request #47715 — see docs/upstream/README.md.)
+        Line 739 records the metrics event before line 741 checks whether the block held a hash, so
+        recycling a block that never held a cached prefix is still reported as an eviction. The
+        model does the same so that its events and the engine's histograms count by the same rule.
+        vLLM pull request #47715 proposes the fix upstream.
         """
         m = self._metrics.pop(b, None)
         if m is not None:
@@ -321,11 +304,12 @@ class VllmBlockPool:
             self.real_evictions += 1
 
     def _commit(self, request_id: str, num_tokens: int) -> None:
-        """kv_cache_manager.py:595-599 `cache_blocks`: hash every block that is now FULL.
+        """kv_cache_manager.py:595-599 `cache_blocks`: hash every block that is now full.
 
-        Prompt blocks take their hash from the trace. Decode blocks — and the block straddling the
-        end of the prompt — get a hash continuing the chain, unique to this request (see the
-        module's assumptions). The chain is extended in place so a preempted request can re-hit it.
+        Prompt blocks take their hash from the trace. Decode blocks, and the block straddling the
+        end of the prompt, get a hash that continues the chain and is unique to this request (see
+        the module's assumptions). The chain is extended in place so a preempted request can hit it
+        again.
         """
         full = num_tokens // self.block_size
         blocks = self._req_blocks[request_id]
@@ -345,14 +329,16 @@ class VllmBlockPool:
                 self._parent.setdefault(h, chain[i - 1] if i > 0 else None)
         self._req_committed[request_id] = max(done, upto)
 
-    # ── invariant checks, for tests ───────────────────────────────────────────────────────────
-
     def stranded_hashes(self) -> list[int]:
-        """Cached hashes whose parent is NOT cached — unreachable by any lookup. Should be none."""
+        """Return cached hashes whose parent is not cached, which no lookup can reach.
+
+        Tail-first freeing and the prefix rule keep a parent at or behind its children in the free
+        queue, so a parent is never evicted before its child and this list should be empty.
+        """
         return [h for h, p in self._parent.items() if p is not None and p not in self._by_hash]
 
     def check_consistency(self) -> None:
-        """Every block is either free (ref 0) or referenced — never both, never neither."""
+        """Assert that every block is either free (ref_cnt 0) or referenced, never both."""
         for b in range(self.num_blocks):
             if b == self.null_block:
                 if b in self._free or self._ref[b] != 0:

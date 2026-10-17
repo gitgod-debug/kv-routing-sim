@@ -1,12 +1,8 @@
-"""Rank agreement between two orderings — the statistic H6 is decided on (docs/09-hypotheses.md).
+"""Rank agreement between two orderings, as Kendall's tau-b.
 
-Kendall's tau-b, written out rather than imported: it is a few lines, the core install stays free
-of scipy (ADR-009), and a reader can check the tie handling without leaving this file.
-
-⭐ tau-B, NOT tau-a, BECAUSE THIS PROJECT'S RANKINGS ARE FULL OF TIES. The three load-balancing
-policies often need exactly the same number of replicas, and "not met at 8 replicas" ties every
-policy that fails. tau-a would count those ties as disagreement and understate agreement; tau-b
-takes them out of the denominator instead.
+It is written out rather than imported so that the core install needs no scipy (ADR-009). Tau-b, not
+tau-a, because policy rankings are full of ties (several policies often need the same number of
+replicas), and tau-b removes ties from the denominator instead of counting them as disagreement.
 """
 
 from __future__ import annotations
@@ -16,13 +12,12 @@ from collections.abc import Sequence
 
 
 def kendall_tau_b(x: Sequence[float], y: Sequence[float]) -> float | None:
-    """Kendall's tau-b between two equal-length sequences. None when either one is all ties.
+    """Return Kendall's tau-b between two equal-length sequences, or None if either is all ties.
 
         tau_b = (concordant - discordant) / sqrt(pairs not tied in x * pairs not tied in y)
 
-    ⛔ None, not 0 or 1: a constant sequence has no order, so there is nothing to agree or
-    disagree with. Making up a number for it would tilt the result toward whichever way the
-    convention leaned.
+    A constant sequence has no order to agree or disagree with, so it gets None rather than an
+    arbitrary 0 or 1.
     """
     if len(x) != len(y):
         raise ValueError(f"tau-b needs equal lengths, got {len(x)} and {len(y)}")

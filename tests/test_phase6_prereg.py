@@ -1,9 +1,8 @@
-"""Phase 6's pre-registration must stay reproducible from the committed code — and the notebook must
-carry exactly what was committed.
+"""Pins the Phase 6 registration, which scripts/phase6_prepare.py generates.
 
-If a model change moves a Phase 6 prediction, these fail. A pre-registered number may only change by
-a deliberate, dated re-registration (re-run scripts/phase6_prepare.py, commit, and say why in
-docs/09-hypotheses.md) — never silently, and never after the GPU run has been seen.
+The predictions must reproduce from the committed code, and the notebook must carry exactly the
+registered prediction hash and trace fingerprints, so a model change that moves a prediction fails
+here.
 """
 
 from __future__ import annotations

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""POST HOC: does C2's fitted, context-aware timing model explain Phase 6's two live replicas?
+"""Post hoc: compare C2's context-aware timing model with Phase 6's two live replicas.
 
-    python scripts/c2_posthoc_phase6.py   # -> artifacts/results/c2_kaggle_t4/posthoc_phase6.md
+    python scripts/c2_posthoc_phase6.py
+        # configs/phase6_sim2real.yaml, Phase 6's results and C2's fitted profile
+        #   -> artifacts/results/c2_kaggle_t4/posthoc_phase6.{json,md}
 
-⚠️ Post hoc, and labelled so everywhere it is quoted. The model's two context terms were added
-BECAUSE Phase 6's latencies were too high, so Phase 6 is not a clean test of them. What keeps it
-honest: the model's coefficients were fitted on C2's parts A and B only — they never saw a Phase 6
-number — and nothing here is tuned. The clean two-replica test is a fresh registered run.
+This is not a clean test: the model's context terms were added because Phase 6's latencies were
+too high. The coefficients were fitted on C2's parts A and B only, and nothing here is tuned.
 
-Method: Phase 6's second run recorded, for every request, which replica served it and when it was
-really sent. Each replica is independent once a request is placed, so each replica's requests are
-replayed through a ONE-replica simulation at their real send times — the measured placement, not a
-re-simulated router. Latency percentiles by the notebook's nearest-rank rule over valid requests.
-Run 1 kept only its printed summary, so it cannot be replayed.
+Phase 6's second run recorded which replica served each request and when it was sent. Replicas are
+independent once a request is placed, so each replica's requests are replayed through a one-replica
+simulation at their measured send times, keeping the measured placement instead of re-simulating
+the router. Percentiles use the notebook's nearest-rank rule over valid requests. Run 1 kept only
+its printed summary, so it cannot be replayed.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def nearest_rank(sorted_vals: list[float], q: float) -> float | None:
 
 
 def replay(trace: dict, recs: list[dict], profile) -> dict:
-    """Each replica's measured requests, one-replica simulation each, at their real send times."""
+    """Replay each replica's measured requests on a one-replica simulation, at their send times."""
     ttft, hits, queries, preempt = {}, 0, 0, 0
     for replica in sorted({r["replica"] for r in recs}):
         mine = [r for r in recs if r["replica"] == replica]

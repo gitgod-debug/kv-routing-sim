@@ -1,43 +1,16 @@
-"""Radix affinity WITH a load term — what production prefix-aware routers actually do.
+"""Radix affinity with a load term: score `matched_blocks - load_penalty * outstanding`.
 
-⭐ WHY A SEVENTH POLICY EXISTS WHEN THE SPEC LISTS SIX. Discovered by running the sim, 2026-09-20:
-
-Pure `radix-affinity` (load_penalty = 0) DEGENERATES. Under agentic traffic every request shares the
-same system-prompt first block, so whichever replica owns that block wins the longest-prefix match
-for every subsequent request, forever. Measured on a 900-request trace across 4 replicas:
-
-    round-robin      [225, 225, 225, 225]    p95 TTFT    49 ms
-    radix-affinity   [  0,   0,   0, 900]    p95 TTFT 22,218 ms      <- all on one replica
-
-It buys a better hit rate (0.89 vs 0.74) and pays 450x in tail latency. That is a real property of
-pure locality and worth keeping in the grid as the extreme — but it is NOT what anyone ships.
-
-⛔ AND SHIPPING IT AS "THE PREFIX-AWARE POLICY" WOULD BE A STRAWMAN. Production routers balance:
-`azrabano23/disagg-sim`'s `kv_aware` scores `matched_blocks − α · prefill_backlog`, and Alibaba's
-earlier scheduler a weighted sum of load and cache miss (docs/04-prior-art.md). If we compared our
-blend against their blend but published pure affinity as the prefix-aware number, the comparison
-would be rigged in a direction that flatters the argument we are making. That is the most damaging
-error available here.
-
-⚠️ CORRECTED 2026-10-05. This said "Dynamo scores `matched_blocks - alpha * prefill_backlog`". Its
-design doc gives a different sum: the new prefill blocks left after an overlap credit, plus the
-blocks its active requests will decode. And the weighted sum itself has a published critique this
-project then ran into: LMetric (OSDI '26) shows that no fixed weight is right at every load, and
-multiplies the two terms instead — `policies/lmetric.py`.
-
-So: `radix-affinity` stays pure and honest about what it is; this is the realistic one.
-
-⚠️ ALPHA IS A GUESS AND MUST BE SWEPT. `matched_blocks - alpha * outstanding` compares blocks to
-queued requests, two different units, so alpha carries the exchange rate between them. There is no
-principled default. It is swept as its own axis in Phase 5 and the chosen value is published, the
-same way every cost constant is (ADR-006).
+Pure radix affinity sends every request that shares a first block to the replica holding it, so
+under agentic traffic one replica takes nearly all the load; production prefix-aware routers balance
+the two. The penalty converts queued requests into blocks of matched prefix and has no principled
+default, so it should be swept.
 """
 
 from __future__ import annotations
 
 from .radix_affinity import RadixAffinity
 
-# 1.0 => one queued request is "worth" one block of matched prefix. A placeholder, to be swept.
+# 1.0: one queued request weighs as much as one block of matched prefix; a placeholder.
 DEFAULT_LOAD_PENALTY = 1.0
 
 

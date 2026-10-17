@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
-"""Are T2's stored grids what the committed simulator gives? A random sample, run again.
+"""Re-run a seeded sample of T2's stored grid cells and check that they reproduce exactly.
 
     python scripts/t2_verify_grid.py      # -> artifacts/results/t2_two_part_slo/verification.json
 
-Why this exists. T2's grids took 35 minutes to compute, one calibration after another in one
-process. Grid A's header was written from a clean tree. While B and C were running, unrelated
-files were being edited in the working tree (`kvsim calibrate`, the CLI, a new module) — so their
-headers, written when each calibration started, say `git_dirty: true`. The simulator's code had
-been loaded when the process started, from the clean commit, and the edits touched nothing a grid
-run imports; but a header cannot show that, and "it could not have mattered" is an argument.
-
-This is the evidence instead: a seeded random sample of cells from every grid, run again by THIS
-checkout — meant to be a clean checkout — and compared with what is stored. The grids are
-deterministic, so a cell either reproduces to the last stored digit or the code differs.
-Deliberately a sample: the full grids are ~30 minutes of every core, and this ran on battery.
+The headers of grids B and C say `git_dirty: true`, so the headers alone cannot show which
+simulator code produced them. For every calibration in configs/tpot_slo.yaml, this re-runs a seeded
+random sample of the grid's cells with the current checkout, which should be clean, and compares
+the results with what is stored. The grids are deterministic, so a cell either reproduces to the
+last stored digit or the code differs. A sample keeps the check short; the full grids take about
+30 minutes on every core.
 """
 
 from __future__ import annotations

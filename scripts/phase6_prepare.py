@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Phase 6's pre-registration: trace fingerprints, the simulator's predictions, the notebook.
+"""Prepare Phase 6: trace fingerprints, the simulator's predictions and the notebook.
 
     python scripts/phase6_prepare.py
         # configs/phase6_sim2real.yaml -> artifacts/results/phase6_prereg/predictions.json
         #                               -> notebooks/phase6_sim2real.ipynb
 
-All three come from the one config in one run, so none can drift from the others. The notebook
-regenerates the traffic on the GPU box with a stdlib port of the generator, and this script checks
-that port BEFORE writing the notebook: it runs the port here and demands the same fingerprints, and
-the same block hashes the simulator routed on. A mismatch is found on this machine, not on Kaggle.
+All three come from one config in one run. The notebook regenerates the traffic on the GPU box
+with a stdlib port of the generator, so before writing the notebook this script runs that port
+here and requires the same fingerprints and the same block hashes the simulator routed on.
 """
 
 from __future__ import annotations
@@ -44,7 +43,7 @@ def sha256(obj: Any) -> str:
 
 def _check_port(workloads: dict[str, Any], fingerprints: dict[str, str],
                 traces: dict[str, list]) -> None:
-    """Run the notebook's own generator and hashing here, and demand what the simulator used."""
+    """Run the notebook's generator and hashing here; require the simulator's traces and hashes."""
     code = DATA_CELL.split("TRACES = {}")[0]  # the definitions, not the notebook's own checks
     code = code.replace('json.loads(r"""@@WORKLOADS@@""")', "WORKLOADS_IN")
     code = code.replace('json.loads(r"""@@FINGERPRINTS@@""")', "{}")

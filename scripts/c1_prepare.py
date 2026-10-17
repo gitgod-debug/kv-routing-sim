@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""C1's registration: build the package's wheel from a clean tree, predict the check, write the
-notebook.
+"""Prepare the C1 run: build the wheel, predict the cache check, and write the notebook.
 
     python scripts/c1_prepare.py
         # configs/c1_calibrate.yaml -> artifacts/results/c1_prereg/prediction.json
         #                           -> notebooks/c1_calibrate_t4.ipynb
 
-The notebook carries the wheel itself, so the GPU box runs exactly the committed code — which is
-why this refuses to run on a dirty tree. The prediction is the simulator's hit rate for the check
-workload that `kvsim calibrate` will send (seed-determined, and far smaller than any T4 cache, so
-nothing is evicted and capacity does not enter it).
+The notebook embeds the package's wheel so the GPU box runs exactly the committed code, which is
+why this refuses to run on a dirty tree. The prediction is the simulator's hit rate for the
+seed-determined check workload that `kvsim calibrate` sends; the workload is far smaller than any
+T4 cache, so nothing is evicted and capacity does not enter it.
 """
 
 from __future__ import annotations

@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
-"""H6's ranking half: does the ORDER of the routing policies survive a change of hardware?
+"""H6, ranking half: whether the order of the routing policies holds when the hardware changes.
 
     python scripts/run_h6.py        # configs/h6_ranking.yaml -> artifacts/results/h6_ranking/
 
-The design and every decision rule were committed before this ran (configs/h6_ranking.yaml, plus a
-dated entry in docs/09-hypotheses.md). This script IS that procedure: it chooses nothing after
-seeing a result.
+Re-runs the Phase 4 design once per regime. A regime multiplies the calibrated T4 profile's timing
+coefficients (a faster GPU, or a different prefill/decode balance) and changes nothing else: KV
+capacity, max_num_seqs, the SLO and the price stay fixed. At every (trace, load) point, each
+rescaled regime is compared with the calibrated baseline. The decision rules come from the config;
+this script applies them and tunes nothing.
 
-What it does: re-runs the Phase-4 design once per REGIME. A regime multiplies the calibrated T4
-profile's timing coefficients — a faster GPU, or a different prefill/decode balance — and changes
-nothing else: KV capacity, max_num_seqs, the SLO and the price stay fixed. Then, at every
-(trace, load) point, it compares each rescaled regime with the calibrated baseline.
-
-Tier (ADR-010): a rescaled profile describes no real GPU, and that is the point — H6 asks whether
-the ranking depends on the hardware at all. No millisecond or rupee figure from a rescaled regime
-is a prediction for anything, and the results file says so.
+ADR-010 tier: a rescaled profile describes no real GPU, so its millisecond and rupee figures are
+not predictions; only the order of the policies is under test.
 """
 
 from __future__ import annotations
@@ -48,9 +44,6 @@ _CONFIG_PATH = REPO / "configs" / "h6_ranking.yaml"
 NOT_MET = 9  # no replica count from 1 to 8 holds the SLO: ranks below every count that did
 
 
-# ── one run, in a worker process ──────────────────────────────────────────────────────────────
-
-
 @lru_cache(maxsize=1)
 def _cfg() -> dict[str, Any]:
     return yaml.safe_load(_CONFIG_PATH.read_text())
@@ -58,7 +51,7 @@ def _cfg() -> dict[str, Any]:
 
 @lru_cache(maxsize=1)
 def _base() -> dict[str, Any]:
-    """The Phase-4 design, read from its own config so the two can never drift apart."""
+    """The Phase 4 design, read from its own config so the two cannot drift apart."""
     return yaml.safe_load((REPO / _cfg()["base_sweep"]).read_text())
 
 
@@ -74,7 +67,7 @@ def _profile(regime: str) -> CostProfile:
     base = load_profile(REPO / _base()["profile"])
     r = _cfg()["regimes"][regime]
     if r["prefill_x"] == 1.0 and r["decode_x"] == 1.0:
-        return base  # the baseline IS the calibrated profile, unchanged
+        return base  # the baseline is the calibrated profile, unchanged
     return dataclasses.replace(
         base,
         name=f"{base.name}+{regime}",
@@ -107,9 +100,6 @@ def _init_worker(config_path: str) -> None:
     _base.cache_clear()
 
 
-# ── the decision rules ────────────────────────────────────────────────────────────────────────
-
-
 def _best_set(required: dict[str, int]) -> list[str]:
     """The policies needing the fewest replicas at one point; empty if none holds the SLO."""
     best = min(required.values())
@@ -119,12 +109,12 @@ def _best_set(required: dict[str, int]) -> list[str]:
 def _compare(regime: str, name: str, load: float, pols: list[str],
              r_base: dict[str, int], r_reg: dict[str, int],
              rec_base: Recommendation, rec_reg: Recommendation) -> dict[str, Any]:
-    """One point, one rescaled regime against the baseline: the registered rules, verbatim."""
+    """Compare one rescaled regime with the baseline at one point, by the config's rules."""
     best_base, best_reg = _best_set(r_base), _best_set(r_reg)
     ours = rec_base.chosen.policy if best_base and rec_base.chosen else None
     theirs = rec_reg.chosen.policy if best_reg and rec_reg.chosen else None
-    # FLIP: our pick is not among the regime's best policies, so following our advice on that
-    # hardware would cost at least one more replica. n/a where nothing holds the SLO.
+    # A flip: the baseline's pick is not among the regime's best policies, so following it on
+    # that hardware would cost at least one more replica. None where nothing holds the SLO.
     flip = None if ours is None or not best_reg else ours not in best_reg
     tau = kendall_tau_b([r_base[p] for p in pols], [r_reg[p] for p in pols])
     return {
@@ -139,7 +129,7 @@ def _compare(regime: str, name: str, load: float, pols: list[str],
         "best_set_regime": best_reg,
         "tau_b": None if tau is None else round(tau, 4),
         "flip": flip,
-        # Reported, not tested (see the config): the literal reading, and a kinder one.
+        # Reported, not tested (see the config): a strict and a lenient reading of a flip.
         "strict_flip": None if ours is None or theirs is None else ours != theirs,
         "lenient_flip": (
             None if not best_base or not best_reg else not set(best_base) & set(best_reg)
@@ -170,8 +160,7 @@ def main() -> int:
     sys.path.insert(0, str(REPO / "scripts"))
     from _spike_common import results_header
 
-    # Taken BEFORE the runs: the header must describe the tree that produced the numbers, not
-    # whatever the tree looks like by the time they finish.
+    # Taken before the runs, so the header describes the tree that produced the numbers.
     payload = results_header("scripts/run_h6.py", seed=0, hardware_path="cpu-only",
                              extra={"config": cfg, "base_config": base})
 
@@ -202,8 +191,8 @@ def main() -> int:
     recs = {g: {name: {str(ld): rec(g, name, ld) for ld in loads} for name in traces}
             for g in regimes}
 
-    # Guard (registered): the baseline must reproduce Phase 4's table exactly. If it does not, the
-    # code has changed since Phase 4 and nothing below is comparable — stop, do not report.
+    # Guard: the baseline must reproduce Phase 4's table exactly; otherwise the code has changed
+    # since Phase 4 and nothing below is comparable.
     if cfg.get("phase4_results"):
         p4 = json.loads((REPO / cfg["phase4_results"]).read_text())["required_replicas"]
         for name in traces:
@@ -232,7 +221,7 @@ def main() -> int:
         pts = [c for c in points if c["regime"] == g]
         taus = [c["tau_b"] for c in pts if c["tau_b"] is not None]
         flips = sum(1 for c in pts if c["flip"] is True)
-        # A regime with no defined tau-b anywhere is UNTESTABLE, and does not count as holding.
+        # A regime with no defined tau-b anywhere is untestable and does not count as holding.
         holds = (flips == 0 and all(t >= cfg["tau_threshold"] for t in taus)) if taus else None
         verdicts[g] = {
             "points": len(pts),
