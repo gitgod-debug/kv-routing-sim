@@ -76,7 +76,7 @@ def test_replay_says_how_close_to_the_edge_its_recommendation_is(tmp_path, capsy
     assert main(args) == 0
     out = capsys.readouterr().out
     assert "with timings 5% slower" in out
-    assert sum(s in out for s in ("⛔ at the knee", "⚠️ at the edge", "not at the edge")) == 1
+    assert sum(s in out for s in ("At the knee", "At the edge", "Not at the edge")) == 1
 
     report = tmp_path / "r.json"
     assert main([*args, "--format", "json", "--out", str(report)]) == 0
@@ -100,7 +100,7 @@ def test_no_edge_check_where_nothing_met_the_slo(tmp_path):
     assert json.loads(report.read_text())["edge"] is None
 
 
-# ── post hoc: the check against T1's five held-out runs ─────────────────────────────────────────
+# Post hoc: the check against T1's five held-out runs.
 
 REPO = __import__("pathlib").Path(__file__).resolve().parents[1]
 POSTHOC = REPO / "artifacts" / "results" / "t1_itl"
@@ -120,7 +120,7 @@ def _script():
 
 
 def test_the_post_hoc_table_reproduces_and_separates_the_runs_the_model_got_wrong():
-    """POST HOC, and labelled so: on T1's five held-out runs the 5% slowdown multiplies p95 TTFT
+    """Post hoc: on T1's five held-out runs the 5% slowdown multiplies p95 TTFT
     by more than five on the two where the simulator's per-token latency was 1.54x and 1.71x the
     engine's, and by 1.13-1.14 on the three where it was within 1.07x. The module's docstring and
     the README quote these numbers."""

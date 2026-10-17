@@ -1,40 +1,12 @@
-"""The engine's time cost — and a hard refusal to pretend it has been measured.
-
-⛔ THE DEFAULTS IN THIS FILE ARE NOT CALIBRATED. They are plausible shapes, not predictions.
-
-This is the ONE place where the Phase-0 gate really bites. Everything else in this package is
-algorithm — a trie, six policies, some statistics — and is correct or incorrect on its own terms.
-These four numbers are a claim about how a real GPU behaves, and we have not yet run one. So the
-profile carries a `calibrated` flag, every result carries the profile that produced it, and the
-reporting layer refuses to present an uncalibrated run as a prediction (`eval/`).
-
-`Mike-Ew/kv-cache-routing` is the cautionary case (docs/04-prior-art.md): they designed against
-documentation, never started an engine, and shipped a README citing a metric that does not exist.
-The difference between that repo and this one is not the design — it is whether the numbers were
-ever checked. This flag is where that difference is enforced in code rather than in intention.
-
-THE MODEL (ADR-001, iteration granularity):
+"""The engine's timing profile: prefill and decode step costs, and the KV cache capacity.
 
     prefill(n, c) = prefill_base_s + prefill_per_token_s * n + prefill_attn_s * n * (c + n / 2)
     decode(b, S)  = decode_base_s  + decode_per_seq_s    * b + decode_per_ctx_token_s * S
 
-n = uncached tokens computed, c = cached tokens before them, b = sequences in the step, S = the
-sum of their context lengths (prompt + tokens generated so far).
-
-The prefill form is not this project's invention: with L = c + n it is c_lin·n + c_attn·n·(L − n/2),
-the cost model SMetric (arXiv 2607.08565, Eq. 1) takes from KunServe (EuroSys '26). C2 derived it
-from the cost of attention without knowing either; what is this project's is the T4 fit and the
-registered tests that it predicts traffic it never saw (docs/04-prior-art.md §2a).
-
-Prefill is compute-bound and scales with the tokens actually computed — which is exactly the
-quantity prefix caching reduces, and therefore exactly the quantity routing controls. Decode is
-memory-bandwidth-bound and scales with how many sequences share the step.
-
-⚠️ THE TWO CONTEXT TERMS (added 2026-09-28, after Phase 6): attention reads every earlier token, so
-both costs also grow with context. Phase 6 found the context-free model optimistic by 2.7–4.0× per
-decode step on ~1,700-token prompts, and C1 found prefill per token rising from 0.71 ms (≤ 1,024
-tokens) to 1.12 ms (2,040). Both terms default to 0.0, which reproduces the old model exactly —
-every profile fitted before C2 keeps its results to the bit. C2 (configs/c2_timing.yaml) fits them.
+Here n is the uncached tokens computed, c the cached tokens before them, b the sequences in the step
+and S the sum of their context lengths (prompt plus tokens generated so far). Prefill scales with
+the tokens actually computed, which is what prefix caching reduces; the two context terms default to
+0.0, the context-free model.
 """
 
 from __future__ import annotations
@@ -53,11 +25,11 @@ TIMING_FIELDS = ("prefill_base_s", "prefill_per_token_s", "prefill_attn_s", "dec
 
 @dataclass(frozen=True, slots=True)
 class CostProfile:
-    """Engine timing + cache capacity for one (GPU, model, flags) combination.
+    """Engine timing and cache capacity for one combination of GPU, model and engine flags.
 
-    ⭐ ADR-010: a profile is the unit that does NOT transfer. A user running different hardware
-    needs their own, which is what `kvsim calibrate` is for. The identity fields exist so a profile
-    can never be silently reused outside the setup it was measured on.
+    A profile does not transfer to other hardware (ADR-010); `kvsim calibrate` measures a new one.
+    The identity fields record the setup it was measured on, and results from a profile that is not
+    `calibrated` are not presented as predictions.
     """
 
     name: str
@@ -69,14 +41,14 @@ class CostProfile:
     block_size: int = 16
     max_num_seqs: int = 256
 
-    # ── Identity: what this profile was measured on. Empty means "nothing; it is a guess." ──
+    # Identity: what the profile was measured on; empty when the profile is a guess.
     gpu: str = ""
     model: str = ""
     engine_version: str = ""
     calibrated: bool = False
     calibration_error: float | None = None  # relative hit-rate error vs the live engine
 
-    # ── The context terms (C2). 0.0 = the context-free model, exactly as before. ──
+    # The context terms; 0.0 gives the context-free model.
     prefill_attn_s: float = 0.0  # per computed token, per token it attends to
     decode_per_ctx_token_s: float = 0.0  # per context token summed over the batch
 
@@ -98,12 +70,12 @@ class CostProfile:
         return bool(self.prefill_attn_s or self.decode_per_ctx_token_s)
 
     def provenance(self) -> dict[str, object]:
-        """What every results file records about where its timing came from."""
+        """Return what a results file records about where its timing came from."""
         d = asdict(self)
         d["WARNING"] = (
-            "UNCALIBRATED — timings are plausible shapes, not measurements. "
-            "Policy RANKING may still be informative (H6); absolute latency and cost are not. "
-            "Run `kvsim calibrate` against a live engine."
+            "UNCALIBRATED: timings are plausible shapes, not measurements. The ranking of "
+            "policies may still be informative, though it changes with the hardware; absolute "
+            "latency and cost are not. Run `kvsim calibrate` against a live engine."
             if not self.calibrated
             else f"calibrated on {self.gpu} / {self.model} / {self.engine_version}"
         )
@@ -111,21 +83,19 @@ class CostProfile:
 
 
 def load_profile(path: str | Path) -> CostProfile:
-    """A profile from a JSON file — e.g. `configs/profiles/t4-qwen3-4b-vllm0.30.0.json`.
+    """Load a profile from a JSON file such as `configs/profiles/t4-qwen3-4b-vllm0.30.0.json`.
 
-    Fails LOUDLY on a missing or unknown field (ADR-004): a mistyped key quietly falling back to a
-    default is exactly how an uncalibrated number ends up published as a calibrated one. Keys that
-    start with `_` are provenance for the reader, and are ignored here.
+    A missing or unknown field raises (ADR-004), so a mistyped key cannot fall back to a default.
+    Keys starting with `_` are provenance for the reader and are ignored.
     """
     return _profile_from_json(Path(path).read_text(encoding="utf-8"), str(path))
 
 
 def resolve_profile(spec: str | Path) -> CostProfile:
-    """A profile from a file, or by the NAME of one shipped with the package — so the same command
-    works from a clone and after `pip install` (`--profile t4-qwen3-4b-vllm0.30.0`).
+    """Load a profile from a file, or by the name of one shipped with the package.
 
-    ⛔ No guessing between the two: an existing file wins, a bare shipped name is the only
-    fallback, and anything else fails with the shipped names listed (ADR-004).
+    An existing file wins; otherwise the name must match a shipped profile, and anything else raises
+    FileNotFoundError listing the shipped names (ADR-004).
     """
     path = Path(spec)
     if path.is_file():
@@ -143,12 +113,11 @@ def resolve_profile(spec: str | Path) -> CostProfile:
 
 
 def replicate_profiles(spec: str | Path) -> list[CostProfile]:
-    """The profile's REPLICATES: the same profile with the timing coefficients fitted on each
-    repeat of the calibration alone (`kvsim calibrate` writes them under `_source.replicates`).
+    """Return the profile refitted on each repeat of its calibration alone.
 
-    They exist to answer "how firm is this replica count?": sizing is re-run on each, and the
-    spread is shown. Empty for a profile without them — the two shipped ones, and any profile
-    written before 2026-10-05 — which is a statement that the spread is unknown, not that it is 0.
+    `kvsim calibrate` writes these under `_source.replicates`; re-running the sizing on each shows
+    how firm a replica count is. The list is empty for a profile without them, which means the
+    spread is unknown, not zero.
     """
     path = Path(spec)
     if path.is_file():
@@ -186,22 +155,19 @@ def _profile_from_json(text: str, where: str) -> CostProfile:
         raise ValueError(f"{where}: {exc}") from None
 
 
-# ⛔ A GUESS. Order-of-magnitude shapes for a Tesla T4 serving Qwen3-4B in fp16 — the hardware and
-# model this project actually calibrates on (decided 2026-09-22; A100/H100 is not in the plan). Used
-# so the simulator runs before Phase 3 replaces it with a measured profile. Not to be cited.
-#
-# The reasoning, so a reader can disagree: T4 fp16 tensor cores peak ~65 TFLOPS; a 4B model costs
-# ~8 GFLOP per prefill token; at ~35% utilisation that is ~0.35 ms/token. Decode is memory-bound:
-# ~7.5 GiB of weights over ~320 GB/s is ~25 ms per step at batch 1.
+# An uncalibrated guess: order-of-magnitude figures for a Tesla T4 serving Qwen3-4B in fp16, so the
+# simulator runs without a measured profile. T4 fp16 tensor cores peak at ~65 TFLOPS and a 4B model
+# costs ~8 GFLOP per prefill token, so ~35% utilisation gives ~0.35 ms/token. Decode is
+# memory-bound: ~7.5 GiB of weights over ~320 GB/s is ~25 ms per step at batch 1.
 UNCALIBRATED_DEFAULT = CostProfile(
     name="uncalibrated-t4-qwen3-4b-shape",
     prefill_base_s=0.010,  # fixed per-batch overhead
     prefill_per_token_s=0.00035,  # ~0.35 ms/token (see above)
     decode_base_s=0.025,  # one decode step: read every weight once
     decode_per_seq_s=0.0005,  # marginal cost of one more sequence in the batch
-    # DERIVED, not typed: qwen3-4b on one 15 GiB T4 at 0.90 util (~2,736 blocks). Computed from
-    # cache/capacity.py so the two can never disagree. vLLM also reserves memory for CUDA graphs and
-    # activations, so the real figure is LOWER — Phase 3 reads it from the engine's own log.
+    # Computed from cache/capacity.py for qwen3-4b on one 15 GiB T4 at 0.90 utilisation (~2,736
+    # blocks). vLLM also reserves memory for CUDA graphs and activations, so the real figure is
+    # lower; a calibrated profile reads it from the engine.
     kv_cache_blocks=kv_blocks_for(SHAPES["qwen3-4b"], 15.0),
     block_size=16,
     max_num_seqs=256,

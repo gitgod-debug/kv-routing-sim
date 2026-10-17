@@ -1,4 +1,4 @@
-"""Statistics, the cost model, and the guards that stop a number acquiring unearned authority."""
+"""Tests for the evaluation code: statistics, the cost model, and the recommendation's guards."""
 
 from __future__ import annotations
 
@@ -23,20 +23,17 @@ def _p(policy, n, hit, p95, inr, meets=True, calibrated=False):
 
 
 def test_grouped_bootstrap_gives_wider_intervals_than_ungrouped_would():
-    """Sessions are the independent unit. Resampling requests pretends dependence away.
-
-    Two sessions that are internally identical but differ from each other carry real uncertainty;
-    a request-level bootstrap would mix them and report near-zero width.
-    """
+    """Sessions, not requests, are resampled: two internally identical but different sessions
+    carry real uncertainty that a request-level bootstrap would hide."""
     groups = [[1.0] * 20, [9.0] * 20]
     ci = bootstrap_ci_grouped(groups, mean, n_resamples=500, seed=0)
     assert ci.unit == "session"
-    assert ci.hi - ci.lo > 3.0  # genuinely uncertain, as it should be
+    assert ci.hi - ci.lo > 3.0
     assert ci.lo <= ci.point <= ci.hi
 
 
 def test_paired_bootstrap_is_tighter_than_two_separate_intervals():
-    """Shared trace difficulty cancels in the delta. This is why every row gets a paired CI."""
+    """Shared trace difficulty cancels in the delta, which is why every row gets a paired CI."""
     a = [[x] for x in range(1, 41)]
     b = [[x + 2.0] for x in range(1, 41)]
     delta = paired_bootstrap_delta(a, b, mean, n_resamples=500, seed=0)
@@ -65,8 +62,7 @@ def test_cost_model_refuses_to_run_on_an_unfilled_config(tmp_path):
 
 
 def test_every_shipped_cost_constant_has_a_source_and_a_date():
-    """configs/cost_model.yaml stayed <TBD> until each constant had a source and a date (filled
-    2026-09-22). This keeps it that way: a constant without both is refused."""
+    """Every constant in configs/cost_model.yaml has a source URL and a date."""
     import datetime
 
     import yaml
@@ -119,7 +115,7 @@ def test_frontier_drops_dominated_points():
 
 
 def test_recommend_distinguishes_no_slo_from_failed_slo():
-    """Three different situations. Saying 'nothing met the SLO' when none was set is false."""
+    """No SLO, a failed SLO and a met SLO give three different reasons."""
     no_slo = [_p("round-robin", 2, 0.7, 40.0, float("inf"), meets=None)]
     assert "no cost model supplied" in recommend(no_slo).reason
 
@@ -135,7 +131,7 @@ def test_recommendation_from_an_uncalibrated_sweep_carries_the_tier_warning():
     d = rec.as_dict()
     assert d["calibrated"] is False
     assert "UNCALIBRATED" in d["WARNING"]
-    assert "POLICY and REPLICA COUNT" in d["WARNING"]
+    assert "policy and replica count depend on the hardware" in d["WARNING"]
 
 
 def test_recommendation_prefers_fewer_replicas_at_equal_cost():
@@ -168,8 +164,8 @@ def test_kendall_tau_b_requires_equal_lengths():
 
 
 def test_recommendation_reports_ties_on_the_same_replica_count():
-    """Between policies that hold the SLO on the same replicas, the rupee gap is noise (H6 found a
-    pick made on 0.1%). The pick is kept; the tie is reported, not hidden."""
+    """Policies that hold the SLO on the same replica count are reported as tied, because the rupee
+    gap between them is noise."""
     sticky = _p("session-sticky", 3, 0.9, 500.0, 4.7842)
     balanced = _p("radix-affinity-balanced", 3, 0.9, 600.0, 4.7796)
     rr = _p("round-robin", 4, 0.8, 500.0, 6.0)
@@ -180,7 +176,7 @@ def test_recommendation_reports_ties_on_the_same_replica_count():
     assert recommend([rr]).tied_with == ()
 
 
-# ── the SLO's second half: time per output token ─────────────────────────────────────────────
+# The second half of the SLO: time per output token
 
 _COST = """
     fx: {{usd_to_inr: 80.0, source: test, date: 2026-09-20}}
@@ -196,8 +192,8 @@ def _cost(tmp_path, tpot: str = "") -> CostModel:
 
 
 def test_the_per_token_half_of_the_slo_is_off_unless_the_cost_model_sets_it(tmp_path):
-    """Every result registered up to 2026-10-05 is on the first-token limit alone. A cost model
-    without `tpot_p95_ms` must keep meaning exactly that — whatever the tokens' speed."""
+    """A cost model without `tpot_p95_ms` applies the first-token limit alone, whatever the
+    per-token speed, as all earlier registered results assume."""
     one = _cost(tmp_path)
     assert one.tpot_p95_slo_ms is None and one.slo_label == "p95 TTFT SLO"
     assert one.meets_slo(1_999.0, 10_000.0) and not one.meets_slo(2_001.0, 1.0)
@@ -209,7 +205,7 @@ def test_with_both_halves_a_configuration_must_meet_both(tmp_path):
     two = _cost(tmp_path, ", tpot_p95_ms: 100")
     assert two.tpot_p95_slo_ms == 100.0 and "time per output token" in two.slo_label
     assert two.meets_slo(1_500.0, 100.0)  # at the limit is within it, as for TTFT
-    assert not two.meets_slo(1_500.0, 100.1)  # a prompt first token does not excuse slow ones
+    assert not two.meets_slo(1_500.0, 100.1)  # a quick first token does not excuse slow ones
     assert not two.meets_slo(2_500.0, 50.0)
     # No request had a second token: there is no per-token latency to miss a limit with.
     assert two.meets_slo(1_500.0, float("nan"))
@@ -230,7 +226,7 @@ def test_a_point_carries_the_per_token_p95_and_decides_the_slo_on_it_only_when_a
     from kv_routing_sim.sim.engine import run
     from kv_routing_sim.traces.schema import NormalizedRequest
 
-    # Decode steps of 150 ms: the first token is prompt, the rest are slow.
+    # Decode steps of 150 ms: the first token is quick, the rest are slow.
     slow = CostProfile(name="slow-decode", prefill_base_s=0.0, prefill_per_token_s=0.0001,
                        decode_base_s=0.150, decode_per_seq_s=0.0, kv_cache_blocks=5_000,
                        block_size=16, max_num_seqs=16)

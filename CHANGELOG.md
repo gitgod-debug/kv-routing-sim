@@ -8,6 +8,13 @@ the file formats may still change between minor versions; each change will be li
 The first public version: planned for PyPI before 2026-11-20.
 
 ### Added
+- **An in-browser runner** (`site/run.html`): generated traffic or an uploaded serving log, the
+  measured T4 profile or one from `kvsim calibrate`, your own latency target and GPU price. The
+  simulator runs in the page through Pyodide, the file is never uploaded, and the page prints the
+  `kvsim` commands that reproduce its answer.
+- **The replay workflow as a library call**: `kv_routing_sim.service.replay()` returns the report
+  that `kvsim replay --format json` writes, with an optional progress callback.
+- `kvsim replay --ttft-slo-ms` and `--gpu-price-usd`; `kvsim generate --system-prompts`.
 - **`kvsim replay`** — a serving trace in; a routing policy, a replica count and ₹ per 1,000
   requests out, with ties on the replica count reported rather than hidden. Seven policies:
   round-robin, least-loaded, power-of-two, consistent-hash-prefix, radix-affinity,
@@ -58,6 +65,14 @@ The first public version: planned for PyPI before 2026-11-20.
   (`t4-qwen3-4b-vllm0.30.0`), and the cited cost model (`--cost-model default`), byte-identical to
   `configs/`.
 - The core install needs only PyYAML.
+
+### Changed
+- Reports use words instead of symbols: "yes" and "no" in the "meets SLO" column, and "Warning:"
+  and "Note:" labels.
+
+### Fixed
+- An unknown policy name, a missing trace file or an out-of-range generator setting now ends with
+  an error message instead of a Python traceback.
 
 ### Known limits
 - Every millisecond, rupee and replica count from the shipped profiles is a **T4 figure**. Run

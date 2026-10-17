@@ -1,13 +1,12 @@
-"""The sweep: policy x replicas x seeds -> points, and the crossover sweep that tests H2.
+"""Grid sweeps: every (policy, replica count) cell over several seeds, averaged into points.
 
-Multi-seed is not optional here. A single seed hides the variance that policy tie-breaking
-introduces, and the differences between policies are sometimes the same size as that variance —
-which is precisely the case where a single number would mislead (docs/06-methodology.md §1).
+Several seeds per cell matter because routing policies break ties at random, and the differences
+between policies can be as small as the variation between seeds (docs/06-methodology.md).
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from ..sim.cost_model import UNCALIBRATED_DEFAULT, CostProfile
@@ -17,6 +16,9 @@ from ..traces.generator import AgenticWorkload
 from ..traces.schema import NormalizedRequest
 from .cost import CostModel
 from .pareto import Point, to_point
+
+RunCallback = Callable[[], None]
+"""Called once after each simulation run finishes; used to report progress."""
 
 
 def sweep(
@@ -28,39 +30,33 @@ def sweep(
     profile: CostProfile = UNCALIBRATED_DEFAULT,
     cost: CostModel | None = None,
     trace_info: dict[str, Any] | None = None,
+    on_run: RunCallback | None = None,
 ) -> tuple[list[Point], list[RunResult]]:
-    """Run the full grid. Returns (one averaged Point per cell, every raw RunResult)."""
+    """Run every (policy, replica count, seed) combination.
+
+    Returns:
+        One point per (policy, replica count) cell, averaged over seeds, and every raw result.
+    """
     results: list[RunResult] = []
     points: list[Point] = []
     for policy in policies:
         for n in replica_counts:
-            cell = [
-                run(
-                    trace,
-                    policy=policy,
-                    n_replicas=n,
-                    seed=s,
-                    profile=profile,
-                    trace_info=trace_info,
-                )
-                for s in seeds
-            ]
+            cell = []
+            for seed in seeds:
+                cell.append(run(trace, policy=policy, n_replicas=n, seed=seed, profile=profile,
+                                trace_info=trace_info))
+                if on_run is not None:
+                    on_run()
             results.extend(cell)
-            points.append(_average_cell(cell, cost))
+            points.append(average_points([to_point(r, cost) for r in cell]))
     return points, results
 
 
-def _average_cell(cell: list[RunResult], cost: CostModel | None) -> Point:
-    """Average a cell's seeds into one point."""
-    return average_points([to_point(r, cost) for r in cell])
-
-
 def average_points(pts: list[Point]) -> Point:
-    """One (policy, replicas) cell's per-seed points -> one point.
+    """Average one cell's per-seed points into a single point.
 
-    ⚠️ Percentiles are averaged ACROSS SEEDS, not pooled. Pooling every seed's TTFTs into one list
-    and taking p95 of that would answer a different question — "the p95 of a mixture of runs" rather
-    than "the typical p95 of a run" — and would systematically understate run-to-run variation.
+    Percentiles are averaged across seeds rather than pooled: the result is the typical p95 of a
+    run, not the p95 of a mixture of runs, which would understate run-to-run variation.
     """
     n = len(pts)
     finite = [p.inr_per_1k for p in pts if p.inr_per_1k != float("inf")]
@@ -73,8 +69,7 @@ def average_points(pts: list[Point]) -> Point:
         inr_per_1k=(sum(finite) / len(finite)) if finite else float("inf"),
         throughput_rps=sum(p.throughput_rps for p in pts) / n,
         load_imbalance=sum(p.load_imbalance for p in pts) / n,
-        # A cell meets the SLO only if EVERY seed did. "Met it on average" is not met.
-        # None propagates: with no cost model there is no SLO to meet or miss.
+        # A cell meets the SLO only if every seed does; None means no SLO was defined.
         meets_slo=(
             None if any(p.meets_slo is None for p in pts) else all(p.meets_slo for p in pts)
         ),
@@ -93,11 +88,10 @@ def crossover_sweep(
     n_sessions: int = 150,
     profile: CostProfile = UNCALIBRATED_DEFAULT,
 ) -> list[dict[str, Any]]:
-    """⭐ The H2 experiment: which policy wins on p95 TTFT across (sharing x load)?
+    """Find the policy with the lowest p95 TTFT for each (prefix sharing, arrival rate) pair.
 
-    This is the finding, and it is a REPORTING AXIS on machinery that already exists — not new
-    work. The x-axis is CROSS-SESSION sharing (the measured value, not the requested knob), because
-    within-session reuse is captured by session-stickiness for free and would hide the effect.
+    The sharing axis reports the cross-session sharing the generator achieved, because reuse
+    within a session is captured by session-sticky routing anyway and would hide the effect.
     """
     rows: list[dict[str, Any]] = []
     for ratio in sharing_ratios:

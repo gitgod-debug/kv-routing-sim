@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run kv-routing-sim</title>
+<meta name="description" content="Size an LLM serving fleet in your browser: replay generated traffic or your own serving log through KV-cache routing policies. Nothing is uploaded.">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%231f5fbf%22/%3E%3Cpath d=%22M4 4h3v8H4zM9 6h3v6H9z%22 fill=%22white%22/%3E%3C/svg%3E">
+</head>
+<body>
+<main>
+  <p class="crumb"><a href="./">kv-routing-sim</a></p>
+  <h1>Run it on your traffic</h1>
+  <p class="sub">Pick your traffic, your GPU and your latency target. The simulator runs in this page,
+    in Python compiled to WebAssembly, and recommends a routing policy and a replica count. Files you
+    choose are read on your computer and never uploaded.</p>
+
+  <form id="form" class="controls" novalidate>
+    <fieldset>
+      <legend>Traffic</legend>
+      <div class="choice">
+        <label><input type="radio" name="traffic" value="generate" checked> Generate agentic traffic</label>
+        <label><input type="radio" name="traffic" value="file"> Use my serving log</label>
+      </div>
+      <div id="generate-fields" class="fields">
+        <label>Sessions <input type="number" id="sessions" value="100" min="1" step="1"></label>
+        <label>Turns per session <input type="number" id="turns" value="6" min="1" step="1"></label>
+        <label>New sessions per second <input type="number" id="rate" value="0.25" min="0.01" step="0.05"></label>
+        <label>Shared system prompt <input type="number" id="sharing" value="0.6" min="0" max="0.95" step="0.05">
+          <span class="hint">share of an average prompt, 0 to 0.95</span></label>
+        <label>Distinct system prompts <input type="number" id="system-prompts" value="1" min="1" max="100" step="1"></label>
+        <label>Random seed <input type="number" id="seed" value="0" min="0" step="1"></label>
+      </div>
+      <div id="file-fields" class="fields" hidden>
+        <label>Log file <input type="file" id="trace-file" accept=".jsonl,.json,.gz"></label>
+        <label>Format
+          <select id="trace-format">
+            <option value="vllm-jsonl">vLLM JSONL, token ids</option>
+            <option value="openai-log">OpenAI-style log</option>
+            <option value="mooncake">Mooncake trace</option>
+            <option value="bailian">Qwen-Bailian trace</option>
+            <option value="agentx">AgentX trace</option>
+          </select>
+        </label>
+      </div>
+      <p id="file-hint" class="hint" hidden>Prompts become block hashes as the file is read; their text
+        is never kept. Large logs take longer: the page shows progress and you can cancel.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>GPU</legend>
+      <div class="choice">
+        <label><input type="radio" name="profile" value="shipped" checked> Tesla T4 serving Qwen3-4B on vLLM 0.30.0, measured</label>
+        <label><input type="radio" name="profile" value="file"> My GPU: a profile from <code>kvsim calibrate</code></label>
+      </div>
+      <div class="fields">
+        <label id="profile-field" hidden>Profile file <input type="file" id="profile-file" accept=".json"></label>
+        <label>Price per GPU-hour, US dollars <input type="number" id="price" min="0" step="0.01" placeholder="0.526, an AWS g4dn.xlarge"></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Latency target, at the 95th percentile</legend>
+      <div class="fields">
+        <label>Time to first token, ms <input type="number" id="ttft" value="2000" min="1" step="50"></label>
+        <label>Time per output token, ms <input type="number" id="tpot" value="100" min="0" step="10">
+          <span class="hint">0 sizes on the first token alone</span></label>
+      </div>
+    </fieldset>
+
+    <details>
+      <summary>Search settings</summary>
+      <div class="fields">
+        <label>Replica counts <input type="text" id="replicas" value="1-8" placeholder="1-8 or 1,2,4,8"></label>
+        <label>Seeds per configuration <input type="number" id="seeds" value="5" min="1" max="10" step="1">
+          <span class="hint">fewer runs faster, with less averaging</span></label>
+      </div>
+      <fieldset>
+        <legend>Routing policies</legend>
+        <div id="policies" class="policy-list"></div>
+      </fieldset>
+      <label class="check"><input type="checkbox" id="edge" checked> Check the margin to saturation
+        (one extra run per seed)</label>
+      <label class="check"><input type="checkbox" id="spread" checked> Show how firm the replica count is,
+        for profiles that keep their calibration repeats</label>
+    </details>
+
+    <div class="actions">
+      <button type="submit" id="run" class="primary">Run</button>
+      <button type="button" id="cancel" hidden>Cancel</button>
+    </div>
+    <div id="status" class="status" aria-live="polite"></div>
+    <progress id="progress" max="1" value="0" hidden></progress>
+    <div id="error" class="error" role="alert" hidden></div>
+  </form>
+
+  <section id="results" hidden>
+    <h2>Recommendation</h2>
+    <div id="answer" class="answer" aria-live="polite"></div>
+    <div id="notes"></div>
+    <h2>Replicas each policy needs</h2>
+    <div class="scroll"><table id="summary"></table></div>
+    <p id="target" class="muted"></p>
+    <div id="spread-section"></div>
+    <details>
+      <summary>Every configuration</summary>
+      <div class="scroll"><table id="table"></table></div>
+    </details>
+    <h2>Reproduce it from the command line</h2>
+    <pre><code id="command"></code></pre>
+    <div class="actions">
+      <button type="button" id="download-json">Download the report as JSON</button>
+      <button type="button" id="download-md">Download the report as Markdown</button>
+    </div>
+  </section>
+
+  <footer>Python runs in your browser through <a href="https://pyodide.org/">Pyodide</a>. Source:
+    <a href="https://github.com/gitgod-debug/kv-routing-sim">the repository</a>.</footer>
+</main>
+<script src="run.js"></script>
+</body>
+</html>

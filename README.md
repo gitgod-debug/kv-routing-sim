@@ -325,13 +325,18 @@ shape with the **prefix-sharing ratio as an explicit parameter**.
 
 ## Install
 
+**In a browser, with nothing installed:** [run it on your traffic](https://gitgod-debug.github.io/kv-routing-sim/run.html).
+The simulator runs in the page through Pyodide; a log you choose is read on your computer and never
+uploaded. The page shows the `kvsim` commands that reproduce its answer.
+
+**On your machine** (not on PyPI yet):
+
 ```bash
-pip install kv-routing-sim          # CPU-only. No GPU dependency, by design.
+pip install git+https://github.com/gitgod-debug/kv-routing-sim   # CPU-only, no GPU dependency
 kvsim replay trace.jsonl --policies all --replicas 1-8 --format md
 ```
 
-⚠️ Not on PyPI yet (first release planned before 2026-11-20). Until then, from a clone:
-`pip install .`
+Set your own target and GPU price with `--ttft-slo-ms`, `--tpot-slo-ms` and `--gpu-price-usd`.
 
 Runs on your laptop. **Your trace never leaves your machine**, and prompts are hashed at the adapter
 boundary, so prompt text never enters the simulator at all.

@@ -5,72 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>kv-routing-sim</title>
 <meta name="description" content="Which KV-cache routing policy should you run, and on how many GPUs? A simulator calibrated against a live vLLM.">
-<style>
-  :root {
-    --bg: #fbfaf7; --fg: #1d1d1b; --muted: #5f5d57; --line: #dedad2; --card: #ffffff;
-    --accent: #1f5fbf; --good: #1d7a3e; --bad: #b3261e; --warn-bg: #fff6e0; --warn-fg: #6b4a00;
-    --chip: #eef2f9;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #151514; --fg: #ecebe6; --muted: #a8a59c; --line: #34332f; --card: #1d1d1b;
-      --accent: #7fb0ff; --good: #6fd08f; --bad: #ff8a80; --warn-bg: #2d2610; --warn-fg: #f3d68a;
-      --chip: #22293a;
-    }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--fg);
-         font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
-  h1 { font-size: 1.75rem; margin: 0 0 4px; letter-spacing: -0.01em; }
-  h2 { font-size: 1.2rem; margin: 40px 0 8px; }
-  p { margin: 8px 0; }
-  .sub { color: var(--muted); margin: 0 0 20px; }
-  .finding { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent);
-             border-radius: 8px; padding: 14px 16px; font-size: 1.1rem; }
-  .note { background: var(--warn-bg); color: var(--warn-fg); border-radius: 8px; padding: 10px 14px;
-          font-size: 0.93rem; }
-  .scroll { overflow-x: auto; }
-  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; margin: 8px 0; }
-  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { color: var(--muted); font-weight: 600; }
-  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  td.num { white-space: nowrap; }
-  #tbl td:first-child { min-width: 8.5em; }
-  @media (max-width: 560px) {
-    table { font-size: 0.85rem; }
-    th, td { padding: 6px 5px; }
-    .opt { display: none; }  /* p50 TTFT: the table's least-needed column, dropped on phones */
-    #tbl td:first-child { min-width: 7em; }
-  }
-  .controls { display: grid; gap: 14px; background: var(--card); border: 1px solid var(--line);
-              border-radius: 8px; padding: 16px; }
-  .control label { display: block; font-weight: 600; margin-bottom: 6px; }
-  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
-  .seg button { font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--fg);
-                border-radius: 999px; padding: 4px 12px; cursor: pointer; }
-  .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
-  .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .answer { font-size: 1.05rem; background: var(--chip); border-radius: 8px; padding: 12px 14px; margin-top: 14px; }
-  .answer strong { color: var(--accent); }
-  .ok { color: var(--good); font-weight: 600; }
-  .no { color: var(--bad); }
-  .muted { color: var(--muted); }
-  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
-  pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow-x: auto; }
-  svg text { fill: var(--muted); font-size: 12px; }
-  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.9rem; margin: 4px 0; }
-  .legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px;
-                         vertical-align: middle; background: var(--c); }
-  a { color: var(--accent); }
-  footer { margin-top: 48px; color: var(--muted); font-size: 0.9rem; }
-</style>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%231f5fbf%22/%3E%3Cpath d=%22M4 4h3v8H4zM9 6h3v6H9z%22 fill=%22white%22/%3E%3C/svg%3E">
 </head>
 <body>
 <main>
   <h1>kv-routing-sim</h1>
   <p class="sub">Which KV-cache routing policy should you run — and on how many GPUs? A simulator whose
     cache model was checked against a live vLLM, and whose tests were written down before they ran.</p>
+  <p class="lead"><a class="button" href="run.html">Run it on your own traffic</a></p>
 
   <div class="finding"><strong>Keep each user on one GPU.</strong> On three calibrations of the same T4,
     session-sticky routing needs the fewest GPUs — or ties for them — at every load with one shared
@@ -99,23 +42,22 @@
       </tbody>
     </table>
   </div>
-  <p class="note"><strong>Scope, before you trust it.</strong> Generated agentic traffic, Qwen3-4B, T4
-    timings from a context-aware model that predicted held-out traffic within 1.41× and, after the fact,
-    two live T4s within 1.02–1.79× (C2). The target on this page is on the first token only. With a
-    limit on the time per token as well (100 ms) — which the <code>kvsim replay</code> command applies
-    by default — the simulator needs about twice as many GPUs; its per-token
-    model was checked on a live T4 on 2026-10-05 (C4: within 7% on three workloads around the
-    limit, on one replica). <strong>This finding changed twice.</strong> On the first, context-free timing
-    model — 5–222× optimistic on live GPUs — prefix routing won once prompts outgrew one GPU's cache.
-    Re-tested on the validated model (2026-09-30, calibration A), that half was falsified. On
-    2026-10-05 the same test was run on two more calibrations of the same T4 (B and C, written by
-    <code>kvsim calibrate</code> on a live engine): it held on both. The three calibrations agree on
-    a GPU count to within one at 96% of points, and that half of the finding was decided by one. The
+  <p class="note"><strong>Scope, before you trust it.</strong> Generated agentic traffic, Qwen3-4B, and
+    T4 timings from a context-aware model that predicted held-out traffic within 1.41× and two live
+    T4s within 1.02–1.79×. The target on this page is on the first token only. With a limit on the
+    time per token as well (100 ms), which <code>kvsim replay</code> applies by default, the simulator
+    needs about twice as many GPUs; its per-token model was checked on a live T4 within 7% on three
+    workloads around that limit, on one replica. <strong>This finding changed twice.</strong> On the
+    first, context-free timing model, which was 5–222× optimistic on live GPUs, prefix routing won
+    once prompts outgrew one GPU's cache. Re-tested on the validated model (calibration A), that
+    half was falsified; on two more calibrations of the same T4 (B and C, measured with
+    <code>kvsim calibrate</code> on a live engine), it held. The three calibrations agree on a GPU
+    count to within one at 96% of points, and that half of the finding was decided by one. The
     explorer below shows calibration A. On Mooncake's real traces, re-run on the validated model on
-    two calibrations (2026-10-06), session-sticky and prefix-affinity are within one replica of
-    each other at every speed.</p>
+    two calibrations, session-sticky and prefix-affinity are within one replica of each other at
+    every speed.</p>
 
-  <h2>The credential — checked against a live vLLM</h2>
+  <h2>Checked against a live vLLM</h2>
   <p>vLLM 0.30.0, Qwen3-4B (fp16), a deliberately small 512-block cache that overflows, three runs of each
     workload, predictions committed before the run.</p>
   <div class="scroll">
@@ -131,10 +73,10 @@
   <p class="muted">Hit rate = <code>vllm:prefix_cache_hits ÷ vllm:prefix_cache_queries</code>, two counters.
     Every request's cached-token count matched too.</p>
   <p>And the timing: a context-aware T4 model, fitted on micro-benchmarks, predicted held-out traffic
-    within 1.41× — where the first, context-free model was up to 7× optimistic (C2, registered). Every
-    number on this page uses it.</p>
+    within 1.41×, where the first, context-free model was up to 7× optimistic. Every number on this
+    page uses it.</p>
 
-  <h2>Try it — every answer below is precomputed, nothing runs</h2>
+  <h2>Explore the precomputed results</h2>
   <div class="controls">
     <div class="control"><label id="lk">Distinct system prompts (tenants)</label>
       <div class="seg" role="group" aria-labelledby="lk" id="ks"></div></div>
@@ -151,11 +93,13 @@
   <p class="muted" id="chartcap"></p>
 
   <h2>Run it on your own traffic</h2>
-  <pre><code>pip install kv-routing-sim
+  <p><a href="run.html">Open the simulator in your browser</a> to size a fleet for generated traffic or
+    your own serving log, on the measured T4 or on your GPU's profile. The file you choose is read on
+    your computer and never uploaded.</p>
+  <p>Or install the command line:</p>
+  <pre><code>pip install git+https://github.com/gitgod-debug/kv-routing-sim
 kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
   --profile t4-qwen3-4b-vllm0.30.0-ctx --cost-model default</code></pre>
-  <p class="muted">No upload box on purpose: a serving log holds your users' prompts. It stays on your
-    machine, and prompts are hashed before they enter the simulator.</p>
 
   <footer id="foot">Every number on this page comes from committed scripts with pinned seeds, in
     <a href="https://github.com/gitgod-debug/kv-routing-sim">the repository</a>.</footer>
@@ -230,7 +174,7 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
                `<th>On ${t4s(A.replicas[r])}</th></tr></thead><tbody>`;
     A.policies.forEach((name, p) => {
       const c = cell(k, l, p, r), ri = needed(k, l, p);
-      rows += `<tr><td>${nice(name)}</td><td class="num">${ri < 0 ? "✗" : A.replicas[ri]}</td>` +
+      rows += `<tr><td>${nice(name)}</td><td class="num">${ri < 0 ? "none" : A.replicas[ri]}</td>` +
               `<td class="num">${c[0].toFixed(3)}</td><td class="num opt">${ms(c[1])}</td><td class="num">${ms(c[2])}</td>` +
               `<td class="num">${c[3] === null ? "—" : c[3].toFixed(2)}</td>` +
               `<td>${c[4] ? '<span class="ok">holds</span>' : '<span class="no">misses</span>'}</td></tr>`;
@@ -256,7 +200,7 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
     ticks.push(none);  // the top line: not held on the largest fleet
     for (const v of ticks) {
       s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="currentColor" opacity="0.12"/>` +
-           `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v === none ? "✗" : v}</text>`;
+           `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v === none ? "none" : v}</text>`;
     }
     A.prompts.forEach((k, i) => { s += `<text x="${x(i)}" y="${H - 12}" text-anchor="middle">K = ${k}</text>`; });
     show.forEach((name, j) => {
@@ -272,18 +216,10 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
     svg.innerHTML = s;
     $("legend").innerHTML = show.map((n, j) => `<span style="--c:${colors[j]}">${nice(n)}</span>`).join("");
     $("chartcap").textContent = `T4s needed to hold the 2 s p95 target at ${A.loads[l]} sessions/s as the ` +
-      `number of distinct system prompts (K) grows; ✗ = not held on ${A.replicas[A.replicas.length - 1]}. ` +
+      `number of distinct system prompts (K) grows; "none" = not held on ${A.replicas[A.replicas.length - 1]}. ` +
       `T4 figures, generated traffic.`;
   }
-  // Published: the grid sits next to the page. Previewed from a clone (`python -m http.server` in
-  // the repo root, then open /site/): it is read from where build_grid.py wrote it.
-  // Which uncommitted paths the build saw (its results header lists them): code, or only notebooks/.
-  function dirtyNote(g) {
-    if (!g.git_dirty) return "";
-    const paths = (g.git_dirty_paths || []).map((x) => x.slice(3));
-    return paths.length && paths.every((x) => x.startsWith("notebooks/"))
-      ? " (uncommitted changes under notebooks/ only, no code)" : " (with uncommitted code changes)";
-  }
+  // Deployed, the grid sits next to the page; in a clone it is read from artifacts/results/.
   function load(urls) {
     return fetch(urls[0]).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
       .catch((e) => (urls.length > 1 ? load(urls.slice(1)) : Promise.reject(e)));
@@ -294,10 +230,9 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
     const two = g.axes.loads.indexOf(2), eight = g.axes.replicas.indexOf(8);
     state.load = two >= 0 ? two : Math.floor(g.axes.loads.length / 2);
     state.rep = eight >= 0 ? eight : Math.floor(g.axes.replicas.length / 2);
-    $("foot").textContent = `Grid: ${g.n_simulator_runs.toLocaleString()} simulator runs ` +
-      `(${g.seeds.length} seeds each point), built ${g.date_utc.slice(0, 10)} (UTC) at commit ${g.git_sha} by ` +
-      `scripts/build_grid.py${dirtyNote(g)}, and checked to reproduce ` +
-      `${g.source === "h2b_c2" ? "the registered re-test's table (H2b on C2's timing)" : "the Phase 5 experiment's table"} exactly.`;
+    $("foot").innerHTML = `The explorer reads ${g.n_simulator_runs.toLocaleString()} precomputed ` +
+      `simulator runs (${g.seeds.length} seeds per point), built with scripts/build_grid.py. ` +
+      `Source: <a href="https://github.com/gitgod-debug/kv-routing-sim">the repository</a>.`;
     render();
     window.addEventListener("resize", () => chart(state.load));
   }).catch(() => { $("answer").textContent = "Could not load demo_grid_ctx.json."; });

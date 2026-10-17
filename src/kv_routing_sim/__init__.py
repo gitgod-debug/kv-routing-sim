@@ -1,19 +1,18 @@
-"""kv-routing-sim — which KV-cache routing policy should you actually run, and on how many replicas?
+"""kv-routing-sim: choose a KV-cache routing policy and a replica count for an LLM serving fleet.
 
-A trace-driven simulator of a multi-replica vLLM fleet, and a recommender on top of it. The cache
-model follows vLLM 0.30.0's block pool and was checked against a live engine before anything was
-built on it (Phase 3: exact on two sequential workloads under eviction pressure, +0.3% concurrent).
+A trace-driven simulator of a multi-replica vLLM fleet with a recommender on top. The cache model
+follows vLLM 0.30.0's block pool and was checked against a live engine.
 
-  traces/    adapters and the generator → requests as chains of block hashes (no text, ever)
-  cache/     the block pool (vLLM's rules) and the plain-LRU ablation
-  policies/  seven routers, one file each
-  sim/       replicas, the event loop, the timing profile
-  eval/      cost, Pareto, bootstrap, rank agreement, the recommendation
-  calib/     `kvsim calibrate`: fit a profile to YOUR engine, and check the cache model on it
-  cli.py     `kvsim replay | generate | crossover | calibrate`
+    traces/    trace adapters and the agentic traffic generator; prompts become block hashes
+    cache/     the vLLM block-pool model and a plain LRU model kept as an ablation
+    policies/  routing policies, one class per file, behind a registry
+    sim/       replicas, the event loop and the timing profile
+    eval/      sweeps, cost, the Pareto frontier, bootstrap intervals and the recommendation
+    calib/     `kvsim calibrate`: fit a timing profile to a running engine
+    service    the replay workflow shared by the command line and the browser page
+    cli        the `kvsim` command line
 
-The layout was written down as contracts before the code (ADR-001…004); the code implements them.
-Read `docs/05-codebase-map.md` for the module-by-module contract.
+See docs/05-codebase-map.md for the module contracts.
 """
 
 __version__ = "0.1.0"  # keep in step with pyproject.toml
