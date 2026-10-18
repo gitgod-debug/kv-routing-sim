@@ -37,6 +37,10 @@ repo was written down before it ran — the ones that failed too.
 > that**; see the honesty gates in [`CHECKPOINTS.md`](CHECKPOINTS.md). Start at
 > [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
 
+[![The in-browser runner: choose traffic, a GPU and a latency target, run it, and read the recommended routing policy and replica count](docs/figures/demo-run.gif)](https://gitgod-debug.github.io/kv-routing-sim/run.html)
+
+**[Run it on your traffic](https://gitgod-debug.github.io/kv-routing-sim/run.html)**, in the browser: nothing to install, and a log you choose is never uploaded.
+
 ---
 
 ## The finding
