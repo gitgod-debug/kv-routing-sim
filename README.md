@@ -14,7 +14,7 @@ repo was written down before it ran — the ones that failed too.
 | **The timing model** | p95 TTFT within **1.4×** on traffic it never saw · p95 time per output token within **7%** around a 100 ms limit · ⛔ 1.5–1.7× off when a GPU is at the knee of its load curve |
 | **What it found** | On a T4, among seven standard policies: keep each session on one GPU. ⚠️ **Not a new result** — SMetric (2026) reached it on production traces; this is an independent agreement. On a public production trace the two published policies, ported here, never needed more GPUs than that. And a simulator's GPU count is good to **± one**: measured, across calibrations of one GPU |
 | **How** | every test's design, rules and prediction committed before it ran; the failed ones are in [the log](docs/09-hypotheses.md), dated |
-| **Upstream** | a bug in `vllm-project/guidellm`'s trace replay, found while calibrating (one token lost per block with tokenizers that add a start token) — fix and test ready in [`docs/upstream/`](docs/upstream/), **not yet submitted** |
+| **Upstream** | a bug in `vllm-project/guidellm`'s trace replay, found while calibrating (one token lost per block with tokenizers that add a start token). Another contributor reported it upstream and it is fixed there (#1424 and #1425, merged 17 November 2026). Nothing was filed from this repository; the dated finding is in [`docs/upstream/`](docs/upstream/) |
 
 > ## 🚧 Status (2026-10-18)
 > **Checked on a live T4, each test registered first:** the cache model (Phase 3, Phase 6), the
