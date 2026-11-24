@@ -34,8 +34,10 @@ The first public version. Not on PyPI yet.
   under eviction pressure, +0.3% on a concurrent one.
 - **Trace adapters:** `vllm-jsonl`, `openai-log`, `mooncake` (the FAST'25 traces: 512-token
   block hashes, sessions inferred) and `bailian` (Alibaba's public Qwen-Bailian usage traces:
-  16-token block hashes, and real sessions from each request's parent). Prompts enter as block
-  hashes only; no text is ever read.
+  16-token block hashes, and real sessions from each request's parent). Prompts enter the
+  simulator as block hashes only. `openai-log` is the one adapter that reads message text, on your
+  machine, to make those hashes: it has no token ids, so it stands in about four characters for a
+  token, which can move a block boundary and so the hit rate. No text is kept or written out.
 - **`kvsim calibrate`** — fit the context-aware timing model to your own running vLLM (decode cells
   over context length × batch, `--decode-contexts`; prefill over prompt length, cold and after a
   cached prefix, `--prefill-cached` and `--prefill-new`), read its KV capacity, and check the cache

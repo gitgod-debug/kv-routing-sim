@@ -81,6 +81,7 @@ def test_every_step_names_a_script_that_exists_and_the_copy_lists_real_files():
     for step in rep.STEPS:
         assert (REPO / step.argv[0]).is_file(), step.argv[0]
         assert step.note or not step.added_since  # an exemption always says why
+    assert [s.argv[0] for s in rep.STEPS if not s.writes] == ["scripts/build_ledger.py"]
     files = rep.tracked_files()
     assert "README.md" in files and "scripts/build_grid.py" in files
     assert all((REPO / f).is_file() for f in files)

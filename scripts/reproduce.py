@@ -12,7 +12,9 @@ committed one. Numbers and text must be equal. Fields that describe the run and 
 (date, commit, machine, package versions, run time) are left out of the comparison.
 
 GPU measurements cannot be made again on a laptop. For those, the analysis is run again on the
-raw files that the GPU run left in the repository.
+raw files that the GPU run left in the repository. Not re-made here either: the stored grids that
+some analyses read (T2's three, C4's, and those of calibrations B and C), the first two sweeps,
+H6, the scale test and the real-trace runs.
 """
 
 from __future__ import annotations
@@ -51,6 +53,7 @@ class Step:
     # Fields today's code writes that the committed file, written by older code, does not have.
     added_since: tuple[str, ...] = ()
     note: str = ""
+    writes: bool = True  # a step that should write files and writes none has failed
 
 
 STEPS = (
@@ -70,11 +73,13 @@ STEPS = (
     Step("per-token timing on a real GPU (C4)", ("scripts/c4_analyze.py",)),
     Step("per-token latency on five held-out runs (T1)", ("scripts/t1_itl_check.py",)),
     Step("the two-part target, from its stored grids (T2)", ("scripts/t2_analyze.py",)),
+    Step("GPU counts across three calibrations, from their stored grids",
+         ("scripts/c3_posthoc_grid.py",)),
     Step("the grid behind the finding and the demo page (H2b on the checked timing model)",
          ("scripts/build_grid.py", "--source", "h2b_c2"), slow=True),
     Step("what one agent session costs (S1)", ("scripts/session_cost.py",), slow=True),
     Step("the README's evidence ledger against the files it names",
-         ("scripts/build_ledger.py", "--check")),
+         ("scripts/build_ledger.py", "--check"), writes=False),
 )
 
 
@@ -158,6 +163,8 @@ def run_step(step: Step, copy: pathlib.Path) -> tuple[bool, list[str], str]:
         else:
             lines.append(f"    DIFFERS from the committed file     {name}")
             ok = False
+    if step.writes and not lines:
+        return False, ["    wrote no file, though it should have"], tail
     return ok, lines, tail
 
 

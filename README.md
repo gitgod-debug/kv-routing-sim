@@ -14,7 +14,7 @@ are in the table below.
 |---|---|
 | **Checked against** | a live **vLLM 0.30.0** (`--enable-prefix-caching`) serving `Qwen/Qwen3-4B` on **2× Tesla T4** — its own `vllm:prefix_cache_hits` ÷ `vllm:prefix_cache_queries`, and each request's cached tokens |
 | **The cache model** | **exact** on one trace of 120 requests sent one at a time, once with 1-token and once with 64-token answers, under eviction pressure: every counter and every request, three identical runs each · hit rates within **1.4%** on two live replicas under three routing policies |
-| **The timing model** | p95 TTFT within **1.4×** on traffic it never saw · p95 time per output token within **7%** around a 100 ms limit · ⛔ at the knee of a GPU's load curve it fails: mean time per token 1.5–1.7× off, and a second calibration put one p95 TTFT **4.17×** off |
+| **The timing model** | p95 TTFT within **1.41×** on traffic it never saw · p95 time per output token within **7%** around a 100 ms limit · ⛔ at the knee of a GPU's load curve it fails: mean time per token 1.5–1.7× off, and a second calibration put one p95 TTFT **4.17×** off |
 | **The routing result** | On a T4, among the standard policies: keep each session on one GPU. ⚠️ **Not a new result** — SMetric (2026) reached it on production traces and LMetric (OSDI '26) had shown why; this is an independent agreement ([the finding](#the-finding)). How far a GPU count from a simulator can be trusted was measured: where three calibrations of the same GPU type all give a count (92 of 144 cells), they are **within one** of each other in 89; in 8 more cells they disagree on whether the target can be held at all |
 
 ## Validity: where these numbers hold
@@ -93,7 +93,7 @@ settled.
 6. [Ten questions a skeptic should ask](#ten-questions-a-skeptic-should-ask), each with its number and where it does not hold.
 
 <details>
-<summary><b>Evidence ledger</b> — for each number above: the file that holds it, what made that file, and the commit</summary>
+<summary><b>Evidence ledger</b> — for each result above: the file that holds it, what made that file, and the commit</summary>
 
 <!-- ledger:start -->
 | Claim | Number | Results file | Made by | Commit |
@@ -105,29 +105,34 @@ settled.
 | Latency on those two replicas, first timing model | 5–222× off | [`analysis.json`](artifacts/results/phase6_kaggle_t4/analysis.json) | `scripts/phase6_analyze.py` | `3a5cd89` |
 | The calibration command's cache check (C1) | 48 of 48 requests | [`c1.json`](artifacts/results/c1_kaggle_t4/c1.json) | `notebooks/c1_calibrate_t4.ipynb` | `3a5cd89` |
 | Timing: three predictions (C2) | 1.92×, 1.00×, within 1.41× | [`analysis.json`](artifacts/results/c2_kaggle_t4/analysis.json) | `scripts/c2_analyze.py` | `8899fd9` |
-| p95 time to first token on traffic the fit never saw | within 1.4× | [`analysis.json`](artifacts/results/c2_kaggle_t4/analysis.json) | `scripts/c2_analyze.py` | `8899fd9` |
+| p95 time to first token on traffic the fit never saw | within 1.41× | [`analysis.json`](artifacts/results/c2_kaggle_t4/analysis.json) | `scripts/c2_analyze.py` | `8899fd9` |
 | One p95 time to first token at the knee, on a second calibration (C3) | 4.17× off | [`analysis.json`](artifacts/results/c3_kaggle_t4/analysis.json) | `scripts/c3_analyze.py` | `b5f5d6c` |
+| A profile fitted on a real GPU, on traffic it never saw; an older profile, another day (C3) | within 1.41× and 1.38× | [`analysis.json`](artifacts/results/c3_kaggle_t4/analysis.json) | `scripts/c3_analyze.py` | `b5f5d6c` |
 | p95 time per output token around the limit (C4) | within 7% | [`analysis.json`](artifacts/results/c4_kaggle_t4/analysis.json) | `scripts/c4_analyze.py` | `81012bb` |
 | Nine rules for per-token timing (C4) | 7 of 9 held | [`analysis.json`](artifacts/results/c4_kaggle_t4/analysis.json) | `scripts/c4_analyze.py` | `81012bb` |
 | One calibration's own spread covers the next one's GPU count (C4, rule E) | 82.4% of cases | [`analysis.json`](artifacts/results/c4_kaggle_t4/analysis.json) | `scripts/c4_analyze.py` | `81012bb` |
 | Per-token latency at the knee of the load curve (T1) | 1.54× and 1.71× | [`t1.json`](artifacts/results/t1_itl/t1.json) | `scripts/t1_itl_check.py` | `904765c` |
 | Per-token latency off the knee (T1) | within 1.07× | [`t1.json`](artifacts/results/t1_itl/t1.json) | `scripts/t1_itl_check.py` | `904765c` |
-| GPU counts under the two-part target (T2) | 1.93–2.00× the first-token counts | [`analysis.json`](artifacts/results/t2_two_part_slo/analysis.json) | `scripts/t2_analyze.py` | `904765c` |
+| GPU counts under the two-part target (T2) | a median of 1.93–2.00× the first-token counts | [`analysis.json`](artifacts/results/t2_two_part_slo/analysis.json) | `scripts/t2_analyze.py` | `904765c` |
 | GPU counts from three calibrations of one GPU type | 92 of 144 cells have a count on all three: 58 equal, 89 within one; 8 more disagree on holding the target | [`posthoc_three_calibrations.json`](artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.json) | `scripts/c3_posthoc_grid.py` | `b5f5d6c` |
 | Ranking of policies across hardware (H6) | τ-b down to 0.51 | [`h6.json`](artifacts/results/h6_ranking/h6.json) | `scripts/run_h6.py` | `892b481` |
 | Two published policies on a production trace (R3) | 2 of 4 held | [`analysis.json`](artifacts/results/r3_bailian/analysis.json) | `scripts/r3_analyze.py` | `c4109a0` |
 | New tokens in a session | 519 of 6,800 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `a27cbaf` |
 | Session-sticky, first-token target | 5 T4s, 27 tokens, ₹0.047 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `a27cbaf` |
 | Round-robin, first-token target | 7 T4s, 669 tokens, ₹0.063 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `a27cbaf` |
+| Balanced prefix-affinity, first-token target | 10 T4s, 438 tokens, ₹0.091 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `a27cbaf` |
+| Least-loaded, first-token target | 11 T4s, 777 tokens, ₹0.098 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `a27cbaf` |
 | Session-sticky, two-part target | 10 T4s, 61 tokens, ₹0.091 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `a27cbaf` |
 | Round-robin, two-part target | 14 T4s, 834 tokens, ₹0.126 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `a27cbaf` |
+| Least-loaded, two-part target | 13 T4s, 805 tokens, ₹0.118 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `a27cbaf` |
 | S1's rupee rule outside its registered cell | more than 10% off in 4 of 86 cells | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `a27cbaf` |
 | Memory for the block hashes of a 100× trace | 537 MiB for 80,000 requests | [`scale.json`](artifacts/results/scale/scale.json) | `scripts/measure_scale.py` | `f141d73` |
 | Engine, block size and cache of the timing profile | vLLM 0.30.0, 16 tokens, 1,537 blocks | [`t4-qwen3-4b-vllm0.30.0-ctx.json`](configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json) | `scripts/c2_analyze.py` | `c0c8b18` |
 <!-- ledger:end -->
 
 `python scripts/build_ledger.py --check` reads every number from its file again and compares it
-with this table.
+with this table. Settings such as block size, cache size and replica ranges are in the configs that
+the validity table draws on; numbers from other people's papers carry their citation.
 
 </details>
 
@@ -174,7 +179,7 @@ package is uploaded, install it from a clone (see Install). Start at
 | 7 | Rupees per what, and over what time? | Per 1,000 requests that met the target, for a T4 at $0.526 an hour and ₹95.87 a dollar, both cited and dated in `configs/cost_model.yaml` | Counted over a short trace's whole run: a service that ran all day would pay about a quarter less |
 | 8 | Real traffic? | Three public traces, each test registered before it ran | Scaled down 16 to 64 times to fit a T4. R1 failed twice, R2 could not be tested on the checked timing model, R3 held in 2 of 4 rules. No run at full size yet |
 | 9 | What breaks first at 100×? | Memory for block hashes: 537 MiB for 80,000 requests, before the simulation starts | Whether many real replicas stay matched cannot be answered on a CPU. Two live replicas is the most that was measured |
-| 10 | Can I get your tables back myself? | `python scripts/reproduce.py`: eleven steps, about 20 minutes on a laptop, and every file a step writes is compared with the committed one | It re-runs the analysis of each GPU run on the raw files stored here; it cannot repeat a GPU measurement. Not covered yet: the first two sweeps, H6, the scale test, the real-trace runs |
+| 10 | Can I get your tables back myself? | `python scripts/reproduce.py`: twelve steps, about 20 minutes on a laptop, and every file a step writes is compared with the committed one | It re-runs the analysis of each GPU run on the raw files stored here; it cannot repeat a GPU measurement. Not covered yet: the first two sweeps, H6, the scale test, the real-trace runs, and the stored grids some analyses start from |
 
 ---
 
@@ -556,13 +561,14 @@ URL and a date — **disagree with a constant, change it, re-run, get your own n
 delete it and get it back, it doesn't ship.**
 
 **One command checks it.** `python scripts/reproduce.py` copies the repository's files to a
-temporary folder, runs eleven steps there and compares every file a step writes with the committed
+temporary folder, runs twelve steps there and compares every file a step writes with the committed
 one: the analysis of each GPU run from the raw files it left here, the grid behind the finding, the
 session cost table and the evidence ledger. It takes about 20 minutes on a 12-thread laptop;
 `--quick` leaves out the three slow steps and takes about 20 seconds. Fields that say when and
 where a file was made are left out of the comparison, and the script says where it makes one more
 exception, and why. **Not covered yet:** the first two sweeps (Phase 4 and Phase 5), H6, the scale
-test, and the three real-trace runs, whose traces are downloaded and not committed. A GPU
+test, the three real-trace runs, whose traces are downloaded and not committed, and the stored grids
+that some analyses start from (T2's three, C4's, and those of calibrations B and C). A GPU
 measurement cannot be made again this way.
 
 ---
