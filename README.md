@@ -139,8 +139,9 @@ cover the next calibration's count often enough (82% of cases; 90% was the rule)
 recommendation sits there. The test behind half of the old headline was decided inside the ± one
 margin; that half is "not settled" below.
 
-**Not new.** The routing result was published first (SMetric, LMetric), and NVIDIA ships a larger
-simulator for the same question — see the note under the finding, and the scope section.
+**Not new.** The routing result was published first (SMetric, LMetric), NVIDIA ships a larger
+simulator for the same question, and three more simulators checked against live engines were
+published in October and November 2026 — see the note under the finding, and the scope section.
 
 **Upstream.** While calibrating, this project found a bug in `vllm-project/guidellm`'s trace replay
 (one token lost per block with tokenizers that add a start token). Another contributor reported it
@@ -197,6 +198,12 @@ none of this is a result about the two systems.
 and the load then goes out of balance — 2.17× on its testbed. It did not show on that trace (1.14×
 at most: its sessions are short), and every generated session here has the same number of turns.
 That weakness is still untested in this repo.
+
+**Since then others have measured both sides** (found by the check of 2026-11-25). On SGLang,
+session affinity cut the uncached input by 48.2% and 46.1% against round-robin (arXiv 2610.15366).
+And Vesta (arXiv 2610.14686) measured the cost of the pure form: sending every turn to the
+instance that holds its cache gave a mean time to first token of 2,819 ms where SMetric gave
+2,060 ms, and 5,457 ms against 3,329 ms at higher load.
 
 Measured on simulated agentic traffic, with the cache model calibrated against a live vLLM (the
 credential, below), a context-aware T4 timing model, and a 2-second p95 TTFT target. The test was
@@ -475,15 +482,16 @@ and why, is in [`docs/04-prior-art.md`](docs/04-prior-art.md).
 
 | Project | What it is, and how this differs |
 |---|---|
-| **NVIDIA Dynamo's simulator** — `ai-dynamo/aisimulate`, "DynoSim" (and `aiconfigurator` before it, arXiv 2601.06288) | **The closest tool, and the larger one.** Replays a saved trace — its tutorial uses the same Mooncake trace as R1 below, and it reads the AgentX traces of R2 — on simulated vLLM or SGLang workers with a block-level prefix cache; compares round-robin with Dynamo's KV-aware router; and recommends a minimum GPU count under TTFT and TPOT limits. Offline multi-worker replay since March 2026. *What I did not find in it (read, not run, 2026-10-05):* routing policies other than those two; a published check of its cache model against a live engine — its public accuracy page covers TTFT and TPOT on single-node points with prefix caching off; a cost in money. |
+| **NVIDIA Dynamo's simulator** — `ai-dynamo/aisim` (called `aisimulate` until November 2026), "DynoSim" (and `aiconfigurator` before it, arXiv 2601.06288) | **The closest tool, and the larger one.** Replays a saved trace — its tutorial uses the same Mooncake trace as R1 below, and it reads the AgentX traces of R2 — on simulated vLLM or SGLang workers with a block-level prefix cache; compares round-robin with Dynamo's KV-aware router; and recommends a minimum GPU count under TTFT and TPOT limits. Offline multi-worker replay since March 2026. *What I did not find in it (read, not run, 2026-10-05):* routing policies other than those two; a published check of its cache model against a live engine — its public accuracy page covers TTFT and TPOT on single-node points with prefix caching off; a cost in money. |
+| **BLIS** (arXiv 2610.14255) · **a simulator for SGLang clusters** (arXiv 2610.15366) · **ROCm InferaSim** (arXiv 2611.04032) — all October and November 2026 | **Three more simulators checked against live engines**, found by the check of 2026-11-25. BLIS models routing and KV-cache management and reports 6.7% median end-to-end error against vLLM with llm-d. The SGLang one reports a token-hit-ratio error within 1.23 points, and measures session affinity against round-robin with predictions frozen first. InferaSim has a block-level prefix cache and routing across replicas. Each is larger than this project; a calibrated simulator of this kind is no longer rare. |
 | **LMetric** (Zhang et al., OSDI '26, arXiv 2603.15202) · **SMetric** (Wang et al., arXiv 2607.08565) · **Preble** (Srivatsa et al., ICLR '25) | **The closest findings, measured on real clusters.** LMetric: multiply new prefill tokens by batch size and no weight needs tuning. SMetric: route agents by session, and migrate a session when its instance would miss the SLO. This repo's routing results agree with them; they are not additions to them. Both are ported here (`lmetric`; `smetric-local`, SMetric's rule without its global cache tier) and were run on a public production trace (R3, above) — ports, not the authors' systems. |
-| **`casys-kaist/LLMServingSim`** (416★, ISPASS '26) | A cycle-level simulator that mirrors vLLM's scheduler and ports its block pool, per instance; it reports TTFT and TPOT within 1% of a real vLLM run on one profile. Its router is round-robin, random or least-loaded — no prefix-aware or sticky policy. |
-| **`microsoft/vidur`** (688★, MLSys'24) | Capacity and parallelism planning. Its `canary` branch **does** have a block-level prefix cache and three cache-aware routers — but it has sat unmerged since June 2025, so `main` (what you install) cannot answer the routing question. |
-| **`NetX-lab/Frontier`** (155★, arXiv 2605.21312) | Prefix and hierarchical caching, SLA-aware Pareto search, and **session-sticky** routing. No prefix-affinity router: sticky is *session* identity, not *shared-prefix* identity. |
+| **`casys-kaist/LLMServingSim`** (483★, ISPASS '26) | A cycle-level simulator that mirrors vLLM's scheduler and ports its block pool, per instance; it reports TTFT and TPOT within 1% of a real vLLM run on one profile. Its router is round-robin, random or least-loaded — no prefix-aware or sticky policy. |
+| **`microsoft/vidur`** (735★, MLSys'24) | Capacity and parallelism planning. Its `canary` branch **does** have a block-level prefix cache and three cache-aware routers — but it has sat unmerged since June 2025, so `main` (what you install) cannot answer the routing question. |
+| **`NetX-lab/Frontier`** (188★, arXiv 2605.21312) | Prefix and hierarchical caching, SLA-aware Pareto search, and **session-sticky** routing. No prefix-affinity router: sticky is *session* identity, not *shared-prefix* identity. |
 | **`azrabano23/disagg-sim`** | Pedagogy: reproducing published scheduling arguments on synthetic workloads. Its own README declines trace fitting and defers to Vidur. |
 | **`jahnavi-yelamanchi/cachetrace`** | A single-path prompt-construction linter. |
 | **CacheWise** (arXiv 2606.16824) · **`gauravapiscean/agentic-kv-cache`** | Prefix-aware scheduling and eviction for coding agents, and single-node eviction policies replayed on the same AgentX and Mooncake traces (which finds LRU hard to beat). Both work **inside one engine**; neither routes across replicas. |
-| **vLLM · SGLang · LMCache · Mooncake · AIBrix · llm-d** | Production engines, caches and gateways: they *implement* caching and routing rather than compare policies. ⚠️ Dynamo was in this row until 2026-10-05, and it ships a simulator; the others' docs have not been re-read for one. |
+| **vLLM · SGLang · LMCache · Mooncake · AIBrix · llm-d** | Production engines, caches and gateways: they *implement* caching and routing rather than compare policies. ⚠️ Dynamo was in this row until 2026-10-05, and it ships a simulator; the others' docs were re-read on 2026-11-25 and none was found to compare routing policies across replicas against a live engine ([`docs/04-prior-art.md`](docs/04-prior-art.md), §2b). |
 
 **What is claimed, after that check.** Not a niche — three things this repo did and can show:
 
