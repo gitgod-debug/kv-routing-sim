@@ -113,3 +113,19 @@ def test_the_validity_table_states_what_the_profile_and_the_grids_record():
     assert f"1 to {max(first)}, and to {max(both)} under the two-part target" in section
     exact = yaml.safe_load((REPO / "configs" / "phase3_workloads.yaml").read_text())["engine"]
     assert f"{exact['num_gpu_blocks']} in the exactness test" in section
+
+
+def test_the_ten_questions_use_numbers_the_ledger_and_the_cost_model_hold():
+    section = _section(README, "## Ten questions a skeptic should ask")
+    rows = [line.strip().strip("|").split(" | ") for line in section.splitlines()
+            if re.match(r"\| \d+ \|", line)]
+    assert [row[0].strip() for row in rows] == [str(n) for n in range(1, 11)]
+    assert all(len(row) == 4 and all(cell.strip() for cell in row) for row in rows)
+    ledger = README[README.index("<!-- ledger:start -->"):README.index("<!-- ledger:end -->")]
+    for number in ("+0.3%", "within 1.4%", "within 1.41×", "within 7%", "1.54× and 1.71×",
+                   "102 of 144", "138", "82.4% of cases", "537 MiB for 80,000 requests"):
+        assert number in section and number in ledger, number
+    assert "2 held" in section and "2 of 4 held" in ledger
+    cost = yaml.safe_load((REPO / "configs" / "cost_model.yaml").read_text())
+    assert f"${cost['compute']['price_per_hour_usd']} an hour" in section
+    assert f"₹{cost['fx']['usd_to_inr']} a dollar" in section

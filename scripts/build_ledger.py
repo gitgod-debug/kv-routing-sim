@@ -101,6 +101,10 @@ ROWS = [
         lambda d: "{} of {} held".format(
             sum(bool(d[k]["holds"]) for k in d["predicted_outcomes"]),
             len(d["predicted_outcomes"]))),
+    Row("One calibration's own spread covers the next one's GPU count (C4, rule E)",
+        "82.4% of cases",
+        f"{RESULTS}/c4_kaggle_t4/analysis.json", "scripts/c4_analyze.py",
+        lambda d: f"{d['e']['coverage']:.1%} of cases"),
     Row("Per-token latency at the knee of the load curve (T1)", "1.54× and 1.71×",
         f"{RESULTS}/t1_itl/t1.json", "scripts/t1_itl_check.py",
         lambda d: "{:.2f}× and {:.2f}×".format(
@@ -146,6 +150,11 @@ ROWS = [
     Row("S1's rupee rule outside its registered cell", "more than 10% off in 4 of 86 cells",
         f"{RESULTS}/session_cost/session_cost.json", "scripts/session_cost.py",
         lambda d: f"more than 10% off in {_rule_outside_its_cell(d)}"),
+    Row("Memory for the block hashes of a 100× trace", "537 MiB for 80,000 requests",
+        f"{RESULTS}/scale/scale.json", "scripts/measure_scale.py",
+        lambda d: "{:.0f} MiB for {:,} requests".format(*next(
+            (c["peak_rss_mib_after_trace"], c["requests"]) for c in d["cases"]
+            if c["case"].startswith("100×") and c["policy"] == "round-robin"))),
     Row("Engine, block size and cache of the timing profile", "vLLM 0.30.0, 16 tokens, 1,537 "
         "blocks",
         "configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json", "scripts/c2_analyze.py",

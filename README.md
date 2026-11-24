@@ -87,7 +87,7 @@ settled.
 3. [The finding, as a replication](#the-finding), next to the work that came first ([`docs/04-prior-art.md`](docs/04-prior-art.md)).
 4. [What one agent session costs](artifacts/results/session_cost/report.md) under each routing policy.
 5. [What breaks at 10× and 100×](artifacts/results/scale/report.md), measured.
-6. [Why it is built this way](docs/02-architecture-decisions.md): thirteen decision records.
+6. [Ten questions a skeptic should ask](#ten-questions-a-skeptic-should-ask), each with its number and where it does not hold.
 
 <details>
 <summary><b>Evidence ledger</b> — for each number above: the file that holds it, what made that file, and the commit</summary>
@@ -105,6 +105,7 @@ settled.
 | p95 time to first token on traffic the fit never saw | within 1.4× | [`analysis.json`](artifacts/results/c2_kaggle_t4/analysis.json) | `scripts/c2_analyze.py` | `8899fd9` |
 | p95 time per output token around the limit (C4) | within 7% | [`analysis.json`](artifacts/results/c4_kaggle_t4/analysis.json) | `scripts/c4_analyze.py` | `81012bb` |
 | Nine rules for per-token timing (C4) | 7 of 9 held | [`analysis.json`](artifacts/results/c4_kaggle_t4/analysis.json) | `scripts/c4_analyze.py` | `81012bb` |
+| One calibration's own spread covers the next one's GPU count (C4, rule E) | 82.4% of cases | [`analysis.json`](artifacts/results/c4_kaggle_t4/analysis.json) | `scripts/c4_analyze.py` | `81012bb` |
 | Per-token latency at the knee of the load curve (T1) | 1.54× and 1.71× | [`t1.json`](artifacts/results/t1_itl/t1.json) | `scripts/t1_itl_check.py` | `904765c` |
 | Per-token latency off the knee (T1) | within 1.07× | [`t1.json`](artifacts/results/t1_itl/t1.json) | `scripts/t1_itl_check.py` | `904765c` |
 | GPU counts under the two-part target (T2) | 1.93–2.00× the first-token counts | [`analysis.json`](artifacts/results/t2_two_part_slo/analysis.json) | `scripts/t2_analyze.py` | `904765c` |
@@ -117,6 +118,7 @@ settled.
 | Session-sticky, two-part target | 10 T4s, 61 tokens, ₹0.091 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `a27cbaf` |
 | Round-robin, two-part target | 14 T4s, 834 tokens, ₹0.126 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `a27cbaf` |
 | S1's rupee rule outside its registered cell | more than 10% off in 4 of 86 cells | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `a27cbaf` |
+| Memory for the block hashes of a 100× trace | 537 MiB for 80,000 requests | [`scale.json`](artifacts/results/scale/scale.json) | `scripts/measure_scale.py` | `f141d73` |
 | Engine, block size and cache of the timing profile | vLLM 0.30.0, 16 tokens, 1,537 blocks | [`t4-qwen3-4b-vllm0.30.0-ctx.json`](configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json) | `scripts/c2_analyze.py` | `c0c8b18` |
 <!-- ledger:end -->
 
@@ -149,6 +151,21 @@ this repository; the dated finding is in [`docs/upstream/`](docs/upstream/).
 [gitgod-debug.github.io/kv-routing-sim](https://gitgod-debug.github.io/kv-routing-sim/). Until the
 package is uploaded, install it from a clone (see Install). Start at
 [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
+
+## Ten questions a skeptic should ask
+
+| | The question | The answer, with its number | Where it does not hold |
+|---|---|---|---|
+| 1 | "Exact" on what? | Two one-at-a-time workloads of 120 requests, three runs each: every counter and every request's cached tokens. A concurrent one: +0.3%. Two live replicas: within 1.4% | Nothing concurrent is exact. One model, one GPU type |
+| 2 | vLLM 0.30.0 is four releases old. Is it still true? | Not known yet. The same exactness test is registered for vLLM 0.34.0 (V1 in [the log](docs/09-hypotheses.md)) and has not run. The engine's eviction and lookup code reads the same; when a running request's blocks are cached has changed | Until V1 has run, every cache result here is a 0.30.0 result |
+| 3 | The timing model was once 5–222× off. Why trust it now? | That model had no term for context length. The one used now predicted unseen traffic within 1.41×, and time per output token within 7% around the limit | At the knee of a GPU's load curve it is 1.54× and 1.71× off (T1 failed). The tool says when an answer sits there |
+| 4 | How good is a GPU count from this? | ± one. Across three calibrations, 102 of 144 counts are equal and 138 are within one | One calibration's own spread covers the next one's count in 82.4% of cases; the rule was 90% (C4) |
+| 5 | Is the routing result new? | No. SMetric and LMetric published it first. Here it is an independent agreement on a small calibrated model | Of four rules for those two policies, ported and run on a production trace, 2 held (R3) |
+| 6 | Does session-sticky always win? | With one shared prompt or with four, on all three calibrations: it needs the fewest GPUs, or ties | With 64 tenant prompts it is not settled (H2b). Sessions of unequal length are not tested here; SMetric measured a 2.17× imbalance |
+| 7 | Rupees per what, and over what time? | Per 1,000 requests that met the target, for a T4 at $0.526 an hour and ₹95.87 a dollar, both cited and dated in `configs/cost_model.yaml` | Counted over a short trace's whole run: a service that ran all day would pay about a quarter less |
+| 8 | Real traffic? | Three public traces, each test registered before it ran | Scaled down 16 to 64 times to fit a T4. R1 failed twice, R2 could not be tested on the checked timing model, R3 held in 2 of 4 rules. No run at full size yet |
+| 9 | What breaks first at 100×? | Memory for block hashes: 537 MiB for 80,000 requests, before the simulation starts | Whether many real replicas stay matched cannot be answered on a CPU. Two live replicas is the most that was measured |
+| 10 | Can I get your tables back myself? | `python scripts/reproduce.py`: eleven steps, about 20 minutes on a laptop, and every file a step writes is compared with the committed one | It re-runs the analysis of each GPU run on the raw files stored here; it cannot repeat a GPU measurement. Not covered yet: the first two sweeps, H6, the scale test, the real-trace runs |
 
 ---
 
@@ -235,6 +252,7 @@ A README needs both, and needs them apart.
 | **The residual, explained** | Sequential: none to explain. The engine's `kv_block_*` histograms: counts exact (963 and 1,880 events); distributions identical bucket for bucket on W2; W1's small residual (max CDF distance 0.042) traced — post-hoc, labelled so — to the **timing** fit, not the cache model |
 | **2-replica validation** | Round-robin across **two physical T4s**: 1,088 prefill tokens computed, **1,088 predicted** (Phase 0 v2). **Under pressure (Phase 6, run twice): all 12 runs' hit rates within 1.4%** (K1 to four decimals), 1,537 blocks per replica, three routers, preemptions included |
 | **Timing under load** | The first, context-free profile was **optimistic**: on Phase 6's ~1,700-token prompts, p95 TTFT came out 5–222× its prediction. ✅ **Fixed by C2 (2026-09-30, registered):** decode cost grows with context (1.92× from 128 to 1,536 tokens) and CPU contention was ruled out (1.00×); the context-aware profile `t4-qwen3-4b-vllm0.30.0-ctx`, fitted on micro-benchmarks, predicted held-out traffic within **1.10–1.41×** — and, post hoc, Phase 6's two live replicas within 1.02–1.79× ([report](artifacts/results/c2_kaggle_t4/report.md)) |
+| **Reproduce** | The analysis: `python scripts/reproduce.py --quick` rebuilds this report from the raw files the GPU run left in this repository and compares it with the committed one (seconds, no GPU). The measurement: [`notebooks/phase3_calibration.ipynb`](notebooks/phase3_calibration.ipynb) on a Kaggle T4, about 40 minutes ([how](notebooks/README.md)) |
 
 **`/metrics` fields consumed, by name:** `vllm:prefix_cache_queries` · `vllm:prefix_cache_hits` ·
 `vllm:prompt_tokens_by_source{source="local_compute"|"local_cache_hit"}` · `vllm:num_preemptions` ·
@@ -252,7 +270,6 @@ requests — 40 sessions × 3 turns, one shared system prefix — three runs of 
 
 | Workload | Engine (all 3 runs) | Block-pool model (default) | Plain-LRU model (ablation) |
 |---|---|---|---|
-| **Reproduce** | The analysis: `python scripts/reproduce.py --quick` rebuilds this report from the raw files the GPU run left in this repository and compares it with the committed one (seconds, no GPU). The measurement: [`notebooks/phase3_calibration.ipynb`](notebooks/phase3_calibration.ipynb) on a Kaggle T4, about 40 minutes ([how](notebooks/README.md)) |
 | **W2** one at a time, 1-token outputs | hit rate **0.6090** · 22,664 computed | **0.6090** · 22,664 — exact | 0.6073 · 22,760 |
 | **W1** one at a time, 64-token outputs | hit rate **0.4883** · 29,656 computed | **0.4883** · 29,656 — exact | 0.6073 · 22,760 |
 | **W3** the same trace, concurrent | hit **0.5076** · **27** preemptions · p95 TTFT **41.0 s** | 0.509 (+0.3%) · 24 · 38.3 s (−6.7%) | 0.6073 (+19.7%) · 0 · 11.2 s (−73%) |
@@ -513,6 +530,16 @@ URL and a date — **disagree with a constant, change it, re-run, get your own n
 **Anything in `artifacts/results/` must be reproducible by running a script in `scripts/`. If you can't
 delete it and get it back, it doesn't ship.**
 
+**One command checks it.** `python scripts/reproduce.py` copies the repository's files to a
+temporary folder, runs eleven steps there and compares every file a step writes with the committed
+one: the analysis of each GPU run from the raw files it left here, the grid behind the finding, the
+session cost table and the evidence ledger. It takes about 20 minutes on a 12-thread laptop;
+`--quick` leaves out the three slow steps and takes about 20 seconds. Fields that say when and
+where a file was made are left out of the comparison, and the script says where it makes one more
+exception, and why. **Not covered yet:** the first two sweeps (Phase 4 and Phase 5), H6, the scale
+test, and the three real-trace runs, whose traces are downloaded and not committed. A GPU
+measurement cannot be made again this way.
+
 ---
 
 ## Documentation
@@ -530,16 +557,6 @@ delete it and get it back, it doesn't ship.**
 | [`CHECKPOINTS.md`](CHECKPOINTS.md) | Where the build actually is |
 
 **Sibling project:** `colpali-lite`, not public yet — the same method (cost and tail latency under a
-**One command checks it.** `python scripts/reproduce.py` copies the repository's files to a
-temporary folder, runs eleven steps there and compares every file a step writes with the committed
-one: the analysis of each GPU run from the raw files it left here, the grid behind the finding, the
-session cost table and the evidence ledger. It takes about 20 minutes on a 12-thread laptop;
-`--quick` leaves out the three slow steps and takes about 20 seconds. Fields that say when and
-where a file was made are left out of the comparison, and the script says where it makes one more
-exception, and why. **Not covered yet:** the first two sweeps (Phase 4 and Phase 5), H6, the scale
-test, and the three real-trace runs, whose traces are downloaded and not committed. A GPU
-measurement cannot be made again this way.
-
 configuration choice, bootstrap CIs, an explicit cost model, reported as ₹ per unit of useful work) applied
 to late-interaction retrieval instead of LLM serving. Serving economics is systematically under-measured in
 ML systems: mean latency, no cost axis, no error bars.
