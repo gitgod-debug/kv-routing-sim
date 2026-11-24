@@ -252,6 +252,7 @@ requests — 40 sessions × 3 turns, one shared system prefix — three runs of 
 
 | Workload | Engine (all 3 runs) | Block-pool model (default) | Plain-LRU model (ablation) |
 |---|---|---|---|
+| **Reproduce** | The analysis: `python scripts/reproduce.py --quick` rebuilds this report from the raw files the GPU run left in this repository and compares it with the committed one (seconds, no GPU). The measurement: [`notebooks/phase3_calibration.ipynb`](notebooks/phase3_calibration.ipynb) on a Kaggle T4, about 40 minutes ([how](notebooks/README.md)) |
 | **W2** one at a time, 1-token outputs | hit rate **0.6090** · 22,664 computed | **0.6090** · 22,664 — exact | 0.6073 · 22,760 |
 | **W1** one at a time, 64-token outputs | hit rate **0.4883** · 29,656 computed | **0.4883** · 29,656 — exact | 0.6073 · 22,760 |
 | **W3** the same trace, concurrent | hit **0.5076** · **27** preemptions · p95 TTFT **41.0 s** | 0.509 (+0.3%) · 24 · 38.3 s (−6.7%) | 0.6073 (+19.7%) · 0 · 11.2 s (−73%) |
@@ -529,6 +530,16 @@ delete it and get it back, it doesn't ship.**
 | [`CHECKPOINTS.md`](CHECKPOINTS.md) | Where the build actually is |
 
 **Sibling project:** `colpali-lite`, not public yet — the same method (cost and tail latency under a
+**One command checks it.** `python scripts/reproduce.py` copies the repository's files to a
+temporary folder, runs eleven steps there and compares every file a step writes with the committed
+one: the analysis of each GPU run from the raw files it left here, the grid behind the finding, the
+session cost table and the evidence ledger. It takes about 20 minutes on a 12-thread laptop;
+`--quick` leaves out the three slow steps and takes about 20 seconds. Fields that say when and
+where a file was made are left out of the comparison, and the script says where it makes one more
+exception, and why. **Not covered yet:** the first two sweeps (Phase 4 and Phase 5), H6, the scale
+test, and the three real-trace runs, whose traces are downloaded and not committed. A GPU
+measurement cannot be made again this way.
+
 configuration choice, bootstrap CIs, an explicit cost model, reported as ₹ per unit of useful work) applied
 to late-interaction retrieval instead of LLM serving. Serving economics is systematically under-measured in
 ML systems: mean latency, no cost axis, no error bars.

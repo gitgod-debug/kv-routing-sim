@@ -200,10 +200,18 @@ def main() -> int:
     args = ap.parse_args()
     built = table()
     if args.check:
-        if in_readme() != built:
+        shown = in_readme()
+        commits_known = all(last_commit(row.file) for row in ROWS)
+        if not commits_known:
+            # No git history here (a copy, or a shallow clone): compare everything but the commits.
+            def drop(text: str) -> list[str]:
+                return [line.rsplit(" | ", 1)[0] for line in text.splitlines()]
+            shown, built = drop(shown), drop(built)
+        if shown != built:
             print("README.md does not hold the ledger this script builds; run with --write")
             return 1
-        print(f"README.md holds the ledger: {len(ROWS)} rows, each number read from its file")
+        print(f"README.md holds the ledger: {len(ROWS)} rows, each number read from its file"
+              + ("" if commits_known else "; commits not checked, there is no git history here"))
         return 0
     if args.write:
         text = README.read_text(encoding="utf-8")
