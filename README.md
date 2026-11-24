@@ -1,45 +1,109 @@
 # kv-routing-sim
 
-**Which KV-cache routing policy should you actually run — and on how many replicas?**
+**A calibrated instrument, plus a replication.** This is a trace-driven simulator of LLM serving
+across replicas. Its prefix-cache model was checked against a live vLLM's own counters, and **the
+error is published**. Its routing result agrees with what others had published first: it is a
+replication, not a new result. Every test was written down before it ran, and the ones that failed
+are in the table below.
 
-A trace-driven simulator of LLM serving across replicas. Give it your serving log; it returns a
-routing policy, a replica count, and a cost number. Its prefix-cache model is calibrated against a
-live vLLM's own Prometheus counters, **the calibration error is published**, and every test in this
-repo was written down before it ran — the ones that failed too.
+**[Run it on your traffic](https://gitgod-debug.github.io/kv-routing-sim/run.html)**, in the browser: nothing to install, and a log you choose is never uploaded.
+
+## The instrument: what was checked, and how far off it is
 
 | | |
 |---|---|
 | **Checked against** | a live **vLLM 0.30.0** (`--enable-prefix-caching`) serving `Qwen/Qwen3-4B` on **2× Tesla T4** — its own `vllm:prefix_cache_hits` ÷ `vllm:prefix_cache_queries`, and each request's cached tokens |
 | **The cache model** | **exact** on two workloads under eviction pressure: every counter and every request, three runs each · hit rates within **1.4%** on two live replicas under three routing policies |
 | **The timing model** | p95 TTFT within **1.4×** on traffic it never saw · p95 time per output token within **7%** around a 100 ms limit · ⛔ 1.5–1.7× off when a GPU is at the knee of its load curve |
-| **What it found** | On a T4, among seven standard policies: keep each session on one GPU. ⚠️ **Not a new result** — SMetric (2026) reached it on production traces; this is an independent agreement. On a public production trace the two published policies, ported here, never needed more GPUs than that. And a simulator's GPU count is good to **± one**: measured, across calibrations of one GPU |
-| **How** | every test's design, rules and prediction committed before it ran; the failed ones are in [the log](docs/09-hypotheses.md), dated |
-| **Upstream** | a bug in `vllm-project/guidellm`'s trace replay, found while calibrating (one token lost per block with tokenizers that add a start token). Another contributor reported it upstream and it is fixed there (#1424 and #1425, merged 17 November 2026). Nothing was filed from this repository; the dated finding is in [`docs/upstream/`](docs/upstream/) |
+| **The routing result** | On a T4, among the standard policies: keep each session on one GPU. ⚠️ **Not a new result** — SMetric (2026) reached it on production traces and LMetric (OSDI '26) had shown why; this is an independent agreement ([the finding](#the-finding)). A simulator's GPU count is good to **± one**: measured, across three calibrations of one GPU |
 
-> ## 🚧 Status (2026-10-18)
-> **Checked on a live T4, each test registered first:** the cache model (Phase 3, Phase 6), the
-> first-token timing (C2, C3), the per-token timing around the limit (C4), and `kvsim calibrate`
-> itself with its repeats (C1, C3, C4).
->
-> **Known limits.** Replica counts are T4 figures on generated traffic, good to ± one, **and they
-> are first-token counts**: with a limit on token speed too, the simulator needs about twice as
-> many GPUs (the command itself applies that limit by default). One calibration's own repeats do not cover the next calibration's count often enough
-> (82% of cases; 90% was the rule), so the tool says "plus one". At the knee of a GPU's load curve
-> no number here is reliable; the tool now says when a recommendation sits there. The test behind half of the old headline was decided inside the
-> ± one margin; that half is "not settled" below.
->
-> **Not new.** The routing result was published first (SMetric, LMetric), and NVIDIA ships a larger
-> simulator for the same question — see the note under the finding, and the scope section.
->
-> **The demo page is live; the package is not on PyPI yet.** The demo:
-> [gitgod-debug.github.io/kv-routing-sim](https://gitgod-debug.github.io/kv-routing-sim/). Until the package is uploaded, install it from
-> a clone (see Install). Every number still written as `TBD — not yet measured` **is exactly
-> that**; see the honesty gates in [`CHECKPOINTS.md`](CHECKPOINTS.md). Start at
-> [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
+## Validity: where these numbers hold
+
+| | What was used | So do not read a number here as |
+|---|---|---|
+| **Engine and version** | vLLM **0.30.0**. The current release is 0.34.0 (16 November 2026); its cache code has changed, and it has not been checked | true of "vLLM" in general |
+| **GPU** | one Tesla T4 for the exact checks, two for the two-replica check; three calibrations of that one GPU type | another GPU's latency, GPU count or rupees |
+| **Model** | `Qwen/Qwen3-4B` | another model's: its timing and its cache size have to be measured again (`kvsim calibrate`) |
+| **Replicas** | live: 1 and 2. Simulated: 1 to 16, and to 32 under the two-part target | a measured fleet: beyond two replicas every count is the simulator's |
+| **Block size and cache** | blocks of 16 tokens; 1,537 blocks on a T4, and 512 in the exactness test | valid for another block size or cache size without a new run |
+| **Traffic** | generated agent sessions of 4 turns and about 1,700 prompt tokens; three public traces, scaled down 16 to 64 times to fit a T4 | production traffic at its real size, or sessions of unequal length |
+
+## What one agent session costs, by routing policy
+
+One shared system prompt, 2 sessions a second, each policy at the fewest T4s that meet the target.
+A session sends 6,800 prompt tokens in 4 requests. 519 of them are new: no routing can avoid
+computing them. *Re-prefilled* tokens are what the GPUs computed beyond that, which a cache shared
+by all GPUs would have saved.
+
+| Target | Policy | T4s | Cache hit rate | Re-prefilled tokens per session (95% interval) | ₹ per session |
+|---|---|---:|---:|---:|---:|
+| p95 time to first token ≤ 2 s | session-sticky | 5 | 92.0% | 27 (7 to 54) | 0.047 |
+| | round-robin | 7 | 82.5% | 669 (627 to 718) | 0.063 |
+| | balanced prefix-affinity | 10 | 85.9% | 438 (398 to 483) | 0.091 |
+| | least-loaded | 11 | 81.0% | 777 (736 to 824) | 0.098 |
+| and p95 time per output token ≤ 100 ms | session-sticky | 10 | 91.5% | 61 (27 to 102) | 0.091 |
+| | least-loaded | 13 | 80.5% | 805 (760 to 857) | 0.118 |
+| | round-robin | 14 | 80.1% | 834 (785 to 889) | 0.126 |
+
+Simulated, on calibration A of one T4 (vLLM 0.30.0, Qwen3-4B), with generated traffic; the
+intervals are bootstrap intervals over sessions. A policy without a row met the target at no GPU
+count of the grid. Session-sticky's 27 tokens are the shared prompt, computed once on each further
+GPU. Rupees are counted over a short trace's whole run: a service that ran all day at this rate
+would pay about a quarter less. Registered before it ran, as S1:
+[the report](artifacts/results/session_cost/report.md), made by `scripts/session_cost.py`.
+
+## Every registered test, and what happened
+
+Each prediction was committed before its test ran; [the log](docs/09-hypotheses.md) has the dated
+entries. Of 19 rows, 9 held (H4 only in an amended form), 4 failed, and 6 held in part or are not
+settled.
+
+| Test | Predicted | Outcome |
+|---|---|---|
+| **H1** | prefix-affinity routing has a higher cache hit rate than least-loaded at every replica count | ⛔ failed: true at 1–2 sessions/s, gone or reversed from 3/s |
+| **H2** | there is a sharing ratio beyond which prefix routing wins | ⛔ failed: pure prefix-affinity loses at every sharing above 0 |
+| **H2b** | prefix routing pays once tenants' prompts outgrow one GPU's cache | ✅⛔ not settled: held on the first timing model, failed on calibration A of the checked one, held on B and C |
+| **H3** | calibration error in single digits (%) on two workload shapes | ✅ held: zero error on two shapes, +0.3% on a third |
+| **H4** | the residual of a naive cache model is eviction-order skew | ✅ held, in an amended form: it is capacity skew (−11.9 points) |
+| **H5** | the cost win is one fewer replica at a fixed target | ✅⛔ in part: only for balanced prefix-affinity at low sharing |
+| **H6** | the ranking of policies does not depend on the hardware | ✅⛔ in part: the ranking moves (τ-b down to 0.51), the direction of the flip does not; first timing model only |
+| **R1** | on the Mooncake trace, prefix-affinity beats session-sticky on tool-agent traffic and never on conversation | ⛔ failed: both directions wrong |
+| **R2** | on the AgentX trace, session-sticky and balanced prefix-affinity tie | ✅ held, on the first timing model |
+| **R1, R2 again** | the same two on the checked timing model: R1 fails again, R2 holds | ✅⛔ in part: R1 failed again, as predicted; R2 could not be tested as designed |
+| **R3** | four rules for the two published policies, ported, on a public production trace | ✅⛔ in part: 2 of 4 held |
+| **Phase 6** | hit rates on two live replicas within 10% | ✅ held: within 1.4%, run twice. Latency came out 5–222× off, which led to C2 |
+| **C1** | `kvsim calibrate` works on a real GPU, and its cache check is exact | ✅ held: 48 of 48 requests |
+| **C2** | three timing predictions, one of them that a busy second GPU does not slow the first | ✅ held: all three (1.92×, 1.00×, within 1.41×) |
+| **C3** | a profile fitted on a real GPU predicts traffic it never saw within 2× | ✅ held: all three (exact, 1.41×, 1.38×) |
+| **C4** | nine rules for per-token timing on a real T4 | ✅⛔ in part: 7 of 9 held |
+| **T1** | per-token latency within 1.5× on five held-out runs | ⛔ failed: 1.54× and 1.71× at the knee of the load curve, within 1.07× off it |
+| **T2** | with a limit on token speed too, session-sticky is still best or tied | ✅ held, on three calibrations; the GPU counts about double |
+| **S1** | three predictions for the session cost table above, which is derived from cells already read | ✅ held at the registered cell; one of its rules fails in 4 of 86 cells outside it |
 
 [![The in-browser runner: choose traffic, a GPU and a latency target, run it, and read the recommended routing policy and replica count](docs/figures/demo-run.gif)](https://gitgod-debug.github.io/kv-routing-sim/run.html)
 
-**[Run it on your traffic](https://gitgod-debug.github.io/kv-routing-sim/run.html)**, in the browser: nothing to install, and a log you choose is never uploaded.
+## Status and known limits (2026-11-24)
+
+**Known limits.** Replica counts are T4 figures on generated traffic, good to ± one, **and they
+are first-token counts**: with a limit on token speed too, the simulator needs about twice as
+many GPUs (the command itself applies that limit by default). One calibration's own repeats do not
+cover the next calibration's count often enough (82% of cases; 90% was the rule), so the tool says
+"plus one". At the knee of a GPU's load curve no number here is reliable; the tool says when a
+recommendation sits there. The test behind half of the old headline was decided inside the ± one
+margin; that half is "not settled" below.
+
+**Not new.** The routing result was published first (SMetric, LMetric), and NVIDIA ships a larger
+simulator for the same question — see the note under the finding, and the scope section.
+
+**Upstream.** While calibrating, this project found a bug in `vllm-project/guidellm`'s trace replay
+(one token lost per block with tokenizers that add a start token). Another contributor reported it
+upstream and it is fixed there (#1424 and #1425, merged 17 November 2026). Nothing was filed from
+this repository; the dated finding is in [`docs/upstream/`](docs/upstream/).
+
+**The demo page is live; the package is not on PyPI yet.** The demo:
+[gitgod-debug.github.io/kv-routing-sim](https://gitgod-debug.github.io/kv-routing-sim/). Until the
+package is uploaded, install it from a clone (see Install). Start at
+[`docs/00-START-HERE.md`](docs/00-START-HERE.md).
 
 ---
 
