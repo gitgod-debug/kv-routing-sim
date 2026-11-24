@@ -82,8 +82,9 @@ The first public version: planned for PyPI before 2026-11-20.
   1.41× (C3). **Near saturation one run is not enough:** a second run on the same engine differed by
   3–5% in its coefficients, and that put one p95 4.2× off. Run it more than once if your answer sits
   at the edge of the target.
-- A replica count is good to about ± one: three calibrations of the same T4 agree exactly on 71% of
-  the counts in the finding's grid and within one on 96%.
+- How far a replica count can be trusted: where three calibrations of the same GPU type all give a
+  count (92 of the 144 cells of the finding's grid), they are equal in 58 and within one in 89. In
+  8 more cells they disagree on whether the target can be held at all.
 - **The "how firm" range is a floor, and a low one.** On a live T4 (C4) another run of
   `kvsim calibrate` gave a replica count outside a run's own range in 18% of cases; 5% with the
   range widened by one replica each way. Size for the top of the range, plus one — `kvsim replay`

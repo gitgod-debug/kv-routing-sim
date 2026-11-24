@@ -65,6 +65,17 @@ def _rule_outside_its_cell(doc: dict) -> str:
     return f"{off} of {len(pairs)} cells"
 
 
+def _across_calibrations(doc: dict) -> str:
+    """How three calibrations' replica counts compare, leaving out cells that none of them holds."""
+    cells = [counts for point in doc["required_replicas"].values() for counts in point.values()]
+    held = [c for c in cells if max(c) < doc["not_met"]]
+    disagree = sum(1 for c in cells if min(c) < doc["not_met"] <= max(c))
+    equal = sum(1 for c in held if len(set(c)) == 1)
+    within = sum(1 for c in held if max(c) - min(c) <= 1)
+    return (f"{len(held)} of {len(cells)} cells have a count on all three: {equal} equal, "
+            f"{within} within one; {disagree} more disagree on holding the target")
+
+
 ROWS = [
     Row("Cache model exact on two workloads, three runs each", "3 of 3 runs, on both",
         f"{RESULTS}/phase3_kaggle_t4/phase3.json", "notebooks/phase3_calibration.ipynb",
@@ -118,11 +129,11 @@ ROWS = [
         lambda d: "{:.2f}–{:.2f}× the first-token counts".format(
             min(c["median_ratio"] for c in d["t2c"]["by_calibration"].values()),
             max(c["median_ratio"] for c in d["t2c"]["by_calibration"].values()))),
-    Row("A GPU count is good to ± one", "102 of 144 counts equal on three calibrations, 138 "
-        "within one",
+    Row("GPU counts from three calibrations of one GPU type",
+        "92 of 144 cells have a count on all three: 58 equal, 89 within one; 8 more disagree on "
+        "holding the target",
         f"{RESULTS}/c3_kaggle_t4/posthoc_three_calibrations.json", "scripts/c3_posthoc_grid.py",
-        lambda d: (f"{d['cells_identical_on_all']} of {d['points'] * len(d['policies'])} counts "
-                   f"equal on three calibrations, {d['cells_within_one']} within one")),
+        _across_calibrations),
     Row("Ranking of policies across hardware (H6)", "τ-b down to 0.51",
         f"{RESULTS}/h6_ranking/h6.json", "scripts/run_h6.py",
         lambda d: f"τ-b down to {min(v['min_tau_b'] for v in d['verdicts'].values()):.2f}"),

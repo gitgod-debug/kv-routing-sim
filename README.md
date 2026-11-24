@@ -15,7 +15,7 @@ are in the table below.
 | **Checked against** | a live **vLLM 0.30.0** (`--enable-prefix-caching`) serving `Qwen/Qwen3-4B` on **2× Tesla T4** — its own `vllm:prefix_cache_hits` ÷ `vllm:prefix_cache_queries`, and each request's cached tokens |
 | **The cache model** | **exact** on two workloads under eviction pressure: every counter and every request, three runs each · hit rates within **1.4%** on two live replicas under three routing policies |
 | **The timing model** | p95 TTFT within **1.4×** on traffic it never saw · p95 time per output token within **7%** around a 100 ms limit · ⛔ 1.5–1.7× off when a GPU is at the knee of its load curve |
-| **The routing result** | On a T4, among the standard policies: keep each session on one GPU. ⚠️ **Not a new result** — SMetric (2026) reached it on production traces and LMetric (OSDI '26) had shown why; this is an independent agreement ([the finding](#the-finding)). A simulator's GPU count is good to **± one**: measured, across three calibrations of one GPU |
+| **The routing result** | On a T4, among the standard policies: keep each session on one GPU. ⚠️ **Not a new result** — SMetric (2026) reached it on production traces and LMetric (OSDI '26) had shown why; this is an independent agreement ([the finding](#the-finding)). How far a GPU count from a simulator can be trusted was measured: where three calibrations of the same GPU type all give a count (92 of 144 cells), they are **within one** of each other in 89; in 8 more cells they disagree on whether the target can be held at all |
 
 ## Validity: where these numbers hold
 
@@ -109,7 +109,7 @@ settled.
 | Per-token latency at the knee of the load curve (T1) | 1.54× and 1.71× | [`t1.json`](artifacts/results/t1_itl/t1.json) | `scripts/t1_itl_check.py` | `904765c` |
 | Per-token latency off the knee (T1) | within 1.07× | [`t1.json`](artifacts/results/t1_itl/t1.json) | `scripts/t1_itl_check.py` | `904765c` |
 | GPU counts under the two-part target (T2) | 1.93–2.00× the first-token counts | [`analysis.json`](artifacts/results/t2_two_part_slo/analysis.json) | `scripts/t2_analyze.py` | `904765c` |
-| A GPU count is good to ± one | 102 of 144 counts equal on three calibrations, 138 within one | [`posthoc_three_calibrations.json`](artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.json) | `scripts/c3_posthoc_grid.py` | `b5f5d6c` |
+| GPU counts from three calibrations of one GPU type | 92 of 144 cells have a count on all three: 58 equal, 89 within one; 8 more disagree on holding the target | [`posthoc_three_calibrations.json`](artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.json) | `scripts/c3_posthoc_grid.py` | `b5f5d6c` |
 | Ranking of policies across hardware (H6) | τ-b down to 0.51 | [`h6.json`](artifacts/results/h6_ranking/h6.json) | `scripts/run_h6.py` | `892b481` |
 | Two published policies on a production trace (R3) | 2 of 4 held | [`analysis.json`](artifacts/results/r3_bailian/analysis.json) | `scripts/r3_analyze.py` | `c4109a0` |
 | New tokens in a session | 519 of 6,800 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `a27cbaf` |
@@ -131,12 +131,14 @@ with this table.
 
 ## Status and known limits (2026-11-24)
 
-**Known limits.** Replica counts are T4 figures on generated traffic, good to ± one, **and they
-are first-token counts**: with a limit on token speed too, the simulator needs about twice as
+**Known limits.** Replica counts are T4 figures on generated traffic. Another calibration of the
+same GPU type usually lands within one of them: in 89 of the 92 cells where three calibrations all
+give a count, while in 8 more cells they disagree on whether the target can be held at all. **And
+they are first-token counts**: with a limit on token speed too, the simulator needs about twice as
 many GPUs (the command itself applies that limit by default). One calibration's own repeats do not
 cover the next calibration's count often enough (82% of cases; 90% was the rule), so the tool says
 "plus one". At the knee of a GPU's load curve no number here is reliable; the tool says when a
-recommendation sits there. The test behind half of the old headline was decided inside the ± one
+recommendation sits there. The test behind half of the old headline was decided inside that
 margin; that half is "not settled" below.
 
 **Not new.** The routing result was published first (SMetric, LMetric), NVIDIA ships a larger
@@ -160,7 +162,7 @@ package is uploaded, install it from a clone (see Install). Start at
 | 1 | "Exact" on what? | Two one-at-a-time workloads of 120 requests, three runs each: every counter and every request's cached tokens. A concurrent one: +0.3%. Two live replicas: within 1.4% | Nothing concurrent is exact. One model, one GPU type |
 | 2 | vLLM 0.30.0 is four releases old. Is it still true? | Not known yet. The same exactness test is registered for vLLM 0.34.0 (V1 in [the log](docs/09-hypotheses.md)) and has not run. The engine's eviction and lookup code reads the same; when a running request's blocks are cached has changed | Until V1 has run, every cache result here is a 0.30.0 result |
 | 3 | The timing model was once 5–222× off. Why trust it now? | That model had no term for context length. The one used now predicted unseen traffic within 1.41×, and time per output token within 7% around the limit | At the knee of a GPU's load curve it is 1.54× and 1.71× off (T1 failed). The tool says when an answer sits there |
-| 4 | How good is a GPU count from this? | ± one. Across three calibrations, 102 of 144 counts are equal and 138 are within one | One calibration's own spread covers the next one's count in 82.4% of cases; the rule was 90% (C4) |
+| 4 | How good is a GPU count from this? | Where three calibrations all give a count (92 of 144 cells), they are equal in 58 and within one in 89 | In 3 cells they are two or three apart, and in 8 more they disagree on whether the target can be held at all: once 10 GPUs against "not on 16". One calibration's own spread covers the next one's count in 82.4% of cases; the rule was 90% (C4). All of this compares calibrations with each other: no count above two replicas has met a live fleet |
 | 5 | Is the routing result new? | No. SMetric and LMetric published it first. Here it is an independent agreement on a small calibrated model | Of four rules for those two policies, ported and run on a production trace, 2 held (R3) |
 | 6 | Does session-sticky always win? | With one shared prompt or with four, on all three calibrations: it needs the fewest GPUs, or ties | With 64 tenant prompts it is not settled (H2b). Sessions of unequal length are not tested here; SMetric measured a 2.17× imbalance |
 | 7 | Rupees per what, and over what time? | Per 1,000 requests that met the target, for a T4 at $0.526 an hour and ₹95.87 a dollar, both cited and dated in `configs/cost_model.yaml` | Counted over a short trace's whole run: a service that ran all day would pay about a quarter less |
@@ -177,7 +179,8 @@ package is uploaded, install it from a clone (see Install). Start at
 > with one shared system prompt and with four, and it never needs more than round-robin or
 > least-loaded anywhere. **Whether routing by prefix then
 > saves GPUs, once tenants' prompts outgrow the cache, is not settled:** the registered test said no
-> on one calibration and yes on the two others. Read every GPU count here as ± one.
+> on one calibration and yes on the two others. Read every GPU count here as one calibration's
+> answer: another calibration usually lands within one of it.
 
 ⚠️ **This is not a new result** — found on 2026-10-05 by a fourth prior-art check, after three had
 missed it ([`docs/04-prior-art.md`](docs/04-prior-art.md), §2a). **SMetric** (Wang et al., arXiv
@@ -230,7 +233,8 @@ table exactly; 3 seeds per point, a point counts only if every seed holds the ta
 above shows.*
 
 ⚠️ **Scope:** generated traffic, one GPU type (T4), one model (Qwen3-4B). The replica counts are T4
-figures on the context-aware model, ± one replica. **They are first-token counts:**
+figures on the context-aware model, and another calibration usually lands within one replica of
+them. **They are first-token counts:**
 with a limit on the time per output token as well, the simulator needs about twice as many GPUs (T2).
 
 **The details are in [`docs/13-the-finding-in-detail.md`](docs/13-the-finding-in-detail.md):** what holds
@@ -500,7 +504,8 @@ and why, is in [`docs/04-prior-art.md`](docs/04-prior-art.md).
 2. **A method.** Every test's design, rules and prediction were committed before it ran; the ones
    that failed are reported as findings.
 3. **Numbers on how far simulator-based sizing can be trusted** — a second calibration of the same
-   GPU, 5% different, that is 4.17× off at the knee of the load curve; replica counts firm to ± one;
+   GPU, 5% different, that is 4.17× off at the knee of the load curve; replica counts within one across three calibrations in 89 of 92 cells, with a disagreement on
+   whether the target can be held in 8 more;
    a per-token model that is right off the knee and wrong at it.
 
 The routing result itself is an agreement with published work, reached independently on a free

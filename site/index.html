@@ -15,11 +15,12 @@
     cache model was checked against a live vLLM, and whose tests were written down before they ran.</p>
   <p class="lead"><a class="button" href="run.html">Run it on your own traffic</a></p>
 
-  <div class="finding"><strong>Keep each user on one GPU.</strong> On three calibrations of the same T4,
+  <div class="finding"><strong>Keep each user on one GPU.</strong> On three calibrations of the same GPU type (a T4),
     session-sticky routing needs the fewest GPUs — or ties for them — at every load with one shared
     system prompt and with four, and never needs more than round-robin or least-loaded. Whether routing
     by prefix then saves GPUs with 64 tenants' prompts is <strong>not settled</strong>: the registered
-    test said no on one calibration and yes on two others. Read every GPU count as ± one.</div>
+    test said no on one calibration and yes on two others. Another calibration usually lands within
+    one GPU of each count shown here.</div>
 
   <p class="note"><strong>This is not a new result.</strong> SMetric (Wang et al., arXiv 2607.08565,
     July 2026) reached the same advice from production traces on 32 real GPUs, and LMetric (Zhang et
@@ -50,9 +51,10 @@
     workloads around that limit, on one replica. <strong>This finding changed twice.</strong> On the
     first, context-free timing model, which was 5–222× optimistic on live GPUs, prefix routing won
     once prompts outgrew one GPU's cache. Re-tested on the validated model (calibration A), that
-    half was falsified; on two more calibrations of the same T4 (B and C, measured with
-    <code>kvsim calibrate</code> on a live engine), it held. The three calibrations agree on a GPU
-    count to within one at 96% of points, and that half of the finding was decided by one. The
+    half was falsified; on two more calibrations of the same GPU type (B and C, measured with
+    <code>kvsim calibrate</code> on a live engine), it held. Where all three calibrations give a GPU
+    count (92 of 144 points), they agree to within one at 89, and that half of the finding was
+    decided by one. At 8 more points they disagree on whether the target can be held at all. The
     explorer below shows calibration A. On Mooncake's real traces, re-run on the validated model on
     two calibrations, session-sticky and prefix-affinity are within one replica of each other at
     every speed.</p>
