@@ -481,8 +481,8 @@ deployed is pure CPU Python:
   machine.
 - **Docs** — static.
 
-Replaying 100k requests through a dict-based trie is milliseconds of CPU work. There is nothing for a GPU
-to do. That is the point of a simulator: **pay the GPU cost once, then answer "what if" thousands of times
+Replaying 80,000 requests through a dict-based trie took 13.5 to 21 seconds on one CPU core
+([measured](artifacts/results/scale/report.md)). There is nothing for a GPU to do. That is the point of a simulator: **pay the GPU cost once, then answer "what if" thousands of times
 for free.**
 
 ---

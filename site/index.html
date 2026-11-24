@@ -161,7 +161,7 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
       const rrNeed = needed(k, l, A.policies.indexOf("round-robin"));
       msg = `Use <strong>${nice(best.name)}</strong> on <strong>${t4s(A.replicas[best.ri])}</strong>` +
             ` — ₹${best.inr.toFixed(2)} per 1,000 requests.`;
-      msg += rrNeed < 0 ? " Round-robin does not hold the target on 8." :
+      msg += rrNeed < 0 ? ` Round-robin does not hold the target on ${A.replicas[A.replicas.length - 1]}.` :
              ` Round-robin needs ${A.replicas[rrNeed]}.`;
       if (ties.length) {
         msg += ` <span class="muted">Same T4 count: ${ties.map(nice).join(", ")} — the rupee gap between them is noise.</span>`;

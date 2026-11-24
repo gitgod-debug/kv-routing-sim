@@ -5,7 +5,7 @@ the file formats may still change between minor versions; each change will be li
 
 ## 0.1.0 — unreleased
 
-The first public version: planned for PyPI before 2026-11-20.
+The first public version. Not on PyPI yet.
 
 ### Added
 - **An in-browser runner** (`site/run.html`): generated traffic or an uploaded serving log, the

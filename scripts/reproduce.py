@@ -2,7 +2,7 @@
 """Re-derive the stored results on this machine and compare them with the committed files.
 
     python scripts/reproduce.py              # every step; no GPU is used
-    python scripts/reproduce.py --quick      # leave out the two steps that take minutes
+    python scripts/reproduce.py --quick      # leave out the steps that take minutes
     python scripts/reproduce.py --list       # the steps, and what each one re-derives
     python scripts/reproduce.py --only c3    # the steps whose script name contains "c3"
 
