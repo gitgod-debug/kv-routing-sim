@@ -32,8 +32,9 @@ from .traces.generator import AgenticWorkload
 
 UNCALIBRATED_BANNER = """
 Warning: uncalibrated cost profile; no live engine has been measured.
-  Usable:     the policy ranking and the replica count, as a rough guide for other hardware.
-  Not usable: the millisecond and rupee figures, which are shapes, not predictions.
+  Usable:     as a first look at how the routing policies differ on this traffic.
+  Not usable: the millisecond and rupee figures, which are shapes, not predictions; nor the
+              policy ranking and the replica count as they stand: both change with the hardware.
   Fix:        kvsim calibrate --engine <your vLLM URL> --out mine.json, then --profile mine.json
 """
 

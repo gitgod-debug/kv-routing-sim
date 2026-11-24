@@ -21,7 +21,8 @@ No GPU is needed for anything except calibrating against a live engine.
    commit the script that made it.
 2. **Experiments are registered before they run.** A new hypothesis gets its design in `configs/`
    and a dated entry in [`docs/09-hypotheses.md`](docs/09-hypotheses.md), committed *before* the run;
-   the result is a new dated entry, falsified or not. Earlier entries are never edited.
+   the result is a new dated entry, falsified or not. Earlier entries are not edited; the two
+   wording-only edits that were made are named at the top of that file.
    **And the tree stays still while a registered run is in flight:** nothing under `src/`,
    `scripts/` or `configs/` is edited until it has finished — a results file records whether the
    tree was clean when it started, and "the edit could not have mattered" is an argument, not a
