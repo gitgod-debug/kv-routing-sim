@@ -104,6 +104,10 @@ ROWS = [
     Row("p95 time to first token on traffic the fit never saw", "within 1.4×",
         f"{RESULTS}/c2_kaggle_t4/analysis.json", "scripts/c2_analyze.py",
         lambda d: f"within {_max_factor(d['c2c']['runs'], 'factor'):.1f}×"),
+    Row("One p95 time to first token at the knee, on a second calibration (C3)", "4.17× off",
+        f"{RESULTS}/c3_kaggle_t4/analysis.json", "scripts/c3_analyze.py",
+        lambda d: "{:.2f}× off".format(
+            max(run["factor"]["p95"] for h in d["holdout"] for run in h["command"].values()))),
     Row("p95 time per output token around the limit (C4)", "within 7%",
         f"{RESULTS}/c4_kaggle_t4/analysis.json", "scripts/c4_analyze.py",
         lambda d: f"within {max(r['factor'] for r in d['traffic']['runs']) - 1:.0%}"),
