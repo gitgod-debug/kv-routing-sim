@@ -11,14 +11,6 @@ venv/
 dist/
 build/
 
-# Private working notes — this repo goes public at ship time.
-# Planning notes, kept beside the build for convenience. They are not part of this repository
-# and stay out of its history.
-# They remain on disk; `git add -f <file>` if that decision is ever reversed.
-FLAGSHIP_PROJECTS.md
-PERSONALIZED_TRACKS.md
-TRACK_A_4MONTH_PLAN.md
-
 # Regenerable outputs — results tables and raw metric scrapes ARE committed (they are the
 # calibration evidence), bulk artifacts are not.
 artifacts/traces/

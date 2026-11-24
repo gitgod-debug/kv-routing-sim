@@ -1,7 +1,7 @@
 # R3 — the two published routing policies, and real sessions of unequal size, on a public
 # production trace.
 # Registered 2026-10-06, BEFORE it runs, with a dated entry in docs/09-hypotheses.md.
-# ⚠️ Outside the plan of record (FLAGSHIP_PROJECTS.md). Agreed on 2026-10-06:
+# ⚠️ Outside the plan of record. Agreed on 2026-10-06:
 # the README has to say that neither published policy has been run here.
 #
 # Why: the prior-art re-audit of 2026-10-05 (docs/04-prior-art.md §2a) found that
