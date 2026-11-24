@@ -5,9 +5,12 @@ are in `session_cost.json` beside this file. A derived table: its cells are cell
 H2b on the validated timing model (calibration A), run again and checked against the
 stored grids. One GPU type (T4), one model, generated traffic.
 
-A session sends 6,800 prompt tokens in 4 requests. 519 of them are new: no routing can avoid computing them. Prefilled is what the GPUs computed.
-Re-prefilled is prefilled minus new: work a shared cache that never forgot would have
-saved. Each policy is shown at the fewest T4s that meet the target.
+A session sends 6,800 prompt tokens in 4 requests. 519 of them are new in this replay: text that no earlier request sent, which no routing can avoid computing. The replay is open-loop, so the model's own earlier replies count as new text; a live engine could still hold them.
+Prefilled is what the GPUs computed. Re-prefilled is prefilled minus new: work a shared
+cache that never forgot would have saved. Each policy is shown at the fewest T4s that
+meet the target. Session-sticky's re-prefill is a one-time cost, the shared prompt
+computed once on each further GPU, so its figure per session falls as a trace gets
+longer.
 
 ## One shared prompt, 2 sessions per second
 

@@ -285,10 +285,14 @@ def report(payload: dict[str, Any]) -> str:
         "",
         (f"A session sends {first['prompt_tokens_per_session']:,.0f} prompt tokens in "
          f"{payload['requests_per_session']:g} requests. "
-         f"{first['new_tokens_per_session']:,.0f} of them are new: no routing can avoid "
-         "computing them. Prefilled is what the GPUs computed."),
-        "Re-prefilled is prefilled minus new: work a shared cache that never forgot would have",
-        "saved. Each policy is shown at the fewest T4s that meet the target.",
+         f"{first['new_tokens_per_session']:,.0f} of them are new in this replay: text that no "
+         "earlier request sent, which no routing can avoid computing. The replay is open-loop, so "
+         "the model's own earlier replies count as new text; a live engine could still hold them."),
+        "Prefilled is what the GPUs computed. Re-prefilled is prefilled minus new: work a shared",
+        "cache that never forgot would have saved. Each policy is shown at the fewest T4s that",
+        "meet the target. Session-sticky's re-prefill is a one-time cost, the shared prompt",
+        "computed once on each further GPU, so its figure per session falls as a trace gets",
+        "longer.",
         "",
         f"## One shared prompt, {load:g} sessions per second",
         "",

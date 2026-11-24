@@ -31,9 +31,11 @@ are in the table below.
 ## What one agent session costs, by routing policy
 
 One shared system prompt, 2 sessions a second, each policy at the fewest T4s that meet the target.
-A session sends 6,800 prompt tokens in 4 requests. 519 of them are new: no routing can avoid
-computing them. *Re-prefilled* tokens are what the GPUs computed beyond that, which a cache shared
-by all GPUs would have saved.
+A session sends 6,800 prompt tokens in 4 requests. 519 of them are new in this replay: text that no
+earlier request sent, which no routing can avoid computing. (180 of the 519 are the model's own
+earlier replies. The replay is open-loop and invents them; a live engine could still hold them
+from generating them.) *Re-prefilled* tokens are what the GPUs computed beyond that, which a cache
+shared by all GPUs would have saved.
 
 | Target | Policy | T4s | Cache hit rate | Re-prefilled tokens per session (95% interval) | ₹ per session |
 |---|---|---:|---:|---:|---:|
@@ -48,7 +50,8 @@ by all GPUs would have saved.
 Simulated, on calibration A of one T4 (vLLM 0.30.0, Qwen3-4B), with generated traffic; the
 intervals are bootstrap intervals over sessions. A policy without a row met the target at no GPU
 count of the grid. Session-sticky's 27 tokens are the shared prompt, computed once on each further
-GPU. Rupees are counted over a short trace's whole run: a service that ran all day at this rate
+GPU: a one-time cost of 4 × 1,360 tokens, not a rate. Per session it would halve in a trace twice
+as long, and its interval only reflects which sessions paid it. Round-robin's 669 is mostly a rate. Rupees are counted over a short trace's whole run: a service that ran all day at this rate
 would pay about a quarter less. Registered before it ran, as S1:
 [the report](artifacts/results/session_cost/report.md), made by `scripts/session_cost.py`.
 
