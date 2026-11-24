@@ -205,152 +205,19 @@ table exactly; 3 seeds per point, a point counts only if every seed holds the ta
 **on calibration A only** — on B and C the 64-prompt points move by up to two replicas, as the table
 above shows.*
 
-- **One shared prompt, or four — this part holds on all three calibrations:** session-sticky needs
-  the fewest GPUs at every load (12 of 12 points), and its saving over round-robin grows with load —
-  5 against 7 at 2 sessions/s, 6 against 9 at 3, 7 or 8 against 12 at 4. Across all 24 points it
-  never needs more than round-robin or least-loaded. *Pure* prefix-affinity still collapses under
-  load: it sends every session to the one replica holding the prompt (H2, falsified).
-- **Many prompts (64) — this part does not:** prefix routing gets the better hit rate (0.87 with a
-  small load weight, 0.80 for session-sticky, 0.47 for round-robin, on A). Whether that becomes fewer
-  GPUs depends on the calibration. With the registered load weight, session-sticky needs 10 against
-  11 on A, 12 against 11 on B, 12 against 10 on C. The three calibrations differ by a few percent in
-  their coefficients; at this point that is one or two GPUs, and the sign of the answer.
-- **Found after the tests, then tested (C4, F1 — holds) — and it is a first-token effect:** with a
-  load weight of 1, prefix routing needs 8 GPUs at 64 prompts and 2 sessions/s on calibrations A, B
-  and C, where session-sticky needs 10 to 12; on three fresh calibrations, registered beforehand,
-  8 · 7 · 8 against 9 · 10 · 10. But under a target that also limits token speed the same policy
-  holds nothing there on 32 replicas, on any of the six: it wins the first token by crowding
-  sessions onto the replicas that hold their prompt, and crowding is what makes tokens slow.
-- **With both halves of the target, the two are one GPU apart at most (C4, F2 — my prediction
-  failed):** I had registered that balanced prefix-affinity would need fewer GPUs than
-  session-sticky at no more than two of six loads. On two of the three fresh calibrations it
-  needed one fewer at three and at four. One GPU of 4 to 27 is inside what two calibrations
-  disagree by, so this is not a result for prefix routing — but it is not "no saving" either.
-- **How far to trust a GPU count:** of the 144 (prompts, load, policy) cells, 102 need the same number
-  of replicas on all three calibrations and 138 are within one.
+⚠️ **Scope:** generated traffic, one GPU type (T4), one model (Qwen3-4B). The replica counts are T4
+figures on the context-aware model, ± one replica. **They are first-token counts:**
+with a limit on the time per output token as well, the simulator needs about twice as many GPUs (T2).
 
-**How this finding changed.** Until 2026-09-30 it read *"…until your tenants' system prompts outgrow
-one GPU's KV cache; then route by prefix"* — at 64 prompts, balanced prefix-affinity held the target
-on 5 T4s where session-sticky could not on 8. That was a correct result about the first, context-free
-timing model, and that model was wrong about the engine: on two live T4s (Phase 6) latency came out
-5–222× its prediction. C2 found the missing term and fitted a model that predicts held-out traffic —
-and, post hoc, Phase 6's two replicas within 1.02–1.79×. Re-tested on it, as registered, the "route
-by prefix" half was **falsified**, and from 2026-09-30 the headline said that prefix routing "did
-not save a GPU".
-
-On 2026-10-05, C3 put `kvsim calibrate` on a real T4. As a registered reported item, the same test
-was re-run on the profile the command wrote — a second calibration of the same GPU, a few percent
-different in its coefficients. H2b's rules **held** there; and on the profile from the command's
-second run (post hoc) they held again. The verdict of 2026-09-30 stands as what that registered
-test said on calibration A. But it was decided by one replica at one point, and one replica is
-what two calibrations of the same GPU disagree by. So the headline now claims only what all three
-support. All versions, and why, are in [`docs/09-hypotheses.md`](docs/09-hypotheses.md).
-
-**The live check (Phase 6, registered; run twice on two T4s).** The traffic at 1 session/s, one prompt
-(K1) and 64 (K64), three routers on two live vLLM replicas:
-
-| | K1: sticky · round-robin · affinity | K64: sticky · round-robin · affinity |
-|---|---|---|
-| **Hit rate**, predicted | 0.921 · 0.880 · 0.923 | 0.821 · 0.694 · **0.844** |
-| **Hit rate**, live (two runs) | 0.921 · 0.880 · 0.923 — to four decimals | 0.810–0.822 · 0.695 · **0.844–0.846** |
-| **p95 TTFT**, first timing model | 0.35 s · 0.44 s · 0.48 s | 1.55 s · 5.8 s · 1.26 s |
-| **p95 TTFT**, context-aware model (post hoc) | 2.0 s · 20.4 s · 128 s | 62 s · 110 s · 39 s |
-| **p95 TTFT**, live (two runs) | **1.8–1.9 s** · 11–15 s · ~106 s | 57–72 s · ~110 s · **32–39 s** |
-
-Every hit rate matched within 1.4%, in the predicted order. The first timing model missed latency by
-5–222×; the context-aware one, which never saw these numbers, lands within 1.02–1.79×
-([Phase 6](artifacts/results/phase6_kaggle_t4/report.md) ·
-[post-hoc replay](artifacts/results/c2_kaggle_t4/posthoc_phase6.md)).
+**The details are in [`docs/13-the-finding-in-detail.md`](docs/13-the-finding-in-detail.md):** what holds
+on all three calibrations and what does not; how this finding changed, and why; the live check on two
+T4s; the three real traces; and the three tests of the per-token half of the target (T1, T2, C4).
 
 **See it yourself:** the [demo page](https://gitgod-debug.github.io/kv-routing-sim/) ([`site/`](site/index.html)) looks up every point of the re-test's
 grid — prompts × load (0.25–4 sessions/s) × replicas (1–16) × six policies, 6,912 simulator runs,
 rebuilt by [`scripts/build_grid.py`](scripts/build_grid.py) only if it reproduces the registered table
 exactly. To open it from a clone: `python -m http.server` in the repo root, then
 `http://localhost:8000/site/`.
-
-**On real traffic** — three trace families, each test registered before it ran. The first two ran
-on the first timing model (2026-09-28) and were re-run on the validated one, on two calibrations
-(2026-10-06, [report](artifacts/results/realtrace_ctx/report.md)); the third ran on the validated
-model only, on four ([report](artifacts/results/r3_bailian/report.md)):
-
-| Real trace | What is shared | Session-sticky vs prefix-affinity, validated model | Pure prefix-affinity | Round-robin |
-|---|---|---|---|---|
-| **Mooncake** FAST'25 (R1, scale 1/32, sessions inferred) | prompts across users | **within one replica at every speed, on both calibrations** (registered, holds): 5 · 5 · 5 against 5 · 5 · 5 on tool-agent. R1's own rules, which predicted a winner on each trace: **falsified again** | holds the target on no replica count | 5 · 5 · 6 on tool-agent: one replica more, at one speed of three |
-| **AgentX**, coding-agent sessions (R2, scale 1/64, real sessions) | nothing across users | ⚠️ **cannot be tested as designed**: on the validated model round-robin holds the 2 s target on 8 T4s at no speed, so the registered design has no speeds. 28% of its prompts are longer than the engine's 2,048-token limit, and a cache miss on a median prompt costs 1.6 s | — | — |
-| **Qwen-Bailian**, Alibaba's coder traffic (R3, scale 1/16, real sessions) | prompts across users: 65% of prompt blocks could be reused, 30% from the request's own session | **the same count at every speed, on four calibrations** (registered, holds): 2 · 4 · 7 against 2 · 4 · 7 | ⛔ **does not fail** (predicted: fails) — as few as round-robin at two speeds, fewer at the third (7 · 6 · 6 · 6 against 8). With a limit on token speed too, it is the worst policy | 2 · 4 · 8: one replica more, at one speed of three |
-
-On the first timing model AgentX gave *identical* counts for session-sticky and prefix-affinity
-(2 T4s at every speed) and no collapse of pure prefix-affinity. That is a first-model result: its
-prefill cost did not grow with context, and most of those prompts are outside what any calibration
-measured. It is neither confirmed nor contradicted by the re-run.
-
-On the Bailian trace the two published policies were run as well: LMetric needs 2 · 4 · 7 (6 on
-one calibration of four) and SMetric's rule without a global tier 2 · 4 · 6. The registered rule
-that LMetric would need *fewer* GPUs than session-sticky somewhere failed: it never needs more,
-and fewer on one calibration only.
-
-So, on real traffic at loads a small fleet can hold, session-sticky and the other sensible
-policies are **one replica apart at most** under a first-token target — which is also what two
-calibrations of the same GPU disagree by. Pure prefix-affinity fails on Mooncake and not on the
-Bailian trace. ⚠️ Reported, not tested: with a limit on token speed as well, the Bailian counts
-spread out — round-robin 14, session-sticky 13, LMetric 11, SMetric's rule 10 at the highest load
-(13 · 12 · 10 · 10 on one calibration) — the first sign here of a difference larger than ± one.
-
-⚠️ **Scope:** generated traffic, one GPU type (T4), one model (Qwen3-4B). The replica counts are T4
-figures on the context-aware model, ± one replica.
-
-⚠️ **Every count above is for the first token only — and that is about half the story.** The MLPerf
-rule the 2 seconds come from pairs them with a limit on the time per output token (100 ms for a
-model of this size). In C3 the live engine took 134–521 ms per token on workloads that met, or
-nearly met, the first-token target. Three registered tests followed — two with no GPU, then one
-on a live T4:
-- **T2 — the same grid under a target with both halves** (p95 TTFT ≤ 2 s *and* p95 time per output
-  token ≤ 100 ms), on all three calibrations. All three rules held, as predicted: session-sticky
-  is still best or tied at every load with one prompt and with four; it never needs more than
-  round-robin or least-loaded; and its replica count is **1.93–2.00× the first-token count**
-  (median over 24 points). With the limit at 200 ms the factor is 1.33–1.37×. No table of those
-  counts is printed here, on purpose — see T1.
-- **T1 — is the simulator's per-token latency right? It failed.** Against the live engine's own
-  inter-token counter on five held-out runs, the simulator is within 7% on the three runs off the
-  knee of the load curve, and **1.5–1.7× too slow** on the two at it (limit: 1.5×; predicted to
-  hold). And all five runs are themselves beyond 100 ms per token, so nothing had been measured
-  where T2's answers live.
-- **C4 — is it right where the limit is? Yes** (a live T4, 2026-10-05; nine rules registered,
-  seven hold). On three workloads chosen to sit under, on and over 100 ms per token, every
-  request's token times kept:
-
-  | workload | p95 time per token: live · registered | share of requests within 100 ms: the engine's own histogram · registered |
-  |---|---|---|
-  | under the limit | 82.6 · 82.9 ms | 100.0% · 100.0% |
-  | on it | 104.2 · 104.3 ms | 90.6% · 91.4% |
-  | over it | 279.7 · 298.5 ms | 47.7% · 46.1% |
-
-  And it found why T1 failed. Batches that share a prompt follow the fitted line within 3% up to
-  twice the range any calibration had measured, and run **12–15% faster** than the line at five to
-  nine times that range. At the knee a slower step keeps more sequences in the batch, which slows
-  the next step: there, 15% per step became 1.5–1.7×.
-
-So the factor of two now rests on a per-token model that was checked where it lives — **on one
-replica and three workloads; a fleet has not been measured.** The counts in this README are still
-first-token counts: read them as a *lower bound* for anything that has to stream at a usable
-speed. **The tool itself now sizes on both halves by default** (2026-10-07, ADR-013):
-`kvsim replay` applies a p95 limit of 100 ms per output token beside the first-token limit,
-unless the cost model sets its own (`slo.tpot_p95_ms`) or the option says otherwise
-(`--tpot-slo-ms 0` sizes on the first token alone). Every report says which target it used
-([T1](artifacts/results/t1_itl/report.md) · [T2](artifacts/results/t2_two_part_slo/report.md) ·
-[C4](artifacts/results/c4_kaggle_t4/report.md) · [`docs/09-hypotheses.md`](docs/09-hypotheses.md)).
-
-⚠️ **The first token is now the less accurate half.** On the same three workloads the live p95
-time to first token was 1.23–1.30× the registered number — inside the 2× that C2 and C3 tested,
-and the model too fast every time.
-
-H6 (the policy ranking under faster and slower GPUs) was tested on the first, context-free model
-only, and will not be re-run on the validated one: what followed from it — a ranking is a result
-for one calibration, so calibrate your own GPU — was built, and C3 and C4 then measured the same
-thing more directly. That locality can lose to load balancing is published — LMetric and SMetric
-on real clusters, Preble before them, `azrabano23/disagg-sim` in a simulator — and llm-d and Dynamo
-weigh prefix and load scores by hand-set weights. On this setup, with timing checked against the
-engine, balance won too.
 
 ## The credential — the Real-Engine Calibration Report
 
@@ -655,7 +522,8 @@ delete it and get it back, it doesn't ship.**
 | [`docs/02-architecture-decisions.md`](docs/02-architecture-decisions.md) | ADR-001…013: why this shape, this fidelity, this hardware |
 | [`docs/04-prior-art.md`](docs/04-prior-art.md) | What exists, what to cite, **and the sentences that must never be written** |
 | [`docs/06-methodology.md`](docs/06-methodology.md) | The statistics protocol and the cost model |
-| [`docs/09-hypotheses.md`](docs/09-hypotheses.md) | **Every hypothesis, pre-registered** — H1–H6, H2b, R1–R2, C1–C2, Phase 6 and the re-test — with dated results, falsified ones included |
+| [`docs/09-hypotheses.md`](docs/09-hypotheses.md) | **Every test, registered before it ran** — H1–H6, H2b, R1–R3, C1–C4, T1, T2, S1, V1 and Phase 6 — with dated results, the failed ones included |
+| [`docs/13-the-finding-in-detail.md`](docs/13-the-finding-in-detail.md) | What stands behind the finding: three calibrations, the live check, the real traces, the per-token half |
 | [`docs/11-where-we-are.md`](docs/11-where-we-are.md) | The whole story so far, in plain words |
 | [`docs/12-story-notes.md`](docs/12-story-notes.md) | Short pieces written to be told, each with its proof linked — starting with the day the finding changed |
 | [`CHECKPOINTS.md`](CHECKPOINTS.md) | Where the build actually is |
