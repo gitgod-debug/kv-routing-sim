@@ -7,6 +7,7 @@ result. The script itself runs the registered cells and checks each against the 
 from __future__ import annotations
 
 import importlib.util
+import json
 import pathlib
 import sys
 
@@ -127,3 +128,27 @@ def test_the_three_predictions_are_scored_by_their_registered_rules():
         r["new_tokens_per_session"] = 541.0
     scored = sc.predictions(rows)
     assert [scored[name]["holds"] for name in ("S1a", "S1b", "S1c")] == [False, False, False]
+
+
+def test_the_stored_table_agrees_with_the_grid_it_was_derived_from():
+    """Read-only: the committed result against the committed grid, row by row."""
+    results = REPO / "artifacts" / "results"
+    table = json.loads((results / "session_cost" / "session_cost.json").read_text())
+    grid = json.loads((results / "demo_grid_ctx.json").read_text())
+    ax = grid["axes"]
+    first = [r for r in table["rows"] if r["target"] == "first_token"]
+    assert (len(first), len(table["rows"])) == (99, 195)
+    for r in first:
+        cell = grid["cells"][ax["prompts"].index(r["prompts"])][ax["loads"].index(r["load"])][
+            ax["policies"].index(r["policy"])][ax["replicas"].index(r["replicas"])]
+        assert (r["hit_rate"], r["inr_per_1k_requests"], 1) == (cell[0], cell[3], cell[4])
+    per_session = table["requests_per_session"]
+    for r in table["rows"]:
+        assert r["inr_per_session"] == pytest.approx(
+            r["inr_per_1k_requests"] * per_session / 1000, abs=1e-5)
+        assert r["prefilled_tokens_per_session"] == pytest.approx(
+            r["new_tokens_per_session"] + r["re_prefilled_tokens_per_session"], abs=0.16)
+        assert r["re_prefilled_tokens_per_session"] >= 0
+        assert r["recomputed_after_preemption_per_session"] == 0
+    assert table["git_dirty"] is False
+    assert [table["predictions"][name]["holds"] for name in ("S1a", "S1b", "S1c")] == [True] * 3
