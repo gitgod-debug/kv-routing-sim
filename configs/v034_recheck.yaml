@@ -1,0 +1,15 @@
+# V1 — Phase 3's exactness test again, on the engine's current release.
+# Registered 2026-11-24, before it runs, with a dated entry in docs/09-hypotheses.md.
+#
+# Why: every cache result in this repository was measured on vLLM 0.30.0. On 2026-11-24 the
+# current release is 0.34.0 (2026-11-16), and its block-pool and scheduler source has changed.
+# Whether the cache model still predicts the engine to the token is not known until it is run.
+#
+# What changes against Phase 3: the engine version, and nothing else. The trace, the workloads,
+# the engine settings, the predictions, the analysis procedure and the decision rules are those
+# of configs/phase3_workloads.yaml and artifacts/results/phase3_prereg/predictions.json.
+# scripts/v034_prepare.py refuses to write anything if one of them differs.
+schema_version: 1
+base: configs/phase3_workloads.yaml
+engine:
+  vllm: "0.34.0"
