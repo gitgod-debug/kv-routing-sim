@@ -65,6 +65,13 @@ def _rule_outside_its_cell(doc: dict) -> str:
     return f"{off} of {len(pairs)} cells"
 
 
+def _exact(doc: dict) -> str:
+    """Whether the engine matched the cache model in every run of both sequential workloads."""
+    both = all(doc["verdict"][w]["vllm"]["exact_runs"] == doc["verdict"][w]["runs"] == 3
+               for w in ("W1_long", "W2_short"))
+    return "3 of 3 runs, on both" if both else "not exact"
+
+
 def _across_calibrations(doc: dict) -> str:
     """How three calibrations' replica counts compare, leaving out cells that none of them holds."""
     cells = [counts for point in doc["required_replicas"].values() for counts in point.values()]
@@ -77,11 +84,10 @@ def _across_calibrations(doc: dict) -> str:
 
 
 ROWS = [
-    Row("Cache model exact on two workloads, three runs each", "3 of 3 runs, on both",
-        f"{RESULTS}/phase3_kaggle_t4/phase3.json", "notebooks/phase3_calibration.ipynb",
-        lambda d: "3 of 3 runs, on both" if all(
-            d["verdict"][w]["vllm"]["exact_runs"] == d["verdict"][w]["runs"] == 3
-            for w in ("W1_long", "W2_short")) else "not exact"),
+    Row("Cache model exact with 1-token and with 64-token answers", "3 of 3 runs, on both",
+        f"{RESULTS}/phase3_kaggle_t4/phase3.json", "notebooks/phase3_calibration.ipynb", _exact),
+    Row("The same test on vLLM 0.34.0 (V1)", "3 of 3 runs, on both",
+        f"{RESULTS}/v034_kaggle_t4/phase3.json", "notebooks/v034_recheck_t4.ipynb", _exact),
     Row("A third, concurrent workload (H3)", "+0.3%",
         f"{RESULTS}/phase3_kaggle_t4/fitted_profile.json", "scripts/phase3_analyze.py",
         lambda d: f"{d['calibration_error']:+.1%}"),
