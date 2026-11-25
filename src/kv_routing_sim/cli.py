@@ -30,6 +30,11 @@ from .service import (
 from .traces import adapters
 from .traces.generator import AgenticWorkload
 
+PROFILE_HELP = (
+    "a profile .json, or a shipped profile's name: t4-qwen3-4b-vllm0.30.0-ctx (checked against "
+    "live latency) or t4-qwen3-4b-vllm0.30.0 (the first one, optimistic on long prompts)"
+)
+
 UNCALIBRATED_BANNER = """
 Warning: uncalibrated cost profile; no live engine has been measured.
   Usable:     as a first look at how the routing policies differ on this traffic.
@@ -182,8 +187,7 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--format-in", default="vllm-jsonl", choices=sorted(adapters.REGISTRY))
     r.add_argument("--cost-model", default=None,
                    help="path to a cost_model.yaml, or 'default' for the shipped, cited one")
-    r.add_argument("--profile", default=None,
-                   help="a profile .json, or a shipped profile's name: t4-qwen3-4b-vllm0.30.0")
+    r.add_argument("--profile", default=None, help=PROFILE_HELP)
     r.add_argument("--ttft-slo-ms", type=float, default=None,
                    help="p95 time to first token allowed, in ms; replaces the cost model's limit")
     r.add_argument("--tpot-slo-ms", type=float, default=DEFAULT_TPOT_SLO_MS,
@@ -220,8 +224,7 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--replicas", type=int, default=4)
     c.add_argument("--seeds", type=int, default=3)
     c.add_argument("--sessions", type=int, default=150)
-    c.add_argument("--profile", default=None,
-                   help="a profile .json, or a shipped profile's name: t4-qwen3-4b-vllm0.30.0")
+    c.add_argument("--profile", default=None, help=PROFILE_HELP)
     c.add_argument("--out", default=None)
     c.set_defaults(func=cmd_crossover)
 

@@ -125,8 +125,9 @@ def _spread_section(report: dict[str, Any]) -> list[str]:
          "not a confidence interval. On a live T4, another calibration run within the hour gave "
          "a count outside a run's own range in 18% of cases, and outside it by more than one "
          "replica in 5%, so size for the top of the range, plus one. The range says nothing "
-         "about another day or another software image: three calibrations of the same T4 "
-         "agreed exactly on 71% of counts and within one replica on 96%."),
+         "about another day or another software image. Three calibrations of one GPU type all "
+         "gave a count at 92 of 144 points: the same one at 58 and within one replica at 89. At 8 "
+         "more points they disagreed on whether the target could be held at all."),
         "",
     ]
     return lines

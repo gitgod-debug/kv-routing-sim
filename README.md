@@ -356,25 +356,26 @@ uploaded. The page shows the `kvsim` commands that reproduce its answer.
 
 ```bash
 pip install git+https://github.com/gitgod-debug/kv-routing-sim   # CPU-only, no GPU dependency
-kvsim replay trace.jsonl --policies all --replicas 1-8 --format md
+kvsim generate --out trace.jsonl --sessions 100 --turns 4 --rate 0.5   # or use your own log
+kvsim replay trace.jsonl --policies all --replicas 1-8 \
+  --profile t4-qwen3-4b-vllm0.30.0-ctx --cost-model default
 ```
+
+That takes about half a minute and ends with a recommendation for a T4.
 
 Set your own target and GPU price with `--ttft-slo-ms`, `--tpot-slo-ms` and `--gpu-price-usd`.
 
 Runs on your laptop. **Your trace never leaves your machine**, and prompts are hashed at the adapter
-boundary, so prompt text never enters the simulator at all.
+boundary, so prompt text never enters the simulator. One caution: a log that has text but no token
+ids (`--format-in openai-log`) is hashed with about four characters standing in for a token. Block
+boundaries then differ from the engine's, which biases the hit rate; prefer a log with token ids or
+block hashes.
 
-To use measured timings instead of the built-in guess, pass a profile. Ours — Tesla T4, Qwen3-4B,
-vLLM 0.30.0 — ships with the package, as does the cited cost model. Use the context-aware one: it is
-the one checked against live latency (C2); `t4-qwen3-4b-vllm0.30.0`, the first, context-free profile,
-is kept for the record and is optimistic on long prompts.
-
-```bash
-kvsim replay trace.jsonl --policies all --replicas 1-16 \
-  --profile t4-qwen3-4b-vllm0.30.0-ctx --cost-model default
-```
-
-(`--profile` also takes a path to any profile file, and `--cost-model` a path to your own YAML — the
+The profile in that command is ours: measured on a Tesla T4 with Qwen3-4B and vLLM 0.30.0, it ships
+with the package, as does the cited cost model. Without `--profile` the timings are a built-in guess.
+Use the context-aware one: it is the one checked against live latency (C2), with prompts up to about
+2,000 tokens; `t4-qwen3-4b-vllm0.30.0`, the first, context-free profile, is kept for the record and is
+optimistic on long prompts. (`--profile` also takes a path to any profile file, and `--cost-model` a path to your own YAML — the
 shipped ones are byte-for-byte `configs/profiles/` and `configs/cost_model.yaml`.)
 
 **The target has two halves by default:** p95 time to first token ≤ 2 s, from the cost model, and
@@ -413,16 +414,14 @@ written but **not** marked calibrated, and the command exits 1.
 
 ⚠️ **Near saturation, one fit is not enough.** A second run on the same engine, 25 minutes later,
 came out 3–5% different in its coefficients. For the one workload at the knee of the load curve,
-that put a p95 **4.2×** off; the other five numbers stayed within 1.35×.
+that put a p95 **4.2×** off; the other five numbers stayed within 1.36×.
 
 **So the tool now shows how firm its own answer is.** Since 2026-10-05 `kvsim calibrate` measures
 every timing cell three times and keeps, beside the fit on all of it, the fit of each repeat alone.
 `kvsim replay` sizes on each of those too, and prints the result next to its recommendation:
 
 ```text
-**session-sticky on 3 replica(s)** — cheapest configuration meeting the p95 TTFT SLO
-⚠️ how firm: 3 to 4 replicas across the calibration's 3 repeats taken alone — size for the larger, plus one
-(this example was run with --tpot-slo-ms 0, on the first-token target)
+How firm: 3 to 4 replicas across the calibration's 3 repeats taken alone; size for the larger, plus one.
 ```
 
 That range is what one calibration's own repeats disagree by: a floor on the uncertainty, not a
@@ -444,12 +443,11 @@ configuration once more with every timing coefficient 5% larger — what a secon
 the same GPU can differ by — and prints how far the p95 latencies moved:
 
 ```text
-not at the edge: with timings 5% slower it still meets the SLO (p95 TTFT 1,021 → 1,076 ms (×1.05); p95 time per token 189 → 201 ms (×1.06)).
+At the edge: with timings 5% slower this configuration no longer meets the SLO (p95 TTFT 619 to 692 ms (×1.12); p95 time per token 93 to 100 ms (×1.07)). Two calibrations of the same GPU differ by that much: allow one replica more.
 ```
 
-With room to spare, 5% in is 5% out, as above. If the configuration stops meeting the SLO, the
-line reads "⚠️ at the edge" and says to allow one replica more. If a p95 moves by more than 1.5×,
-it reads "⛔ at the knee": the fleet is close to saturation, and that is where the simulator's
+That is the line the example above ends with. With room to spare it reads "Not at the edge" and the
+p95s move by about the same 5%. If a p95 moves by more than 1.5×, it reads "At the knee": the fleet is close to saturation, and that is where the simulator's
 own latencies were 1.5–1.7× off on a live GPU (T1). `--no-edge-check` skips it.
 
 ⚠️ **The 1.5 was chosen after looking** (post hoc, and labelled so). On T1's five held-out runs
@@ -478,12 +476,13 @@ so the honest answer comes in three tiers, and they must not be blended (ADR-010
 The GPU appears **once**, on our calibration box, offline, before anything is published. Everything
 deployed is pure CPU Python:
 
-- **PyPI** — on your machine. The real usage path.
+- **The package** — on your machine. The real usage path. (From a clone today; the PyPI upload is left.)
 - **A static demo page**, [live on GitHub Pages](https://gitgod-debug.github.io/kv-routing-sim/) — a precomputed grid with selectors, so you can see the recommendation change
   with the prompts and the load in ten seconds, with nothing installed. No server, so **nothing to wake up**, and every number on it comes
-  from a committed script with a pinned seed. It is a **shop window, not a service**. ⛔ It deliberately
-  does not accept uploaded production traces: those are your users' prompts, and they belong on your
-  machine.
+  from a committed script with a pinned seed. It is a **shop window, not a service**: it takes no uploads, because your traces are your users'
+  prompts and belong on your machine. The [in-browser runner](https://gitgod-debug.github.io/kv-routing-sim/run.html)
+  beside it runs the same package inside your browser; a log you choose there is read locally and not
+  uploaded.
 - **Docs** — static.
 
 Replaying 80,000 requests through a dict-based trie took 13.5 to 21 seconds on one CPU core

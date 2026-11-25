@@ -41,8 +41,10 @@ No GPU is needed for anything except calibrating against a live engine.
 **A new routing policy** is one file. Subclass `RoutingPolicy` in
 [`src/kv_routing_sim/policies/`](src/kv_routing_sim/policies/), implement `choose(state, request,
 rng)`, add it to `REGISTRY` in `registry.py`. The parametrised tests in `tests/test_policies.py`
-pick it up; add one test for what makes it different. A policy sees load only (`FleetState`), never
-the replicas' caches — a real router does not either.
+pick it up; add one test for what makes it different. By default a policy sees load only
+(`FleetState`) and keeps its own record of what it sent where, as a router without cache events
+does. A policy that sets `wants_cache_view` is given each replica's cache hits when it decides, as a
+router fed by vLLM's KV events sees them; say which of the two a result used.
 
 **A new trace adapter** is one file in
 [`src/kv_routing_sim/traces/adapters/`](src/kv_routing_sim/traces/adapters/), registered in that

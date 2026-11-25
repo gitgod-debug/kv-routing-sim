@@ -122,5 +122,5 @@ The first public version. Not on PyPI yet.
   unbalance the load when sessions differ widely in size (SMetric); traffic from `kvsim generate`
   cannot show that. Use a real trace to check it. The Qwen-Bailian hour run in R3 did not show it
   either (the busiest replica got at most 1.14× its share): its sessions are short.
-- NVIDIA's AISimulate is a larger simulator for the same question, with timing data for many
+- NVIDIA's AISim (called AISimulate until November 2026) is a larger simulator for the same question, with timing data for many
   data-centre GPUs. See the README's scope section for how the two differ.

@@ -51,9 +51,10 @@ DEFAULT_TPOT_SLO_MS = 100.0
 
 SPREAD_UNAVAILABLE = (
     "This profile has no per-repeat fits, so the spread of these replica counts cannot be shown. "
-    "For scale: three calibrations of the same T4 agreed on a count exactly at 71% of points and "
-    "within one replica at 96%. A profile written by `kvsim calibrate` includes its own spread; "
-    "even then, allow one replica more."
+    "For scale: three calibrations of one GPU type all gave a count at 92 of 144 points, the same "
+    "one at 58 and within one replica at 89; at 8 more they disagreed on whether the target could "
+    "be held at all. A profile written by `kvsim calibrate` includes its own spread; even then, "
+    "allow one replica more."
 )
 
 ProgressCallback = Callable[[str, int, int], None]
