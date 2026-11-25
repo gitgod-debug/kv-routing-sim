@@ -1,0 +1,31 @@
+# L1 — the whole AgentX trace at its recorded size: cache accounting and routing, no timing.
+# Registered 2026-11-25, before it runs, with a dated entry in docs/09-hypotheses.md.
+#
+# Why: every replay of a public trace here was scaled down 16 to 64 times to fit a T4's cache and
+# its timing model. Whether the cache accounting and the routing comparison hold at the size a
+# trace was recorded at, and what that costs to run, has not been measured.
+#
+# No timing: no GPU has been calibrated on prompts of this length (up to 894,371 tokens), so each
+# request finishes before the next one arrives and nothing here is a latency, a GPU count or a cost.
+# The cache size is an input, stated with every number.
+schema_version: 1
+trace: artifacts/traces/agentx/traces.jsonl   # 739 coding-agent sessions; not committed
+trace_sha256: d9e30ba2120d624cb5818a7b19f0150b1181b18ba2e4fe0c05c64218713eed33
+source: https://huggingface.co/datasets/semianalysisai/cc-traces-weka-042026   # Apache-2.0
+adapter: {block_size: 64, token_scale: 1.0, concurrency: 48, window_s: null, stagger_s: 600,
+          seed: 0, models: main}   # 48 sessions at a time, as in R2; nothing is cut or scaled
+cache_model: vllm
+step_s: 1.0e-9                     # an answer of 18,195 tokens, the longest, takes 18 microseconds
+replicas: 8
+capacity_tokens: [1048576, 2097152, 4194304]   # cache per replica; the longest request needs 895,168
+never_forgets_blocks: 5000000      # L1a's one replica: more than every block the trace ever makes
+policies:
+  round-robin: [0]                 # uses no random choice, so one seed is all there is
+  session-sticky: [0, 1, 2, 3, 4]
+  radix-affinity: [0, 1, 2, 3, 4]
+bootstrap_resamples: 10000
+workers: 4
+rules:
+  l1b_max_minutes: 10              # each run of the grid, one core
+  l1c_min_ratio: 4                 # round-robin's re-prefilled tokens over session-sticky's
+  l1d_max_points: 2                # |radix-affinity - session-sticky|, points of prompt tokens

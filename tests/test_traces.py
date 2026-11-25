@@ -278,6 +278,23 @@ def test_agentx_hash_scope_is_local_and_blocks_group_at_the_scale(tmp_path):
     assert (t1[0].prompt_tokens, t1[0].output_tokens) == (16, 1)
 
 
+def test_agentx_hashes_each_distinct_block_once_and_shares_the_value(tmp_path):
+    """The chained hash is what it was, and a repeated prefix is the same objects, not copies."""
+    from kv_routing_sim.traces.adapters import agentx
+
+    reqs = list(adapters.get("agentx").read(_agentx(tmp_path), block_size=64, token_scale=1.0,
+                                            concurrency=2, stagger_s=0.0))
+    first, second = (r for r in reqs if r.session_id == "t1")
+    expected, prev = [], 0
+    for block_id in range(1, 33):
+        prev = agentx._hash("t1", prev, [block_id])
+        expected.append(prev)
+    assert (list(first.block_hashes), list(second.block_hashes)) == (expected[:16], expected)
+    assert all(a is b for a, b in zip(first.block_hashes, second.block_hashes, strict=False))
+    (other,) = [r for r in reqs if r.session_id == "t2"]  # the same local ids, another session
+    assert not set(other.block_hashes) & set(second.block_hashes)
+
+
 def test_agentx_keeps_one_model_and_subagents_as_their_own_sessions(tmp_path):
     stats = TraceStats()
     reqs = list(adapters.get("agentx").read(_agentx(tmp_path), token_scale=1 / 64,

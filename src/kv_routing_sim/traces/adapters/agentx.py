@@ -136,6 +136,9 @@ def read(
             fh.seek(index[k][0])
             d = json.loads(fh.readline())
             main = (d.get("models") or [None])[0]
+            # A session sends the same leading blocks on nearly every turn. Each distinct block is
+            # hashed once, and its value is one shared object, so a full-size trace fits in memory.
+            known: dict[tuple, int] = {}
             for t, sid, q in _flat(d):
                 arrival = start + t
                 if window_s is not None and arrival >= window_s:
@@ -154,8 +157,12 @@ def read(
                     continue
                 hashes, prev = [], 0
                 for g in range(len(ids) // group):
-                    prev = _hash(sid, prev, ids[g * group:(g + 1) * group])
-                    hashes.append(prev)
+                    key = (sid, prev, *ids[g * group:(g + 1) * group])
+                    block = known.get(key)
+                    if block is None:
+                        block = known[key] = _hash(sid, prev, ids[g * group:(g + 1) * group])
+                    hashes.append(block)
+                    prev = block
                 rows.append((arrival, sid, tuple(hashes), n_in, n_out))
 
     rows.sort(key=lambda r: r[0])
