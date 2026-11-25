@@ -75,3 +75,21 @@ def test_any_other_difference_between_the_notebooks_is_seen():
     one_cell_more = _notebook("!pip install -q vllm==0.34.0\n", "NUM_GPU_BLOCKS = 512\n", "pass\n")
     assert not v034.same_but_for_the_version(one_cell_more, old, ("x", "y"),
                                              ("0.30.0", "0.34.0"))
+
+
+def test_the_run_on_the_later_engine_is_exact_on_both_sequential_workloads():
+    """Pins V1's result from the committed raw files of the run."""
+    v1 = json.loads((RESULTS / "v034_prereg" / "predictions.json").read_text())
+    run = json.loads((RESULTS / "v034_kaggle_t4" / "phase3.json").read_text())
+    assert run["environment"]["packages"]["vllm"] == v1["predictions"]["engine"]["vllm"]
+    assert run["trace_fingerprint_sha256"] == v1["trace_fingerprint_sha256"]
+    assert run["predictions_sha256"] == v1["predictions_sha256"]
+    for workload in ("W1_long", "W2_short"):
+        verdict = run["verdict"][workload]
+        assert (verdict["runs"], verdict["valid_runs"], verdict["vllm"]["exact_runs"]) == (3, 3, 3)
+        assert verdict["runs_identical"] is True
+        predicted = v1["predictions"]["workloads"][workload]["predictions"]["vllm"]
+        for n in (1, 2, 3):
+            one = json.loads((RESULTS / "v034_kaggle_t4" / f"run_{workload}_r{n}.json").read_text())
+            cached = [r["cached_tokens"] for r in one["requests"]]
+            assert (len(cached), sum(cached)) == (120, predicted["prefix_cache_hits"])

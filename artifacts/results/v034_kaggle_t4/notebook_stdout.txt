@@ -1,0 +1,222 @@
+date_utc   2026-11-24T19:48:00+00:00
+platform   Linux-6.18.55+-x86_64-with-glibc2.39
+python     3.13.16
+cpu_count  4
+gpus       0, Tesla T4, 15360 MiB, 7.5, 580.178.04
+1, Tesla T4, 15360 MiB, 7.5, 580.178.04
+kaggle     True
+[31mERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+ydata-profiling 4.18.4 requires numba<0.63,>=0.60, but you have numba 0.65.0 which is incompatible.
+litellm 1.109.1 requires huggingface-hub<2.0,>=0.34.0, but you have huggingface-hub 2.4.0 which is incompatible.
+numba-cuda 0.28.2 requires cuda-core<1.0.0,>=0.5.1, but you have cuda-core 1.3.1 which is incompatible.
+datasets 4.8.5 requires huggingface-hub<2.0,>=0.25.0, but you have huggingface-hub 2.4.0 which is incompatible.
+cuml-cu13 26.6.0 requires numba<0.65.0,>=0.60.0, but you have numba 0.65.0 which is incompatible.
+cudf-cu13 26.6.0 requires numba<0.65.0,>=0.60.0, but you have numba 0.65.0 which is incompatible.
+gradio 6.30.0 requires pillow<13.0,>=8.0, but you have pillow 13.0.0 which is incompatible.
+google-adk 2.7.1 requires opentelemetry-api<=1.42.1,>=1.39, but you have opentelemetry-api 1.45.2 which is incompatible.
+google-adk 2.7.1 requires opentelemetry-sdk<=1.42.1,>=1.39, but you have opentelemetry-sdk 1.45.2 which is incompatible.[0m[31m
+[0mpackages: {'vllm': '0.34.0', 'torch': '2.14.0', 'transformers': '5.20.2', 'triton': '3.8.0'}
+
+vllm 0.34.0: 3,604 source files read
+── the simulator cites
+  OK  null block reserved at start-up              v1/core/block_pool.py
+  OK  uncached blocks reused first (prepend)       v1/core/block_pool.py
+  OK  finished requests freed tail-first           v1/core/single_type_kv_cache_manager.py
+  --  lookup capped at prompt_length - 1           NOT FOUND
+  OK  queries counted at admission only            v1/core/sched/scheduler.py
+  OK  eviction event fired before hash check       v1/core/block_pool.py
+  OK  block access history bounded to 4            v1/core/kv_cache_metrics.py
+  OK  reset also clears block metrics              v1/core/block_pool.py
+  --  async scheduler caches on each output        NOT FOUND
+  OK  full-prompt admission check, default on      config/scheduler.py
+  OK  admission watermark, default 0               config/scheduler.py
+── this notebook uses
+  OK  metric vllm:prefix_cache_queries             v1/metrics/loggers.py
+  OK  metric vllm:prefix_cache_hits                v1/metrics/loggers.py
+  OK  metric vllm:prompt_tokens_by_source          v1/metrics/loggers.py
+  OK  metric vllm:num_preemptions                  v1/metrics/loggers.py
+  OK  metric vllm:kv_block_lifetime_seconds        v1/metrics/loggers.py
+  OK  metric vllm:kv_block_idle_before_evict_seconds v1/metrics/loggers.py
+  OK  metric vllm:kv_block_reuse_gap_seconds       v1/metrics/loggers.py
+  OK  metric vllm:num_requests_running             v1/metrics/loggers.py
+  OK  flag --num-gpu-blocks-override               engine/arg_utils.py
+  OK  flag --enable-prompt-tokens-details          entrypoints/.../serving.py
+  OK  request field ignore_eos                     sampling_params.py
+  OK  POST /reset_prefix_cache                     entrypoints/serve/dev/cache/api_router.py
+  OK  GET /server_info                             entrypoints/serve/instrumentator/metrics.py
+  OK  vllm:prefix_cache_hit_rate does not exist (ADR-008)
+
+⚠️  not found verbatim: ['lookup capped at prompt_length - 1', 'async scheduler caches on each output']. Run anyway — the counts will show whether the behaviour itself changed.
+trace ✓  120 requests · 57,960 prompt tokens · lengths [383, 483, 583] · ids in [1006, 99988]
+fingerprint ✓ 54472296d0f8549e…   predictions ✓ ecd6cd6380abadb2…
+
+Pre-registered — committed to the repo before this run:
+  W1_long        vllm model hit 0.4883  (computed 29,656)   lru model hit 0.6073  (computed 22,760)
+  W2_short       vllm model hit 0.6090  (computed 22,664)   lru model hit 0.6073  (computed 22,760)
+  W3_concurrent  vllm model: preemptions > 0   lru model: 0 preemptions, hit 0.6073
+server helpers ready
+client helpers ready
+launched: vllm serve Qwen/Qwen3-4B --port 8000 --dtype half --block-size 16 --num-gpu-blocks-override 512 --max-model-len 2048 --max-num-seqs 256 --max-num-batched-tokens 8192 --gpu-memory-utilization 0.85 --enable-prefix-caching --kv-cache-metrics --kv-cache-metrics-sample 1.0 --enable-prompt-tokens-details --seed 0   (GPU 0)
+    ...30s  Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate l
+    ...60s  W1124 19:53:09.616000 150 torch/_library/opaque_object.py:211] typ='value' is deprecated, use typ='constant' i
+    ...90s  (EngineCore pid=150) INFO 11-24 19:53:25 [base_loader.py:95] Initializing model took 1.324653 seconds
+    ...120s  (EngineCore pid=150) INFO 11-24 19:54:16 [monitor.py:40] [backbone] Starting torch.compile
+    ...150s  (EngineCore pid=150) INFO 11-24 19:54:41 [backends.py:421] [backbone] Compiling a graph for compile range (1, 
+    ...180s  (EngineCore pid=150) INFO 11-24 19:55:15 [kernel_warmup.py:304] JIT kernel warmup finished in 0.00s.
+  ready in 210s
+  kv_cache_size_tokens_logged    8192
+  expected_tokens                8192
+  override_logged                True
+  kv_cache_metrics_enabled       True
+  server_info: HTTP 200, saved · async_scheduling = true
+  warm-up done: responses carry cached_tokens and exact lengths; every counter present
+
+── W2_short · run 1/3 · sequential · 1-token outputs
+     20/120      3s elapsed, ~  13s to go
+     40/120      5s elapsed, ~  10s to go
+     60/120      8s elapsed, ~   8s to go
+     80/120     12s elapsed, ~   6s to go
+    100/120     16s elapsed, ~   3s to go
+    120/120     18s elapsed, ~   0s to go
+                                engine     vllm model       lru model
+    prefix_cache_queries        57,960         57,960 ✓         57,960 ✓
+    prefix_cache_hits           35,296         35,296 ✓         35,200 ✗
+    local_compute               22,664         22,664 ✓         22,760 ✗
+    preemptions                      0              0 ✓              0 ✓
+    hist_lifetime_count            963            963 ✓              —  
+    hist_idle_count                963            963 ✓              —  
+    hist_reuse_gap_count            99             99 ✓              —  
+    hit rate                    0.6090         0.6090           0.6073
+    ==> vllm model EXACT     counters ✓ · requests 120/120 · hit-rate error +0.00 pts
+    ==> lru  model MISMATCH  counters ✗ · requests 118/120 · hit-rate error +0.17 pts
+
+── W2_short · run 2/3 · sequential · 1-token outputs
+     20/120      3s elapsed, ~  14s to go
+     40/120      5s elapsed, ~  11s to go
+     60/120      8s elapsed, ~   8s to go
+     80/120     12s elapsed, ~   6s to go
+    100/120     17s elapsed, ~   3s to go
+    120/120     19s elapsed, ~   0s to go
+                                engine     vllm model       lru model
+    prefix_cache_queries        57,960         57,960 ✓         57,960 ✓
+    prefix_cache_hits           35,296         35,296 ✓         35,200 ✗
+    local_compute               22,664         22,664 ✓         22,760 ✗
+    preemptions                      0              0 ✓              0 ✓
+    hist_lifetime_count            963            963 ✓              —  
+    hist_idle_count                963            963 ✓              —  
+    hist_reuse_gap_count            99             99 ✓              —  
+    hit rate                    0.6090         0.6090           0.6073
+    ==> vllm model EXACT     counters ✓ · requests 120/120 · hit-rate error +0.00 pts
+    ==> lru  model MISMATCH  counters ✗ · requests 118/120 · hit-rate error +0.17 pts
+
+── W2_short · run 3/3 · sequential · 1-token outputs
+     20/120      3s elapsed, ~  15s to go
+     40/120      5s elapsed, ~  11s to go
+     60/120      8s elapsed, ~   8s to go
+     80/120     13s elapsed, ~   6s to go
+    100/120     17s elapsed, ~   3s to go
+    120/120     19s elapsed, ~   0s to go
+                                engine     vllm model       lru model
+    prefix_cache_queries        57,960         57,960 ✓         57,960 ✓
+    prefix_cache_hits           35,296         35,296 ✓         35,200 ✗
+    local_compute               22,664         22,664 ✓         22,760 ✗
+    preemptions                      0              0 ✓              0 ✓
+    hist_lifetime_count            963            963 ✓              —  
+    hist_idle_count                963            963 ✓              —  
+    hist_reuse_gap_count            99             99 ✓              —  
+    hit rate                    0.6090         0.6090           0.6073
+    ==> vllm model EXACT     counters ✓ · requests 120/120 · hit-rate error +0.00 pts
+    ==> lru  model MISMATCH  counters ✗ · requests 118/120 · hit-rate error +0.17 pts
+
+── W1_long · run 1/3 · sequential · 64-token outputs
+     20/120     57s elapsed, ~ 285s to go
+     40/120    117s elapsed, ~ 233s to go
+     60/120    178s elapsed, ~ 178s to go
+     80/120    238s elapsed, ~ 119s to go
+    100/120    299s elapsed, ~  60s to go
+    120/120    358s elapsed, ~   0s to go
+                                engine     vllm model       lru model
+    prefix_cache_queries        57,960         57,960 ✓         57,960 ✓
+    prefix_cache_hits           28,304         28,304 ✓         35,200 ✗
+    local_compute               29,656         29,656 ✓         22,760 ✗
+    preemptions                      0              0 ✓              0 ✓
+    hist_lifetime_count          1,880          1,880 ✓              —  
+    hist_idle_count              1,880          1,880 ✓              —  
+    hist_reuse_gap_count             3              3 ✓              —  
+    hit rate                    0.4883         0.4883           0.6073
+    ==> vllm model EXACT     counters ✓ · requests 120/120 · hit-rate error +0.00 pts
+    ==> lru  model MISMATCH  counters ✗ · requests 92/120 · hit-rate error -11.90 pts
+
+── W1_long · run 2/3 · sequential · 64-token outputs
+     20/120     61s elapsed, ~ 307s to go
+     40/120    121s elapsed, ~ 241s to go
+     60/120    181s elapsed, ~ 181s to go
+     80/120    242s elapsed, ~ 121s to go
+    100/120    303s elapsed, ~  61s to go
+    120/120    363s elapsed, ~   0s to go
+                                engine     vllm model       lru model
+    prefix_cache_queries        57,960         57,960 ✓         57,960 ✓
+    prefix_cache_hits           28,304         28,304 ✓         35,200 ✗
+    local_compute               29,656         29,656 ✓         22,760 ✗
+    preemptions                      0              0 ✓              0 ✓
+    hist_lifetime_count          1,880          1,880 ✓              —  
+    hist_idle_count              1,880          1,880 ✓              —  
+    hist_reuse_gap_count             3              3 ✓              —  
+    hit rate                    0.4883         0.4883           0.6073
+    ==> vllm model EXACT     counters ✓ · requests 120/120 · hit-rate error +0.00 pts
+    ==> lru  model MISMATCH  counters ✗ · requests 92/120 · hit-rate error -11.90 pts
+
+── W1_long · run 3/3 · sequential · 64-token outputs
+     20/120     61s elapsed, ~ 307s to go
+     40/120    120s elapsed, ~ 240s to go
+     60/120    180s elapsed, ~ 180s to go
+     80/120    240s elapsed, ~ 120s to go
+    100/120    301s elapsed, ~  60s to go
+    120/120    361s elapsed, ~   0s to go
+                                engine     vllm model       lru model
+    prefix_cache_queries        57,960         57,960 ✓         57,960 ✓
+    prefix_cache_hits           28,304         28,304 ✓         35,200 ✗
+    local_compute               29,656         29,656 ✓         22,760 ✗
+    preemptions                      0              0 ✓              0 ✓
+    hist_lifetime_count          1,880          1,880 ✓              —  
+    hist_idle_count              1,880          1,880 ✓              —  
+    hist_reuse_gap_count             3              3 ✓              —  
+    hit rate                    0.4883         0.4883           0.6073
+    ==> vllm model EXACT     counters ✓ · requests 120/120 · hit-rate error +0.00 pts
+    ==> lru  model MISMATCH  counters ✗ · requests 92/120 · hit-rate error -11.90 pts
+── decode sweep · batch sizes [1, 2, 4, 8, 12, 16] · 48-token outputs
+    batch  1:   43.9 ms per decode step · preemptions 0
+    batch  2:   45.8 ms per decode step · preemptions 0
+    batch  4:   46.2 ms per decode step · preemptions 0
+    batch  8:   55.1 ms per decode step · preemptions 0
+    batch 12:   65.5 ms per decode step · preemptions 0
+    batch 16:   73.3 ms per decode step · preemptions 0
+
+── W3_concurrent · run 1/3 · concurrent · 64-token outputs
+    all 120 sent; worst lag behind the schedule 1 ms
+    engine: hit rate 0.5079 · computed 28,520 · preemptions 26 · TTFT p50/p95/p99 15,202 / 40,105 / 40,579 ms
+    lru model claimed 0 preemptions        → REFUTED
+    lru model claimed hit rate 0.6073    → engine 0.5079 (-9.94 pts)
+    vllm model claimed preemptions > 0     → holds
+
+── W3_concurrent · run 2/3 · concurrent · 64-token outputs
+    all 120 sent; worst lag behind the schedule 2 ms
+    engine: hit rate 0.5066 · computed 28,600 · preemptions 24 · TTFT p50/p95/p99 14,469 / 40,109 / 40,583 ms
+    lru model claimed 0 preemptions        → REFUTED
+    lru model claimed hit rate 0.6073    → engine 0.5066 (-10.08 pts)
+    vllm model claimed preemptions > 0     → holds
+
+── W3_concurrent · run 3/3 · concurrent · 64-token outputs
+    all 120 sent; worst lag behind the schedule 2 ms
+    engine: hit rate 0.5068 · computed 28,584 · preemptions 27 · TTFT p50/p95/p99 14,867 / 39,992 / 40,466 ms
+    lru model claimed 0 preemptions        → REFUTED
+    lru model claimed hit rate 0.6073    → engine 0.5068 (-10.05 pts)
+    vllm model claimed preemptions > 0     → holds
+workload          valid   vllm model                   lru model                   
+W1_long           3/3     exact 3/3  err +0.00,+0.00,+0.00 exact 0/3  err -11.90,-11.90,-11.90
+W2_short          3/3     exact 3/3  err +0.00,+0.00,+0.00 exact 0/3  err +0.17,+0.17,+0.17
+W3_concurrent     3/3     preemptions>0 holds 3/3      0 preemptions holds 0/3     
+
+saved phase3_results/ (31 files) and phase3_results.zip (0.3 MB)
+⭐ Download phase3_results.zip and bring it back — then run the clean-up cell.
+pid, used_gpu_memory [MiB]

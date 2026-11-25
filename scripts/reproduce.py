@@ -62,6 +62,9 @@ STEPS = (
          added_since=("prefill_attn_s", "decode_per_ctx_token_s"),
          note="a profile gained two timing fields on 2026-09-30 (C2); the committed Phase 3 "
               "files are older and do not have them. Every other value is compared."),
+    Step("the same calibration report for vLLM 0.34.0, from that run's raw files (V1)",
+         ("scripts/phase3_analyze.py", "artifacts/results/v034_kaggle_t4", "--prereg",
+          "artifacts/results/v034_prereg/predictions.json")),
     Step("hit rates on two live replicas, from the raw files (Phase 6)",
          ("scripts/phase6_analyze.py",)),
     Step("the calibration command on a real GPU (C1)", ("scripts/c1_analyze.py",)),

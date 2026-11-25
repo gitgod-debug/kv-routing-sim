@@ -13,7 +13,7 @@ are in the table below.
 | | |
 |---|---|
 | **Checked against** | a live **vLLM 0.30.0** (`--enable-prefix-caching`) serving `Qwen/Qwen3-4B` on **2× Tesla T4** — its own `vllm:prefix_cache_hits` ÷ `vllm:prefix_cache_queries`, and each request's cached tokens |
-| **The cache model** | **exact** on one trace of 120 requests sent one at a time, once with 1-token and once with 64-token answers, under eviction pressure: every counter and every request, three identical runs each · hit rates within **1.4%** on two live replicas under three routing policies |
+| **The cache model** | **exact** on one trace of 120 requests sent one at a time, once with 1-token and once with 64-token answers, under eviction pressure: every counter and every request, three identical runs each · **exact again on vLLM 0.34.0**, the same test (V1) · hit rates within **1.4%** on two live replicas under three routing policies |
 | **The timing model** | p95 TTFT within **1.41×** on traffic it never saw · p95 time per output token within **7%** around a 100 ms limit · ⛔ at the knee of a GPU's load curve it fails: mean time per token 1.5–1.7× off, and a second calibration put one p95 TTFT **4.17×** off |
 | **The routing result** | On a T4, among the standard policies: keep each session on one GPU. ⚠️ **Not a new result** — SMetric (2026) reached it on production traces and LMetric (OSDI '26) had shown why; this is an independent agreement ([the finding](#the-finding)). How far a GPU count from a simulator can be trusted was measured: where three calibrations of the same GPU type all give a count (92 of 144 cells), they are **within one** of each other in 89; in 8 more cells they disagree on whether the target can be held at all |
 
@@ -21,7 +21,7 @@ are in the table below.
 
 | | What was used | So do not read a number here as |
 |---|---|---|
-| **Engine and version** | vLLM **0.30.0**. The current release is 0.34.0 (16 November 2026); its cache code has changed, and it has not been checked | true of "vLLM" in general |
+| **Engine and version** | vLLM **0.30.0**. The cache model alone was checked again on 0.34.0, the release of 16 November 2026: exact on the same test (V1). Timing, GPU counts and rupees were not checked again | true of "vLLM" in general, or, for timing and cost, of any version but 0.30.0 |
 | **GPU** | one Tesla T4 for the exact checks, two for the two-replica check; three calibrations of that one GPU type | another GPU's latency, GPU count or rupees |
 | **Model** | `Qwen/Qwen3-4B` | another model's: its timing and its cache size have to be measured again (`kvsim calibrate`) |
 | **Replicas** | live: 1 and 2. Simulated: 1 to 16, and to 32 under the two-part target | a measured fleet: beyond two replicas every count is the simulator's |
@@ -58,7 +58,7 @@ would pay about a quarter less. Registered before it ran, as S1:
 ## Every registered test, and what happened
 
 Each prediction was committed before its test ran; [the log](docs/09-hypotheses.md) has the dated
-entries. Of 19 rows, 9 held (H4 only in an amended form), 4 failed, and 6 held in part or are not
+entries. Of 20 rows, 10 held (H4 only in an amended form), 4 failed, and 6 held in part or are not
 settled.
 
 | Test | Predicted | Outcome |
@@ -82,10 +82,11 @@ settled.
 | **T1** | per-token latency within 1.5× on five held-out runs | ⛔ failed: 1.54× and 1.71× at the knee of the load curve, within 1.07× off it |
 | **T2** | with a limit on token speed too, session-sticky is still best or tied | ✅ held, on three calibrations; the GPU counts about double |
 | **S1** | three predictions for the session cost table above, which is derived from cells already read | ✅ held at the registered cell; one of its rules fails in 4 of 86 cells outside it |
+| **V1** | the cache model, unchanged, is exact on vLLM 0.34.0 too, on the same test | ✅ held: every counter and all 120 requests' cached tokens, three runs each, with 1-token and with 64-token answers |
 
 ## If you have five minutes
 
-1. [Every registered test, and what happened](#every-registered-test-and-what-happened): 19 rows; 4 failed and 6 held only in part.
+1. [Every registered test, and what happened](#every-registered-test-and-what-happened): 20 rows; 4 failed and 6 held only in part.
 2. [The calibration report](artifacts/results/phase3_kaggle_t4/calibration_report.md): predicted against measured, request by request, and the residual explained.
 3. [The finding, as a replication](#the-finding), next to the work that came first ([`docs/04-prior-art.md`](docs/04-prior-art.md)).
 4. [What one agent session costs](artifacts/results/session_cost/report.md) under each routing policy.
@@ -171,7 +172,7 @@ package is uploaded, install it from a clone (see Install). Start at
 | | The question | The answer, with its number | Where it does not hold |
 |---|---|---|---|
 | 1 | "Exact" on what? | One trace of 120 requests, sent one at a time to one replica, once with 1-token and once with 64-token answers, three identical runs each: every counter and every request's cached tokens. A concurrent one: +0.3%. Two live replicas: within 1.4% | Nothing concurrent is exact. One model, one GPU type |
-| 2 | vLLM 0.30.0 is four releases old. Is it still true? | Not known yet. The same exactness test is registered for vLLM 0.34.0 (V1 in [the log](docs/09-hypotheses.md)) and has not run. The engine's eviction and lookup code reads the same; when a running request's blocks are cached has changed | Until V1 has run, every cache result here is a 0.30.0 result |
+| 2 | vLLM 0.30.0 is four releases old. Is it still true? | For the cache model, yes. The same exactness test ran on vLLM 0.34.0 on 2026-11-25, registered first (V1): exact with 1-token and with 64-token answers, three runs each | Timing was not checked again. Latency, GPU counts and rupees are 0.30.0 results, and the two-replica check was not repeated |
 | 3 | The timing model was once 5–222× off. Why trust it now? | That model had no term for context length. The one used now predicted unseen traffic within 1.41×, and time per output token within 7% around the limit | At the knee of a GPU's load curve it is 1.54× and 1.71× off (T1 failed). The tool says when an answer sits there |
 | 4 | How good is a GPU count from this? | Where three calibrations all give a count (92 of 144 cells), they are equal in 58 and within one in 89 | In 3 cells they are two or three apart, and in 8 more they disagree on whether the target can be held at all: once 10 GPUs against "not on 16". One calibration's own spread covers the next one's count in 82.4% of cases; the rule was 90% (C4). All of this compares calibrations with each other: no count above two replicas has met a live fleet |
 | 5 | Is the routing result new? | No. SMetric and LMetric published it first. Here it is an independent agreement on a small calibrated model | Of four rules for those two policies, ported and run on a production trace, 2 held (R3) |
@@ -179,7 +180,7 @@ package is uploaded, install it from a clone (see Install). Start at
 | 7 | Rupees per what, and over what time? | Per 1,000 requests that met the target, for a T4 at $0.526 an hour and ₹95.87 a dollar, both cited and dated in `configs/cost_model.yaml` | Counted over a short trace's whole run: a service that ran all day would pay about a quarter less |
 | 8 | Real traffic? | Three public traces, each test registered before it ran | Scaled down 16 to 64 times to fit a T4. R1 failed twice, R2 could not be tested on the checked timing model, R3 held in 2 of 4 rules. No run at full size yet |
 | 9 | What breaks first at 100×? | Memory for block hashes: 537 MiB for 80,000 requests, before the simulation starts | Whether many real replicas stay matched cannot be answered on a CPU. Two live replicas is the most that was measured |
-| 10 | Can I get your tables back myself? | `python scripts/reproduce.py`: twelve steps, about 20 minutes on a laptop, and every file a step writes is compared with the committed one | It re-runs the analysis of each GPU run on the raw files stored here; it cannot repeat a GPU measurement. Not covered yet: the first two sweeps, H6, the scale test, the real-trace runs, and the stored grids some analyses start from |
+| 10 | Can I get your tables back myself? | `python scripts/reproduce.py`: thirteen steps, about 20 minutes on a laptop, and every file a step writes is compared with the committed one | It re-runs the analysis of each GPU run on the raw files stored here; it cannot repeat a GPU measurement. Not covered yet: the first two sweeps, H6, the scale test, the real-trace runs, and the stored grids some analyses start from |
 
 ---
 
@@ -275,6 +276,7 @@ A README needs both, and needs them apart.
 | **Hit-rate error vs live engine** | ⭐ **Zero** on 2 sequential shapes × 3 runs — every counter, and every one of 120 requests' cached tokens, to the token. **+0.3%** (relative) on the concurrent shape, predicted by a timing profile fitted without it. Plain LRU on the same runs **over-predicts** by **11.9 points** (W1) and **19.7%** (W3) |
 | **The residual, explained** | Sequential: none to explain. The engine's `kv_block_*` histograms: counts exact (963 and 1,880 events); distributions identical bucket for bucket on W2; W1's small residual (max CDF distance 0.042) traced — post-hoc, labelled so — to the **timing** fit, not the cache model |
 | **2-replica validation** | Round-robin across **two physical T4s**: 1,088 prefill tokens computed, **1,088 predicted** (Phase 0 v2). **Under pressure (Phase 6, run twice): all 12 runs' hit rates within 1.4%** (K1 to four decimals), 1,537 blocks per replica, three routers. The engines preempted requests in 8 of the 10 runs where the model predicted none |
+| **The same test on a later engine** | **vLLM 0.34.0**, 2026-11-25 (V1, registered first): the same notebook with only the engine version changed. **Zero** error again on both sequential shapes × 3 runs, and +0.7% on the concurrent shape ([report](artifacts/results/v034_kaggle_t4/calibration_report.md)). Timing was fitted on it and not checked |
 | **Timing under load** | The first, context-free profile was **optimistic**: on Phase 6's ~1,700-token prompts, p95 TTFT came out 5–222× its prediction. ✅ **Fixed by C2 (2026-09-30, registered):** decode cost grows with context (1.92× from 128 to 1,536 tokens) and CPU contention was ruled out (1.00×); the context-aware profile `t4-qwen3-4b-vllm0.30.0-ctx`, fitted on micro-benchmarks, predicted held-out traffic within **1.10–1.41×** — and, post hoc, Phase 6's two live replicas within 1.02–1.79× ([report](artifacts/results/c2_kaggle_t4/report.md)) |
 | **Reproduce** | The analysis: `python scripts/reproduce.py --quick` rebuilds this report from the raw files the GPU run left in this repository and compares it with the committed one (seconds, no GPU). The measurement: [`notebooks/phase3_calibration.ipynb`](notebooks/phase3_calibration.ipynb) on a Kaggle T4, about 40 minutes ([how](notebooks/README.md)) |
 
@@ -560,7 +562,7 @@ URL and a date — **disagree with a constant, change it, re-run, get your own n
 delete it and get it back, it doesn't ship.**
 
 **One command checks it.** `python scripts/reproduce.py` copies the repository's files to a
-temporary folder, runs twelve steps there and compares every file a step writes with the committed
+temporary folder, runs thirteen steps there and compares every file a step writes with the committed
 one: the analysis of each GPU run from the raw files it left here, the grid behind the finding, the
 session cost table and the evidence ledger. It takes about 20 minutes on a 12-thread laptop;
 `--quick` leaves out the three slow steps and takes about 20 seconds. Fields that say when and

@@ -69,7 +69,8 @@ line-length = 100
 target-version = "py311"
 
 # Notebooks keep imports in the cell that needs them and probe unfamiliar machines broadly, so they
-# are not linted as library code; artifacts/ holds raw outputs of runs, kept byte for byte.
+# are not linted as library code; artifacts/ holds raw outputs of runs, kept as they were written
+# apart from one shortened path (notebooks/README.md).
 extend-exclude = ["*.ipynb", "artifacts"]
 
 [tool.ruff.lint]
