@@ -628,9 +628,6 @@ C4's, and those of calibrations B and C). A GPU measurement cannot be made again
 | [`docs/06-methodology.md`](docs/06-methodology.md) | The statistics protocol and the cost model |
 | [`docs/09-hypotheses.md`](docs/09-hypotheses.md) | Every test, registered before it ran (H1–H6, H2b, R1–R3, C1–C4, T1, T2, S1, V1, L1 and Phase 6), with dated results, failed ones included |
 | [`docs/13-the-finding-in-detail.md`](docs/13-the-finding-in-detail.md) | What stands behind the finding: three calibrations, the live check, the real traces, the per-token half |
-| [`docs/11-where-we-are.md`](docs/11-where-we-are.md) | The whole story so far, in plain words |
-| [`docs/12-story-notes.md`](docs/12-story-notes.md) | Short notes, each with a link to its proof. The first one is about the day the finding changed |
-| [`CHECKPOINTS.md`](CHECKPOINTS.md) | Where the build is now |
 
 **Sibling project:** `colpali-lite`, not public yet. It uses the same method (cost and tail latency
 under a configuration choice, bootstrap CIs, an explicit cost model, results in ₹ per unit of

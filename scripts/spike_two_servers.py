@@ -210,9 +210,9 @@ def main() -> int:
             chosen = "mig"
     elif args.force_path != "memory-split":
         print(
-            f"\n⚠️  fewer than 2 MIG instances ({len(uuids)}). Either MIG is off, or it is on with "
-            "one instance. See the MIG setup commands in docs/07-environment.md — enabling "
-            "it needs root and no running processes.",
+            f"\nWarning: fewer than 2 MIG instances ({len(uuids)}). Either MIG is off, or it is on "
+            "with one instance. NVIDIA's MIG user guide has the setup commands. Enabling it needs "
+            "root and no running processes.",
             flush=True,
         )
 

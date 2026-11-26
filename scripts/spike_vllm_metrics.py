@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Phase 0 spike: check that a live vLLM exposes prefix-cache counters that move under load.
 
-This is the Phase 0 metric gate in CHECKPOINTS.md: the calibration relies on these metrics, so they
+This is the Phase 0 metric gate: the calibration relies on these metrics, so they
 are checked on a real server rather than taken from documentation. Checks, most important first:
 
   1. `vllm:prefix_cache_queries` and `vllm:prefix_cache_hits` are present (ADR-008).
@@ -328,8 +328,8 @@ def main() -> int:
         if off is not None
         else None,
     }
-    # The other checks, H4's included, are reported but not required: the Phase 0 gate in
-    # CHECKPOINTS.md is counters present and moving.
+    # The other checks, H4's included, are reported but not required: the Phase 0 gate is
+    # counters present and moving.
     gate["PHASE_0_METRIC_GATE"] = gate["counters_present"] and gate["counters_moved"]
 
     payload: dict[str, Any] = {}
