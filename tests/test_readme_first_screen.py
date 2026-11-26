@@ -25,7 +25,7 @@ OUTCOMES = {
     "H1": FAILED, "H2": FAILED, "H2b": PART, "H3": HELD, "H4": HELD, "H5": PART, "H6": PART,
     "R1": FAILED, "R2": HELD, "R1, R2 again": PART, "R3": PART, "Phase 6": HELD,
     "C1": HELD, "C2": HELD, "C3": HELD, "C4": PART, "T1": FAILED, "T2": HELD, "S1": HELD,
-    "V1": HELD,
+    "V1": HELD, "L1": HELD,
 }
 
 

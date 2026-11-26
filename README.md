@@ -4,7 +4,9 @@
 across replicas. Its prefix-cache model was checked against a live vLLM's own counters, and **the
 error is published**. Its routing result agrees with what others had published first: it is a
 replication, not a new result. Every test was written down before it ran, and the ones that failed
-are in the table below.
+are in the table below. It has also replayed a public trace of 739 coding-agent sessions end to end,
+at its recorded size (53,967 requests, 7.8 billion prompt tokens): cache accounting and routing only,
+with no timing.
 
 **[Run it on your traffic](https://gitgod-debug.github.io/kv-routing-sim/run.html)**, in the browser: nothing to install, and a log you choose is never uploaded.
 
@@ -26,7 +28,7 @@ are in the table below.
 | **Model** | `Qwen/Qwen3-4B` | another model's: its timing and its cache size have to be measured again (`kvsim calibrate`) |
 | **Replicas** | live: 1 and 2. Simulated: 1 to 16, and to 32 under the two-part target | a measured fleet: beyond two replicas every count is the simulator's |
 | **Block size and cache** | blocks of 16 tokens; 1,537 blocks on a T4, and 512 in the exactness test | valid for another block size or cache size without a new run |
-| **Traffic** | the exactness test: one generated trace of 120 requests (40 sessions of 3 turns, prompts of 383 to 583 tokens), one at a time. The finding: generated agent sessions of 4 turns and about 1,700 prompt tokens. Three public traces, scaled down 16 to 64 times to fit a T4 | production traffic at its real size, sessions of unequal length, or an exact answer for requests that overlap |
+| **Traffic** | the exactness test: one generated trace of 120 requests (40 sessions of 3 turns, prompts of 383 to 583 tokens), one at a time. The finding: generated agent sessions of 4 turns and about 1,700 prompt tokens. Three public traces, scaled down 16 to 64 times to fit a T4; one of them, AgentX, also whole and at its recorded size, without timing (L1) | production traffic at its real size, sessions of unequal length, or an exact answer for requests that overlap |
 
 ## What one agent session costs, by routing policy
 
@@ -58,7 +60,7 @@ would pay about a quarter less. Registered before it ran, as S1:
 ## Every registered test, and what happened
 
 Each prediction was committed before its test ran; [the log](docs/09-hypotheses.md) has the dated
-entries. Of 20 rows, 10 held (H4 only in an amended form), 4 failed, and 6 held in part or are not
+entries. Of 21 rows, 11 held (H4 only in an amended form), 4 failed, and 6 held in part or are not
 settled.
 
 | Test | Predicted | Outcome |
@@ -83,10 +85,11 @@ settled.
 | **T2** | with a limit on token speed too, session-sticky is still best or tied | ✅ held, on three calibrations; the GPU counts about double |
 | **S1** | three predictions for the session cost table above, which is derived from cells already read | ✅ held at the registered cell; one of its rules fails in 4 of 86 cells outside it |
 | **V1** | the cache model, unchanged, is exact on vLLM 0.34.0 too, on the same test | ✅ held: every counter and all 120 requests' cached tokens, three runs each, with 1-token and with 64-token answers |
+| **L1** | on the whole AgentX trace at its recorded size, the cache model serves exactly what the raw file allows; round-robin re-prefills at least 4× what session-sticky does; pure prefix-affinity ties session-sticky | ✅ held: 53,967 of 53,967 requests exact; 35× to 993×; within 0.02 points. No timing |
 
 ## If you have five minutes
 
-1. [Every registered test, and what happened](#every-registered-test-and-what-happened): 20 rows; 4 failed and 6 held only in part.
+1. [Every registered test, and what happened](#every-registered-test-and-what-happened): 21 rows; 4 failed and 6 held only in part.
 2. [The calibration report](artifacts/results/phase3_kaggle_t4/calibration_report.md): predicted against measured, request by request, and the residual explained.
 3. [The finding, as a replication](#the-finding), next to the work that came first ([`docs/04-prior-art.md`](docs/04-prior-art.md)).
 4. [What one agent session costs](artifacts/results/session_cost/report.md) under each routing policy.
@@ -179,7 +182,7 @@ package is uploaded, install it from a clone (see Install). Start at
 | 5 | Is the routing result new? | No. SMetric and LMetric published it first. Here it is an independent agreement on a small calibrated model | Of four rules for those two policies, ported and run on a production trace, 2 held (R3) |
 | 6 | Does session-sticky always win? | With one shared prompt or with four, on all three calibrations: it needs the fewest GPUs, or ties | With 64 tenant prompts it is not settled (H2b). Sessions of unequal length are not tested here; SMetric measured a 2.17× imbalance |
 | 7 | Rupees per what, and over what time? | Per 1,000 requests that met the target, for a T4 at $0.526 an hour and ₹95.87 a dollar, both cited and dated in `configs/cost_model.yaml` | Counted over a short trace's whole run: a service that ran all day would pay about a quarter less |
-| 8 | Real traffic? | Three public traces, each test registered before it ran | Scaled down 16 to 64 times to fit a T4. R1 failed twice, R2 could not be tested on the checked timing model, R3 held in 2 of 4 rules. No run at full size yet |
+| 8 | Real traffic? | Three public traces, each test registered before it ran. One of them, 739 coding-agent sessions (AgentX), was also replayed whole at its recorded size: the cache model served exactly what the raw file allows, and round-robin computed again 46.64% of the prompt tokens with 1 Mi tokens of cache per replica, where session-sticky computed 1.32% (L1) | The time-based tests ran on traces scaled down 16 to 64 times. R1 failed twice, R2 could not be tested on the checked timing model, R3 held in 2 of 4 rules. The full-size replay has no timing: no GPU here was timed on prompts that long |
 | 9 | What breaks first at 100×? | Memory for block hashes: 537 MiB for 80,000 requests, before the simulation starts | Whether many real replicas stay matched cannot be answered on a CPU. Two live replicas is the most that was measured |
 | 10 | Can I get your tables back myself? | `python scripts/reproduce.py`: thirteen steps, about 20 minutes on a laptop, and every file a step writes is compared with the committed one | It re-runs the analysis of each GPU run on the raw files stored here; it cannot repeat a GPU measurement. Not covered yet: the first two sweeps, H6, the scale test, the real-trace runs, and the stored grids some analyses start from |
 
@@ -546,6 +549,7 @@ profile; each case was run with round-robin and with balanced prefix-affinity.
 | **10× trace length** (8,000 requests) | RSS ceiling and sweep wall-clock? | **81 MiB** peak per process. One run: 1.3 s (round-robin) to 2.0 s (balanced affinity), after 8 s to generate the trace. Nothing breaks: a default `kvsim replay` sweep (280 runs, one core) is minutes. |
 | **100× trace length** (80,000 requests, 8.5 M block hashes) | What gives out first — block-hash memory, the policy inner loop, or the report renderer? | **Block-hash memory.** The trace alone holds **537 MiB** (about 64 bytes per hash, as Python ints) before the simulation starts; the simulation adds 11–35 MiB. The policy loop stays linear: 13.5 s and 21 s, about 10× the 10× case. The renderer does not grow with the trace. Two walls follow by arithmetic, not measured: the parallel experiment scripts copy the trace into every worker (11 workers ≈ 6 GiB), and a default one-core sweep is 280 × 13–21 s ≈ 1–1.6 hours. |
 | **10× replicas** (80 replicas at 10× load) | Does the cache model's fidelity hold, or does eviction-order skew compound? | **Not answerable on a CPU.** In the model each replica is its own block pool, so errors cannot compound inside the simulator; whether real replicas stay matched is what Phase 6 checks, on 2 GPUs. 80 is untested. What *was* measured: affinity routing scores every replica on every request, so its run time grew 2.4× (2.0 → 4.8 s for the same 8,000 requests) while round-robin stayed flat (1.3 → 1.4 s). |
+| **A real trace, whole** (AgentX: 53,967 requests, 121.6 M block hashes of 64 tokens, prompts up to 894,371 tokens) | Does it run at a recorded size, and does the cache accounting still hold? | **Yes, with the block hashes shared.** Reading the trace: 81 s and 1.3 GiB, once the reader hashes each distinct block of a session once; before that it would have needed about 8 GiB. One run of 8 replicas: 3.2 to 5.4 minutes on one core. One replica that never evicts served exactly what the raw file allows, for all 53,967 requests (L1, [report](artifacts/results/l1_agentx_full/report.md)). Cache accounting only, no timing |
 
 ---
 
@@ -569,8 +573,9 @@ session cost table and the evidence ledger. It takes about 20 minutes on a 12-th
 `--quick` leaves out the three slow steps and takes about 20 seconds. Fields that say when and
 where a file was made are left out of the comparison, and the script says where it makes one more
 exception, and why. **Not covered yet:** the first two sweeps (Phase 4 and Phase 5), H6, the scale
-test, the three real-trace runs, whose traces are downloaded and not committed, and the stored grids
-that some analyses start from (T2's three, C4's, and those of calibrations B and C). A GPU
+test, the real-trace runs (R1 to R3, and the full-size run L1), whose traces are downloaded and not
+committed, and the stored grids that some analyses start from (T2's three, C4's, and those of
+calibrations B and C). A GPU
 measurement cannot be made again this way.
 
 ---
