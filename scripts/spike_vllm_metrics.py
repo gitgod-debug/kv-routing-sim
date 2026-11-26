@@ -295,8 +295,8 @@ def main() -> int:
     )
     if not kv_flag_ok:
         print(
-            "⚠️  flag absent on this version: the three vllm:kv_block_* histograms will be "
-            "unavailable, so HYPOTHESIS H4 IS UNTESTABLE AS WRITTEN. Amend docs/09-hypotheses.md "
+            "Warning: flag absent on this version: the three vllm:kv_block_* histograms will be "
+            "unavailable, so hypothesis H4 is untestable as written. Amend its registration "
             "with a date rather than keeping the narrative.",
             flush=True,
         )

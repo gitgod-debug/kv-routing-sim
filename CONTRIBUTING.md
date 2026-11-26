@@ -20,10 +20,8 @@ No GPU is needed for anything except calibrating against a live engine.
    `artifacts/results/` comes from a script in `scripts/` with pinned seeds, and records the commit
    it ran at. If you change a result, commit the script that made it.
 2. **Registration before the run.** Experiments are registered before they run. A new hypothesis
-   gets its design in `configs/` and a dated entry in
-   [`docs/09-hypotheses.md`](docs/09-hypotheses.md), and both are committed before the run. The
-   result is a new dated entry, falsified or not. Earlier entries are not edited. Two edits were
-   made, both to wording only, and they are named at the top of that file. The tree also stays
+   gets its design and its predictions in `configs/`, committed before the run. The result is
+   reported, falsified or not. The tree also stays
    unchanged while a registered run is in progress: nothing under `src/`, `scripts/` or `configs/`
    is edited until the run has finished. A results file records whether the tree was clean when
    the run started. A claim that "the edit could not have mattered" is only an argument, and it
@@ -65,4 +63,4 @@ package, and the shipped copy must stay byte-identical (`tests/test_packaging.py
 - `pytest -q` and `ruff check .` pass.
 - If a committed result changes, say which one and why in the description.
 
-Good first issues are listed in [`docs/good-first-issues.md`](docs/good-first-issues.md).
+Issues that suit a first contribution carry the label `good first issue`.

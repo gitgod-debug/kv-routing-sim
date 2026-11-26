@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Draw the README's figure from the demo grid.
 
-    python scripts/make_figures.py  # -> docs/figures/flip-*.svg and paper/figures/flip.pdf
+    python scripts/make_figures.py  # -> figures/flip-*.svg and paper/figures/flip.pdf
 
 Needs the [analysis] extra (matplotlib). Reads artifacts/results/demo_grid_ctx.json, which
 `scripts/build_grid.py --source h2b_c2` writes only when it reproduces the H2b table on C2's
@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 GRID = REPO / "artifacts" / "results" / "demo_grid_ctx.json"
-OUT = REPO / "docs" / "figures"
+OUT = REPO / "figures"
 PAPER = REPO / "paper" / "figures" / "flip.pdf"  # the preprint's copy: pdfLaTeX does not read SVG
 LOAD = 2  # sessions/s: the README table's column
 REPLICAS = 8  # fleet size for the hit-rate panel, as in the h2b_c2 report

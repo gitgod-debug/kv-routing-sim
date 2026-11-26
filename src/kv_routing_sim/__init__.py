@@ -11,8 +11,6 @@ follows vLLM 0.30.0's block pool and was checked against a live engine.
     calib/     `kvsim calibrate`: fit a timing profile to a running engine
     service    the replay workflow shared by the command line and the browser page
     cli        the `kvsim` command line
-
-See docs/05-codebase-map.md for the module contracts.
 """
 
 __version__ = "0.1.0"  # keep in step with pyproject.toml

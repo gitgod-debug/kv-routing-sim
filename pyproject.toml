@@ -52,7 +52,6 @@ docs = ["markdown-it-py>=4.0"]
 [project.urls]
 Homepage = "https://github.com/gitgod-debug/kv-routing-sim"
 Demo = "https://gitgod-debug.github.io/kv-routing-sim/"
-Changelog = "https://github.com/gitgod-debug/kv-routing-sim/blob/main/CHANGELOG.md"
 Issues = "https://github.com/gitgod-debug/kv-routing-sim/issues"
 
 [project.scripts]

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble the static site: the pages, the demo grids, the docs, and a wheel for the runner.
+"""Assemble the static site: the pages, the demo grids, and a wheel for the runner.
 
     python scripts/build_site.py --out _site
     python scripts/build_site.py --space --out _space   # the same, as a Hugging Face static Space
@@ -20,9 +20,6 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / "scripts"))
-
-import build_docs
 
 GRIDS = ("demo_grid.json", "demo_grid_ctx.json")
 
@@ -58,10 +55,9 @@ def build_site(out: Path, *, space: bool = False) -> None:
         shutil.copy2(REPO / "artifacts" / "results" / grid, out / grid)
     wheel = build_wheel(out)
     (out / "wheel.json").write_text(json.dumps({"wheel": wheel.name}) + "\n", encoding="utf-8")
-    pages = build_docs.build(out / "docs")
     if space:
         shutil.copy2(REPO / "space" / "README.md", out / "README.md")
-    print(f"built {out} with {wheel.name} and {len(pages)} docs pages")
+    print(f"built {out} with {wheel.name}")
 
 
 def main() -> None:

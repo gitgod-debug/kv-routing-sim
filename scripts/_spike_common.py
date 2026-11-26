@@ -1,7 +1,7 @@
 """Shared helpers for the spike scripts: the results-file header and the writers.
 
-Every results file starts with a header of date, git SHA, seed, hardware and package versions
-(docs/06-methodology.md §3). Two header fields come from ADR-005: `hardware.compute_capability`
+Every results file starts with a header of date, git SHA, seed, hardware and package versions.
+Two header fields come from ADR-005: `hardware.compute_capability`
 decides whether bf16/FP8 and the FlashAttention backend were available, and `hardware_path`
 records whether the memory-split fallback was used, whose TTFT percentiles include test-rig SM
 contention and must not be attributed to a routing policy.
@@ -152,7 +152,7 @@ def results_header(
     hardware_path: str = "single-replica",
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Return the header every results file starts with (docs/06-methodology.md §3).
+    """Return the header every results file starts with.
 
     `git_dirty` records whether tracked or untracked files under `PROVENANCE_PATHS` differ from
     HEAD, in which case the numbers cannot be re-derived from a commit. `hardware_path` (ADR-005)
@@ -191,8 +191,7 @@ def write_results(filename: str, payload: dict[str, Any]) -> Path:
 def write_raw(filename: str, text: str) -> Path:
     """Write a raw artifact, such as a /metrics scrape, verbatim to artifacts/results/.
 
-    Keeping the raw text beside the parsed summary lets the parse be checked
-    (docs/06-methodology.md §4).
+    Keeping the raw text beside the parsed summary lets the parse be checked.
     """
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     path = RESULTS_DIR / filename

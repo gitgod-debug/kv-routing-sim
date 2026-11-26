@@ -151,7 +151,7 @@ def amend(args: argparse.Namespace, cfg: dict[str, Any], header: dict[str, Any],
     if not all(same.values()):
         raise SystemExit("error: not an amendment — these no longer come out as registered: "
                          f"{', '.join(k for k, ok in same.items() if not ok)}. Changing them "
-                         "means a new registration (run without --amend, and say why in docs/09).")
+                         "means a new registration (run without --amend, and say why).")
     src = "".join("".join(c["source"]) for c in json.loads(old)["cells"]
                   if c["cell_type"] == "code")
     wheel = base64.b64decode(re.search(r'b64decode\("""([A-Za-z0-9+/=]*)"""\)', src).group(1))

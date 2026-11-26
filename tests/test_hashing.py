@@ -42,7 +42,7 @@ def test_salt_separates_logically_different_caches():
 
 def test_cross_session_ratio_ignores_within_session_reuse():
     """Within-session reuse is not cross-session sharing: session-sticky routing already captures
-    it, so it must not count on the H2 axis (docs/03, section 5)."""
+    it, so it must not count on the H2 axis."""
     blocks = (1, 2, 3)
     one_session = [(blocks, "s1"), (blocks, "s1"), (blocks, "s1")]
     assert cross_session_sharing_ratio(one_session) == 0.0

@@ -1,7 +1,7 @@
 """Grid sweeps: every (policy, replica count) cell over several seeds, averaged into points.
 
 Several seeds per cell matter because routing policies break ties at random, and the differences
-between policies can be as small as the variation between seeds (docs/06-methodology.md).
+between policies can be as small as the variation between seeds.
 """
 
 from __future__ import annotations

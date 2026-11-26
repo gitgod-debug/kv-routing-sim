@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""What one agent session costs under each routing policy (S1 in docs/09-hypotheses.md).
+"""What one agent session costs under each routing policy (S1, registered before it ran).
 
     python scripts/session_cost.py               # every cell -> artifacts/results/session_cost/
     python scripts/session_cost.py --only 4 0.5  # one cell (prompts, load): printed, not written

@@ -8,12 +8,10 @@ on:
     branches: [main]
     paths:
       - "site/**"
-      - "docs/**"
       - "src/**"
       - "pyproject.toml"
       - "artifacts/results/demo_grid*.json"
       - "scripts/build_site.py"
-      - "scripts/build_docs.py"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 

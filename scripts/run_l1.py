@@ -4,7 +4,7 @@
     python scripts/run_l1.py                   # every run -> artifacts/results/l1_agentx_full/
     python scripts/run_l1.py --keep-finished   # go on with a job that was stopped
 
-Registered in docs/09-hypotheses.md; the design and the rules are in configs/l1_agentx_full.yaml.
+Registered before it ran; the design and the rules are in configs/l1_agentx_full.yaml.
 Every request finishes before the next one arrives, so the result says which tokens the caches
 served and which had to be computed, and nothing about time, GPU counts or cost.
 

@@ -68,8 +68,7 @@ before it ran, as S1: [the report](artifacts/results/session_cost/report.md), ma
 
 ## Every registered test, and what happened
 
-Each prediction was committed before its test ran. [The log](docs/09-hypotheses.md) has the dated
-entries.
+Each prediction was committed before its test ran.
 Of 21 rows, 11 held (H4 only in an amended form), 4 failed, and 6 held in part or are not settled.
 
 | Test | Predicted | Outcome |
@@ -100,7 +99,7 @@ Of 21 rows, 11 held (H4 only in an amended form), 4 failed, and 6 held in part o
 
 1. [Every registered test, and what happened](#every-registered-test-and-what-happened): 21 rows. 4 failed, and 6 held only in part.
 2. [The calibration report](artifacts/results/phase3_kaggle_t4/calibration_report.md): the prediction against the measurement, request by request, with the residual explained.
-3. [The finding, as a replication](#the-finding), next to the work that came first ([`docs/04-prior-art.md`](docs/04-prior-art.md)).
+3. [The finding, as a replication](#the-finding), next to the work that came first ([related work](#related-work-and-what-is-claimed)).
 4. [What one agent session costs](artifacts/results/session_cost/report.md) under each routing policy.
 5. [What breaks at 10× and 100×](artifacts/results/scale/report.md), as measured.
 6. [Ten questions a skeptic should ask](#ten-questions-a-skeptic-should-ask), each with its number and where it does not hold.
@@ -153,7 +152,7 @@ the validity table uses. Numbers from other people's papers carry their citation
 
 </details>
 
-[![The in-browser runner: choose traffic, a GPU and a latency target, run it, and read the recommended routing policy and replica count](docs/figures/demo-run.gif)](https://gitgod-debug.github.io/kv-routing-sim/run.html)
+[![The in-browser runner: choose traffic, a GPU and a latency target, run it, and read the recommended routing policy and replica count](figures/demo-run.gif)](https://gitgod-debug.github.io/kv-routing-sim/run.html)
 
 ## Status and known limits (2026-11-26)
 
@@ -166,7 +165,7 @@ calibration do not cover the next calibration's count often enough: 82% of cases
 was 90%. So the tool says "plus one". At the knee of a GPU's load curve no number here is reliable,
 and the tool says when a recommendation is there. The grid behind the finding has one generated
 trace per point and three seeds of the router.
-[`docs/06-methodology.md`](docs/06-methodology.md) asks for five seeds, and a paired interval on
+The methodology asks for five seeds, and a paired interval on
 every row that compares a policy with the baseline. The test behind half of the old headline was
 decided inside that margin, so that half is "not settled" below.
 
@@ -177,13 +176,11 @@ in October and November 2026. See the note under the finding, and the section on
 **Upstream.** During calibration, this project found a bug in the trace replay of
 `vllm-project/guidellm`: one token is lost per block with tokenizers that add a start token.
 Another contributor reported it there, and it is fixed (#1424 and #1425, merged 17 November 2026).
-Nothing was filed from this repository. The dated finding is in [`docs/upstream/`](docs/upstream/).
+Nothing was filed from this repository.
 
-**Demo and docs.** The demo page is live at
-[gitgod-debug.github.io/kv-routing-sim](https://gitgod-debug.github.io/kv-routing-sim/), and the
-documentation is next to it as [web pages](https://gitgod-debug.github.io/kv-routing-sim/docs/). The
-package is on PyPI: `pip install kv-routing-sim` (see Install). Start reading at
-[`docs/00-START-HERE.md`](docs/00-START-HERE.md).
+**Demo.** The demo page is live at
+[gitgod-debug.github.io/kv-routing-sim](https://gitgod-debug.github.io/kv-routing-sim/). The package
+is on PyPI: `pip install kv-routing-sim` (see Install).
 
 ## Ten questions a skeptic should ask
 
@@ -213,7 +210,7 @@ package is on PyPI: `pip install kv-routing-sim` (see Install). Start reading at
 > calibration usually gives a count within one of it.
 
 **This is not a new result.** A fourth check of prior work found this on 2026-10-05, after three
-earlier checks had missed it ([`docs/04-prior-art.md`](docs/04-prior-art.md), §2a). SMetric (Wang
+earlier checks had missed it. SMetric (Wang
 et al., arXiv 2607.08565, July 2026) reached the same advice from production traces on 32 real
 GPUs: send the follow-up requests of a session to the instance that served it. LMetric (Zhang et
 al., OSDI '26) had shown before that a hand-weighted mix of a cache score and a load score has no
@@ -242,7 +239,7 @@ higher load it was 5,457 ms against 3,329 ms.
 How it was measured: simulated agent traffic, the cache model calibrated against a live vLLM (see
 the calibration report below), a context-aware T4 timing model, and a 2-second p95 TTFT target. The
 test was registered before it ran, on calibration A, which is C2's fit
-([`docs/09-hypotheses.md`](docs/09-hypotheses.md), 2026-09-30). B and C are the two profiles that
+(2026-09-30). B and C are the two profiles that
 `kvsim calibrate` wrote on a real T4 in C3 (2026-10-05). B's table was a registered reported item.
 C's table was added after seeing it, so it is post hoc
 ([all three, side by side](artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.md)).
@@ -253,8 +250,8 @@ C's table was added after seeing it, so it is post hoc
 | 64 offered, 48 used | 2.66 | session-sticky 10 · 12 · 12 · balanced prefix-affinity 11 · 11 · 10 · round-robin 16 · 16 · not held · least-loaded: not held *(prefix-affinity with a load weight of 1: **8 · 8 · 8**, a weight found after the tests)* |
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/figures/flip-dark.svg">
-  <img src="docs/figures/flip-light.svg" width="100%" alt="Left: T4s needed at 2 sessions/s as distinct system prompts grow from 1 to 64, on the context-aware timing model. Session-sticky needs 5 with one prompt and 10 with 64; balanced prefix-affinity needs 10 and 11; round-robin 7 and 16. Right: hit rate on 8 T4s. Round-robin falls from 0.81 to 0.47, session-sticky from 0.92 to 0.80, prefix-affinity with load weight 1 stays near 0.87.">
+  <source media="(prefers-color-scheme: dark)" srcset="figures/flip-dark.svg">
+  <img src="figures/flip-light.svg" width="100%" alt="Left: T4s needed at 2 sessions/s as distinct system prompts grow from 1 to 64, on the context-aware timing model. Session-sticky needs 5 with one prompt and 10 with 64; balanced prefix-affinity needs 10 and 11; round-robin 7 and 16. Right: hit rate on 8 T4s. Round-robin falls from 0.81 to 0.47, session-sticky from 0.92 to 0.80, prefix-affinity with load weight 1 stays near 0.87.">
 </picture>
 
 *Drawn by [`scripts/make_figures.py`](scripts/make_figures.py) from
@@ -267,11 +264,6 @@ and C the 64-prompt points move by up to two replicas, as the table above shows.
 figures on the context-aware model, and another calibration usually gives a count within one
 replica of them. They are first-token counts. With a limit on the time per output token as well,
 the simulator needs about twice as many GPUs (T2).
-
-The details are in [`docs/13-the-finding-in-detail.md`](docs/13-the-finding-in-detail.md): what
-holds on all three calibrations and what does not, how this finding changed and why, the live check
-on two T4s, the three real traces, and the three tests of the per-token half of the target (T1, T2,
-C4).
 
 **Try it.** The [demo page](https://gitgod-debug.github.io/kv-routing-sim/) ([`site/`](site/index.html))
 looks up every point of the re-test's grid: prompts × load (0.25–4 sessions/s) × replicas (1–16) ×
@@ -537,7 +529,7 @@ thousands of times on a CPU.
 
 Other people work on the same problem, and more of them than this README said before 2026-10-05.
 Three checks of prior work missed NVIDIA's simulator and the two papers below. The fourth check
-found them. What was missed, and why, is in [`docs/04-prior-art.md`](docs/04-prior-art.md).
+found them.
 
 | Project | What it is, and how this differs |
 |---|---|
@@ -550,7 +542,7 @@ found them. What was missed, and why, is in [`docs/04-prior-art.md`](docs/04-pri
 | **`azrabano23/disagg-sim`** | A teaching tool: it reproduces published scheduling arguments on synthetic workloads. Its own README says it does not fit traces, and points to Vidur for that. |
 | **`jahnavi-yelamanchi/cachetrace`** | A single-path prompt-construction linter. |
 | **CacheWise** (arXiv 2606.16824) · **`gauravapiscean/agentic-kv-cache`** | Prefix-aware scheduling and eviction for coding agents, and single-node eviction policies replayed on the same AgentX and Mooncake traces (that second one finds LRU hard to beat). Both work inside one engine. Neither routes across replicas. |
-| **vLLM · SGLang · LMCache · Mooncake · AIBrix · llm-d** | Production engines, caches and gateways. They implement caching and routing, and do not compare policies. Dynamo was in this row until 2026-10-05, and it ships a simulator. The docs of the others were read again on 2026-11-25, and none was found to compare routing policies across replicas against a live engine ([`docs/04-prior-art.md`](docs/04-prior-art.md), §2b). |
+| **vLLM · SGLang · LMCache · Mooncake · AIBrix · llm-d** | Production engines, caches and gateways. They implement caching and routing, and do not compare policies. Dynamo was in this row until 2026-10-05, and it ships a simulator. The docs of the others were read again on 2026-11-25, and none was found to compare routing policies across replicas against a live engine. |
 
 **What is claimed, after that check.** Not an empty niche. Only three things that this repository
 did and can show:
@@ -618,18 +610,9 @@ C4's, and those of calibrations B and C). A GPU measurement cannot be made again
 
 ---
 
-## Documentation
+## Sibling project
 
-| | |
-|---|---|
-| [`docs/00-START-HERE.md`](docs/00-START-HERE.md) | Start here: what this is, and the order to read the docs |
-| [`docs/02-architecture-decisions.md`](docs/02-architecture-decisions.md) | ADR-001 to ADR-013: the design decisions and their reasons |
-| [`docs/04-prior-art.md`](docs/04-prior-art.md) | Other work on the same question, what to cite, and the sentences this project must never write |
-| [`docs/06-methodology.md`](docs/06-methodology.md) | The statistics protocol and the cost model |
-| [`docs/09-hypotheses.md`](docs/09-hypotheses.md) | Every test, registered before it ran (H1–H6, H2b, R1–R3, C1–C4, T1, T2, S1, V1, L1 and Phase 6), with dated results, failed ones included |
-| [`docs/13-the-finding-in-detail.md`](docs/13-the-finding-in-detail.md) | What stands behind the finding: three calibrations, the live check, the real traces, the per-token half |
-
-**Sibling project:** `colpali-lite`, not public yet. It uses the same method (cost and tail latency
+`colpali-lite` is not public yet. It uses the same method (cost and tail latency
 under a configuration choice, bootstrap CIs, an explicit cost model, results in ₹ per unit of
 useful work) for late-interaction retrieval instead of LLM serving. Serving cost is usually
 measured too little in ML systems: mean latency only, no cost axis, no error bars.

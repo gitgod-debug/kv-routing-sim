@@ -58,4 +58,4 @@ def test_no_relative_link_is_left_in_this_readme():
     assert len(targets) > 50
     assert [t for t in targets if not re.match(r"^(https?:|mailto:|#)", t)] == []
     raw = meta["urls"]["Homepage"].replace("github.com", "raw.githubusercontent.com")
-    assert f"{raw}/v{meta['version']}/docs/figures/" in text
+    assert f"{raw}/v{meta['version']}/figures/" in text
