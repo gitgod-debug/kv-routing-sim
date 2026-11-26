@@ -1,8 +1,9 @@
 """The README's first screen against the files it summarises.
 
 Three tables sit at the top of the README: where the numbers hold, what one agent session costs,
-and every registered test with its outcome. These tests fail if a table drifts from the log, the
-stored result or the profile it was copied from.
+and every registered test with its outcome. These tests fail if a table drifts from the stored
+result or the profile it was copied from. The registration log is not in the repository. Where a
+copy of it is present, they also fail if the outcome table drifts from the log.
 """
 
 from __future__ import annotations
@@ -11,16 +12,19 @@ import json
 import pathlib
 import re
 
+import pytest
 import yaml
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 RESULTS = REPO / "artifacts" / "results"
 README = (REPO / "README.md").read_text(encoding="utf-8")
-LOG = (REPO / "docs" / "09-hypotheses.md").read_text(encoding="utf-8")
+LOG_FILE = REPO / "docs" / "09-hypotheses.md"
+LOG = LOG_FILE.read_text(encoding="utf-8") if LOG_FILE.exists() else None
+needs_log = pytest.mark.skipif(LOG is None, reason="the registration log is not in the repository")
 
 HELD, FAILED, PART = "✅ held", "⛔ failed", "✅⛔"
-# One entry per row of the log's status table. A test added to the log must be added here and to
-# the README, or the first test below fails.
+# One entry per registered test. A new test must be added here, to the README and to the log, or
+# the tests below fail.
 OUTCOMES = {
     "H1": FAILED, "H2": FAILED, "H2b": PART, "H3": HELD, "H4": HELD, "H5": PART, "H6": PART,
     "R1": FAILED, "R2": HELD, "R1, R2 again": PART, "R3": PART, "Phase 6": HELD,
@@ -48,13 +52,18 @@ def _log_status() -> dict[str, str]:
 
 
 def test_every_registered_test_is_on_the_first_screen_with_its_outcome():
-    assert set(_log_status()) == set(OUTCOMES), "the log's status table gained or lost a test"
     shown = _named_rows(_section(README, "## Every registered test"))
     assert set(shown) == set(OUTCOMES)
     for name, mark in OUTCOMES.items():
         assert shown[name][2].startswith(mark), name
 
 
+@needs_log
+def test_the_log_lists_the_same_tests():
+    assert set(_log_status()) == set(OUTCOMES), "the log's status table gained or lost a test"
+
+
+@needs_log
 def test_the_first_screen_shows_no_success_the_log_does_not_record():
     """A row shown as held is not one the log calls falsified, and the reverse."""
     log = _log_status()
