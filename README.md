@@ -169,7 +169,9 @@ published in October and November 2026 — see the note under the finding, and t
 upstream and it is fixed there (#1424 and #1425, merged 17 November 2026). Nothing was filed from
 this repository; the dated finding is in [`docs/upstream/`](docs/upstream/).
 
-**The demo page is live; the package is not on PyPI yet.** The demo:
+**The demo page is live, with the documentation beside it
+([docs](https://gitgod-debug.github.io/kv-routing-sim/docs/), once the next deploy has run); the package
+is not on PyPI yet.** The demo:
 [gitgod-debug.github.io/kv-routing-sim](https://gitgod-debug.github.io/kv-routing-sim/). Until the
 package is uploaded, install it from a clone (see Install). Start at
 [`docs/00-START-HERE.md`](docs/00-START-HERE.md).

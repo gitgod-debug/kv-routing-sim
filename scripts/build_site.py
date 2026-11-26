@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Assemble the static site: the pages, the demo grids, and a wheel for the in-browser runner.
+"""Assemble the static site: the pages, the demo grids, the docs, and a wheel for the runner.
 
     python scripts/build_site.py --out _site
+    python scripts/build_site.py --space --out _space   # the same, as a Hugging Face static Space
 
 The GitHub Pages workflow runs this; run it locally and serve the output directory to preview
-the site exactly as it is published (python -m http.server --directory _site).
+the site exactly as it is published (python -m http.server --directory _site). `--space` adds the
+README.md that a Space reads its settings from; pushing it is a separate step, done by hand.
 """
 
 from __future__ import annotations
@@ -18,6 +20,10 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "scripts"))
+
+import build_docs
+
 GRIDS = ("demo_grid.json", "demo_grid_ctx.json")
 
 
@@ -44,7 +50,7 @@ def build_wheel(destination: Path) -> Path:
         return Path(shutil.copy2(wheels[0], destination))
 
 
-def build_site(out: Path) -> None:
+def build_site(out: Path, *, space: bool = False) -> None:
     if out.exists():
         shutil.rmtree(out)
     shutil.copytree(REPO / "site", out)
@@ -52,13 +58,19 @@ def build_site(out: Path) -> None:
         shutil.copy2(REPO / "artifacts" / "results" / grid, out / grid)
     wheel = build_wheel(out)
     (out / "wheel.json").write_text(json.dumps({"wheel": wheel.name}) + "\n", encoding="utf-8")
-    print(f"built {out} with {wheel.name}")
+    pages = build_docs.build(out / "docs")
+    if space:
+        shutil.copy2(REPO / "space" / "README.md", out / "README.md")
+    print(f"built {out} with {wheel.name} and {len(pages)} docs pages")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", type=Path, default=REPO / "_site")
-    build_site(parser.parse_args().out.resolve())
+    parser.add_argument("--space", action="store_true",
+                        help="add the README.md of a Hugging Face static Space")
+    args = parser.parse_args()
+    build_site(args.out.resolve(), space=args.space)
 
 
 if __name__ == "__main__":
