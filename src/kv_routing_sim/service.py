@@ -21,6 +21,7 @@ from .eval.edge import edge_check
 from .eval.recommend import recommend
 from .eval.spread import replica_spread
 from .eval.sweep import RunCallback, sweep
+from .profiles import longest_prompt_measured
 from .sim.cost_model import (
     UNCALIBRATED_DEFAULT,
     CostProfile,
@@ -95,6 +96,7 @@ class ReplayReport:
     replica_spread: dict[str, Any] | None
     replica_spread_note: str | None
     edge: dict[str, Any] | None
+    prompt_range: dict[str, Any] | None = None
 
     @property
     def calibrated(self) -> bool:
@@ -110,6 +112,7 @@ class ReplayReport:
             "replica_spread": self.replica_spread,
             "replica_spread_note": self.replica_spread_note,
             "edge": self.edge,
+            "prompt_range": self.prompt_range,
         }
 
 
@@ -308,7 +311,18 @@ def replay(
         replica_spread=spread,
         replica_spread_note=spread_note,
         edge=edge,
+        prompt_range=prompt_range(trace, options.profile),
     )
+
+
+def prompt_range(trace: list[NormalizedRequest], profile: str | None) -> dict[str, Any] | None:
+    """How many prompts are longer than any the profile was timed on; None if it does not say."""
+    longest = longest_prompt_measured(profile) if profile else None
+    if longest is None:
+        return None
+    lengths = [r.prompt_tokens for r in trace]
+    return {"longest_measured": longest, "longest_here": max(lengths, default=0),
+            "requests": len(lengths), "requests_longer": sum(n > longest for n in lengths)}
 
 
 def _stage(progress: ProgressCallback | None, stage: str, total: int) -> RunCallback | None:

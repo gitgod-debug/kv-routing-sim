@@ -55,6 +55,15 @@ def recommendation_notes(report: dict[str, Any]) -> list[Note]:
     edge = report.get("edge")
     if edge:
         notes.append(Note(_edge_line(edge), warning=edge["verdict"] in ("knee", "edge")))
+    prompts = report.get("prompt_range")
+    if prompts and prompts["requests_longer"]:
+        share = 100 * prompts["requests_longer"] / prompts["requests"]
+        notes.append(Note(
+            f"Outside the measured range: {prompts['requests_longer']:,} of "
+            f"{prompts['requests']:,} prompts ({share:.0f}%) are longer than "
+            f"{prompts['longest_measured']:,} tokens, the longest this profile was timed on (the "
+            f"longest here has {prompts['longest_here']:,}). Their timings are extrapolated.",
+            warning=True))
     return notes
 
 

@@ -62,7 +62,7 @@ where = ["src"]
 # The measured T4 profiles and the cited cost model ship with the package, so `--profile <name>` and
 # `--cost-model default` work without a clone.
 [tool.setuptools.package-data]
-kv_routing_sim = ["data/*.yaml", "data/profiles/*.json"]
+kv_routing_sim = ["data/*.yaml", "data/profiles/*.json", "data/profiles/*.yaml"]
 
 [tool.ruff]
 line-length = 100

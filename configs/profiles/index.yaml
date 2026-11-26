@@ -1,0 +1,25 @@
+# The measured profiles, keyed by the setup each one was measured on. `kvsim profiles` reads this
+# file. A profile holds for its own key; nothing is interpolated between two of them.
+#
+# longest_prompt: the longest prompt, in tokens, whose timing was measured. checked: what of the
+# simulator was compared with the engine on this key, and how far off it was.
+schema_version: 1
+profiles:
+  - name: t4-qwen3-4b-vllm0.30.0-ctx
+    key: {gpu: Tesla T4, model: Qwen/Qwen3-4B, engine_version: "0.30.0", block_size: 16, max_num_seqs: 256}
+    kv_cache_blocks: 1537
+    longest_prompt: 1984
+    checked:
+      - "cache counts: exact for requests sent one at a time; the same test was exact on vLLM 0.34.0"
+      - "hit rates on two live replicas: within 1.4%"
+      - "p95 time to first token on traffic the fit never saw: within 1.41x"
+      - "p95 time per output token around a 100 ms limit: within 7%; 1.5-1.7x off at the knee"
+    evidence: artifacts/results/c2_kaggle_t4/report.md
+  - name: t4-qwen3-4b-vllm0.30.0
+    key: {gpu: Tesla T4, model: Qwen/Qwen3-4B, engine_version: "0.30.0", block_size: 16, max_num_seqs: 256}
+    kv_cache_blocks: 1537
+    longest_prompt: 583
+    checked:
+      - "cache counts: exact for requests sent one at a time"
+      - "timing: no term for context length; 5-222x optimistic under load with 1,700-token prompts"
+    evidence: artifacts/results/phase3_kaggle_t4/calibration_report.md

@@ -152,6 +152,32 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_profiles(args: argparse.Namespace) -> int:
+    """List the measured profiles, or say how far a setup is from the nearest one."""
+    from .profiles import measured_profiles, nearest, render_distance, render_list, setup_of
+
+    given = {"gpu": args.gpu, "model": args.model, "engine_version": args.engine_version,
+             "block_size": args.block_size, "max_num_seqs": args.max_num_seqs}
+    if args.engine:
+        from .calib.calibrate import CalibrationError, Engine, probe
+
+        try:
+            info = probe(Engine(args.engine), model=args.model, block_size=args.block_size,
+                         max_num_seqs=args.max_num_seqs)
+        except CalibrationError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        read = {"model": info.model, "engine_version": info.version,
+                "block_size": info.block_size, "max_num_seqs": info.max_num_seqs}
+        given = {k: v if v is not None else read.get(k) for k, v in given.items()}
+    if not any(v is not None for v in given.values()):
+        print(render_list(measured_profiles()))
+        return 0
+    yours = setup_of(**given)
+    print(render_distance(yours, *nearest(yours)))
+    return 0
+
+
 def _ints(spec: str, flag: str) -> tuple[int, ...]:
     """Parse a comma-separated list of integers given for `flag`."""
     try:
@@ -227,6 +253,17 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--profile", default=None, help=PROFILE_HELP)
     c.add_argument("--out", default=None)
     c.set_defaults(func=cmd_crossover)
+
+    p = sub.add_parser("profiles", help="the measured profiles, and how far a setup is from them")
+    p.add_argument("--gpu", default=None, help='as nvidia-smi names it, e.g. "Tesla T4"')
+    p.add_argument("--model", default=None)
+    p.add_argument("--engine-version", default=None, help="vLLM's version, e.g. 0.30.0")
+    p.add_argument("--block-size", type=int, default=None)
+    p.add_argument("--max-num-seqs", type=int, default=None)
+    p.add_argument("--engine", default=None,
+                   help="a running vLLM to read the model, version, block size and max_num_seqs "
+                        "from; the GPU is not served over HTTP, so give --gpu as well")
+    p.set_defaults(func=cmd_profiles)
 
     cal = sub.add_parser(
         "calibrate", help="fit a timing profile to your running vLLM and check the cache model"

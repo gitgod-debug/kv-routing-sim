@@ -384,7 +384,11 @@ The profile in that command is ours: measured on a Tesla T4 with Qwen3-4B and vL
 with the package, as does the cited cost model. Without `--profile` the timings are a built-in guess.
 Use the context-aware one: it is the one checked against live latency (C2), with prompts up to about
 2,000 tokens; `t4-qwen3-4b-vllm0.30.0`, the first, context-free profile, is kept for the record and is
-optimistic on long prompts. (`--profile` also takes a path to any profile file, and `--cost-model` a path to your own YAML — the
+optimistic on long prompts. `kvsim profiles` lists what each was measured on and checked against;
+with `--gpu`, `--model`, `--engine-version`, `--block-size` and `--max-num-seqs` (or `--engine` and
+a running vLLM) it says which of the five differ from your setup and what each difference means.
+Nothing is interpolated between profiles. A replay also says how many of your prompts are longer
+than any its profile was timed on. (`--profile` also takes a path to any profile file, and `--cost-model` a path to your own YAML — the
 shipped ones are byte-for-byte `configs/profiles/` and `configs/cost_model.yaml`.)
 
 **The target has two halves by default:** p95 time to first token ≤ 2 s, from the cost model, and

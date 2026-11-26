@@ -22,5 +22,10 @@ def profiles() -> dict[str, Traversable]:
             if p.name.endswith(".json")}
 
 
+def profile_index() -> Traversable:
+    """Return the index that keys each shipped profile by the setup it was measured on."""
+    return root() / "profiles" / "index.yaml"
+
+
 def cost_model() -> Traversable:
     return root() / "cost_model.yaml"
