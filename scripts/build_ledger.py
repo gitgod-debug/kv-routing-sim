@@ -192,6 +192,23 @@ ROWS = [
         lambda d: "{:.0f} MiB for {:,} requests".format(*next(
             (c["peak_rss_mib_after_trace"], c["requests"]) for c in d["cases"]
             if c["case"].startswith("100×") and c["policy"] == "round-robin"))),
+    Row("A public trace replayed whole, at its recorded size (L1)",
+        "739 sessions, 53,967 requests, 7.8 billion prompt tokens",
+        f"{RESULTS}/l1_agentx_full/l1.json", "scripts/run_l1.py",
+        lambda d: "{} sessions, {:,} requests, {:.1f} billion prompt tokens".format(
+            d["trace"]["sessions"], d["trace"]["requests"], d["trace"]["prompt_tokens"] / 1e9)),
+    Row("At that size, one replica that never evicts against the raw file (L1a)",
+        "53,967 of 53,967 requests exact",
+        f"{RESULTS}/l1_agentx_full/l1.json", "scripts/run_l1.py",
+        lambda d: "{:,} of {:,} requests exact".format(d["never_forgets"]["requests_equal"],
+                                                       d["never_forgets"]["requests"])),
+    Row("Computed again with 1 Mi tokens of cache per replica: round-robin, session-sticky (L1)",
+        "46.64% and 1.32% of prompt tokens",
+        f"{RESULTS}/l1_agentx_full/l1.json", "scripts/run_l1.py",
+        lambda d: "{:.2%} and {:.2%} of prompt tokens".format(*(
+            next(r["re_prefilled_share"] for r in d["rows"]
+                 if (r["policy"], r["capacity_tokens"]) == (policy, 2**20))
+            for policy in ("round-robin", "session-sticky")))),
     Row("Engine, block size and cache of the timing profile", "vLLM 0.30.0, 16 tokens, 1,537 "
         "blocks",
         "configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json", "scripts/c2_analyze.py",
