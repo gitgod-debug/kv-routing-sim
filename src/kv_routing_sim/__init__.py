@@ -13,4 +13,4 @@ follows vLLM 0.30.0's block pool and was checked against a live engine.
     cli        the `kvsim` command line
 """
 
-__version__ = "0.1.0"  # keep in step with pyproject.toml
+__version__ = "0.1.1"  # keep in step with pyproject.toml
