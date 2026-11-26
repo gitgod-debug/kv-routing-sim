@@ -182,8 +182,8 @@ Nothing was filed from this repository. The dated finding is in [`docs/upstream/
 **Demo and docs.** The demo page is live at
 [gitgod-debug.github.io/kv-routing-sim](https://gitgod-debug.github.io/kv-routing-sim/), and the
 documentation is next to it as [web pages](https://gitgod-debug.github.io/kv-routing-sim/docs/). The
-package is not on PyPI yet. Until it is uploaded, install it from a clone (see Install). Start
-reading at [`docs/00-START-HERE.md`](docs/00-START-HERE.md).
+package is on PyPI: `pip install kv-routing-sim` (see Install). Start reading at
+[`docs/00-START-HERE.md`](docs/00-START-HERE.md).
 
 ## Ten questions a skeptic should ask
 
@@ -378,16 +378,19 @@ shape, and the prefix-sharing ratio is one of its parameters.
 The simulator runs inside the page with Pyodide. A log you choose is read on your computer and is
 never uploaded. The page shows the `kvsim` commands that give the same answer.
 
-**On your machine** (not on PyPI yet):
+**On your machine:**
 
 ```bash
-pip install git+https://github.com/gitgod-debug/kv-routing-sim   # CPU-only, no GPU dependency
+pip install kv-routing-sim   # CPU-only, no GPU dependency
 kvsim generate --out trace.jsonl --sessions 100 --turns 4 --rate 0.5   # or use your own log
 kvsim replay trace.jsonl --policies all --replicas 1-8 \
   --profile t4-qwen3-4b-vllm0.30.0-ctx --cost-model default
 ```
 
 That takes about half a minute and ends with a recommendation for a T4.
+
+For the newest code on GitHub instead of the last release, install with
+`pip install git+https://github.com/gitgod-debug/kv-routing-sim`.
 
 Set your own target and GPU price with `--ttft-slo-ms`, `--tpot-slo-ms` and `--gpu-price-usd`.
 
@@ -512,8 +515,8 @@ size. So the answer comes in three levels, and they must not be mixed (ADR-010):
 A GPU is used only once: for calibration, offline, before anything is published. Everything that
 is deployed is plain CPU Python:
 
-- **The package**, on your machine. This is the main way to use it. (Install it from a clone for
-  now. The PyPI upload is not done yet.)
+- **The package**, on your machine, from PyPI (`pip install kv-routing-sim`). This is the main way
+  to use it.
 - **A static demo page**, [live on GitHub Pages](https://gitgod-debug.github.io/kv-routing-sim/).
   It is a precomputed grid with selectors. You can see the recommendation change with the prompts
   and the load in ten seconds, with nothing installed. There is no server, and every number on the

@@ -3,9 +3,9 @@
 Versions follow [semantic versioning](https://semver.org/). Before 1.0, the command-line interface and
 the file formats may still change between minor versions. Each change will be listed here.
 
-## 0.1.0 — unreleased
+## 0.1.0 — 2026-11-26
 
-The first public version. It is not on PyPI yet.
+The first public version, and the first one on PyPI.
 
 ### Added
 - **An in-browser runner** (`site/run.html`). It takes generated traffic or a serving log that you
