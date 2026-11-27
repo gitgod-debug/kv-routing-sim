@@ -14,7 +14,8 @@
   <p class="sub">Which KV-cache routing policy should you run, and on how many GPUs? This simulator
     answers that. Its cache model was checked against a live vLLM, and its tests were written down
     before they ran.</p>
-  <p class="lead"><a class="button" href="run.html">Run it on your own traffic</a></p>
+  <p class="lead actions"><a class="button" href="run.html">Run it on your own traffic</a>
+    <a class="button alt" href="#explore">Explore the results</a></p>
 
   <div class="finding"><strong>Keep each user on one GPU.</strong> This holds on three calibrations of
     the same GPU type (a T4). Session-sticky routing needs the fewest GPUs, or ties for the fewest, at
@@ -34,7 +35,8 @@
     and plain session-sticky routing then leaves the load unbalanced. Every generated session here has
     the same number of turns. NVIDIA's Dynamo ships a larger simulator for the same question (AISim).
     Three more simulators checked against live engines were published in October and November 2026.
-    The prior-art file in the repository says what an earlier check missed.</p>
+    <a href="https://github.com/gitgod-debug/kv-routing-sim#related-work-and-what-is-claimed">The
+    related-work section of the README</a> names them and says what earlier checks missed.</p>
 
   <div class="scroll">
     <table aria-label="The finding in numbers">
@@ -64,10 +66,11 @@
 
   <h2>Checked against a live vLLM</h2>
   <p>vLLM 0.30.0, Qwen3-4B (fp16), and a small cache of 512 blocks, chosen so that it overflows. Each
-    workload ran three times, and the predictions were committed before the run.</p>
+    workload ran three times, and the predictions were committed before the run. The numbers in the
+    table are prefix-cache hit rates.</p>
   <div class="scroll">
-    <table aria-label="Calibration">
-      <thead><tr><th>Workload</th><th class="num">Engine</th><th class="num">Block-pool model</th><th class="num">Plain LRU</th></tr></thead>
+    <table aria-label="Prefix-cache hit rate of the live engine and of two models">
+      <thead><tr><th>Workload</th><th class="num">Live engine</th><th class="num">Block-pool model</th><th class="num">Plain LRU</th></tr></thead>
       <tbody>
         <tr><td>One at a time, 1-token outputs</td><td class="num">0.6090</td><td class="num">0.6090 · exact</td><td class="num">0.6073</td></tr>
         <tr><td>One at a time, 64-token outputs</td><td class="num">0.4883</td><td class="num">0.4883 · exact</td><td class="num">0.6073</td></tr>
@@ -81,7 +84,7 @@
     held-out traffic within 1.41×, where the first model (no context term) was up to 7× optimistic.
     Every number on this page uses it.</p>
 
-  <h2>Explore the precomputed results</h2>
+  <h2 id="explore">Explore the precomputed results</h2>
   <div class="controls">
     <div class="control"><label id="lk">Distinct system prompts (tenants)</label>
       <div class="seg" role="group" aria-labelledby="lk" id="ks"></div></div>
@@ -93,6 +96,7 @@
   <div class="answer" id="answer" aria-live="polite">Loading the grid…</div>
   <p class="muted" id="ws"></p>
   <div class="scroll"><table id="tbl" aria-label="Every policy at the chosen point"></table></div>
+  <p class="muted" id="tblcap"></p>
   <div class="scroll"><svg id="chart" width="100%" height="220" role="img" aria-label="T4s needed as prompts multiply"></svg></div>
   <div class="legend" id="legend"></div>
   <p class="muted" id="chartcap"></p>
@@ -117,11 +121,15 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
   const state = { k: 0, load: 0, rep: 0 };  // indices into the axes; set from the grid on load
   let G = null;
 
-  // Readable names for the grid's policy labels ("radix-affinity-balanced@16" -> a load weight).
+  // Readable names for the grid's policy labels, as the README names them. The load weight the
+  // tests chose (alpha*, 16) is "balanced prefix-affinity"; any other weight is named by its value.
   function nice(name) {
     const m = /^radix-affinity-balanced@(.+)$/.exec(name);
-    if (m) return `prefix-affinity, load weight ${m[1]}`;
-    return name === "radix-affinity" ? "prefix-affinity, pure" : name;
+    if (m) {
+      return m[1] === String(G.alpha_star) ? `balanced prefix-affinity (load weight ${m[1]})`
+                                           : `prefix-affinity, load weight ${m[1]}`;
+    }
+    return name === "radix-affinity" ? "pure prefix-affinity" : name;
   }
   function seg(el, values, fmt, key) {
     el.innerHTML = "";
@@ -140,8 +148,9 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
     return -1;
   }
   function t4s(n) { return `${n} T4${n > 1 ? "s" : ""}`; }
+  // Whole milliseconds below 10 s, so that a p95 of 2,041 ms does not read as "2.0 s".
   function ms(x) {
-    return x >= 10000 ? (x / 1000).toFixed(0) + " s" : x >= 1000 ? (x / 1000).toFixed(1) + " s" : x + " ms";
+    return x >= 10000 ? (x / 1000).toFixed(0) + " s" : Math.round(x).toLocaleString("en-US") + " ms";
   }
   function render() {
     const A = G.axes;
@@ -164,7 +173,7 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
       const ties = A.policies.filter((n, p) => p !== best.p && needed(k, l, p) === best.ri);
       const rrNeed = needed(k, l, A.policies.indexOf("round-robin"));
       msg = `Use <strong>${nice(best.name)}</strong> on <strong>${t4s(A.replicas[best.ri])}</strong>` +
-            `, at ₹${best.inr.toFixed(2)} per 1,000 requests.`;
+            `, at ₹${best.inr.toFixed(2)} per 1,000 requests that met the target.`;
       msg += rrNeed < 0 ? ` Round-robin does not hold the target on ${A.replicas[A.replicas.length - 1]}.` :
              ` Round-robin needs ${A.replicas[rrNeed]}.`;
       if (ties.length) {
@@ -177,7 +186,7 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
       `${ws.toLocaleString()} blocks = ${(ws / cap).toFixed(2)}× one T4's usable KV cache (${cap.toLocaleString()} blocks).`;
     let rows = `<thead><tr><th>Policy</th><th class="num">T4s needed</th><th class="num">Hit rate</th>` +
                `<th class="num opt">p50 TTFT</th><th class="num">p95 TTFT</th><th class="num">₹ / 1k</th>` +
-               `<th>On ${t4s(A.replicas[r])}</th></tr></thead><tbody>`;
+               `<th>2&nbsp;s target on ${t4s(A.replicas[r]).replace(" ", "&nbsp;")}</th></tr></thead><tbody>`;
     A.policies.forEach((name, p) => {
       const c = cell(k, l, p, r), ri = needed(k, l, p);
       rows += `<tr><td>${nice(name)}</td><td class="num">${ri < 0 ? "none" : A.replicas[ri]}</td>` +
@@ -188,6 +197,13 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
     $("tbl").innerHTML = rows + "</tbody>";
     $("tbl").setAttribute("aria-label", `Every policy at ${A.prompts[k]} prompt(s), ${A.loads[l]} sessions/s; ` +
       `the last column says whether ${t4s(A.replicas[r])} hold the 2 s p95 target`);
+    const fx = G.cost_model.fx.usd_to_inr, usd = G.cost_model.compute.price_per_hour_usd;
+    $("tblcap").textContent = `"T4s needed" is the fewest T4s that hold the target. The other columns ` +
+      `are for ${t4s(A.replicas[r])}, the number chosen above. The target is a p95 time to first token ` +
+      `of 2 s or less in each of the ${G.seeds.length} seeds. The p95 shown is their mean, so a value ` +
+      `near 2 s can still miss. ₹ / 1k is rupees per 1,000 requests that got their first token within ` +
+      `2 s, for a T4 at $${usd} an hour and ₹${fx} a dollar. It rises fast when few requests meet the ` +
+      `target and the queues make the run longer.`;
     chart(l);
   }
   function chart(l) {
@@ -197,15 +213,18 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
     const colors = ["#8d8a82", "#1f9d6a", "#3a78d8", "#c2542d"];
     const W = svg.clientWidth || 600, H = 220, L = 44, R = 24, T = 12, B = 34;
     const x = (i) => L + (W - L - R) * (i / (A.prompts.length - 1));
-    const maxR = A.replicas[A.replicas.length - 1], none = maxR + 1;  // none = not held on maxR
-    const y = (v) => T + (H - T - B) * (1 - (v - 1) / maxR);
+    // "none" = not held on the largest fleet. It sits two steps above it, so its label stays apart.
+    const maxR = A.replicas[A.replicas.length - 1], none = maxR + 2;
+    const y = (v) => T + (H - T - B) * (1 - (v - 1) / (none - 1));
     let s = "";
-    const tick = maxR > 8 ? 3 : 2;
-    const ticks = [];
-    for (let v = 1; v < maxR; v += tick) ticks.push(v);
-    ticks.push(none);  // the top line: not held on the largest fleet
+    const step = maxR > 8 ? 4 : 2;
+    const ticks = [1];
+    for (let v = step; v <= maxR; v += step) ticks.push(v);
+    if (ticks[ticks.length - 1] !== maxR) ticks.push(maxR);
+    ticks.push(none);
     for (const v of ticks) {
-      s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="currentColor" opacity="0.12"/>` +
+      const look = v === none ? 'opacity="0.35" stroke-dasharray="4 4"' : 'opacity="0.12"';
+      s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="currentColor" ${look}/>` +
            `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v === none ? "none" : v}</text>`;
     }
     A.prompts.forEach((k, i) => { s += `<text x="${x(i)}" y="${H - 12}" text-anchor="middle">K = ${k}</text>`; });
@@ -221,9 +240,11 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
     });
     svg.innerHTML = s;
     $("legend").innerHTML = show.map((n, j) => `<span style="--c:${colors[j]}">${nice(n)}</span>`).join("");
-    $("chartcap").textContent = `T4s needed to hold the 2 s p95 target at ${A.loads[l]} sessions/s as the ` +
-      `number of distinct system prompts (K) grows; "none" = not held on ${A.replicas[A.replicas.length - 1]}. ` +
-      `T4 figures, generated traffic.`;
+    const left = A.policies.filter((n) => !show.includes(n)).map(nice);
+    $("chartcap").textContent = `T4s needed to hold the 2 s p95 target at ${A.loads[l]} sessions/s, as the ` +
+      `number of distinct system prompts (K) grows. "none" means the target is not held even on ${maxR} ` +
+      `T4s. T4 figures, generated traffic.` +
+      (left.length ? ` To keep the chart readable, it leaves out ${left.join(" and ")}. The table has them.` : "");
   }
   // Deployed, the grid sits next to the page; in a clone it is read from artifacts/results/.
   function load(urls) {

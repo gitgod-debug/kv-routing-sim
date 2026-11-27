@@ -63,6 +63,7 @@ footer { margin-top: 48px; color: var(--muted); font-size: 0.9rem; }
 .button, button.primary { display: inline-block; font: inherit; font-weight: 600; text-decoration: none;
                           background: var(--accent); color: var(--bg); border: 1px solid var(--accent);
                           border-radius: 8px; padding: 8px 18px; cursor: pointer; }
+.button.alt { background: transparent; color: var(--accent); }
 button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--fg);
          border-radius: 8px; padding: 6px 14px; cursor: pointer; }
 button:disabled { opacity: 0.55; cursor: progress; }

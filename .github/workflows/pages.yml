@@ -1,6 +1,5 @@
-# Publishes the static site to GitHub Pages: the pages in site/, the demo grids, the docs rendered
-# as HTML, and a wheel of the package that the in-browser runner installs. Repository setting: Pages
-# source = GitHub Actions.
+# Publishes the static site to GitHub Pages: the pages in site/, the demo grids and a wheel of the
+# package that the in-browser runner installs. Repository setting: Pages source = GitHub Actions.
 name: pages
 
 on:
