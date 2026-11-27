@@ -144,10 +144,10 @@ def test_capacity_is_read_from_the_engine_log(tmp_path):
 
 
 def test_the_grid_helper_counts_what_the_readme_claims():
-    """`--grid` counts session-sticky as best or tied at 22 of the committed table's 24 points, as
-    the README states."""
+    """`--grid` counts session-sticky as best or tied at 20 of the committed table's 24 points, as
+    the three-calibration comparison does for calibration A."""
     committed = json.loads((REPO / "artifacts/results/h2b_c2/h2b_c2.json").read_text())
     req = committed["required_replicas"]
     assert sum(len(v) for v in req.values()) == 24
-    assert c3._sticky_best(req, committed["not_met"]) == 22
+    assert c3._sticky_best(req, committed["not_met"]) == 20
 

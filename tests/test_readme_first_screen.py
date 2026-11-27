@@ -106,10 +106,10 @@ def test_the_ten_questions_use_numbers_the_ledger_and_the_cost_model_hold():
     assert all(len(row) == 4 and all(cell.strip() for cell in row) for row in rows)
     ledger = README[README.index("<!-- ledger:start -->"):README.index("<!-- ledger:end -->")]
     for number in ("+0.3%", "within 1.4%", "within 1.41×", "within 7%", "1.54× and 1.71×",
-                   "82.4% of cases", "537 MiB for 80,000 requests"):
+                   "83.8% of cases", "537 MiB for 80,000 requests"):
         assert number in section and number in ledger, number
-    assert "(92 of 144 cells), they are equal in 58 and within one in 89" in section
-    assert "92 of 144 cells have a count on all three: 58 equal, 89 within one" in ledger
+    assert "(91 of 144 cells), they are equal in 62 and within one in 86" in section
+    assert "91 of 144 cells have a count on all three: 62 equal, 86 within one" in ledger
     assert "2 held" in section and "2 of 4 held" in ledger
     cost = yaml.safe_load((REPO / "configs" / "cost_model.yaml").read_text())
     assert f"${cost['compute']['price_per_hour_usd']} an hour" in section

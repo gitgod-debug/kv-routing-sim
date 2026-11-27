@@ -17,7 +17,6 @@ import tempfile
 import pytest
 
 from kv_routing_sim.sim.cost_model import load_profile
-from kv_routing_sim.sim.engine import use_engine
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 RESULTS = REPO / "artifacts" / "results" / "c4_kaggle_t4"
@@ -142,9 +141,8 @@ def test_the_traffic_numbers_the_write_up_quotes(analysis):
 
 def test_the_grids_are_the_registered_design_from_a_clean_tree():
     assert GRIDS["git_dirty"] is False and GRIDS["n_runs"] == 22_032
-    # Run at a later commit than the registration; the commits in between changed nothing under
-    # src, scripts or configs.
-    assert GRIDS["git_sha"] == "7f95146"
+    # Derived again with the fixed engine of release 0.2.0 (configs/rederive_0_2_0.yaml).
+    assert GRIDS["git_sha"] == "60a8aff"
     runs = [f"s{s}" for s in "012"]
     assert GRIDS["fit_ids"] == sorted(["A", *runs, *(f"{r}r{i}" for r in runs for i in range(3))])
     firm, p64 = GRIDS["grids"]["firmness"], GRIDS["grids"]["prompts64"]
@@ -161,7 +159,6 @@ def test_the_grids_are_the_registered_design_from_a_clean_tree():
     ("firmness", "s0r2", 1, 2, "radix-affinity-balanced", 16.0, 9, 0),
     ("prompts64", "s2", 64, 3, "radix-affinity-balanced", 1.0, 20, 2),
 ])
-@use_engine("0.1.2")  # the stored grid is release 0.1.2's until it is derived again
 def test_a_stored_cell_is_what_the_simulator_gives(name, fit, k, load, policy, alpha, n, seed):
     """Ties the grids to the code: one cell of each kind, run again here."""
     cfg = PREREG["config"]
@@ -179,51 +176,51 @@ def test_a_stored_cell_is_what_the_simulator_gives(name, fit, k, load, policy, a
 
 
 def test_one_runs_spread_does_not_cover_another_runs_count(analysis):
-    """E, predicted to hold, does not: coverage is 82.4% against the 90% required."""
+    """E, predicted to hold, does not: coverage is 83.8% against the 90% required."""
     e = analysis["e"]
     assert e["runs"] == {"s0": 4, "s1": 4, "s2": 4}  # each run: its pooled fit and three repeats
-    assert (e["covered"], e["cases"]) == (178, 216)
-    assert round(e["coverage"], 3) == 0.824 < e["min_coverage"] == 0.9
-    assert round(e["coverage_within_one"], 3) == 0.949
-    assert round(e["profile_a_coverage"], 3) == 0.796
+    assert (e["covered"], e["cases"]) == (181, 216)
+    assert round(e["coverage"], 3) == 0.838 < e["min_coverage"] == 0.9
+    assert round(e["coverage_within_one"], 3) == 0.954
+    assert round(e["profile_a_coverage"], 3) == 0.815
     misses = e["misses"]
-    assert len(misses) == 38
+    assert len(misses) == 35
     far = [m for m in misses if not m["range"][0] - 1 <= m["count"] <= m["range"][1] + 1]
-    assert len(far) == 11
+    assert len(far) == 10
     # The two runs taken back to back agree with each other; the run an hour earlier does not
     # agree with them, which no run's own repeats can detect.
     by_pair = {}
     for m in misses:
         by_pair[(m["range_from"], m["other"])] = by_pair.get((m["range_from"], m["other"]), 0) + 1
-    assert by_pair == {("s0", "s1"): 7, ("s0", "s2"): 9, ("s1", "s0"): 10, ("s2", "s0"): 10,
-                       ("s1", "s2"): 2}
+    assert by_pair == {("s0", "s1"): 9, ("s0", "s2"): 8, ("s1", "s0"): 8, ("s2", "s0"): 7,
+                       ("s1", "s2"): 1, ("s2", "s1"): 2}
     late = 72 - by_pair[("s1", "s2")] - by_pair.get(("s2", "s1"), 0)
-    assert round(late / 72, 3) == 0.972
+    assert round(late / 72, 3) == 0.958
     early = 144 - sum(v for k, v in by_pair.items() if "s0" in k)
-    assert round(early / 144, 3) == 0.75
+    assert round(early / 144, 3) == 0.778
 
 
 def test_the_64_prompt_question_on_the_fresh_calibrations(analysis):
-    """F1 holds and F2 does not: under both halves, balanced affinity needs one replica fewer than
-    session-sticky at more than two loads on two of the three fits."""
+    """F1 holds and F2 does not: under both halves, balanced affinity needs fewer replicas than
+    session-sticky at more than two loads on one of the three fits (s0)."""
     f1 = analysis["f1"]["by_fit"]
     assert [(f1[f]["sticky"], f1[f]["weight_1"]) for f in ("s0", "s1", "s2")] == [
-        (9, 8), (10, 7), (10, 8)]
+        (11, 7), (10, 7), (12, 7)]
     f2 = analysis["f2"]["by_fit"]
     assert all(f2[f]["weight_1_holds_nothing"] for f in f2)  # part (i) holds on all three
     assert {f: f2[f]["loads_balanced_wins"] for f in f2} == {
-        "s0": ["4"], "s1": ["0.5", "1", "4"], "s2": ["1", "2", "3", "4"]}
-    assert {f: f2[f]["loads_sticky_wins"] for f in f2} == {"s0": [], "s1": ["2"], "s2": []}
-    assert [f2[f]["holds"] for f in ("s0", "s1", "s2")] == [True, False, False]
+        "s0": ["0.5", "1", "2", "4"], "s1": ["1", "3"], "s2": ["1", "4"]}
+    assert {f: f2[f]["loads_sticky_wins"] for f in f2} == {"s0": [], "s1": ["4"], "s2": []}
+    assert [f2[f]["holds"] for f in ("s0", "s1", "s2")] == [False, True, True]
     two = analysis["prompts64"]["tables"]["two_part"]
-    assert [two[f]["2"][STICKY] for f in ("s0", "s1", "s2")] == [13, 14, 15]
-    assert [two[f]["2"][BAL16] for f in ("s0", "s1", "s2")] == [13, 15, 14]
-    # Where the two differ under both halves, they differ by exactly one replica.
+    assert [two[f]["2"][STICKY] for f in ("s0", "s1", "s2")] == [14, 14, 14]
+    assert [two[f]["2"][BAL16] for f in ("s0", "s1", "s2")] == [13, 14, 14]
+    # Where the two differ under both halves, they differ by one replica or two.
     gaps = {abs(two[f][ld][STICKY] - two[f][ld][BAL16]) for f in two for ld in two[f]}
-    assert gaps == {0, 1}
+    assert gaps == {0, 1, 2}
     first = analysis["prompts64"]["tables"]["first_token"]
-    assert [first[f]["3"][STICKY] for f in ("s0", "s1", "s2")] == [17, 18, 19]
-    assert [first[f]["3"][BAL16] for f in ("s0", "s1", "s2")] == [16, 16, 17]
+    assert [first[f]["3"][STICKY] for f in ("s0", "s1", "s2")] == [14, 19, 19]
+    assert [first[f]["3"][BAL16] for f in ("s0", "s1", "s2")] == [16, 17, 17]
 
 
 def test_the_post_hoc_table_reproduces_and_starts_from_the_registered_numbers(analysis):

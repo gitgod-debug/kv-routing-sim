@@ -74,7 +74,7 @@ def test_the_reported_grid_comparison_is_what_the_two_tables_say():
              for ld, by_pol in by_load.items() for p, r in by_pol.items()]
     g = COMMITTED["grid"]
     assert (len(pairs), g["cells"]) == (144, 144)
-    assert sum(1 for x, y in pairs if x == y) == g["equal"] == 122
+    assert sum(1 for x, y in pairs if x == y) == g["equal"] == 125
     assert sum(1 for x, y in pairs if abs(x - y) <= 1) == g["within_one"] == 141
     # The registered test was falsified on C2's profile; the same rules hold on the command's.
     assert (a["verdict"]["holds"], b["verdict"]["holds"]) == (False, True)
@@ -87,14 +87,14 @@ def test_what_survives_three_calibrations_and_what_does_not():
     tables = {t: json.loads(path.read_text()) for t, (_, path) in posthoc.TABLES.items()}
     a = posthoc.analyze(tables)
     assert a == json.loads((RESULTS / "posthoc_three_calibrations.json").read_text())
-    assert (a["cells"], a["cells_identical_on_all"], a["cells_within_one"]) == (144, 102, 138)
+    assert (a["cells"], a["cells_identical_on_all"], a["cells_within_one"]) == (144, 106, 135)
     # Does not survive: H2b's verdict.
-    assert [a["h2b_verdict"][t]["holds"] for t in "ABC"] == [False, True, True]
+    assert [a["h2b_verdict"][t]["holds"] for t in "ABC"] == [False, True, False]
     # Holds on all three: sticky best or tied at every load with 1 prompt and with 4,
     by_k = a["sticky_best_or_tied_on_all_by_K"]
     assert (by_k["1"], by_k["4"]) == ({"points": 6, "of": 6}, {"points": 6, "of": 6})
-    assert a["sticky_best_or_tied"] == {"A": 22, "B": 20, "C": 20}
-    assert a["sticky_best_or_tied_on_all"] == 19
+    assert a["sticky_best_or_tied"] == {"A": 20, "B": 20, "C": 21}
+    assert a["sticky_best_or_tied_on_all"] == 20
     # and never more replicas than round-robin or least-loaded, on any calibration.
     never = a["sticky_never_needs_more_than"]
     assert never["round-robin"] == never["least-loaded"] == a["points"] == 24
@@ -102,6 +102,6 @@ def test_what_survives_three_calibrations_and_what_does_not():
     row = a["required_replicas"]
     assert row["1@2"]["session-sticky"] == [5, 5, 5] and row["1@2"]["round-robin"] == [7, 7, 7]
     assert row["1@2"]["radix-affinity-balanced@16"] == [10, 17, 17]  # 17 = not held on 16
-    assert row["64@2"]["session-sticky"] == [10, 12, 12]
-    assert row["64@2"]["radix-affinity-balanced@16"] == [11, 11, 10]
-    assert row["64@2"]["radix-affinity-balanced@1"] == [8, 8, 8]  # post hoc weight: not a finding
+    assert row["64@2"]["session-sticky"] == [10, 12, 10]
+    assert row["64@2"]["radix-affinity-balanced@16"] == [10, 10, 10]
+    assert row["64@2"]["radix-affinity-balanced@1"] == [8, 7, 8]  # post hoc weight: not a finding

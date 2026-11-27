@@ -92,11 +92,12 @@ def test_the_traffic_the_write_up_describes():
     assert ANALYSIS["adapter_stats"]["skip_reasons"] == {"output_capped": 13}
 
 
-def test_the_runs_are_tied_to_the_commits_that_registered_them():
-    """The probe ran from the commit that registered the design, with no speeds chosen yet; the
-    grid ran from the commit that wrote the speeds down."""
-    assert PROBE["git_sha"] == "1ca73e9" and GRID["git_sha"] == "d189b1a"
-    assert ANALYSIS["grid_header"]["git_sha"] == "d189b1a"
+def test_the_runs_are_tied_to_their_commits():
+    """The probe ran from the commit that registered the design, with no speeds chosen yet. The
+    grid was derived again with the fixed engine of release 0.2.0, at a clean tree."""
+    assert PROBE["git_sha"] == "1ca73e9" and GRID["git_sha"] == "a169ed9"
+    assert GRID["git_dirty"] is False
+    assert ANALYSIS["grid_header"]["git_sha"] == "a169ed9"
     assert ANALYSIS["grid_header"]["n_runs"] == 5184
 
 
@@ -127,9 +128,9 @@ def test_the_replica_counts_the_write_up_quotes_first_token_target():
         STICKY: [_same(2), _same(4), _same(7)],
         BAL16: [_same(2), _same(4), _same(7)],
         "radix-affinity-balanced@1": [_same(2), _same(4), _same(6)],
-        PURE: [_same(2), _same(4), [7, 6, 6, 6]],
+        PURE: [_same(2), _same(4), _same(6)],
         LM: [_same(2), _same(4), [7, 6, 7, 7]],
-        SM: [_same(2), _same(4), _same(6)],
+        SM: [_same(2), _same(4), [7, 6, 6, 6]],
         "lmetric@dispatch": [_same(2), _same(4), _same(7)],
     }
     assert {p: _counts("first_token", p) for p in want} == want
@@ -140,22 +141,22 @@ def test_the_reported_counts_under_the_two_part_target():
     other = ANALYSIS["reported_other_target"]
     assert other["target"] == "two_part"
     assert {k: other[k]["holds"] for k in ("r3a", "r3b", "r3c", "r3d")} == {
-        "r3a": True, "r3b": True, "r3c": False, "r3d": False}
+        "r3a": True, "r3b": True, "r3c": True, "r3d": False}
     want = {
         RR: [[4, 4, 4, 4], [7, 7, 7, 7], [14, 13, 14, 14]],
         "least-loaded": [[4, 4, 4, 4], [7, 7, 8, 7], [14, 13, 14, 14]],
-        STICKY: [[4, 4, 4, 4], [7, 7, 7, 7], [13, 12, 13, 13]],
-        BAL16: [[4, 4, 4, 4], [7, 6, 7, 7], [12, 11, 11, 12]],
+        STICKY: [[4, 4, 4, 4], [7, 7, 7, 7], [12, 12, 13, 13]],
+        BAL16: [[4, 4, 4, 4], [7, 6, 7, 7], [11, 11, 12, 12]],
         "radix-affinity-balanced@1": [[4, 4, 4, 4], [7, 6, 7, 7], [12, 11, 12, 12]],
-        PURE: [[4, 4, 4, 4], [8, 8, 7, 7], [16, 14, 17, 17]],  # 17 = not held on 16
+        PURE: [[4, 4, 4, 4], [8, 7, 7, 7], [15, 14, 17, 16]],  # 17 = not held on 16
         LM: [[4, 3, 4, 4], [6, 6, 6, 6], [11, 10, 11, 11]],
         SM: [[4, 3, 4, 4], [6, 6, 6, 6], [10, 10, 10, 10]],
         "lmetric@dispatch": [[4, 4, 4, 4], [6, 6, 6, 6], [11, 10, 11, 11]],
     }
     assert {p: _counts("two_part", p) for p in want} == want
-    # "two to three replicas fewer than session-sticky at the highest load"
+    # At the highest load, LMetric needs one or two fewer than session-sticky, SMetric two or three.
     for i in range(4):
-        assert want[STICKY][2][i] - want[LM][2][i] == 2
+        assert want[STICKY][2][i] - want[LM][2][i] in (1, 2)
         assert want[STICKY][2][i] - want[SM][2][i] in (2, 3)
 
 
@@ -170,29 +171,29 @@ def test_the_side_numbers_the_write_up_quotes():
     assert [ANALYSIS["at_sticky"]["A"][sp]["replicas"] for sp in SPEEDS] == [2, 4, 7]
     assert [round(x, 3) for x in _at(RR, "hit_rate")] == [0.304, 0.285, 0.232]
     assert [round(x, 3) for x in _at(STICKY, "hit_rate")] == [0.338, 0.359, 0.384]
-    assert [round(x, 3) for x in _at(LM, "hit_rate")] == [0.353, 0.392, 0.425]
+    assert [round(x, 3) for x in _at(LM, "hit_rate")] == [0.353, 0.394, 0.427]
     assert [round(x, 3) for x in _at(SM, "hit_rate")] == [0.362, 0.411, 0.461]
-    assert [round(x, 3) for x in _at(PURE, "hit_rate")] == [0.378, 0.434, 0.488]
+    assert [round(x, 3) for x in _at(PURE, "hit_rate")] == [0.378, 0.435, 0.489]
     sticky = [round(x) for x in _at(STICKY, "ttft_p95_ms")]
     lmetric = [round(x) for x in _at(LM, "ttft_p95_ms")]
-    assert sticky == [1042, 950, 999] and lmetric == [777, 612, 601]
-    assert [round(x) for x in _at("lmetric@dispatch", "ttft_p95_ms")] == [901, 714, 685]
+    assert sticky == [1040, 943, 1013] and lmetric == [773, 613, 602]
+    assert [round(x) for x in _at("lmetric@dispatch", "ttft_p95_ms")] == [890, 699, 685]
     # LMetric's p95 first token is a quarter to two fifths below session-sticky's at the same count.
     assert all(0.59 < a / b < 0.76 for a, b in zip(lmetric, sticky, strict=True))
     # pure prefix-affinity crowds one replica
-    assert [round(x, 2) for x in _at(PURE, "busiest_over_mean")] == [1.13, 1.4, 1.87]
-    # SMetric's rule at those counts: it kept 7%, 12% and 17% of requests in place and moved nothing
+    assert [round(x, 2) for x in _at(PURE, "busiest_over_mean")] == [1.14, 1.38, 1.76]
+    # SMetric's rule at those counts: it kept 7%, 12% and 18% of requests in place and moved nothing
     router = _at(SM, "router")
-    assert [round(r["stuck"]) for r in router] == [1428, 2398, 3509]
-    assert [round(100 * r["stuck"] / 20054) for r in router] == [7, 12, 17]
+    assert [round(r["stuck"]) for r in router] == [1432, 2398, 3510]
+    assert [round(100 * r["stuck"] / 20054) for r in router] == [7, 12, 18]
     worst_moved = max(ANALYSIS["at_sticky"][c][sp]["policies"][SM]["router"]["migrated"]
                       for c in CALS for sp in SPEEDS)
     assert worst_moved == 0.7
     # ... and it did move sessions where the fleet was too small
-    moved = GRID["cells"]["s1"]["4"][SM]["router"]["migrated"]
+    moved = GRID["cells"]["s0"]["4"][SM]["router"]["migrated"]
     assert max(m for c in CALS for sp in SPEEDS
-               for m in GRID["cells"][c][sp][SM]["router"]["migrated"]) == max(moved) == 574.0
-    assert GRID["axes"]["replicas"][moved.index(574.0)] == 5
+               for m in GRID["cells"][c][sp][SM]["router"]["migrated"]) == max(moved) == 575.3
+    assert GRID["axes"]["replicas"][moved.index(575.3)] == 5
 
 
 def test_session_stickys_known_weakness_does_not_show_on_this_trace():
@@ -201,4 +202,4 @@ def test_session_stickys_known_weakness_does_not_show_on_this_trace():
     worst = max(b for c in CALS for sp in SPEEDS
                 for b in GRID["cells"][c][sp][STICKY]["busiest_over_mean"][1:])
     assert round(worst, 2) == 1.14
-    assert [round(x, 2) for x in _at(STICKY, "busiest_over_mean")] == [1.02, 1.04, 1.06]
+    assert [round(x, 2) for x in _at(STICKY, "busiest_over_mean")] == [1.0, 1.05, 1.04]

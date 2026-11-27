@@ -65,9 +65,10 @@ def test_each_stored_run_is_the_registered_design_with_only_the_profile_and_spee
         assert yaml.safe_load((RESULTS / "R1" / cal / "config.yaml").read_text()) == want
         assert run["git_dirty"] is False and run["n_runs"] == 2 * 3 * 8 * 8 * 3
         assert run["profile"]["calibrated"] is True
-    # Both from the commit that fixed the speeds, and the same trace bytes as the first model's run.
+    # Both derived again with the fixed engine of release 0.2.0, from one commit, and the same
+    # trace bytes as the first model's run.
     first = json.loads((REPO / "artifacts/results/realtrace_mooncake/realtrace.json").read_text())
-    assert {_run(c)["git_sha"] for c in CFG["calibrations"]} == {"3fd95df"}
+    assert {_run(c)["git_sha"] for c in CFG["calibrations"]} == {"47761da"}
     assert all(_run(c)["trace_sha256"] == first["trace_sha256"] for c in CFG["calibrations"])
 
 
@@ -104,24 +105,25 @@ def test_the_replica_counts_the_write_up_quotes():
     for cal in ("A", "s0"):
         assert row(cal, "toolagent", STICKY) == row(cal, "toolagent", STAR) == [5, 5, 5]
         assert row(cal, "toolagent", RR) == [5, 5, 6]
-        assert row(cal, "conversation", RR) == [6, 6, 7]
         assert row(cal, "conversation", STAR) == [6, 6, 6]
         # Pure prefix-affinity holds the target on no replica count, on either trace.
         assert row(cal, "toolagent", PURE) == row(cal, "conversation", PURE) == [9, 9, 9]
+    assert row("A", "conversation", RR) == [6, 6, 8] and row("s0", "conversation", RR) == [6, 6, 7]
     assert row("A", "conversation", STICKY) == [6, 6, 7]
     assert row("s0", "conversation", STICKY) == [6, 6, 6]
-    # No sensible policy is more than one replica from round-robin at these speeds.
-    for cal in ("A", "s0"):
-        for trace in ("toolagent", "conversation"):
-            for policy in (STICKY, STAR, "radix-affinity-balanced@1"):
-                assert all(abs(a - b) <= 1 for a, b in zip(row(cal, trace, policy),
-                                                           row(cal, trace, RR), strict=True))
-    # The two calibrations differ at 9 of the 48 cells, never by more than one replica.
+    # Every sensible policy is within one replica of round-robin at these speeds, except one: on
+    # A's conversation trace at 1x, round-robin needs 8 and balanced prefix-affinity 6.
+    far = [(cal, trace, policy) for cal in ("A", "s0") for trace in ("toolagent", "conversation")
+           for policy in (STICKY, STAR, "radix-affinity-balanced@1")
+           if any(abs(a - b) > 1 for a, b in zip(row(cal, trace, policy), row(cal, trace, RR),
+                                                 strict=True))]
+    assert far == [("A", "conversation", STAR)]
+    # The two calibrations differ at 12 of the 48 cells, never by more than one replica.
     a = SUMMARY["tests"]["R1"]["calibrations"]["A"]["required_replicas"]
     b = SUMMARY["tests"]["R1"]["calibrations"]["s0"]["required_replicas"]
     gaps = [abs(a[tr][sp][p] - b[tr][sp][p]) for tr in a for sp in a[tr] for p in a[tr][sp]]
-    assert (len(gaps), sum(1 for g in gaps if g), max(gaps)) == (48, 9, 1)
-    # At the one speed both models share (1x), the validated model needs one or two replicas more.
+    assert (len(gaps), sum(1 for g in gaps if g), max(gaps)) == (48, 12, 1)
+    # At the one speed both models share (1x), the validated model needs one to three more.
     first = SUMMARY["tests"]["R1"]["first_model"]["required_replicas"]
     assert [first["toolagent"]["1"][p] for p in (RR, STICKY, STAR)] == [4, 4, 4]
-    assert [first["conversation"]["1"][p] for p in (RR, STICKY, STAR)] == [5, 5, 4]
+    assert [first["conversation"]["1"][p] for p in (RR, STICKY, STAR)] == [5, 5, 5]
