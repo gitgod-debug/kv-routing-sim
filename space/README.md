@@ -6,7 +6,7 @@ sdk: static
 app_file: index.html
 pinned: false
 license: mit
-short_description: LLM request routing, simulated; cache model checked on vLLM
+short_description: LLM routing simulator, cache checked on vLLM 0.30.0 on a T4
 ---
 
 # kv-routing-sim
