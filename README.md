@@ -288,7 +288,7 @@ above says something about the world. The two are kept apart here.
 | **The same test on a later engine** | vLLM 0.34.0, 2026-11-25 (V1, registered first): the same notebook, with only the engine version changed. Zero error again on both sequential shapes × 3 runs, and +0.7% on the concurrent shape ([report](artifacts/results/v034_kaggle_t4/calibration_report.md)). Timing was fitted on it but not checked |
 | **Check on 2 replicas** | Round-robin across two physical T4s: 1,088 prefill tokens computed, 1,088 predicted (Phase 0 v2). Under cache pressure (Phase 6, run twice), the hit rates of all 12 runs were within 1.4% (K1 to four decimals), with 1,537 blocks per replica and three routers. The engines preempted requests in 8 of the 10 runs where the model predicted none |
 | **Timing under load** | The first profile had no context term and was optimistic. On Phase 6's prompts of ~1,700 tokens, p95 TTFT came out 5–222× its prediction. ✅ Fixed by C2 (2026-09-30, registered): decode cost grows with context (1.92× from 128 to 1,536 tokens), and CPU contention was ruled out (1.00×). The context-aware profile `t4-qwen3-4b-vllm0.30.0-ctx`, fitted on micro-benchmarks, predicted held-out traffic within 1.10–1.41×. Post hoc, it also predicted Phase 6's two live replicas within 1.02–1.79× ([report](artifacts/results/c2_kaggle_t4/report.md)) |
-| **Reproduce** | The analysis: `python scripts/reproduce.py --quick` rebuilds this report from the raw files that the GPU run left in this repository, and compares it with the committed one (seconds, no GPU). The measurement: [`notebooks/phase3_calibration.ipynb`](notebooks/phase3_calibration.ipynb) on a Kaggle T4, about 40 minutes ([how](notebooks/README.md)) |
+| **Reproduce** | The analysis: `python scripts/reproduce.py --quick` rebuilds this report from the raw files that the GPU run left in this repository, and compares it with the committed one (seconds, no GPU). The measurement: [`notebooks/phase3_calibration.ipynb`](notebooks/phase3_calibration.ipynb) on a Kaggle T4, about 40 minutes (its first cells say how to run it) |
 
 **`/metrics` fields used, by name:** `vllm:prefix_cache_queries` · `vllm:prefix_cache_hits` ·
 `vllm:prompt_tokens_by_source{source="local_compute"|"local_cache_hit"}` · `vllm:num_preemptions` ·
@@ -598,6 +598,11 @@ constant, change it and run again to get your own number.
 
 The rule: everything in `artifacts/results/` must be reproducible by running a script in
 `scripts/`. A result that cannot be deleted and made again does not go into the repository.
+
+**One edit to stored outputs.** In 13 stored files of the GPU runs (Phase 3, Phase 6, C1 to C4 and
+V1), one path of vLLM's source tree is written `entrypoints/.../serving.py`, with a folder name left
+out. It is a line of the notebooks' check of vLLM's source, not a measurement. In V1's two files it
+is the only edit, and the analysis gives the same bytes with and without it.
 
 **One command checks it.** `python scripts/reproduce.py` copies the files of the repository to a
 temporary folder and runs thirteen steps there. It compares every file a step writes with the

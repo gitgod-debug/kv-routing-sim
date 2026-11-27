@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Draw the README's figure from the demo grid.
 
-    python scripts/make_figures.py  # -> figures/flip-*.svg and paper/figures/flip.pdf
+    python scripts/make_figures.py  # -> figures/flip-light.svg and figures/flip-dark.svg
 
 Needs the [analysis] extra (matplotlib). Reads artifacts/results/demo_grid_ctx.json, which
 `scripts/build_grid.py --source h2b_c2` writes only when it reproduces the H2b table on C2's
@@ -26,7 +26,6 @@ import matplotlib.pyplot as plt
 REPO = pathlib.Path(__file__).resolve().parents[1]
 GRID = REPO / "artifacts" / "results" / "demo_grid_ctx.json"
 OUT = REPO / "figures"
-PAPER = REPO / "paper" / "figures" / "flip.pdf"  # the preprint's copy: pdfLaTeX does not read SVG
 LOAD = 2  # sessions/s: the README table's column
 REPLICAS = 8  # fleet size for the hit-rate panel, as in the h2b_c2 report
 
@@ -113,7 +112,6 @@ def draw(grid: dict[str, Any], theme: str) -> plt.Figure:
 def main() -> int:
     plt.rcParams["svg.hashsalt"] = "kv-routing-sim"  # stable ids: same grid, same bytes
     plt.rcParams["svg.fonttype"] = "none"  # text stays text: smaller, and in the reader's font
-    plt.rcParams["pdf.fonttype"] = 42  # TrueType in the PDF, not Type 3, as arXiv prefers
     grid = json.loads(GRID.read_text())
     OUT.mkdir(parents=True, exist_ok=True)
     for theme in THEMES:
@@ -122,11 +120,6 @@ def main() -> int:
         fig.savefig(path, format="svg", metadata={"Date": None})
         plt.close(fig)
         print(f"wrote {path.relative_to(REPO)} ({path.stat().st_size / 1024:.0f} KiB)")
-    PAPER.parent.mkdir(parents=True, exist_ok=True)
-    fig = draw(grid, "light")
-    fig.savefig(PAPER, format="pdf", metadata={"CreationDate": None})
-    plt.close(fig)
-    print(f"wrote {PAPER.relative_to(REPO)} ({PAPER.stat().st_size / 1024:.0f} KiB)")
     return 0
 
 
