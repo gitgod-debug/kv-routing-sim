@@ -7,7 +7,7 @@ Decode cells: contexts 128, 512, 1024 × batches 1, 2, 4, 8, 16, one rep (C2's 1
 | prefill cells | decode rep | decode: base + per seq + per 1K context | prefill: base + per token + per token per 1K attended | K1_half p50 · p95 | K64_quarter p50 · p95 |
 |---|---:|---|---|---|---|
 | cold only | 0 | 40.9 ms + 0.25 + 3.43 | 20.8 ms + 0.239 + 0.842 | 1,855 ms (1.41×) · 13,238 ms (5.69×) | 451 ms (1.22×) · 1,952 ms (1.07×) |
-| cold only | 1 | 41.9 ms + 0.00 + 3.64 | 20.0 ms + 0.239 + 0.842 | 2,059 ms (1.56×) · 16,711 ms (7.19×) | 460 ms (1.20×) · 2,029 ms (1.03×) |
+| cold only | 1 | 41.9 ms + 0.00 + 3.64 | 20.0 ms + 0.239 + 0.842 | 2,059 ms (1.56×) · 16,711 ms (7.19×) | 467 ms (1.18×) · 2,007 ms (1.04×) |
 | with cached prefix | 0 | 40.9 ms + 0.25 + 3.43 | 0.0 ms + 0.318 + 0.758 | 1,284 ms (1.03×) · 2,217 ms (1.05×) | 406 ms (1.36×) · 1,866 ms (1.12×) |
 | with cached prefix | 1 | 41.9 ms + 0.00 + 3.64 | 0.0 ms + 0.317 + 0.758 | 1,375 ms (1.04×) · 2,804 ms (1.21×) | 422 ms (1.31×) · 1,890 ms (1.11×) |
 | *C2's full fit (56 + 45 points)* | both | 40.1 ms + 0.34 + 3.50 | 0.0 ms + 0.319 + 0.758 | *1.10× · 1.41×* | *1.31× · 1.11×* |
