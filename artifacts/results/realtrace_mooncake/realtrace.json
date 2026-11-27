@@ -1,7 +1,7 @@
 {
  "script": "scripts/run_realtrace.py",
- "date_utc": "2026-09-27T19:47:36+00:00",
- "git_sha": "3f61f9e",
+ "date_utc": "2026-11-27T19:22:08+00:00",
+ "git_sha": "eac9db9",
  "git_dirty": false,
  "seed": 0,
  "hardware_path": "cpu-only",
@@ -96,7 +96,7 @@
   "toolagent": "48a2db1a13d3bc05e6330140c64f604ba366df20d3c9e128b5c35a01c1fa5f71",
   "conversation": "b8cbb061a85206d729d91cdc2981f43c9e0d99209dce588d3af5f7934408b9df"
  },
- "runtime_s": 235.0,
+ "runtime_s": 219.4,
  "n_runs": 1152,
  "profile": {
   "name": "t4-qwen3-4b-vllm0.30.0",
@@ -112,6 +112,8 @@
   "engine_version": "0.30.0",
   "calibrated": true,
   "calibration_error": 0.002901,
+  "prefill_attn_s": 0.0,
+  "decode_per_ctx_token_s": 0.0,
   "WARNING": "calibrated on Tesla T4 / Qwen/Qwen3-4B / 0.30.0"
  },
  "required_replicas": {
@@ -155,12 +157,12 @@
     "consistent-hash-prefix": 6,
     "radix-affinity": 9,
     "session-sticky": 5,
-    "radix-affinity-balanced@16": 4,
+    "radix-affinity-balanced@16": 5,
     "radix-affinity-balanced@1": 5
    },
    "2": {
     "round-robin": 5,
-    "least-loaded": 5,
+    "least-loaded": 6,
     "power-of-two": 6,
     "consistent-hash-prefix": 7,
     "radix-affinity": 9,
@@ -184,65 +186,65 @@
   "toolagent": {
    "1": {
     "round-robin": 0.3708,
-    "least-loaded": 0.3714,
-    "power-of-two": 0.3697,
+    "least-loaded": 0.3697,
+    "power-of-two": 0.3707,
     "consistent-hash-prefix": 0.4302,
     "radix-affinity": 0.3568,
-    "session-sticky": 0.424,
-    "radix-affinity-balanced@16": 0.4205,
-    "radix-affinity-balanced@1": 0.4238
+    "session-sticky": 0.4231,
+    "radix-affinity-balanced@16": 0.4197,
+    "radix-affinity-balanced@1": 0.4217
    },
    "2": {
     "round-robin": 0.371,
-    "least-loaded": 0.3706,
-    "power-of-two": 0.3704,
+    "least-loaded": 0.3692,
+    "power-of-two": 0.3714,
     "consistent-hash-prefix": 0.4297,
     "radix-affinity": 0.3558,
-    "session-sticky": 0.4235,
-    "radix-affinity-balanced@16": 0.4166,
-    "radix-affinity-balanced@1": 0.4247
+    "session-sticky": 0.4238,
+    "radix-affinity-balanced@16": 0.414,
+    "radix-affinity-balanced@1": 0.424
    },
    "4": {
     "round-robin": 0.3651,
-    "least-loaded": 0.3699,
-    "power-of-two": 0.3695,
+    "least-loaded": 0.3703,
+    "power-of-two": 0.3696,
     "consistent-hash-prefix": 0.4247,
     "radix-affinity": 0.3558,
-    "session-sticky": 0.4215,
-    "radix-affinity-balanced@16": 0.4051,
-    "radix-affinity-balanced@1": 0.4252
+    "session-sticky": 0.4218,
+    "radix-affinity-balanced@16": 0.3995,
+    "radix-affinity-balanced@1": 0.4236
    }
   },
   "conversation": {
    "1": {
     "round-robin": 0.0711,
-    "least-loaded": 0.0712,
-    "power-of-two": 0.0698,
+    "least-loaded": 0.0697,
+    "power-of-two": 0.0708,
     "consistent-hash-prefix": 0.1423,
     "radix-affinity": 0.0502,
-    "session-sticky": 0.1372,
-    "radix-affinity-balanced@16": 0.1342,
-    "radix-affinity-balanced@1": 0.1454
+    "session-sticky": 0.138,
+    "radix-affinity-balanced@16": 0.1343,
+    "radix-affinity-balanced@1": 0.1437
    },
    "2": {
     "round-robin": 0.0713,
-    "least-loaded": 0.0695,
-    "power-of-two": 0.0706,
+    "least-loaded": 0.0688,
+    "power-of-two": 0.0718,
     "consistent-hash-prefix": 0.1432,
     "radix-affinity": 0.0491,
-    "session-sticky": 0.1378,
-    "radix-affinity-balanced@16": 0.1284,
-    "radix-affinity-balanced@1": 0.1432
+    "session-sticky": 0.1366,
+    "radix-affinity-balanced@16": 0.127,
+    "radix-affinity-balanced@1": 0.1436
    },
    "4": {
-    "round-robin": 0.0693,
-    "least-loaded": 0.0689,
-    "power-of-two": 0.0689,
-    "consistent-hash-prefix": 0.1414,
+    "round-robin": 0.0687,
+    "least-loaded": 0.0672,
+    "power-of-two": 0.068,
+    "consistent-hash-prefix": 0.1413,
     "radix-affinity": 0.0491,
-    "session-sticky": 0.1363,
-    "radix-affinity-balanced@16": 0.1092,
-    "radix-affinity-balanced@1": 0.1407
+    "session-sticky": 0.1358,
+    "radix-affinity-balanced@16": 0.1095,
+    "radix-affinity-balanced@1": 0.1399
    }
   }
  },
@@ -254,16 +256,22 @@
     "2": "sticky",
     "4": "tie"
    },
+   "rules": {
+    "affinity_wins": false
+   },
    "holds": false
   },
   "conversation": {
    "rule": "affinity_never_wins",
    "winner_by_speed": {
-    "1": "affinity",
+    "1": "tie",
     "2": "tie",
     "4": "tie"
    },
-   "holds": false
+   "rules": {
+    "affinity_never_wins": true
+   },
+   "holds": true
   }
  },
  "structure": {
