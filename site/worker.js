@@ -24,7 +24,12 @@ async function boot() {
   const micropip = pyodide.pyimport("micropip");
   await micropip.install(new URL(manifest.wheel, self.location.href).href);
   pyodide.FS.mkdirTree(WORK_DIR);
-  return { pyodide, entry: pyodide.pyimport("kv_routing_sim.browser") };
+  // The dollar rate and default GPU price of the package's cost model, for the page's cost line.
+  const cost = JSON.parse(pyodide.runPython(
+    "import json\nfrom kv_routing_sim.service import load_cost_model\n" +
+    "_cost = load_cost_model('default')\n" +
+    "json.dumps({'usd_to_inr': _cost.usd_to_inr, 'price_per_hour_usd': _cost.price_per_hour_usd})"));
+  return { pyodide, entry: pyodide.pyimport("kv_routing_sim.browser"), cost };
 }
 
 async function writeInput(pyodide, file) {
@@ -54,7 +59,7 @@ self.onmessage = async (event) => {
   const { settings, traceFile, profileFile } = event.data;
   try {
     runtime = runtime || (await boot());
-    const { pyodide, entry } = runtime;
+    const { pyodide, entry, cost } = runtime;
     if (traceFile) Object.assign(settings.traffic, await writeInput(pyodide, traceFile));
     if (profileFile) Object.assign(settings.profile, await writeInput(pyodide, profileFile));
     post({
@@ -63,7 +68,7 @@ self.onmessage = async (event) => {
     });
     const output = entry.run_json(JSON.stringify(settings), throttledProgress(), WORK_DIR);
     const result = JSON.parse(output);
-    post(result.error ? { type: "error", message: result.error } : { type: "result", result });
+    post(result.error ? { type: "error", message: result.error } : { type: "result", result: { ...result, cost } });
   } catch (err) {
     post({ type: "error", message: `Unexpected error: ${lastLine(err && err.message ? err.message : err)}` });
   }

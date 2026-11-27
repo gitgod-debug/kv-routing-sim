@@ -43,8 +43,8 @@
       <thead><tr><th>Distinct system prompts</th><th class="num">Working set ÷ one T4's cache</th>
         <th>Fewest T4s that hold a 2 s p95 time-to-first-token at 2 sessions/s, on calibrations A · B · C</th></tr></thead>
       <tbody>
-        <tr><td>1</td><td class="num">0.06</td><td>session-sticky <strong>5 · 5 · 5</strong> · round-robin 7 · 7 · 7 · balanced prefix-affinity 10 · not held on 16 · not held</td></tr>
-        <tr><td>64 offered, 48 used</td><td class="num">2.66</td><td>session-sticky 10 · 12 · 12 · balanced prefix-affinity 11 · 11 · 10 · round-robin 16 · 16 · not held (prefix-affinity with a load weight of 1: 8 · 8 · 8, a weight found after the tests)</td></tr>
+        <tr><td>1</td><td class="num">0.06</td><td>session-sticky <strong>5 · 5 · 5</strong> · round-robin 7 · 7 · 7 · balanced prefix-affinity (load&nbsp;weight&nbsp;16) 10 · not held on 16 · not held</td></tr>
+        <tr><td>64 offered, 48 used</td><td class="num">2.66</td><td>session-sticky 10 · 12 · 12 · balanced prefix-affinity (load&nbsp;weight&nbsp;16) 11 · 11 · 10 · round-robin 16 · 16 · not held (prefix-affinity, load&nbsp;weight&nbsp;1: 8 · 8 · 8, a weight found after the tests)</td></tr>
       </tbody>
     </table>
   </div>
@@ -126,8 +126,8 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
   function nice(name) {
     const m = /^radix-affinity-balanced@(.+)$/.exec(name);
     if (m) {
-      return m[1] === String(G.alpha_star) ? `balanced prefix-affinity (load weight ${m[1]})`
-                                           : `prefix-affinity, load weight ${m[1]}`;
+      const w = `load weight ${m[1]}`;  // no line break inside, when a table cell wraps
+      return m[1] === String(G.alpha_star) ? `balanced prefix-affinity (${w})` : `prefix-affinity, ${w}`;
     }
     return name === "radix-affinity" ? "pure prefix-affinity" : name;
   }

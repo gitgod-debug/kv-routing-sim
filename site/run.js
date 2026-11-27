@@ -35,6 +35,7 @@
       .forEach((input) => input.addEventListener("change", syncChoices));
     $("form").addEventListener("submit", (event) => { event.preventDefault(); start(); });
     $("cancel").addEventListener("click", cancel);
+    $("copy-command").addEventListener("click", copyCommand);
     $("download-json").addEventListener("click", () =>
       download("kvsim-report.json", JSON.stringify(lastResult.report, null, 2), "application/json"));
     $("download-md").addEventListener("click", () =>
@@ -181,6 +182,32 @@
     })[c]);
   }
 
+  // The package writes its notes for Markdown too: show `code` as code, the rest as plain text.
+  function prose(text) {
+    return escapeHtml(text).replace(/`([^`]+)`/g, "<code>$1</code>");
+  }
+
+  function copyCommand() {
+    const say = (text) => {
+      $("copy-command").textContent = text;
+      setTimeout(() => { $("copy-command").textContent = "Copy the commands"; }, 2000);
+    };
+    // Without clipboard access, select the text, so that the keyboard can copy it.
+    const select = () => {
+      const range = document.createRange();
+      range.selectNodeContents($("command"));
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      say("Selected, copy it with the keyboard");
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(lastResult ? lastResult.command : "").then(() => say("Copied"), select);
+    } else {
+      select();
+    }
+  }
+
   function labelOf(name) {
     const policy = POLICIES.find((p) => p.name === name);
     return policy ? policy.label : name;
@@ -207,9 +234,12 @@
     $("results").hidden = false;
 
     if (chosen && chosen.meets_slo) {
+      // With a per-token limit, that limit is part of the answer, so the banner shows both.
+      const perToken = settings.tpot_slo_ms > 0 ? `, p95 per token ${milliseconds(chosen.p95_tpot_ms)}` : "";
       $("answer").innerHTML = `Use <strong>${escapeHtml(labelOf(chosen.policy))}</strong> on ` +
         `<strong>${replicas(chosen.n_replicas)}</strong>: ${rupees(chosen.inr_per_1k_requests)} per ` +
-        `1,000 requests that met the target, p95 first token ${milliseconds(chosen.p95_ttft_ms)}.`;
+        `1,000 requests that met the target, p95 first token ${milliseconds(chosen.p95_ttft_ms)}` +
+        `${perToken}.`;
     } else if (chosen) {
       $("answer").innerHTML = `No configuration meets the target on up to ${replicas(swept)}. ` +
         `The lowest p95 first-token latency is ${escapeHtml(labelOf(chosen.policy))} on ` +
@@ -223,30 +253,36 @@
     if (rec.WARNING) cautions.push(rec.WARNING);
     if (settings.profile.source === "shipped") {
       cautions.push("Every figure is for a Tesla T4 serving Qwen3-4B. For your hardware, run " +
-        "kvsim calibrate against your vLLM server and load the profile it writes.");
+        "`kvsim calibrate` against your vLLM server and load the profile it writes.");
     } else if (settings.gpu_price_per_hour_usd === null) {
       cautions.push("Rupee figures use the T4's price. Enter your GPU's price per hour for your costs.");
     }
     if (report.replica_spread_note) cautions.push(report.replica_spread_note);
-    $("notes").innerHTML = info.map((n) => `<p class="muted">${escapeHtml(n)}</p>`).join("") +
+    $("notes").innerHTML = info.map((n) => `<p class="muted">${prose(n)}</p>`).join("") +
       (cautions.length
-        ? `<div class="note caveats">${cautions.map((n) => `<p>${escapeHtml(n)}</p>`).join("")}</div>`
+        ? `<div class="note caveats">${cautions.map((n) => `<p>${prose(n)}</p>`).join("")}</div>`
         : "");
 
     $("summary").innerHTML = summaryTable(report.points, chosen, swept);
-    $("target").textContent = targetSentence(settings);
+    $("target").textContent = targetSentence(settings, result.cost);
     $("spread-section").innerHTML = spreadTable(report.replica_spread);
     $("table").innerHTML = fullTable(report.points, chosen);
     $("command").textContent = result.command;
     $("results").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function targetSentence(settings) {
+  // `cost` is the package's own cost model, read by the worker: its dollar rate and default price.
+  function targetSentence(settings, cost) {
     const parts = [`p95 time to first token at most ${settings.ttft_slo_ms.toLocaleString()} ms`];
     if (settings.tpot_slo_ms > 0) {
       parts.push(`p95 time per output token at most ${settings.tpot_slo_ms.toLocaleString()} ms`);
     }
-    return `Target: ${parts.join(" and ")}. Costs are rupees per 1,000 requests that met the target.`;
+    let costs = "Costs are rupees per 1,000 requests that met the target";
+    if (cost) {
+      const price = settings.gpu_price_per_hour_usd ?? cost.price_per_hour_usd;
+      costs += `, for a GPU at $${price} an hour and ₹${cost.usd_to_inr} a dollar`;
+    }
+    return `Target: ${parts.join(" and ")}. ${costs}.`;
   }
 
   function summaryTable(points, chosen, swept) {

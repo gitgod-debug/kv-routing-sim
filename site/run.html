@@ -25,7 +25,7 @@
       </div>
       <div id="generate-fields" class="fields">
         <label>Sessions <input type="number" id="sessions" value="100" min="1" step="1"></label>
-        <label>Turns per session <input type="number" id="turns" value="6" min="1" step="1"></label>
+        <label>Turns per session <input type="number" id="turns" value="4" min="1" step="1"></label>
         <label>New sessions per second <input type="number" id="rate" value="0.25" min="0.01" step="0.05"></label>
         <label>Shared system prompt <input type="number" id="sharing" value="0.6" min="0" max="0.95" step="0.05">
           <span class="hint">share of an average prompt, 0 to 0.95</span></label>
@@ -73,22 +73,29 @@
       <summary>Search settings</summary>
       <div class="fields">
         <label>Replica counts <input type="text" id="replicas" value="1-8" placeholder="1-8 or 1,2,4,8"></label>
-        <label>Seeds per configuration <input type="number" id="seeds" value="5" min="1" max="10" step="1">
+        <label>Seeds per configuration <input type="number" id="seeds" value="3" min="1" max="10" step="1">
           <span class="hint">fewer runs faster, with less averaging</span></label>
       </div>
       <fieldset>
         <legend>Routing policies</legend>
         <div id="policies" class="policy-list"></div>
+        <p class="hint">The explorer's balanced prefix-affinity uses a load weight of 16, the weight the
+          registered tests chose. This page and <code>kvsim replay</code> run the package's default
+          weight, 1. They have no option to change it.</p>
       </fieldset>
       <label class="check"><input type="checkbox" id="edge" checked> Check the margin to saturation
         (one extra run per seed)</label>
-      <label class="check"><input type="checkbox" id="spread" checked> Show how firm the replica count is,
-        for profiles that keep their calibration repeats</label>
+      <label class="check"><input type="checkbox" id="spread" checked> Show how firm the replica count
+        is</label>
+      <p class="hint">A profile from <code>kvsim calibrate</code> keeps its calibration repeats. The
+        measured T4 has none, so the page gives the spread of three T4 calibrations instead.</p>
     </details>
 
     <div class="actions">
       <button type="submit" id="run" class="primary">Run</button>
       <button type="button" id="cancel" hidden>Cancel</button>
+      <span class="hint" id="run-hint">One to two minutes with these settings. More seeds, replicas
+        or policies take longer.</span>
     </div>
     <div id="status" class="status" aria-live="polite"></div>
     <progress id="progress" max="1" value="0" hidden></progress>
@@ -110,6 +117,7 @@
     <h2>Reproduce it from the command line</h2>
     <pre><code id="command"></code></pre>
     <div class="actions">
+      <button type="button" id="copy-command">Copy the commands</button>
       <button type="button" id="download-json">Download the report as JSON</button>
       <button type="button" id="download-md">Download the report as Markdown</button>
     </div>
