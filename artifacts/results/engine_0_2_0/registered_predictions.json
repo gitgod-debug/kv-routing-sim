@@ -1,0 +1,161 @@
+{
+ "script": "scripts/registered_predictions_again.py",
+ "date_utc": "2026-11-27T20:37:26+00:00",
+ "git_sha": "9c072c7",
+ "git_dirty": false,
+ "seed": 0,
+ "hardware_path": "cpu-only",
+ "hardware": {
+  "platform": "Linux-6.17.0-41-generic-x86_64-with-glibc2.42",
+  "python": "3.13.12",
+  "usable_cpus": 12,
+  "gpus": [
+   "NVIDIA GeForce GTX 1650, 4096 MiB, 7.5, 595.71.05"
+  ],
+  "gpu_name": "NVIDIA GeForce GTX 1650",
+  "gpu_memory_total": "4096 MiB",
+  "compute_capability": "7.5",
+  "driver_version": "595.71.05",
+  "mig_enabled": false,
+  "mig_mode_current": [
+   "[N/A]"
+  ]
+ },
+ "packages": {
+  "vllm": "not installed",
+  "torch": "not installed",
+  "numpy": "2.5.3",
+  "pydantic": "2.13.5",
+  "httpx": "not installed",
+  "prometheus-client": "not installed",
+  "matplotlib": "3.11.2"
+ },
+ "post_hoc": true,
+ "sources": {
+  "Phase 3 (H3, H4; V1 registered the same predictions)": {
+   "registered_in": "artifacts/results/phase3_prereg/predictions.json",
+   "old_engine_reproduces": true,
+   "moved": []
+  },
+  "C1": {
+   "registered_in": "artifacts/results/c1_prereg/prediction.json",
+   "old_engine_reproduces": true,
+   "moved": []
+  },
+  "C2": {
+   "registered_in": "artifacts/results/c2_prereg/predictions.json",
+   "old_engine_reproduces": true,
+   "moved": []
+  },
+  "C3": {
+   "registered_in": "artifacts/results/c3_prereg/predictions.json",
+   "old_engine_reproduces": true,
+   "moved": []
+  },
+  "C4": {
+   "registered_in": "artifacts/results/c4_prereg/predictions.json",
+   "old_engine_reproduces": true,
+   "moved": [
+    {
+     "path": ".runs.long_below.profile A.itl_mean_ms",
+     "registered": 64.116,
+     "engine_0_2_0": 64.118
+    },
+    {
+     "path": ".runs.long_below.profile A.ttft_p50_ms",
+     "registered": 268.487,
+     "engine_0_2_0": 268.148
+    }
+   ]
+  },
+  "Phase 6": {
+   "registered_in": "artifacts/results/phase6_prereg/predictions.json",
+   "old_engine_reproduces": true,
+   "moved": [
+    {
+     "path": ".K1.session-sticky.requests_per_replica",
+     "registered": [
+      240,
+      240
+     ],
+     "engine_0_2_0": [
+      248,
+      232
+     ]
+    },
+    {
+     "path": ".K1.session-sticky.ttft_p50_ms",
+     "registered": 192.192,
+     "engine_0_2_0": 193.514
+    },
+    {
+     "path": ".K1.session-sticky.ttft_p95_ms",
+     "registered": 347.25,
+     "engine_0_2_0": 357.702
+    },
+    {
+     "path": ".K64.session-sticky.hit_rate",
+     "registered": 0.821373,
+     "engine_0_2_0": 0.823039
+    },
+    {
+     "path": ".K64.session-sticky.prefix_cache_hits",
+     "registered": 670240,
+     "engine_0_2_0": 671600
+    },
+    {
+     "path": ".K64.session-sticky.requests_per_replica",
+     "registered": [
+      248,
+      232
+     ],
+     "engine_0_2_0": [
+      244,
+      236
+     ]
+    },
+    {
+     "path": ".K64.session-sticky.ttft_p50_ms",
+     "registered": 228.416,
+     "engine_0_2_0": 218.367
+    },
+    {
+     "path": ".K64.session-sticky.ttft_p95_ms",
+     "registered": 1550.683,
+     "engine_0_2_0": 1350.627
+    }
+   ]
+  }
+ },
+ "registered_check": {
+  "holds": false,
+  "moved": [
+   {
+    "test": "Phase 6",
+    "path": ".K64.session-sticky.hit_rate",
+    "registered": 0.821373,
+    "engine_0_2_0": 0.823039
+   },
+   {
+    "test": "Phase 6",
+    "path": ".K64.session-sticky.prefix_cache_hits",
+    "registered": 670240,
+    "engine_0_2_0": 671600
+   }
+  ]
+ },
+ "phase6_rules": {
+  "run1": {
+   "s1_max_registered": 0.01397,
+   "s1_max_engine_0_2_0": 0.01596,
+   "s2_holds": true,
+   "holds": true
+  },
+  "run2": {
+   "s1_max_registered": 0.00225,
+   "s1_max_engine_0_2_0": 0.00225,
+   "s2_holds": true,
+   "holds": true
+  }
+ }
+}
