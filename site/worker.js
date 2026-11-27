@@ -57,19 +57,30 @@ function lastLine(text) {
 
 self.onmessage = async (event) => {
   const { settings, traceFile, profileFile } = event.data;
+  // Messages name the file the user chose, not its copy in Pyodide's file system.
+  const copies = [];
+  const plain = (text) => copies.reduce((t, { path, name }) => t.split(path).join(name), String(text));
   try {
     runtime = runtime || (await boot());
     const { pyodide, entry, cost } = runtime;
-    if (traceFile) Object.assign(settings.traffic, await writeInput(pyodide, traceFile));
-    if (profileFile) Object.assign(settings.profile, await writeInput(pyodide, profileFile));
+    if (traceFile) {
+      const input = await writeInput(pyodide, traceFile);
+      copies.push(input);
+      Object.assign(settings.traffic, input);
+    }
+    if (profileFile) {
+      const input = await writeInput(pyodide, profileFile);
+      copies.push(input);
+      Object.assign(settings.profile, input);
+    }
     post({
       type: "status",
       text: traceFile ? "Reading the log and simulating…" : "Generating traffic and simulating…",
     });
     const output = entry.run_json(JSON.stringify(settings), throttledProgress(), WORK_DIR);
     const result = JSON.parse(output);
-    post(result.error ? { type: "error", message: result.error } : { type: "result", result: { ...result, cost } });
+    post(result.error ? { type: "error", message: plain(result.error) } : { type: "result", result: { ...result, cost } });
   } catch (err) {
-    post({ type: "error", message: `Unexpected error: ${lastLine(err && err.message ? err.message : err)}` });
+    post({ type: "error", message: `Unexpected error: ${plain(lastLine(err && err.message ? err.message : err))}` });
   }
 };

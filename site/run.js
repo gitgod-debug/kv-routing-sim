@@ -100,7 +100,10 @@
     const settings = readSettings();
     const problem = validate(settings);
     showError(problem);
-    if (problem) return;
+    if (problem) {
+      setStatus("");
+      return;
+    }
     activeSettings = settings;
     setRunning(true);
     startedAt = performance.now();
@@ -117,6 +120,7 @@
     w.addEventListener("message", (event) => handleMessage(event.data));
     w.addEventListener("error", (event) => {
       finish();
+      setStatus("");
       showError(`The simulator could not start: ${event.message || "unknown error"}.`);
       worker = null;
     });
@@ -139,6 +143,7 @@
       renderResult(message.result, activeSettings);
     } else if (message.type === "error") {
       finish();
+      setStatus("");  // the error box says why the run stopped
       showError(message.message);
     }
   }
