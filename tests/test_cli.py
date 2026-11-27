@@ -236,3 +236,154 @@ def test_replay_compares_cost_with_round_robin_only_between_fleets_that_meet_the
     both_meet = capsys.readouterr().out
     assert "cheapest configuration meeting the p95 TTFT SLO" in both_meet
     assert "vs round-robin:" in both_meet
+
+
+def _strict(text: str):
+    """Parse JSON as JavaScript's JSON.parse does: NaN and Infinity are not JSON."""
+    def refuse(token):
+        raise ValueError(f"not JSON: {token}")
+    return json.loads(text, parse_constant=refuse)
+
+
+@pytest.fixture
+def small_trace(tmp_path, capsys):
+    trace = tmp_path / "t.jsonl"
+    main(["generate", "--out", str(trace), "--sessions", "5"])
+    capsys.readouterr()
+    return trace
+
+
+@pytest.mark.parametrize(("args", "message"), [
+    (["--policies", ""], "choose at least one routing policy"),
+    (["--replicas", "1-99999999999999"], "Ask for at most 1,024"),
+    (["--ttft-slo-ms", "nan"], "first-token limit"),
+    (["--gpu-price-usd", "inf"], "GPU price"),
+    (["--tpot-slo-ms", "-1"], "per-token limit"),
+    (["--tpot-slo-ms", "nan"], "per-token limit"),
+    (["--token-scale", "0.5"], "works only with the agentx, bailian and mooncake formats"),
+    (["--token-scale", "nan", "--format-in", "mooncake"], "--token-scale must be a number above 0"),
+    (["--token-scale", "0", "--format-in", "agentx"], "--token-scale must be a number above 0"),
+    (["--token-scale", "0.3", "--format-in", "bailian"], "1/k for a whole number k"),
+])
+def test_replay_options_are_checked_before_any_simulation_runs(small_trace, monkeypatch, args,
+                                                               message):
+    from kv_routing_sim import service
+
+    monkeypatch.setattr(service, "sweep", lambda *a, **k: pytest.fail("a simulation ran"))
+    with pytest.raises(SystemExit, match=message):
+        main(["replay", str(small_trace), *args])
+
+
+@pytest.mark.parametrize("command", ["replay", "generate", "crossover"])
+def test_an_output_path_that_cannot_be_written_is_refused_at_startup(tmp_path, small_trace,
+                                                                     monkeypatch, command):
+    from kv_routing_sim import cli
+
+    monkeypatch.setattr(cli, "replay", lambda *a, **k: pytest.fail("the replay ran"))
+    monkeypatch.setattr(cli, "crossover_sweep", lambda *a, **k: pytest.fail("the sweep ran"))
+    monkeypatch.setattr(cli, "AgenticWorkload", lambda *a, **k: pytest.fail("traffic was made"))
+    first = {"replay": ["replay", str(small_trace)], "generate": ["generate"],
+             "crossover": ["crossover"]}[command]
+    with pytest.raises(SystemExit, match="the folder .* does not exist"):
+        main([*first, "--out", str(tmp_path / "no-such-folder" / "out.json")])
+    with pytest.raises(SystemExit, match="is a folder. Give a file name"):
+        main([*first, "--out", str(tmp_path)])
+    with pytest.raises(SystemExit, match="is not a folder"):
+        main([*first, "--out", str(small_trace / "out.json")])
+
+
+@pytest.mark.parametrize(("args", "message"), [
+    (["--sharing", "0.1,1.0"], "--sharing values must be at least 0 and below 1"),
+    (["--sharing", "-0.1"], "--sharing values must be at least 0 and below 1"),
+    (["--sharing", "nan"], "--sharing must be finite numbers"),
+    (["--sharing", "lots"], "could not parse --sharing"),
+    (["--sharing", ""], "--sharing is empty"),
+    (["--rates", "4,0"], "--rates must be numbers above 0"),
+    (["--rates", "inf"], "--rates must be finite numbers"),
+    (["--seeds", "0"], "--seeds must be at least 1"),
+    (["--replicas", "0"], "--replicas must be at least 1"),
+    (["--sessions", "0"], "--sessions must be at least 1"),
+    (["--policies", ""], "choose at least one routing policy"),
+])
+def test_crossover_options_are_checked_before_any_simulation_runs(monkeypatch, args, message):
+    from kv_routing_sim import cli
+
+    monkeypatch.setattr(cli, "crossover_sweep", lambda *a, **k: pytest.fail("the sweep ran"))
+    with pytest.raises(SystemExit, match=message):
+        main(["crossover", *args])
+
+
+@pytest.mark.parametrize("command", ["calibrate", "profiles"])
+def test_an_engine_that_is_not_an_http_url_is_refused(tmp_path, command):
+    with pytest.raises(SystemExit, match="must start with http:// or https://"):
+        main([command, "--engine", "localhost:8000", "--out", str(tmp_path / "p.json")]
+             if command == "calibrate" else [command, "--engine", "localhost:8000"])
+
+
+def test_generate_refuses_no_sessions_and_a_rate_that_is_not_a_number(tmp_path):
+    out = tmp_path / "t.jsonl"
+    with pytest.raises(SystemExit, match="n_sessions must be >= 1"):
+        main(["generate", "--out", str(out), "--sessions", "0"])
+    with pytest.raises(SystemExit, match="arrival_rate must be a finite number"):
+        main(["generate", "--out", str(out), "--rate", "nan"])
+    assert not out.exists()
+
+
+@pytest.mark.parametrize(("change", "message"), [
+    (("ttft_p95_ms: 2000", "ttft_p95_ms: [2000"), "not valid YAML"),
+    (("price_per_hour_usd: 0.526", "price_per_hour_usd: 0"), "compute.price_per_hour_usd must be"),
+    (("usd_to_inr: 95.87", "usd_to_inr: -1"), "fx.usd_to_inr must be a number above 0"),
+    (("ttft_p95_ms: 2000", "ttft_p95_ms: .nan"), "slo.ttft_p95_ms must be a number above 0"),
+    (("ttft_p95_ms: 2000", "ttft_p95_ms: 2000\n  tpot_p95_ms: -5"), "slo.tpot_p95_ms must be"),
+    (("ttft_p95_ms: 2000", "ttft_p95_ms: .inf"), "slo.ttft_p95_ms must be a number above 0"),
+])
+def test_a_cost_model_with_a_bad_value_is_refused(small_trace, tmp_path, change, message):
+    bad = tmp_path / "cost.yaml"
+    bad.write_text(pathlib.Path("configs/cost_model.yaml").read_text().replace(*change))
+    with pytest.raises(SystemExit, match=message):
+        main(["replay", str(small_trace), "--cost-model", str(bad)])
+
+
+@pytest.mark.parametrize(("field", "value", "message"), [
+    ("block_size", 0, "block_size must be a whole number of at least 1"),
+    ("kv_cache_blocks", 1, "kv_cache_blocks must be a whole number of at least 2"),
+    ("max_num_seqs", 0, "max_num_seqs must be a whole number of at least 1"),
+    ("max_num_seqs", 2.5, "max_num_seqs must be a whole number of at least 1"),
+    ("prefill_base_s", -0.001, "prefill_base_s must be a finite number of at least 0"),
+    ("decode_per_seq_s", float("nan"), "decode_per_seq_s must be a finite number of at least 0"),
+    ("decode_base_s", "0.02", "decode_base_s must be a finite number of at least 0"),
+])
+def test_a_profile_with_a_value_no_engine_has_is_refused(small_trace, tmp_path, field, value,
+                                                          message):
+    raw = json.loads(pathlib.Path(PROFILE).read_text())
+    raw[field] = value
+    bad = tmp_path / "p.json"
+    bad.write_text(json.dumps(raw))
+    with pytest.raises(SystemExit, match=message):
+        main(["replay", str(small_trace), "--profile", str(bad), "--block-size",
+              str(raw["block_size"])])
+
+
+def test_json_output_writes_null_for_nan_and_infinity(small_trace, tmp_path, monkeypatch, capsys):
+    from kv_routing_sim import cli
+    from kv_routing_sim.report import to_json
+    from kv_routing_sim.service import ReplayReport
+
+    assert to_json({"a": float("nan"), "b": [1.5, float("inf")], "c": (float("-inf"),)}) == \
+        '{"a": null, "b": [1.5, null], "c": [null]}'
+    report = ReplayReport(trace={"requests": 1}, profile={"calibrated": True},
+                          points=[{"p95_ttft_ms": float("nan"), "hit_rate": 0.5}],
+                          recommendation={"calibrated": True}, slo=None, replica_spread=None,
+                          replica_spread_note=None, edge={"slowdown": float("inf")})
+    monkeypatch.setattr(cli, "replay", lambda *a, **k: report)
+    out = tmp_path / "r.json"
+    assert main(["replay", str(small_trace), "--format", "json", "--out", str(out)]) == 0
+    written = _strict(out.read_text())
+    assert written["points"][0] == {"p95_ttft_ms": None, "hit_rate": 0.5}
+    assert written["edge"] == {"slowdown": None}
+
+    monkeypatch.setattr(cli, "crossover_sweep", lambda **k: [{"p95_by_policy_ms": {
+        "round-robin": float("nan")}}])
+    assert main(["crossover", "--out", str(out)]) == 0
+    assert _strict(out.read_text())["crossover"] == [{"p95_by_policy_ms": {"round-robin": None}}]
+    capsys.readouterr()

@@ -316,3 +316,25 @@ def test_probe_reads_what_a_real_vllm_0_30_served():
     info = probe(_Canned(_real(stripped)))
     assert info.kv_cache_blocks == 512
     assert any("from GET /server_info" in n for n in info.notes)
+
+
+def test_a_check_with_no_hit_on_the_engine_is_reported_not_crashed(mock_url, tmp_path,
+                                                                    monkeypatch, capsys):
+    """One check request on a cold cache hits nothing, so the hit-rate error is not defined. The
+    summary says so, and the command writes the profile, not calibrated, and exits with 1."""
+    lines = []
+    profile, ok = calibrate(Engine(mock_url, poll_s=0.05), model="mock",
+                            **{**SMALL, "check_sessions": 1, "check_turns": 1}, log=lines.append)
+    assert not ok and profile["calibration_error"] is None
+    assert profile["_source"]["check"]["measured"]["hits"] == 0
+    assert any("error not defined (no hit on the engine) over 1 requests" in line
+               for line in lines)
+
+    from kv_routing_sim.calib import calibrate as lib
+    from kv_routing_sim.cli import main
+
+    monkeypatch.setattr(lib, "calibrate", lambda *a, **k: (profile, False))
+    out = tmp_path / "mine.json"
+    assert main(["calibrate", "--engine", mock_url, "--out", str(out)]) == 1
+    assert "the engine reported no prefix-cache hit during the check" in capsys.readouterr().err
+    assert json.loads(out.read_text())["calibrated"] is False

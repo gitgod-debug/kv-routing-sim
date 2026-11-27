@@ -643,8 +643,10 @@ def calibrate(engine: Engine, *, model: str | None = None, gpu: str | None = Non
     # one request whose cached tokens differ means a rule differs on this engine, even when the
     # aggregate error is small (a wrong block size moves it by only a few percent).
     ok = err is not None and err <= max_error and n_eq == n_cmp
+    # With no hit on the engine there is no relative error to show.
+    error = "not defined (no hit on the engine)" if err is None else f"{err:.2%}"
     log(f"check    hit rate: engine {check['measured']['hit_rate']:.4f}, model "
-        f"{check['predicted']['hit_rate']:.4f}, error {err:.2%} over {check['requests']} requests")
+        f"{check['predicted']['hit_rate']:.4f}, error {error} over {check['requests']} requests")
     if n_cmp:
         log(f"         per-request cached tokens: {n_eq} of {n_cmp} equal")
     else:

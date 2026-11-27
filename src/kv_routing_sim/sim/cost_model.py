@@ -12,6 +12,7 @@ the tokens actually computed, which is what prefix caching reduces; the two cont
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
 
@@ -85,8 +86,10 @@ class CostProfile:
 def load_profile(path: str | Path) -> CostProfile:
     """Load a profile from a JSON file such as `configs/profiles/t4-qwen3-4b-vllm0.30.0.json`.
 
-    A missing or unknown field raises (ADR-004), so a mistyped key cannot fall back to a default.
-    Keys starting with `_` are provenance for the reader and are ignored.
+    A missing or unknown field raises (ADR-004), so a mistyped key cannot fall back to a default,
+    and so does a value no engine could have: a block size or batch limit below 1, fewer than two
+    KV blocks, or a timing coefficient that is negative or not a finite number. Keys starting with
+    `_` are provenance for the reader and are ignored.
     """
     return _profile_from_json(Path(path).read_text(encoding="utf-8"), str(path))
 
@@ -116,8 +119,8 @@ def replicate_profiles(spec: str | Path) -> list[CostProfile]:
     """Return the profile refitted on each repeat of its calibration alone.
 
     `kvsim calibrate` writes these under `_source.replicates`; re-running the sizing on each shows
-    how firm a replica count is. The list is empty for a profile without them, which means the
-    spread is unknown, not zero.
+    how firm a replica count is. The list is empty for a profile without them, or with one that
+    lacks a coefficient or has an impossible one, which means the spread is unknown, not zero.
     """
     path = Path(spec)
     if path.is_file():
@@ -131,13 +134,21 @@ def replicate_profiles(spec: str | Path) -> list[CostProfile]:
             return []
         text = shipped[name].read_text(encoding="utf-8")
     raw = json.loads(text)
-    reps = ((raw.get("_source") or {}).get("replicates") if isinstance(raw, dict) else None) or []
-    if not reps:
+    source = raw.get("_source") if isinstance(raw, dict) else None
+    reps = source.get("replicates") if isinstance(source, dict) else None
+    if not reps or not isinstance(reps, list):
         return []
     base = _profile_from_json(text, str(spec))
-    return [replace(base, name=f"{base.name}#repeat{r.get('rep', i)}",
-                    **{k: float(r[k]) for k in TIMING_FIELDS})
-            for i, r in enumerate(reps)]
+    out = []
+    for i, r in enumerate(reps):
+        try:
+            timing = {k: float(r[k]) for k in TIMING_FIELDS}
+        except (KeyError, TypeError, ValueError, OverflowError):
+            return []
+        if not all(math.isfinite(v) and v >= 0 for v in timing.values()):
+            return []
+        out.append(replace(base, name=f"{base.name}#repeat{r.get('rep', i)}", **timing))
+    return out
 
 
 def _profile_from_json(text: str, where: str) -> CostProfile:
@@ -150,9 +161,23 @@ def _profile_from_json(text: str, where: str) -> CostProfile:
     if unknown:
         raise ValueError(f"{where}: unknown profile field(s) {unknown}; known: {sorted(known)}")
     try:
-        return CostProfile(**data)
+        profile = CostProfile(**data)
     except TypeError as exc:  # a required field is missing
         raise ValueError(f"{where}: {exc}") from None
+    # A batch limit of 0 makes a run never end, a block size of 0 divides by zero, and a cache
+    # needs one block besides the one vLLM keeps for itself.
+    for name, least in (("block_size", 1), ("kv_cache_blocks", 2), ("max_num_seqs", 1)):
+        value = getattr(profile, name)
+        if isinstance(value, bool) or not isinstance(value, int) or value < least:
+            raise ValueError(f"{where}: {name} must be a whole number of at least {least}, "
+                             f"got {value!r}")
+    for name in TIMING_FIELDS:
+        value = getattr(profile, name)
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or not math.isfinite(value) or value < 0):
+            raise ValueError(f"{where}: {name} must be a finite number of at least 0, "
+                             f"got {value!r}")
+    return profile
 
 
 # An uncalibrated guess: order-of-magnitude figures for a Tesla T4 serving Qwen3-4B in fp16, so the

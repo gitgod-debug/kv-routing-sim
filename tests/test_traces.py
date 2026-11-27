@@ -32,16 +32,14 @@ def test_malformed_lines_are_skipped_and_counted(tmp_path):
     p.write_text(
         "\n".join(
             [
-                json.dumps(
-                    {"request_id": "a", "timestamp": 1.0, "prompt_token_ids": list(range(32))}
-                ),
+                json.dumps({"request_id": "a", "timestamp": 1.0,
+                            "prompt_token_ids": list(range(32)), "num_generated_tokens": 8}),
                 "{ broken json",
                 json.dumps([1, 2, 3]),
                 json.dumps({"request_id": "no-timestamp", "prompt_token_ids": [1]}),
                 "",
-                json.dumps(
-                    {"request_id": "b", "timestamp": 2.0, "prompt_token_ids": list(range(32))}
-                ),
+                json.dumps({"request_id": "b", "timestamp": 2.0,
+                            "prompt_token_ids": list(range(32)), "num_generated_tokens": 8}),
             ]
         )
     )
@@ -68,6 +66,7 @@ def test_timestamps_are_normalized_to_trace_start(tmp_path):
                     "request_id": f"r{i}",
                     "timestamp": 1_700_000_000 + i,
                     "prompt_token_ids": [1] * 32,
+                    "num_generated_tokens": 8,
                 }
             )
             for i in range(3)
@@ -397,3 +396,234 @@ def test_bailian_applies_the_engines_length_limit_and_counts_it(tmp_path):
     assert st.skipped_lines == 2  # a cut output is counted, but it is not a skipped line
     assert {k: v for k, v in st.skip_reasons.items() if k != "output_capped"} == {
         "prompt_too_long": 1, "block_count_mismatch": 1}
+
+
+def _jsonl(tmp_path, rows, name="t.jsonl"):
+    """Write rows as JSONL. A str row is written as it is, for text json.dumps cannot produce."""
+    p = tmp_path / name
+    p.write_text("".join((r if isinstance(r, str) else json.dumps(r)) + "\n" for r in rows))
+    return p
+
+
+def _vllm(rid, ts, n=32, out=8, **extra):
+    return {"request_id": rid, "timestamp": ts, "prompt_token_ids": list(range(n)),
+            "num_generated_tokens": out, **extra}
+
+
+def test_a_file_in_newest_first_order_is_read_in_time_order(tmp_path):
+    """Time starts at the earliest request, not the first line, and nothing is clamped to 0."""
+    p = _jsonl(tmp_path, [_vllm("c", 130.0), _vllm("b", 110.0), _vllm("a", 100.0),
+                          _vllm("a2", 100.0)])
+    out = list(adapters.get("vllm-jsonl").read(p))
+    assert [(r.request_id, r.arrival_ts) for r in out] == [
+        ("a", 0.0), ("a2", 0.0), ("b", 10.0), ("c", 30.0)]  # equal times keep the file's order
+
+
+def test_a_bad_timestamp_is_skipped_and_never_sets_the_clock(tmp_path):
+    rows = [_vllm("bad", "soon"), _vllm("nan", "NaN"), _vllm("bool", True), _vllm("inf", "1e999"),
+            _vllm("x", 50.0), _vllm("y", 52.5)]
+    stats = TraceStats()
+    out = list(adapters.get("vllm-jsonl").read(_jsonl(tmp_path, rows), stats=stats))
+    assert [(r.request_id, r.arrival_ts) for r in out] == [("x", 0.0), ("y", 2.5)]
+    assert stats.skip_reasons == {"bad_timestamp": 4}
+
+
+def test_timestamps_may_be_numeric_or_iso_8601_strings(tmp_path):
+    rows = [_vllm("a", "2026-11-27T10:00:00Z"), _vllm("b", "2026-11-27T10:00:01.5"),
+            _vllm("c", "2026-11-27T11:00:02+01:00"), _vllm("d", str(1_795_773_603))]
+    out = list(adapters.get("vllm-jsonl").read(_jsonl(tmp_path, rows)))
+    # A time without an offset is UTC. 11:00:02+01:00 is 10:00:02Z, and the number is 10:00:03Z.
+    assert [(r.request_id, r.arrival_ts) for r in out] == [
+        ("a", 0.0), ("b", 1.5), ("c", 2.0), ("d", 3.0)]
+    # Mooncake counts in milliseconds: a numeric string is milliseconds, a date is converted.
+    for stamps, expected in ((["2026-11-27T10:00:00Z", "2026-11-27T10:00:02.5Z"], [0.0, 2.5]),
+                             (["4000", 7500], [0.0, 3.5])):
+        rows = [{"timestamp": t, "input_length": 512, "output_length": 1, "hash_ids": [i]}
+                for i, t in enumerate(stamps)]
+        moon = list(adapters.get("mooncake").read(_mooncake(tmp_path, rows)))
+        assert [r.arrival_ts for r in moon] == expected
+
+
+def test_mooncake_and_bailian_read_newest_first_files_in_time_order(tmp_path):
+    """Their sessions follow the order of arrival too: a follow-up joins the request before it."""
+    rows = [{"timestamp": 9000, "input_length": 1536, "output_length": 1, "hash_ids": [1, 2, 3]},
+            {"timestamp": 3000, "input_length": 1024, "output_length": 1, "hash_ids": [1, 2]}]
+    first, second = adapters.get("mooncake").read(_mooncake(tmp_path, rows))
+    assert (first.request_id, first.arrival_ts, second.arrival_ts) == ("m1", 0.0, 6.0)
+    assert second.session_id == first.session_id  # extends the earlier request's full blocks
+
+    p = _bailian(tmp_path, [_brow(2, 1, 9.0, 32, 8, [5, 6], turn=3),
+                            _brow(1, 0, 4.0, 32, 8, [5, 6], turn=2),
+                            _brow(0, -1, 2.5, 32, 8, [5, 6])])
+    out = list(adapters.get("bailian").read(p))
+    assert [(r.request_id, r.arrival_ts, r.session_id) for r in out] == [
+        ("b0", 0.0, "b0"), ("b1", 1.5, "b0"), ("b2", 6.5, "b0")]
+
+
+def test_a_missing_output_length_is_skipped_and_an_explicit_zero_is_kept(tmp_path):
+    rows = [{"request_id": "none", "timestamp": 1, "prompt_token_ids": list(range(32))},
+            _vllm("zero", 2, out=0), _vllm("five", 3, out=5)]
+    stats = TraceStats()
+    out = list(adapters.get("vllm-jsonl").read(_jsonl(tmp_path, rows), stats=stats))
+    assert [(r.request_id, r.output_tokens) for r in out] == [("zero", 0), ("five", 5)]
+    assert stats.skip_reasons == {"no_output_length": 1}
+
+
+def test_openai_output_length_is_the_usage_else_the_requests_limit(tmp_path):
+    msgs = [{"role": "user", "content": "hello there " * 20}]
+    rows = [{"id": "usage", "created": 1, "messages": msgs, "max_tokens": 99,
+             "usage": {"prompt_tokens": 40, "completion_tokens": 7}},
+            {"id": "top", "created": 2, "messages": msgs, "max_tokens": 11},
+            {"id": "body", "created": 3, "body": {"messages": msgs, "max_tokens": 13}},
+            {"id": "none", "created": 4, "messages": msgs}]
+    stats = TraceStats()
+    out = list(adapters.get("openai-log").read(_jsonl(tmp_path, rows), stats=stats))
+    assert [(r.request_id, r.output_tokens) for r in out] == [("usage", 7), ("top", 11),
+                                                              ("body", 13)]
+    assert stats.skip_reasons == {"no_output_length": 1}
+
+
+def test_a_prompt_that_is_a_list_of_integers_is_token_ids(tmp_path):
+    ids = list(range(1000, 1040))
+    rows = [{"request_id": "ids", "timestamp": 0, "prompt_token_ids": ids, "max_tokens": 4},
+            {"request_id": "prompt", "timestamp": 1, "prompt": ids, "max_tokens": 4}]
+    a, b = adapters.get("vllm-jsonl").read(_jsonl(tmp_path, rows))
+    assert (b.block_hashes, b.prompt_tokens) == (a.block_hashes, 40)
+
+
+def test_an_empty_prompt_is_skipped_and_counted(tmp_path):
+    rows = [{"request_id": "ids", "timestamp": 0, "prompt_token_ids": [], "max_tokens": 4},
+            {"request_id": "text", "timestamp": 1, "prompt": "   ", "max_tokens": 4},
+            {"request_id": "count", "timestamp": 2, "prompt_token_ids": [1, 2],
+             "num_prompt_tokens": 0, "max_tokens": 4},
+            _vllm("ok", 3)]
+    stats = TraceStats()
+    out = list(adapters.get("vllm-jsonl").read(_jsonl(tmp_path, rows), stats=stats))
+    assert [r.request_id for r in out] == ["ok"]
+    assert stats.skip_reasons == {"empty_prompt": 3}
+    chat = [{"id": "empty", "created": 0, "messages": [], "max_tokens": 4},
+            {"id": "ok", "created": 1, "messages": [{"role": "user", "content": "hi"}],
+             "max_tokens": 4}]
+    stats = TraceStats()
+    out = list(adapters.get("openai-log").read(_jsonl(tmp_path, chat, "c.jsonl"), stats=stats))
+    assert [r.request_id for r in out] == ["ok"] and stats.skip_reasons == {"empty_prompt": 1}
+
+
+def test_a_byte_order_mark_does_not_cost_the_first_record(tmp_path):
+    p = tmp_path / "bom.jsonl"
+    p.write_text("﻿" + json.dumps(_vllm("a", 0)) + "\n" + json.dumps(_vllm("b", 1)) + "\n",
+                 encoding="utf-8")
+    stats = TraceStats()
+    assert [r.request_id for r in adapters.get("vllm-jsonl").read(p, stats=stats)] == ["a", "b"]
+    assert stats.skipped_lines == 0
+    m = tmp_path / "bom_m.jsonl"
+    m.write_text("﻿" + json.dumps({"timestamp": 0, "input_length": 512, "output_length": 1,
+                                        "hash_ids": [1]}) + "\n", encoding="utf-8")
+    assert len(list(adapters.get("mooncake").read(m))) == 1
+
+
+def test_one_bad_record_is_skipped_never_a_traceback(tmp_path):
+    """Values that convert badly, in each adapter: each skips its own record and is counted."""
+    base = [
+        _vllm("text-count", 1, num_prompt_tokens="n/a"),
+        {"request_id": "none-in-ids", "timestamp": 2, "prompt_token_ids": [1] * 20 + [None],
+         "max_tokens": 4},  # in the partial last block, which is never hashed
+        '{"request_id": "huge", "timestamp": 3, "prompt_token_ids": [1, 2], "max_tokens": 1e999}',
+        '{"request_id": "nan", "timestamp": 4, "prompt_token_ids": [1, 2], "max_tokens": NaN}',
+        _vllm("big-id", 5, n=0, prompt_token_ids=[2**64] * 16),
+        _vllm("ok", 6),
+    ]
+    stats = TraceStats()
+    out = list(adapters.get("vllm-jsonl").read(_jsonl(tmp_path, base), stats=stats))
+    assert [r.request_id for r in out] == ["ok"] and stats.skip_reasons == {"invalid_record": 5}
+
+    def moon(**row):
+        return {"timestamp": 0, "input_length": 512, "output_length": 1, "hash_ids": [1], **row}
+
+    rows = [moon(hash_ids=[2**64]), moon(hash_ids=[-1]), moon(output_length=10**400),
+            '{"timestamp": 0, "input_length": 1e999, "output_length": 1, "hash_ids": [1]}',
+            moon(timestamp=7)]
+    stats = TraceStats()
+    out = list(adapters.get("mooncake").read(_jsonl(tmp_path, rows, "m.jsonl"), stats=stats))
+    assert len(out) == 1 and stats.skip_reasons == {"invalid_record": 4}
+
+    huge_chat = json.dumps(_brow(2, -1, 2.0, 32, 8, [1, 2])).replace('"chat_id": 2',
+                                                                     '"chat_id": 1e999')
+    rows = [_brow(0, -1, 0.0, 32, 8, [2**64, 1]), _brow(1, -1, 1.0, 32, 10**400, [1, 2]),
+            huge_chat, _brow(3, -1, 3.0, 32, 8, [1, 2])]
+    stats = TraceStats()
+    out = list(adapters.get("bailian").read(_jsonl(tmp_path, rows, "b.jsonl"), stats=stats))
+    assert [r.request_id for r in out] == ["b3"] and stats.skip_reasons == {"invalid_record": 3}
+
+
+def test_agentx_skips_a_session_or_request_it_cannot_read(tmp_path):
+    good = {"id": "ok", "models": ["m"], "requests": [
+        {"t": 0.0, "type": "n", "model": "m", "in": 1024, "out": 8, "hash_ids": list(range(16)),
+         "api_time": 1.0}]}
+
+    def session(sid, **changes):
+        return {**good, "id": sid, **changes}
+
+    def request(**changes):
+        return [{**good["requests"][0], **changes}]
+
+    rows = [[1, 2, 3], '"a string"',
+            session("models", models="m"),
+            session("entry", requests=["not an object"]),
+            session("negative", requests=request(t=-1.0)),
+            '{"id": "nan", "models": ["m"], "requests": [{"t": NaN, "in": 1024, "out": 8}]}',
+            session("big-id", requests=request(hash_ids=[2**64] * 16)),
+            session("huge-out", requests=request(out=10**400)),
+            good]
+    stats = TraceStats()
+    out = list(adapters.get("agentx").read(_jsonl(tmp_path, rows, "x.jsonl"), stats=stats))
+    assert [r.session_id for r in out] == ["ok"]
+    assert stats.skip_reasons == {"invalid_record": 8}
+
+
+def test_repeated_request_ids_are_made_unique_and_counted(tmp_path):
+    rows = [_vllm("x", 0), _vllm("x", 1), _vllm("x#2", 2), _vllm("y", 3)]
+    stats = TraceStats()
+    out = list(adapters.get("vllm-jsonl").read(_jsonl(tmp_path, rows), stats=stats))
+    assert [r.request_id for r in out] == ["x", "x#2", "x#2#2", "y"]
+    assert stats.renamed_duplicate_ids == 2 and stats.as_dict()["renamed_duplicate_ids"] == 2
+    p = _bailian(tmp_path, [_brow(5, -1, 0.0, 32, 8, [1, 2]), _brow(5, -1, 1.0, 32, 8, [1, 2])])
+    stats = TraceStats()
+    assert [r.request_id for r in adapters.get("bailian").read(p, stats=stats)] == ["b5", "b5#2"]
+    assert stats.renamed_duplicate_ids == 1
+
+
+def test_agentx_reads_a_compressed_file_as_it_reads_the_plain_one(tmp_path):
+    import gzip
+
+    plain = _agentx(tmp_path)
+    packed = tmp_path / "agentx.jsonl.gz"
+    packed.write_bytes(gzip.compress(plain.read_bytes()))
+    kw = {"token_scale": 1 / 64, "concurrency": 1, "stagger_s": 0.0}
+    assert list(adapters.get("agentx").read(packed, **kw)) == \
+        list(adapters.get("agentx").read(plain, **kw))
+
+
+def test_the_trace_statistics_state_how_the_reader_scaled_it(tmp_path):
+    stats = TraceStats()
+    list(adapters.get("agentx").read(_agentx(tmp_path), stats=stats))
+    assert stats.as_dict()["scaling"] == {"token_scale": 0.03125, "concurrency": 32,
+                                          "stagger_s": 600.0}
+    rows = [{"timestamp": 0, "input_length": 1024, "output_length": 160, "hash_ids": [1, 2]}]
+    for scale, scaling in ((1 / 16, {"token_scale": 0.0625}), (1.0, None)):
+        stats = TraceStats()
+        list(adapters.get("mooncake").read(_mooncake(tmp_path, rows), token_scale=scale,
+                                           stats=stats))
+        assert stats.as_dict().get("scaling") == scaling
+    p = _bailian(tmp_path, [_brow(0, -1, 0.0, 64, 8, [5, 6, 7, 8])])
+    stats = TraceStats()
+    list(adapters.get("bailian").read(p, token_scale=1 / 2, stats=stats))
+    assert stats.as_dict()["scaling"] == {"token_scale": 0.5}
+
+
+def test_the_generator_refuses_no_sessions_and_a_rate_that_is_not_a_number():
+    with pytest.raises(ValueError, match="n_sessions"):
+        AgenticWorkload(n_sessions=0)
+    for rate in (float("nan"), float("inf"), -1.0):
+        with pytest.raises(ValueError, match="arrival_rate"):
+            AgenticWorkload(arrival_rate=rate)

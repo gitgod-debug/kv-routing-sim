@@ -23,9 +23,10 @@ from pathlib import Path
 
 from ..hashing import DEFAULT_BLOCK_SIZE
 from ..schema import NormalizedRequest, TraceStats
-from .base import open_maybe_gzip
+from .base import open_maybe_gzip, parse_timestamp
 
 TRACE_BLOCK_TOKENS = 512  # FAST25-release/README.md: "The block size is 512 tokens."
+ID_LIMIT = 2**64  # a hash id is hashed as 8 bytes
 
 
 def _sub_hash(trace_id: int, j: int) -> int:
@@ -36,6 +37,11 @@ def _sub_hash(trace_id: int, j: int) -> int:
 
 def _rows(path: str | Path, stats: TraceStats | None) -> Iterator[tuple[int, dict]]:
     """Yield valid rows; malformed ones are counted by reason (ADR-004) and skipped."""
+
+    def skip(reason: str) -> None:
+        if stats is not None:
+            stats.skip(reason)
+
     with open_maybe_gzip(path) as fh:
         for index, line in enumerate(fh):
             line = line.strip()
@@ -44,24 +50,27 @@ def _rows(path: str | Path, stats: TraceStats | None) -> Iterator[tuple[int, dic
             try:
                 obj = json.loads(line)
             except json.JSONDecodeError:
-                if stats is not None:
-                    stats.skip("json_decode_error")
+                skip("json_decode_error")
                 continue
             try:
                 ids = [int(h) for h in obj["hash_ids"]]
                 n_in, n_out = int(obj["input_length"]), int(obj["output_length"])
-                ts = float(obj["timestamp"])
+                raw_ts = obj["timestamp"]
             except (KeyError, TypeError, ValueError):
-                if stats is not None:
-                    stats.skip("missing_or_bad_fields")
+                skip("missing_or_bad_fields")
                 continue
-            if n_in < 1 or n_out < 0 or any(h < 0 for h in ids):
-                if stats is not None:
-                    stats.skip("invalid_record")
+            except (OverflowError, AttributeError, IndexError):  # 1e999 is read as an infinity
+                skip("invalid_record")
                 continue
-            if len(ids) != math.ceil(n_in / TRACE_BLOCK_TOKENS):
-                if stats is not None:
-                    stats.skip("block_count_mismatch")
+            ts = parse_timestamp(raw_ts, per_second=1000.0)  # in ms, as the trace has it
+            if ts is None:
+                skip("bad_timestamp")
+                continue
+            if n_in < 1 or n_out < 0 or any(not 0 <= h < ID_LIMIT for h in ids):
+                skip("invalid_record")
+                continue
+            if len(ids) != -(-n_in // TRACE_BLOCK_TOKENS):
+                skip("block_count_mismatch")
                 continue
             yield index, {"ids": ids, "n_in": n_in, "n_out": n_out, "ts": ts}
 
@@ -97,7 +106,11 @@ def read(
     stats: TraceStats | None = None,
     **_: object,
 ) -> Iterator[NormalizedRequest]:
-    """Stream a Mooncake trace as `NormalizedRequest`s.
+    """Read a Mooncake trace as `NormalizedRequest`s, in order of arrival.
+
+    Time starts at the earliest valid request, and sessions are inferred in order of arrival, so
+    the file is read to the end before the first request is returned. Requests with equal times
+    keep the file's order.
 
     Args:
         token_scale: Factor applied to every token count; at 1/16 a 512-token block becomes 32
@@ -114,19 +127,30 @@ def read(
     """
     scaled_block = TRACE_BLOCK_TOKENS * token_scale
     per_block = scaled_block / block_size
-    if token_scale <= 0 or per_block < 1 or per_block != int(per_block):
+    if (not math.isfinite(token_scale) or token_scale <= 0 or per_block < 1
+            or per_block != int(per_block)):
         raise ValueError(
             f"token_scale {token_scale} makes a {TRACE_BLOCK_TOKENS}-token trace block "
             f"{scaled_block:g} tokens, which is not a whole number of {block_size}-token blocks"
         )
     per_block = int(per_block)
     stats = stats if stats is not None else TraceStats()
+    if token_scale != 1:
+        stats.scaling = {"token_scale": token_scale}
     hot = _hot_prefixes(path, hot_fanout) if infer_sessions else set()
 
-    first_ts: float | None = None
+    # Stable: rows with equal times keep the file's order.
+    rows = sorted(_rows(path, stats), key=lambda item: item[1]["ts"])
+    kept = []  # (timestamp in ms, line, block hashes, prompt tokens, output tokens, session)
     registered: dict[int, str] = {}  # the id ending a request's full blocks -> its session
-    for index, row in _rows(path, stats):
+    for index, row in rows:
         ids, n_in = row["ids"], row["n_in"]
+        try:
+            prompt_tokens = max(1, round(n_in * token_scale))
+            output_tokens = max(1, round(row["n_out"] * token_scale))
+        except OverflowError:  # an output length too large to scale
+            stats.skip("invalid_record")
+            continue
         full = n_in // TRACE_BLOCK_TOKENS
         hashes = [_sub_hash(t, j) for t in ids[:full] for j in range(per_block)]
         tail = int((n_in % TRACE_BLOCK_TOKENS) * token_scale) // block_size
@@ -147,14 +171,15 @@ def read(
             if len(ids) >= 2:
                 registered.setdefault(ids[-2], session)
 
-        if first_ts is None:
-            first_ts = row["ts"]
+        kept.append((row["ts"], index, tuple(hashes), prompt_tokens, output_tokens, session))
+
+    for ts, index, hashes, prompt_tokens, output_tokens, session in kept:
         stats.requests += 1
         yield NormalizedRequest(
             request_id=f"m{index}",
-            arrival_ts=max(0.0, (row["ts"] - first_ts) / 1000.0),
-            block_hashes=tuple(hashes),
-            prompt_tokens=max(1, round(n_in * token_scale)),
-            output_tokens=max(1, round(row["n_out"] * token_scale)),
+            arrival_ts=(ts - kept[0][0]) / 1000.0,
+            block_hashes=hashes,
+            prompt_tokens=prompt_tokens,
+            output_tokens=output_tokens,
             session_id=session,
         )

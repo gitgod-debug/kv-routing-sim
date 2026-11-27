@@ -48,15 +48,24 @@ class TraceStats:
     requests: int = 0
     skipped_lines: int = 0
     skip_reasons: dict[str, int] = field(default_factory=dict)
+    # Requests whose id an earlier request of the file already had. Each got #2, #3, ... appended.
+    renamed_duplicate_ids: int = 0
+    # How the reader changed the trace, when it did: the factor on every token count and, for a
+    # replay of separately recorded sessions, how many run at once and how their starts are spread.
+    scaling: dict[str, float] | None = None
 
     def skip(self, reason: str) -> None:
         self.skipped_lines += 1
         self.skip_reasons[reason] = self.skip_reasons.get(reason, 0) + 1
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        out: dict[str, object] = {
             "schema_version": self.schema_version,
             "requests": self.requests,
             "skipped_lines": self.skipped_lines,
             "skip_reasons": dict(self.skip_reasons),
+            "renamed_duplicate_ids": self.renamed_duplicate_ids,
         }
+        if self.scaling is not None:
+            out["scaling"] = dict(self.scaling)
+        return out

@@ -1,13 +1,39 @@
-"""Render a replay report as Markdown."""
+"""Render a replay report as Markdown, or as JSON that every parser accepts."""
 
 from __future__ import annotations
 
+import inspect
 import json
+import math
 from dataclasses import dataclass
 from typing import Any
 
+from .traces.adapters import agentx
+
 SLO_MARKS = {True: "yes", False: "no", None: "—"}
 """How the "meets SLO" column reads; the dash means no SLO was defined."""
+
+AGENTX_TOKEN_SCALE = inspect.signature(agentx.read).parameters["token_scale"].default
+"""The AgentX reader's default token scale, read from the reader so that the two cannot differ."""
+
+
+def to_json(payload: Any, *, indent: int | None = None) -> str:
+    """Serialize as strict JSON: a NaN or an infinity is written as null.
+
+    Python writes them as NaN and Infinity, which JavaScript's JSON.parse and most other parsers
+    reject.
+    """
+    return json.dumps(_finite(payload), indent=indent, allow_nan=False)
+
+
+def _finite(node: Any) -> Any:
+    if isinstance(node, float):
+        return node if math.isfinite(node) else None
+    if isinstance(node, dict):
+        return {k: _finite(v) for k, v in node.items()}
+    if isinstance(node, (list, tuple)):
+        return [_finite(v) for v in node]
+    return node
 
 
 def render_markdown(report: dict[str, Any]) -> str:
@@ -64,6 +90,10 @@ def recommendation_notes(report: dict[str, Any]) -> list[Note]:
             f"{prompts['longest_measured']:,} tokens, the longest this profile was timed on (the "
             f"longest here has {prompts['longest_here']:,}). Their timings are extrapolated.",
             warning=True))
+    scaling = (report.get("trace") or {}).get("scaling") or {}
+    if scaling.get("token_scale", 1) != 1:
+        block_size = (report.get("profile") or {}).get("block_size", 16)
+        notes.append(Note(_scale_line(scaling, block_size), warning=True))
     return notes
 
 
@@ -144,6 +174,32 @@ def _spread_section(report: dict[str, Any]) -> list[str]:
 
 def _count(n: int | None, swept_up_to: int) -> str:
     return f"not met on {swept_up_to}" if n is None else str(n)
+
+
+def _ratio(scale: float) -> str:
+    """0.03125 as 1/32. A scale that is not one over a whole number stays a decimal."""
+    k = round(1 / scale)
+    return f"1/{k}" if scale < 1 and abs(k * scale - 1) < 1e-9 else f"{scale:g}"
+
+
+def _scale_line(scaling: dict[str, Any], block_size: int) -> str:
+    """Say that the reader scaled every token count, and how to read the trace at another scale."""
+    scale = scaling["token_scale"]
+    line = f"Token counts were scaled by {_ratio(scale)} when the trace was read"
+    if "concurrency" not in scaling:  # Mooncake or Bailian: the scale was asked for
+        return f"{line} (--token-scale). Use --token-scale 1 for the trace at its recorded size."
+    if scale == AGENTX_TOKEN_SCALE:
+        line += ": the AgentX reader's default, so that it fits a T4."
+    else:
+        line += " (--token-scale)."
+    # One 64-token AgentX block must fit in one simulator block, so the scale is at most
+    # block_size / 64.
+    largest = block_size / 64
+    if largest >= 1:
+        return f"{line} Use --token-scale 1 for the trace at its recorded size."
+    return (f"{line} With {block_size}-token blocks the largest scale is {_ratio(largest)} "
+            f"(--token-scale {largest:g}). The trace at its recorded size needs a profile with "
+            "64-token blocks.")
 
 
 def _firmness_line(row: dict[str, Any], spread: dict[str, Any]) -> str:

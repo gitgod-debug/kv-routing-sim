@@ -11,6 +11,7 @@ to zero.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -40,6 +41,10 @@ class CostModel:
 
         Raises:
             UnfilledCostModel: If any constant is still `<TBD>`.
+            ValueError: If a constant is missing, not a finite number, or out of range: the price,
+                the exchange rate and the first-token limit must be above 0, and a per-token limit
+                at least 0.
+            yaml.YAMLError: If the file is not valid YAML.
         """
         if str(path) == "default":
             from .. import data
@@ -55,7 +60,10 @@ class CostModel:
                 "Every value needs a source and a date before any rupee figure is produced "
                 "(ADR-006). No defaults are supplied on purpose."
             )
-        return cls(
+        if not isinstance(raw, dict) or not all(
+                isinstance(raw.get(s), dict) for s in ("fx", "compute", "slo")):
+            raise ValueError("a cost model needs the sections fx, compute and slo")
+        model = cls(
             usd_to_inr=float(raw["fx"]["usd_to_inr"]),
             price_per_hour_usd=float(raw["compute"]["price_per_hour_usd"]),
             sku=str(raw["compute"]["sku"]),
@@ -64,6 +72,15 @@ class CostModel:
             tpot_p95_slo_ms=(None if raw["slo"].get("tpot_p95_ms") is None
                              else float(raw["slo"]["tpot_p95_ms"])),
         )
+        for name, value in (("fx.usd_to_inr", model.usd_to_inr),
+                            ("compute.price_per_hour_usd", model.price_per_hour_usd),
+                            ("slo.ttft_p95_ms", model.ttft_p95_slo_ms)):
+            if not (math.isfinite(value) and value > 0):
+                raise ValueError(f"{name} must be a number above 0, got {value}")
+        tpot = model.tpot_p95_slo_ms
+        if tpot is not None and not (math.isfinite(tpot) and tpot >= 0):
+            raise ValueError(f"slo.tpot_p95_ms must be a number of at least 0, got {tpot}")
+        return model
 
     @property
     def slo_label(self) -> str:
