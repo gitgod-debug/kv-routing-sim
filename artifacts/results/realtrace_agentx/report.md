@@ -1,6 +1,6 @@
 # R2 — real traffic: SemiAnalysis's AgentX traces (coding-agent sessions)
 
-T4 profile · token counts × 0.015625 · first 180 min, the first 30 min warm-up · real sessions (one per trace), hashes session-local · SLO p95 TTFT ≤ 2,000 ms · 576 runs in 176 s · generated `2026-09-28T05:09:44+00:00` at `cf74aec`.
+T4 profile · token counts × 0.015625 · first 180 min, the first 30 min warm-up · real sessions (one per trace), hashes session-local · SLO p95 TTFT ≤ 2,000 ms · 576 runs in 137 s · generated `2026-11-27T19:25:49+00:00` at `5577190`.
 
 **R2: HOLDS**
 
@@ -19,10 +19,10 @@ T4 profile · token counts × 0.015625 · first 180 min, the first 30 min warm-u
 | policy | replicas | hit rate at 4 replicas |
 |---|---|---|
 | round-robin | 2 2 5 | 0.591 0.590 0.590 |
-| least-loaded | 2 2 3 | 0.588 0.588 0.589 |
-| power-of-two | 2 2 3 | 0.589 0.589 0.586 |
+| least-loaded | 2 2 3 | 0.591 0.590 0.583 |
+| power-of-two | 2 2 5 | 0.587 0.587 0.587 |
 | consistent-hash-prefix | 2 2 3 | 0.933 0.933 0.933 |
-| radix-affinity | 2 2 2 | 0.936 0.934 0.933 |
-| session-sticky | 2 2 2 | 0.935 0.934 0.933 |
+| radix-affinity | 2 2 2 | 0.935 0.934 0.935 |
+| session-sticky | 2 2 2 | 0.935 0.934 0.934 |
 | radix-affinity-balanced@16 | 2 2 2 | 0.937 0.937 0.936 |
-| radix-affinity-balanced@1 | 2 2 2 | 0.936 0.934 0.933 |
+| radix-affinity-balanced@1 | 2 2 2 | 0.935 0.934 0.935 |

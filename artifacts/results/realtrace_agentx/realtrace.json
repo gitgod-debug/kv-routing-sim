@@ -1,7 +1,7 @@
 {
  "script": "scripts/run_realtrace.py",
- "date_utc": "2026-09-28T05:09:44+00:00",
- "git_sha": "cf74aec",
+ "date_utc": "2026-11-27T19:25:49+00:00",
+ "git_sha": "5577190",
  "git_dirty": false,
  "seed": 0,
  "hardware_path": "cpu-only",
@@ -104,7 +104,7 @@
  "trace_sha256": {
   "agentx": "d9e30ba2120d624cb5818a7b19f0150b1181b18ba2e4fe0c05c64218713eed33"
  },
- "runtime_s": 176.5,
+ "runtime_s": 137.3,
  "n_runs": 576,
  "profile": {
   "name": "t4-qwen3-4b-vllm0.30.0",
@@ -120,6 +120,8 @@
   "engine_version": "0.30.0",
   "calibrated": true,
   "calibration_error": 0.002901,
+  "prefill_attn_s": 0.0,
+  "decode_per_ctx_token_s": 0.0,
   "WARNING": "calibrated on Tesla T4 / Qwen/Qwen3-4B / 0.30.0"
  },
  "required_replicas": {
@@ -147,7 +149,7 @@
    "2": {
     "round-robin": 5,
     "least-loaded": 3,
-    "power-of-two": 3,
+    "power-of-two": 5,
     "consistent-hash-prefix": 3,
     "radix-affinity": 2,
     "session-sticky": 2,
@@ -160,33 +162,33 @@
   "agentx": {
    "0.5": {
     "round-robin": 0.5905,
-    "least-loaded": 0.5884,
-    "power-of-two": 0.5889,
+    "least-loaded": 0.5905,
+    "power-of-two": 0.5874,
     "consistent-hash-prefix": 0.9335,
-    "radix-affinity": 0.9359,
-    "session-sticky": 0.935,
+    "radix-affinity": 0.9354,
+    "session-sticky": 0.9347,
     "radix-affinity-balanced@16": 0.9366,
-    "radix-affinity-balanced@1": 0.9359
+    "radix-affinity-balanced@1": 0.9354
    },
    "1": {
     "round-robin": 0.5902,
-    "least-loaded": 0.5879,
-    "power-of-two": 0.5886,
+    "least-loaded": 0.5897,
+    "power-of-two": 0.5872,
     "consistent-hash-prefix": 0.9335,
-    "radix-affinity": 0.9343,
-    "session-sticky": 0.9337,
-    "radix-affinity-balanced@16": 0.9374,
-    "radix-affinity-balanced@1": 0.9343
+    "radix-affinity": 0.9341,
+    "session-sticky": 0.9345,
+    "radix-affinity-balanced@16": 0.9369,
+    "radix-affinity-balanced@1": 0.9341
    },
    "2": {
     "round-robin": 0.5897,
-    "least-loaded": 0.589,
-    "power-of-two": 0.5859,
+    "least-loaded": 0.5829,
+    "power-of-two": 0.5868,
     "consistent-hash-prefix": 0.9335,
-    "radix-affinity": 0.9331,
-    "session-sticky": 0.9331,
-    "radix-affinity-balanced@16": 0.9356,
-    "radix-affinity-balanced@1": 0.9331
+    "radix-affinity": 0.935,
+    "session-sticky": 0.9339,
+    "radix-affinity-balanced@16": 0.9357,
+    "radix-affinity-balanced@1": 0.935
    }
   }
  },
