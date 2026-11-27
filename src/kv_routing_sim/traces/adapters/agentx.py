@@ -13,14 +13,16 @@ object per line, one agent session each:
 
 Because hash ids are local, each session's blocks are kept distinct from every other session's: the
 replay shows reuse within a session and none across users, unlike Mooncake's global ids. Sessions
-are the trace's own, not inferred.
+are the trace's own, not inferred. A file whose name ends in .gz is read compressed.
 """
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import heapq
 import json
+import math
 import random
 from collections.abc import Iterator
 from pathlib import Path
@@ -30,6 +32,11 @@ from ..hashing import DEFAULT_BLOCK_SIZE
 from ..schema import NormalizedRequest, TraceStats
 
 TRACE_BLOCK_TOKENS = 64  # README.md: "KV block size: 64 tokens"
+ID_LIMIT = 2**64  # a hash id is hashed as 8 bytes
+
+
+class _Malformed(ValueError):
+    """A session the replay cannot place in time. It is skipped and counted as invalid_record."""
 
 
 def _hash(scope: str, prev: int, ids: list[int]) -> int:
@@ -38,34 +45,61 @@ def _hash(scope: str, prev: int, ids: list[int]) -> int:
     return int.from_bytes(hashlib.blake2b(data, digest_size=8, person=b"agentx").digest(), "big")
 
 
-def _flat(d: dict[str, Any]) -> Iterator[tuple[float, str, dict[str, Any]]]:
-    """Yield (time from session start, session id, request); a sub-agent is its own session."""
+def _open(path: str | Path):
+    p = Path(path)
+    return gzip.open(p, "rb") if p.suffix == ".gz" else p.open("rb")
+
+
+def _seconds(value: Any, *, signed: bool = False) -> float:
+    """A finite number of seconds, not negative unless `signed`."""
+    try:
+        s = float(value)
+    except OverflowError:  # an integer too large for a float
+        raise _Malformed(f"{value!r} seconds") from None
+    if not math.isfinite(s) or (s < 0 and not signed):
+        raise _Malformed(f"{value!r} seconds")
+    return s
+
+
+def _flat(d: Any) -> Iterator[tuple[float, str, dict[str, Any]]]:
+    """Yield (time from session start, session id, request); a sub-agent is its own session.
+
+    Raises _Malformed for a line that is not an object, a `models` that is not a list, a request
+    that is not an object, and a `t` that is negative or not finite.
+    """
+    if not isinstance(d, dict) or not isinstance(d.get("models") or [], list):
+        raise _Malformed("not a session")
     for r in d.get("requests") or []:
+        if not isinstance(r, dict):
+            raise _Malformed("a request is not an object")
         if r.get("type") == "subagent":
             sid = f"{d['id']}/{r.get('agent_id', 'subagent')}"
             for q in r.get("requests") or []:
-                yield float(r["t"]) + float(q["t"]), sid, q
+                if not isinstance(q, dict):
+                    raise _Malformed("a request is not an object")
+                yield _seconds(r["t"]) + _seconds(q["t"]), sid, q
         else:
-            yield float(r["t"]), str(d["id"]), r
+            yield _seconds(r["t"]), str(d["id"]), r
 
 
 def _index(path: str | Path, stats: TraceStats) -> list[tuple[int, float]]:
-    """First pass: (byte offset, span in seconds) per session. Memory: two numbers per session."""
+    """First pass: (line number, span in seconds) per session. Memory: two numbers per session."""
     out = []
-    with open(path, "rb") as fh:
-        offset = 0
-        for raw in fh:
-            here, offset = offset, offset + len(raw)
+    with _open(path) as fh:
+        for line, raw in enumerate(fh):
             if not raw.strip():
                 continue
             try:
                 d = json.loads(raw)
-                span = max((t + float(q.get("api_time") or 0.0) for t, _, q in _flat(d)),
-                           default=0.0)
-            except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+                span = max((t + _seconds(q.get("api_time") or 0.0, signed=True)
+                            for t, _, q in _flat(d)), default=0.0)
+            except _Malformed:
+                stats.skip("invalid_record")
+                continue
+            except (KeyError, TypeError, ValueError):  # including a line that is not JSON
                 stats.skip("bad_session")
                 continue
-            out.append((here, span))
+            out.append((line, span))
     return out
 
 
@@ -101,8 +135,10 @@ def read(
         models: "main" drops requests to any model other than the session's main one, counted as
             `other_model`; "all" keeps them. A sub-agent is its own session either way.
     """
+    if not math.isfinite(token_scale) or token_scale <= 0:
+        raise ValueError(f"token_scale must be a number above 0, got {token_scale}")
     group = block_size / (TRACE_BLOCK_TOKENS * token_scale)
-    if token_scale <= 0 or group < 1 or group != int(group):
+    if group < 1 or group != int(group):
         raise ValueError(
             f"token_scale {token_scale} makes a {TRACE_BLOCK_TOKENS}-token trace block "
             f"{TRACE_BLOCK_TOKENS * token_scale:g} tokens, which does not divide a "
@@ -113,6 +149,9 @@ def read(
         raise ValueError(f"models must be 'main' or 'all', got {models!r}")
     group = int(group)
     stats = stats if stats is not None else TraceStats()
+    # Every number produced depends on these choices, so the trace's statistics carry them.
+    stats.scaling = {"token_scale": token_scale, "concurrency": concurrency,
+                     "stagger_s": float(stagger_s)}
 
     # The schedule: which session starts when. Seeded, and decided before any session is parsed.
     index = _index(path, stats)
@@ -129,17 +168,21 @@ def read(
         starts.append((k, free))
         heapq.heappush(slots, (free + index[k][1], j))
 
-    # Second pass: parse only the scheduled sessions, and keep what arrives inside the window.
+    # Second pass, through the file in order, since a compressed file is slow to read out of
+    # order: parse only the scheduled sessions, and keep what arrives inside the window.
+    scheduled = {index[k][0]: (rank, start) for rank, (k, start) in enumerate(starts)}
     rows = []
-    with open(path, "rb") as fh:
-        for k, start in starts:
-            fh.seek(index[k][0])
-            d = json.loads(fh.readline())
+    with _open(path) as fh:
+        for line, raw in enumerate(fh):
+            if line not in scheduled:
+                continue
+            rank, start = scheduled[line]
+            d = json.loads(raw)
             main = (d.get("models") or [None])[0]
             # A session sends the same leading blocks on nearly every turn. Each distinct block is
             # hashed once, and its value is one shared object, so a full-size trace fits in memory.
             known: dict[tuple, int] = {}
-            for t, sid, q in _flat(d):
+            for place, (t, sid, q) in enumerate(_flat(d)):
                 arrival = start + t
                 if window_s is not None and arrival >= window_s:
                     continue
@@ -152,8 +195,19 @@ def read(
                 except (KeyError, TypeError, ValueError):
                     stats.skip("missing_or_bad_fields")
                     continue
+                except OverflowError:  # 1e999 is read as an infinity
+                    stats.skip("invalid_record")
+                    continue
                 if n_in < 1 or n_out < 0 or len(ids) != n_in // TRACE_BLOCK_TOKENS:
                     stats.skip("block_count_mismatch")
+                    continue
+                if any(not 0 <= h < ID_LIMIT for h in ids):
+                    stats.skip("invalid_record")
+                    continue
+                try:
+                    sizes = (max(1, round(n_in * token_scale)), max(1, round(n_out * token_scale)))
+                except OverflowError:  # an output length too large to scale
+                    stats.skip("invalid_record")
                     continue
                 hashes, prev = [], 0
                 for g in range(len(ids) // group):
@@ -163,16 +217,17 @@ def read(
                         block = known[key] = _hash(sid, prev, ids[g * group:(g + 1) * group])
                     hashes.append(block)
                     prev = block
-                rows.append((arrival, sid, tuple(hashes), n_in, n_out))
+                rows.append((arrival, rank, place, sid, tuple(hashes), sizes))
 
-    rows.sort(key=lambda r: r[0])
-    for i, (arrival, sid, hashes, n_in, n_out) in enumerate(rows):
+    # By arrival, then by the schedule, then by each session's own order of requests.
+    rows.sort(key=lambda r: r[:3])
+    for i, (arrival, _, _, sid, hashes, (prompt_tokens, output_tokens)) in enumerate(rows):
         stats.requests += 1
         yield NormalizedRequest(
             request_id=f"a{i}",
             arrival_ts=arrival,
             block_hashes=hashes,
-            prompt_tokens=max(1, round(n_in * token_scale)),
-            output_tokens=max(1, round(n_out * token_scale)),
+            prompt_tokens=prompt_tokens,
+            output_tokens=output_tokens,
             session_id=sid,
         )

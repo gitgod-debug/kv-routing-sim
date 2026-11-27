@@ -13,12 +13,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
 
 from .eval.sweep import crossover_sweep
-from .report import render_markdown
+from .report import render_markdown, to_json
 from .service import (
     DEFAULT_TPOT_SLO_MS,
     ConfigError,
@@ -45,6 +46,7 @@ Warning: uncalibrated cost profile; no live engine has been measured.
 
 
 def cmd_replay(args: argparse.Namespace) -> int:
+    _check_out(args.out)
     options = ReplayOptions(
         policies=args.policies,
         replicas=args.replicas,
@@ -58,17 +60,19 @@ def cmd_replay(args: argparse.Namespace) -> int:
         gpu_price_per_hour_usd=args.gpu_price_usd,
         edge_check=not args.no_edge_check,
         spread=not args.no_spread,
+        token_scale=args.token_scale,
     )
     report = replay(args.trace, options)
     if not report.calibrated:
         print(UNCALIBRATED_BANNER, file=sys.stderr)
     payload = report.as_dict()
-    _emit(json.dumps(payload, indent=2) if args.format == "json" else render_markdown(payload),
+    _emit(to_json(payload, indent=2) if args.format == "json" else render_markdown(payload),
           args.out)
     return 0
 
 
 def cmd_generate(args: argparse.Namespace) -> int:
+    _check_out(args.out)
     try:
         workload = AgenticWorkload(
             n_sessions=args.sessions,
@@ -88,11 +92,22 @@ def cmd_generate(args: argparse.Namespace) -> int:
 
 def cmd_crossover(args: argparse.Namespace) -> int:
     names = resolve_policies(args.policies)
+    sharing = _floats(args.sharing, "--sharing")
+    if not all(0.0 <= x < 1.0 for x in sharing):
+        raise ConfigError("--sharing values must be at least 0 and below 1")
+    rates = _floats(args.rates, "--rates")
+    if not all(x > 0 for x in rates):
+        raise ConfigError("--rates must be numbers above 0, in sessions per second")
+    for flag, value in (("--replicas", args.replicas), ("--seeds", args.seeds),
+                        ("--sessions", args.sessions)):
+        if value < 1:
+            raise ConfigError(f"{flag} must be at least 1")
+    _check_out(args.out)
     profile = load_profile(args.profile)
     rows = crossover_sweep(
         policies=names,
-        sharing_ratios=[float(x) for x in args.sharing.split(",")],
-        arrival_rates=[float(x) for x in args.rates.split(",")],
+        sharing_ratios=sharing,
+        arrival_rates=rates,
         n_replicas=args.replicas,
         seeds=tuple(range(args.seeds)),
         n_sessions=args.sessions,
@@ -101,7 +116,7 @@ def cmd_crossover(args: argparse.Namespace) -> int:
     if not profile.calibrated:
         print(UNCALIBRATED_BANNER, file=sys.stderr)
     payload: dict[str, Any] = {"profile": profile.provenance(), "crossover": rows}
-    _emit(json.dumps(payload, indent=2), args.out)
+    _emit(to_json(payload, indent=2), args.out)
     return 0
 
 
@@ -109,6 +124,9 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     """Fit a profile to a running vLLM, check the cache model against it, and write the profile."""
     from .calib.calibrate import CalibrationError, Engine, calibrate
 
+    _check_engine(args.engine)
+    # Checked now: the measurements take minutes, and a profile that cannot be written loses them.
+    _check_out(args.out)
     lo_hi = _ints(args.token_range, "--token-range")
     if len(lo_hi) != 2 or not 0 <= lo_hi[0] < lo_hi[1]:
         raise ConfigError("--token-range must be two integers LO,HI with LO < HI")
@@ -136,6 +154,13 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
         print(f"wrote {args.out} — calibrated. Use it: kvsim replay <trace> --profile {args.out}")
         return 0
     check = profile["_source"]["check"]
+    if profile["calibration_error"] is None:
+        print(f"wrote {args.out}, not calibrated: the engine reported no prefix-cache hit during "
+              "the check, so the cache model could not be compared with it. Its timings are "
+              "measured, but its hit rates would not be. Check that prefix caching is on, and use "
+              "more --check-sessions or --check-turns. Details are in _source.check.",
+              file=sys.stderr)
+        return 1
     if profile["calibration_error"] > args.max_error:
         why = (f"it missed this engine's hit rate by {profile['calibration_error']:.2%} (limit "
                f"{args.max_error:.0%})")
@@ -161,6 +186,7 @@ def cmd_profiles(args: argparse.Namespace) -> int:
     if args.engine:
         from .calib.calibrate import CalibrationError, Engine, probe
 
+        _check_engine(args.engine)
         try:
             info = probe(Engine(args.engine), model=args.model, block_size=args.block_size,
                          max_num_seqs=args.max_num_seqs)
@@ -189,6 +215,39 @@ def _ints(spec: str, flag: str) -> tuple[int, ...]:
     return values
 
 
+def _floats(spec: str, flag: str) -> tuple[float, ...]:
+    """Parse a comma-separated list of finite numbers given for `flag`."""
+    try:
+        values = tuple(float(x) for x in spec.split(",") if x.strip())
+    except ValueError:
+        raise ConfigError(f"could not parse {flag} {spec!r}. Use numbers such as "
+                          "'0.1,0.5'") from None
+    if not values:
+        raise ConfigError(f"{flag} is empty")
+    if not all(math.isfinite(v) for v in values):
+        raise ConfigError(f"{flag} must be finite numbers")
+    return values
+
+
+def _check_out(out: str | None) -> None:
+    """Refuse an output path that cannot be written, before anything runs."""
+    if not out:
+        return
+    path = Path(out)
+    if path.is_dir():
+        raise ConfigError(f"--out {out!r} is a folder. Give a file name.")
+    if not path.parent.exists():
+        raise ConfigError(f"--out {out!r}: the folder {str(path.parent)!r} does not exist")
+    if not path.parent.is_dir():
+        raise ConfigError(f"--out {out!r}: {str(path.parent)!r} is not a folder")
+
+
+def _check_engine(url: str) -> None:
+    if not url.lower().startswith(("http://", "https://")):
+        raise ConfigError(f"--engine {url!r} must start with http:// or https://, for example "
+                          "http://localhost:8000")
+
+
 def _emit(text: str, out: str | None) -> None:
     if out:
         Path(out).write_text(text + "\n", encoding="utf-8")
@@ -211,6 +270,9 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--seeds", type=int, default=5)
     r.add_argument("--block-size", type=int, default=16)
     r.add_argument("--format-in", default="vllm-jsonl", choices=sorted(adapters.REGISTRY))
+    r.add_argument("--token-scale", type=float, default=None,
+                   help="factor on every token count, for the agentx, bailian and mooncake "
+                        "formats (default: the reader's own, 1/32 for agentx and 1 otherwise)")
     r.add_argument("--cost-model", default=None,
                    help="path to a cost_model.yaml, or 'default' for the shipped, cited one")
     r.add_argument("--profile", default=None, help=PROFILE_HELP)

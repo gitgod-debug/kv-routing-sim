@@ -176,6 +176,14 @@ The methodology asks for five seeds, and a paired interval on
 every row that compares a policy with the baseline. The test behind half of the old headline was
 decided inside that margin, so that half is "not settled" below.
 
+**A defect of the engine, found on 27 November 2026.** When a step finished all the work a GPU
+had, the engine let the next request start before that step had ended. A real engine runs one
+step at a time. The router also saw that GPU as idle while it was still computing. The GPU counts
+and latencies of this release come from that engine. Release 0.2.0 fixes it and derives every
+result again. The cache counts do not change. This release, 0.1.3, fixes how the tool reads your
+own logs: their time order, missing answer lengths, repeated request ids and the scale of AgentX
+traces.
+
 **Not new.** The routing result was published first (SMetric, LMetric). NVIDIA ships a larger
 simulator for the same question. Three more simulators checked against live engines were published
 in October and November 2026. See the note under the finding, and the section on related work.

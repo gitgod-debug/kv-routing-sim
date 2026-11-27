@@ -121,3 +121,23 @@ def test_a_replay_says_when_prompts_are_longer_than_the_profile_was_timed_on(tmp
           "--profile", "t4-qwen3-4b-vllm0.30.0-ctx", "--cost-model", "default", "--no-edge-check",
           "--out", str(md)])
     assert ("Outside the measured range" in md.read_text()) is outside
+
+
+def test_a_source_that_is_not_an_object_means_the_spread_and_range_are_unknown(tmp_path):
+    from kv_routing_sim.sim.cost_model import replicate_profiles
+
+    raw = json.loads((REPO / "configs" / "profiles" / "t4-qwen3-4b-vllm0.30.0.json").read_text())
+    reps = [{"rep": r, "prefill_base_s": 0.01, "prefill_per_token_s": 1e-4, "prefill_attn_s": 0.0,
+             "decode_base_s": 0.02, "decode_per_seq_s": 1e-3, "decode_per_ctx_token_s": 0.0}
+            for r in range(2)]
+    path = tmp_path / "p.json"
+    for source in ([1, 2], "text", {"replicates": "many", "decode_cells": [3, None]},
+                   {"replicates": [reps[0], {"rep": 1}]},  # a repeat without its fit
+                   {"replicates": [reps[0], {**reps[1], "decode_base_s": -1.0}]},
+                   {"replicates": [reps[0], ["not", "an", "object"]]}):
+        path.write_text(json.dumps({**raw, "_source": source}))
+        assert replicate_profiles(path) == []
+        assert longest_prompt_measured(path) is None
+    path.write_text(json.dumps({**raw, "_source": {"replicates": reps}}))
+    assert [p.name for p in replicate_profiles(path)] == [f"{raw['name']}#repeat{r}"
+                                                         for r in range(2)]

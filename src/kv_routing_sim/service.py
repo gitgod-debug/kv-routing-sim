@@ -10,10 +10,15 @@ end presents the same report in its own way.
 from __future__ import annotations
 
 import dataclasses
+import inspect
+import math
+import zlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from . import policies as policy_registry
 from .eval.cost import CostModel, UnfilledCostModel
@@ -38,6 +43,7 @@ __all__ = [
     "ReplayOptions",
     "ReplayReport",
     "apply_overrides",
+    "check_fits",
     "describe_slo",
     "load_cost_model",
     "load_profile",
@@ -45,10 +51,14 @@ __all__ = [
     "read_trace",
     "replay",
     "resolve_policies",
+    "takes_token_scale",
 ]
 
 DEFAULT_TPOT_SLO_MS = 100.0
 """p95 time per output token allowed when the cost model sets none: MLPerf's pair for a 2 s TTFT."""
+
+MAX_REPLICA_COUNTS = 1024
+"""The most replica counts one sweep may ask for, so that a typo cannot exhaust the memory."""
 
 SPREAD_UNAVAILABLE = (
     "This profile has no per-repeat fits, so the spread of these replica counts cannot be shown. "
@@ -82,6 +92,8 @@ class ReplayOptions:
     gpu_price_per_hour_usd: float | None = None
     edge_check: bool = True
     spread: bool = True
+    # The factor on every token count, for the readers that take one. None keeps the reader's own.
+    token_scale: float | None = None
 
 
 @dataclass
@@ -121,23 +133,32 @@ def parse_replicas(spec: str) -> list[int]:
     spec = spec.strip()
     try:
         if "-" in spec and "," not in spec:
-            lo, hi = spec.split("-", 1)
-            counts = list(range(int(lo), int(hi) + 1))
+            lo, hi = (int(x) for x in spec.split("-", 1))
+            counts: range | list[int] = range(lo, hi + 1)
+            asked = hi - lo + 1
         else:
             counts = [int(x) for x in spec.split(",") if x.strip()]
+            asked = len(counts)
     except ValueError:
         raise ConfigError(f"could not parse replicas {spec!r}; use '1-8' or '1,2,4'") from None
+    # Checked before the list is made: "1-99999999999999" would fill the memory first.
+    if asked > MAX_REPLICA_COUNTS:
+        raise ConfigError(f"replicas {spec!r} asks for {asked:,} replica counts. Ask for at most "
+                          f"{MAX_REPLICA_COUNTS:,}.")
     if not counts or any(n < 1 for n in counts):
         raise ConfigError(f"replicas {spec!r} must be one or more positive integers")
-    return counts
+    return list(counts)
 
 
 def resolve_policies(spec: str) -> list[str]:
     """Return the policy names for "all" or a comma-separated list, rejecting unknown names."""
     try:
-        return policy_registry.resolve(spec)
+        names = policy_registry.resolve(spec)
     except ValueError as exc:
         raise ConfigError(str(exc)) from None
+    if not names:
+        raise ConfigError("choose at least one routing policy")
+    return names
 
 
 def load_cost_model(spec: str | None) -> CostModel | None:
@@ -148,7 +169,12 @@ def load_cost_model(spec: str | None) -> CostModel | None:
         return CostModel.from_yaml(spec)
     except UnfilledCostModel as exc:
         raise ConfigError(str(exc)) from None
-    except (OSError, KeyError, TypeError, ValueError) as exc:
+    except yaml.YAMLError as exc:
+        mark = getattr(exc, "problem_mark", None)
+        where = f" (line {mark.line + 1})" if mark is not None else ""
+        raise ConfigError(f"could not read cost model {spec!r}: it is not valid "
+                          f"YAML{where}") from None
+    except (OSError, KeyError, TypeError, ValueError, AttributeError) as exc:
         raise ConfigError(f"could not read cost model {spec!r}: {exc}") from None
 
 
@@ -177,17 +203,23 @@ def apply_overrides(
     Returns:
         The cost model, whether the first-token limit came from the options, and whether the
         per-token limit did.
+
+    Raises:
+        ConfigError: a limit or the price is not a finite number in range, with or without a cost
+            model.
     """
+    if ttft_slo_ms is not None and not _finite_above(ttft_slo_ms, 0):
+        raise ConfigError("the first-token limit must be a positive number of milliseconds")
+    if gpu_price_per_hour_usd is not None and not _finite_above(gpu_price_per_hour_usd, 0):
+        raise ConfigError("the GPU price must be a positive number of US dollars per hour")
+    if not (math.isfinite(tpot_slo_ms) and tpot_slo_ms >= 0):
+        raise ConfigError("the per-token limit must be 0 or a positive number of milliseconds")
     if cost is None:
         return None, False, False
     ttft_from_options = ttft_slo_ms is not None
     if ttft_from_options:
-        if ttft_slo_ms <= 0:
-            raise ConfigError("the first-token limit must be a positive number of milliseconds")
         cost = dataclasses.replace(cost, ttft_p95_slo_ms=float(ttft_slo_ms))
     if gpu_price_per_hour_usd is not None:
-        if gpu_price_per_hour_usd <= 0:
-            raise ConfigError("the GPU price must be a positive number of US dollars per hour")
         cost = dataclasses.replace(cost, price_per_hour_usd=float(gpu_price_per_hour_usd))
     tpot_from_options = cost.tpot_p95_slo_ms is None and tpot_slo_ms > 0
     if tpot_from_options:
@@ -217,23 +249,74 @@ def describe_slo(
     return sentence
 
 
+def takes_token_scale(trace_format: str) -> bool:
+    """Whether the named reader can scale token counts, as its signature says."""
+    reader = adapters.REGISTRY.get(trace_format)
+    return reader is not None and "token_scale" in inspect.signature(reader.read).parameters
+
+
 def read_trace(
-    path: str | Path, trace_format: str, block_size: int
+    path: str | Path, trace_format: str, block_size: int, token_scale: float | None = None
 ) -> tuple[list[NormalizedRequest], dict[str, Any]]:
-    """Read a trace with the named adapter; return its requests and the reader's statistics."""
+    """Read a trace with the named adapter; return its requests and the reader's statistics.
+
+    Args:
+        token_scale: The factor on every token count, for a reader that takes one. None keeps the
+            reader's own default.
+    """
     if trace_format not in adapters.REGISTRY:
         raise ConfigError(f"unknown trace format {trace_format!r}; available: "
                           f"{', '.join(sorted(adapters.REGISTRY))}")
+    kwargs: dict[str, Any] = {}
+    if token_scale is not None:
+        if not takes_token_scale(trace_format):
+            scalable = sorted(name for name in adapters.REGISTRY if takes_token_scale(name))
+            raise ConfigError(f"--token-scale works only with the {', '.join(scalable[:-1])} and "
+                              f"{scalable[-1]} formats. A {trace_format} trace is read at its "
+                              "recorded size.")
+        if not _finite_above(token_scale, 0):
+            raise ConfigError("--token-scale must be a number above 0")
+        kwargs["token_scale"] = token_scale
     stats = TraceStats()
+    where = f"could not read trace {str(path)!r}"
     try:
         trace = list(adapters.get(trace_format).read(str(path), block_size=block_size,
-                                                     stats=stats))
+                                                     stats=stats, **kwargs))
     except OSError as exc:
-        raise ConfigError(f"could not read trace {str(path)!r}: {exc}") from None
+        raise ConfigError(f"{where}: {exc}") from None
+    except EOFError:  # a compressed file cut short
+        raise ConfigError(f"{where}: the file ends early") from None
+    except zlib.error:
+        raise ConfigError(f"{where}: the file is damaged or ends early") from None
+    except ValueError as exc:  # a setting the reader cannot use, such as its token scale
+        raise ConfigError(f"{where}: {exc}") from None
     if not trace:
         raise ConfigError(f"no usable requests in {str(path)!r} ({stats.skipped_lines} line(s) "
                           f"skipped: {stats.skip_reasons})")
     return trace, stats.as_dict()
+
+
+def check_fits(trace: list[NormalizedRequest], profile: CostProfile, trace_format: str) -> None:
+    """Refuse a trace with a request that one replica of the profile can never hold.
+
+    vLLM does not start when its longest context does not fit the KV cache, and the simulator
+    stops at the first such request. Blocks are counted as the engine counts them: whole blocks
+    for the prompt and the output, of a cache that keeps one block for itself.
+    """
+    size = profile.block_size
+    usable = profile.kv_cache_blocks - 1
+    needs = [r.prompt_tokens + r.output_tokens for r in trace]
+    too_long = [n for n in needs if -(-n // size) > usable]
+    if not too_long:
+        return
+    message = (f"{len(too_long):,} of {len(trace):,} requests "
+               f"{'needs' if len(too_long) == 1 else 'need'} more KV cache than one replica of "
+               f"this profile holds. The longest needs {max(too_long):,} tokens, and a replica "
+               f"holds {usable * size:,}. vLLM would not start with a context this long on this "
+               "GPU. Use a profile measured with more KV cache")
+    if takes_token_scale(trace_format):
+        message += ", or read the trace with a smaller --token-scale"
+    raise ConfigError(message + ".")
 
 
 def replay(
@@ -263,7 +346,9 @@ def replay(
     if options.block_size != profile.block_size:
         raise ConfigError(f"block size {options.block_size} does not match the profile's block "
                           f"size {profile.block_size} ({profile.name})")
-    trace, info = read_trace(trace_path, options.trace_format, options.block_size)
+    trace, info = read_trace(trace_path, options.trace_format, options.block_size,
+                             token_scale=options.token_scale)
+    check_fits(trace, profile, options.trace_format)
 
     points, _ = sweep(
         trace,
@@ -323,6 +408,10 @@ def prompt_range(trace: list[NormalizedRequest], profile: str | None) -> dict[st
     lengths = [r.prompt_tokens for r in trace]
     return {"longest_measured": longest, "longest_here": max(lengths, default=0),
             "requests": len(lengths), "requests_longer": sum(n > longest for n in lengths)}
+
+
+def _finite_above(value: float, least: float) -> bool:
+    return math.isfinite(value) and value > least
 
 
 def _stage(progress: ProgressCallback | None, stage: str, total: int) -> RunCallback | None:

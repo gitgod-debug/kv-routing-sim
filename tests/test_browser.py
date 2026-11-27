@@ -64,3 +64,51 @@ def test_a_trace_file_and_a_profile_file_are_read_from_their_paths(tmp_path, cap
 def test_run_json_keeps_null_values(tmp_path):
     result = json.loads(browser.run_json(json.dumps(SETTINGS), None, str(tmp_path)))
     assert result["report"]["replica_spread"] is None
+
+
+def test_numeric_settings_get_messages_of_their_own(tmp_path):
+    def error(traffic=None, **changes):
+        settings = {**SETTINGS, **changes}
+        if traffic is not None:
+            settings["traffic"] = {**SETTINGS["traffic"], **traffic}
+        return browser.run(settings, work_dir=tmp_path)["error"]
+
+    # 3.7 would have run as seed 3, while the command shown said 3.7.
+    assert error(traffic={"seed": 3.7}) == "seed must be a whole number of at least 0"
+    assert error(traffic={"seed": -1}) == "seed must be a whole number of at least 0"
+    assert error(traffic={"rate": None}) == "enter a number for arrival rate"
+    assert error(traffic={"sharing": ""}) == "enter a number for sharing"
+    assert error(traffic={"sessions": "  "}) == "enter a number for sessions"
+    assert error(traffic={"rate": "fast"}) == "arrival rate must be a number"
+    assert error(traffic={"rate": float("nan")}) == "arrival rate must be a finite number"
+    assert error(seeds=None) == "enter a number for seeds"
+    assert error(seeds=2.5) == "seeds must be a whole number of at least 1"
+    assert error(tpot_slo_ms=None) == "enter a number for the per-token limit"
+    assert error(ttft_slo_ms="soon") == "the first-token limit must be a number"
+    assert error(gpu_price_per_hour_usd=[1]) == "the GPU price must be a number"
+
+
+def test_a_trace_files_token_scale_reaches_the_reader_and_the_command(tmp_path):
+    rows = [{"timestamp": 1000 * i, "input_length": 1024, "output_length": 160,
+             "hash_ids": [i, i + 100]} for i in range(4)]
+    trace = tmp_path / "m.jsonl"
+    trace.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    result = browser.run({
+        **SETTINGS,
+        "traffic": {"source": "file", "path": str(trace), "name": "m.jsonl", "format": "mooncake",
+                    "token_scale": 0.0625},
+    }, work_dir=tmp_path)
+    assert result["report"]["trace"]["scaling"] == {"token_scale": 0.0625}
+    assert "--format-in mooncake --token-scale 0.0625" in result["command"]
+    assert any("scaled by 1/16" in n["text"] and n["warning"] for n in result["notes"])
+
+
+def test_run_json_writes_strict_json(tmp_path, monkeypatch):
+    monkeypatch.setattr(browser, "run", lambda *a, **k: {"report": {"x": float("nan")},
+                                                         "y": [float("inf")]})
+
+    def refuse(token):
+        raise ValueError(token)
+
+    out = json.loads(browser.run_json("{}", None, str(tmp_path)), parse_constant=refuse)
+    assert out == {"report": {"x": None}, "y": [None]}

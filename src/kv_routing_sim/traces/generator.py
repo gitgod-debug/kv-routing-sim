@@ -8,6 +8,7 @@ depends on how sessions run, so `generate()` measures and reports it.
 
 from __future__ import annotations
 
+import math
 import random
 from collections.abc import Iterator
 
@@ -67,12 +68,15 @@ class AgenticWorkload:
         n_shared_prefixes: int = 1,
         prefix_zipf_s: float = 1.0,
     ) -> None:
+        if n_sessions < 1:
+            raise ValueError(f"n_sessions must be >= 1, got {n_sessions}")
         if not 0.0 <= prefix_sharing_ratio < 1.0:
             raise ValueError(f"prefix_sharing_ratio must be in [0, 1), got {prefix_sharing_ratio}")
         if turns_per_session < 1:
             raise ValueError("turns_per_session must be >= 1")
-        if arrival_rate <= 0:
-            raise ValueError("arrival_rate must be > 0")
+        # NaN would pass a plain `<= 0` and write NaN timestamps.
+        if not (math.isfinite(arrival_rate) and arrival_rate > 0):
+            raise ValueError(f"arrival_rate must be a finite number > 0, got {arrival_rate}")
         if not 1 <= n_shared_prefixes <= MAX_SHARED_PREFIXES:
             raise ValueError(
                 f"n_shared_prefixes must be in [1, {MAX_SHARED_PREFIXES}], got {n_shared_prefixes}"

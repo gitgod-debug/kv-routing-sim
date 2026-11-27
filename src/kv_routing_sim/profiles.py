@@ -8,6 +8,7 @@ interpolated between profiles, because an interpolated figure would have no meas
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any
@@ -104,15 +105,24 @@ def longest_prompt_measured(spec: str | Path) -> int | None:
     """The longest prompt whose timing a profile was fitted on, or None if it does not say.
 
     A shipped profile has it in the index. One written by `kvsim calibrate` has it in its cells.
+    A `_source` that is not an object, and cells that are not, say nothing.
     """
     path = Path(spec)
     if not path.is_file():
         name = str(spec).removesuffix(".json")
         return next((p.longest_prompt for p in measured_profiles() if p.name == name), None)
     raw = json.loads(path.read_text(encoding="utf-8"))
-    source = raw.get("_source") or {} if isinstance(raw, dict) else {}
-    seen = [c.get("context", 0) for c in source.get("decode_cells") or []]
-    seen += [p.get("prompt_tokens", 0) for p in source.get("prefill_points") or []]
+    source = raw.get("_source") if isinstance(raw, dict) else None
+    if not isinstance(source, dict):
+        return None
+    seen = []
+    for cells, length in (("decode_cells", "context"), ("prefill_points", "prompt_tokens")):
+        found = source.get(cells)
+        for cell in found if isinstance(found, list) else []:
+            value = cell.get(length) if isinstance(cell, dict) else None
+            if (isinstance(value, (int, float)) and not isinstance(value, bool)
+                    and math.isfinite(value)):
+                seen.append(value)
     return max(seen, default=0) or None
 
 

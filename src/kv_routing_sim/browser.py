@@ -8,11 +8,12 @@ in-memory filesystem, so nothing the user provides leaves the browser.
 from __future__ import annotations
 
 import json
+import math
 import shlex
 from pathlib import Path
 from typing import Any
 
-from .report import recommendation_notes, render_markdown
+from .report import recommendation_notes, render_markdown, to_json
 from .service import ConfigError, ProgressCallback, ReplayOptions, replay
 from .traces.generator import AgenticWorkload
 
@@ -53,8 +54,11 @@ def run(
 
 def run_json(settings_json: str, progress: ProgressCallback | None = None,
              work_dir: str = ".") -> str:
-    """JSON-in, JSON-out wrapper of `run`, which keeps None as null across the Pyodide boundary."""
-    return json.dumps(run(json.loads(settings_json), progress, work_dir=work_dir))
+    """JSON-in, JSON-out wrapper of `run`, which keeps None as null across the Pyodide boundary.
+
+    The output is strict JSON, which the page's JSON.parse accepts: a NaN or an infinity is null.
+    """
+    return to_json(run(json.loads(settings_json), progress, work_dir=work_dir))
 
 
 def reproduce_command(settings: dict[str, Any]) -> str:
@@ -75,6 +79,8 @@ def reproduce_command(settings: dict[str, Any]) -> str:
     else:
         replay_args = ["kvsim", "replay", traffic.get("name") or Path(traffic["path"]).name,
                        "--format-in", traffic.get("format", "vllm-jsonl")]
+        if traffic.get("token_scale") not in (None, ""):
+            replay_args += ["--token-scale", str(traffic["token_scale"])]
     profile = settings.get("profile") or {}
     if profile.get("source", "shipped") == "shipped":
         replay_args += ["--profile", profile.get("name", SHIPPED_PROFILE)]
@@ -104,15 +110,16 @@ def _prepare_traffic(traffic: dict[str, Any],
         if not traffic.get("path"):
             raise ConfigError("choose a trace file")
         return Path(traffic["path"]), traffic.get("format", "vllm-jsonl"), None
+    params = {
+        "n_sessions": _whole(traffic.get("sessions", 100), "sessions", least=1),
+        "turns_per_session": _whole(traffic.get("turns", 6), "turns per session", least=1),
+        "prefix_sharing_ratio": _number(traffic.get("sharing", 0.6), "sharing"),
+        "arrival_rate": _number(traffic.get("rate", 0.25), "arrival rate"),
+        "seed": _whole(traffic.get("seed", 0), "seed", least=0),
+        "n_shared_prefixes": _whole(traffic.get("system_prompts", 1), "system prompts", least=1),
+    }
     try:
-        workload = AgenticWorkload(
-            n_sessions=_positive_int(traffic.get("sessions", 100), "sessions"),
-            turns_per_session=_positive_int(traffic.get("turns", 6), "turns per session"),
-            prefix_sharing_ratio=float(traffic.get("sharing", 0.6)),
-            arrival_rate=float(traffic.get("rate", 0.25)),
-            seed=int(traffic.get("seed", 0)),
-            n_shared_prefixes=_positive_int(traffic.get("system_prompts", 1), "system prompts"),
-        )
+        workload = AgenticWorkload(**params)
     except (TypeError, ValueError) as exc:
         raise ConfigError(str(exc)) from None
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -129,35 +136,48 @@ def _replay_options(settings: dict[str, Any], trace_format: str) -> ReplayOption
         profile_spec = str(profile["path"])
     else:
         raise ConfigError("choose a profile file")
-    try:
-        return ReplayOptions(
-            policies=str(settings.get("policies", "all")),
-            replicas=str(settings.get("replicas", "1-8")),
-            seeds=_positive_int(settings.get("seeds", 5), "seeds"),
-            trace_format=trace_format,
-            cost_model="default",
-            profile=profile_spec,
-            ttft_slo_ms=_optional_float(settings.get("ttft_slo_ms")),
-            tpot_slo_ms=float(settings.get("tpot_slo_ms", 100)),
-            gpu_price_per_hour_usd=_optional_float(settings.get("gpu_price_per_hour_usd")),
-            edge_check=bool(settings.get("edge_check", True)),
-            spread=bool(settings.get("spread", True)),
-        )
-    except (TypeError, ValueError) as exc:
-        raise ConfigError(str(exc)) from None
+    traffic = settings.get("traffic") or {}
+    return ReplayOptions(
+        policies=str(settings.get("policies", "all")),
+        replicas=str(settings.get("replicas", "1-8")),
+        seeds=_whole(settings.get("seeds", 5), "seeds", least=1),
+        trace_format=trace_format,
+        cost_model="default",
+        profile=profile_spec,
+        ttft_slo_ms=_optional_number(settings.get("ttft_slo_ms"), "the first-token limit"),
+        tpot_slo_ms=_number(settings.get("tpot_slo_ms", 100), "the per-token limit"),
+        gpu_price_per_hour_usd=_optional_number(settings.get("gpu_price_per_hour_usd"),
+                                                "the GPU price"),
+        edge_check=bool(settings.get("edge_check", True)),
+        spread=bool(settings.get("spread", True)),
+        token_scale=_optional_number(traffic.get("token_scale"), "the token scale"),
+    )
 
 
-def _positive_int(value: Any, name: str) -> int:
+def _number(value: Any, name: str) -> float:
+    """A finite number from a setting, with a message of its own when it is missing or not one."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        raise ConfigError(f"enter a number for {name}")
+    if isinstance(value, bool):
+        raise ConfigError(f"{name} must be a number")
     try:
-        number = int(value)
-    except (TypeError, ValueError):
-        raise ConfigError(f"{name} must be a whole number") from None
-    if number < 1 or number != float(value):
-        raise ConfigError(f"{name} must be a whole number of at least 1")
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        raise ConfigError(f"{name} must be a number") from None
+    if not math.isfinite(number):
+        raise ConfigError(f"{name} must be a finite number")
     return number
 
 
-def _optional_float(value: Any) -> float | None:
-    if value is None or value == "":
+def _whole(value: Any, name: str, *, least: int) -> int:
+    """A whole number of at least `least`: 3.7 is refused, never run as 3."""
+    number = _number(value, name)
+    if number != int(number) or number < least:
+        raise ConfigError(f"{name} must be a whole number of at least {least}")
+    return int(number)
+
+
+def _optional_number(value: Any, name: str) -> float | None:
+    if value is None or (isinstance(value, str) and not value.strip()):
         return None
-    return float(value)
+    return _number(value, name)

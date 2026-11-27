@@ -1,8 +1,9 @@
 """Adapter for vLLM-style JSONL request logs.
 
 vLLM has no single log format, so each field is read from the first of several names seen in
-practice (the alias tuples below). A log with `prompt_token_ids` is preferred; with text alone,
-`hashing.approx_token_ids` stands in, and its block boundaries will not match the engine's.
+practice (the alias tuples below). A log with `prompt_token_ids` is preferred, and a `prompt` that
+is a list of integers is read as token ids too. With text alone, `hashing.approx_token_ids` stands
+in, and its block boundaries will not match the engine's.
 """
 
 from __future__ import annotations
@@ -31,13 +32,23 @@ def _first(obj: dict[str, Any], keys: tuple[str, ...]) -> Any:
     return None
 
 
+def _is_token_ids(value: Any) -> bool:
+    """True for a list of integers, which vLLM accepts as a prompt of token ids."""
+    return isinstance(value, list) and all(
+        isinstance(t, int) and not isinstance(t, bool) for t in value
+    )
+
+
 def _map(obj: dict[str, Any], index: int) -> dict[str, Any]:
     ts = _first(obj, _TS)
     if ts is None:
         raise KeyError("no timestamp field")
+    ids = _first(obj, _IDS)
+    if ids is None and _is_token_ids(obj.get("prompt")):
+        ids = obj["prompt"]
     return {
         "arrival_ts": ts,
-        "token_ids": _first(obj, _IDS),
+        "token_ids": ids,
         "prompt_text": _first(obj, _TEXT),
         "request_id": _first(obj, _RID) or f"r{index}",
         "session_id": _first(obj, _SID),
