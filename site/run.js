@@ -187,6 +187,38 @@
     return escapeHtml(text).replace(/`([^`]+)`/g, "<code>$1</code>");
   }
 
+  // Continue a long command on the next line with a backslash, as a shell reads it. The text
+  // comes from Python's shlex.join, so a space outside quotes ends an argument, and a line is
+  // only broken there, before a flag. Joining the lines again gives the same command.
+  const COMMAND_WIDTH = 96;
+  function continued(line) {
+    const parts = [];
+    let start = 0, single = false, double = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === "'" && !double) single = !single;
+      else if (c === '"' && !single) double = !double;
+      else if (c === " " && !single && !double && line.startsWith("--", i + 1)) {
+        parts.push(line.slice(start, i));
+        start = i + 1;
+      }
+    }
+    parts.push(line.slice(start));
+    const rows = [];
+    let row = parts[0];
+    for (const part of parts.slice(1)) {
+      if (row.length + 1 + part.length > COMMAND_WIDTH) {
+        rows.push(row);
+        row = "  " + part;
+      } else {
+        row += " " + part;
+      }
+    }
+    rows.push(row);
+    const text = rows.join(" \\\n");
+    return text.split(" \\\n  ").join(" ") === line ? text : line;
+  }
+
   function copyCommand() {
     const say = (text) => {
       $("copy-command").textContent = text;
@@ -202,7 +234,7 @@
       say("Selected, copy it with the keyboard");
     };
     if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(lastResult ? lastResult.command : "").then(() => say("Copied"), select);
+      navigator.clipboard.writeText($("command").textContent).then(() => say("Copied"), select);
     } else {
       select();
     }
@@ -263,7 +295,9 @@
     let info = result.notes.filter((n) => !n.warning).map((n) => n.text);
     if (tied.size) {
       // The banner states the tie. The package's other notes are about its pick.
-      info = info.filter((text) => !text.startsWith("tied on replicas with"));
+      // A cost gap to round-robin is that same noise when round-robin is one of the tied.
+      info = info.filter((text) => !text.startsWith("tied on replicas with") &&
+        !(text.startsWith("vs round-robin") && tied.has("round-robin")));
       info.unshift(`The notes below are for ${labelOf(chosen.policy)}, the cheapest of them.`);
     }
     const cautions = result.notes.filter((n) => n.warning).map((n) => n.text);
@@ -284,9 +318,7 @@
     $("target").textContent = targetSentence(settings, result.cost);
     $("spread-section").innerHTML = spreadTable(report.replica_spread);
     $("table").innerHTML = fullTable(report.points, chosen, tied);
-    // One block per command, so that a long command wraps with its later lines indented.
-    $("command").innerHTML = result.command.split("\n")
-      .map((line) => `<span class="cmd">${escapeHtml(line)}</span>`).join("");
+    $("command").textContent = result.command.split("\n").map(continued).join("\n");
     $("results").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -296,12 +328,17 @@
     if (settings.tpot_slo_ms > 0) {
       parts.push(`p95 time per output token at most ${settings.tpot_slo_ms.toLocaleString()} ms`);
     }
+    // A configuration holds only if every seed holds, while the tables show means over the seeds.
+    const each = settings.seeds > 1
+      ? `, in each of the ${settings.seeds} seeds. The values shown are means over the seeds, so a ` +
+        "value at the limit can still miss"
+      : "";
     let costs = "Costs are rupees per 1,000 requests that met the target";
     if (cost) {
       const price = settings.gpu_price_per_hour_usd ?? cost.price_per_hour_usd;
       costs += `, for a GPU at $${price} an hour and ₹${cost.usd_to_inr} a dollar`;
     }
-    return `Target: ${parts.join(" and ")}. ${costs}.`;
+    return `Target: ${parts.join(" and ")}${each}. ${costs}.`;
   }
 
   function summaryTable(points, chosen, swept, tied) {

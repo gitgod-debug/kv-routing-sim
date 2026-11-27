@@ -90,6 +90,4 @@ details[open] summary { margin-bottom: 10px; }
 progress { width: 100%; height: 8px; accent-color: var(--accent); }
 .error { background: var(--warn-bg); color: var(--warn-fg); border-radius: 8px; padding: 10px 14px; }
 tr.chosen td { background: var(--chip); font-weight: 600; }
-/* A long command wraps inside its box, and its later lines are indented. */
-.cmd { display: block; padding-left: 2ch; text-indent: -2ch; white-space: pre-wrap; overflow-wrap: anywhere; }
 .hint { color: var(--muted); font-size: 0.85rem; }
