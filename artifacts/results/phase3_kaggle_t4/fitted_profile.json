@@ -11,5 +11,7 @@
  "model": "Qwen/Qwen3-4B",
  "engine_version": "0.30.0",
  "calibrated": true,
- "calibration_error": 0.002901
+ "calibration_error": 0.002901,
+ "prefill_attn_s": 0.0,
+ "decode_per_ctx_token_s": 0.0
 }

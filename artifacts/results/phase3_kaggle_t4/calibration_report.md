@@ -41,14 +41,14 @@
 
 | run | family | engine count | model count | max CDF distance |
 |---|---|---|---|---|
-| W2_short_r1 | lifetime | 963 | 963 | 0.000 |
-| W2_short_r1 | idle | 963 | 963 | 0.000 |
+| W2_short_r1 | lifetime | 963 | 968 | 0.095 |
+| W2_short_r1 | idle | 963 | 968 | 0.095 |
 | W2_short_r1 | reuse_gap | 99 | 99 | 0.000 |
-| W2_short_r2 | lifetime | 963 | 963 | 0.000 |
-| W2_short_r2 | idle | 963 | 963 | 0.000 |
+| W2_short_r2 | lifetime | 963 | 966 | 0.080 |
+| W2_short_r2 | idle | 963 | 966 | 0.080 |
 | W2_short_r2 | reuse_gap | 99 | 99 | 0.000 |
-| W2_short_r3 | lifetime | 963 | 963 | 0.000 |
-| W2_short_r3 | idle | 963 | 963 | 0.000 |
+| W2_short_r3 | lifetime | 963 | 963 | 0.074 |
+| W2_short_r3 | idle | 963 | 963 | 0.074 |
 | W2_short_r3 | reuse_gap | 99 | 99 | 0.000 |
 | W1_long_r1 | lifetime | 1,880 | 1,880 | 0.042 |
 | W1_long_r1 | idle | 1,880 | 1,880 | 0.042 |
