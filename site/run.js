@@ -2,14 +2,16 @@
 (function () {
   "use strict";
 
+  // Labels follow the README and the explorer. The balanced policy runs with the package's default
+  // weight, DEFAULT_LOAD_PENALTY in policies/radix_affinity_balanced.py, which is 1.
   const POLICIES = [
-    { name: "round-robin", label: "Round-robin", standard: true },
-    { name: "least-loaded", label: "Least loaded", standard: true },
-    { name: "power-of-two", label: "Power of two choices", standard: true },
-    { name: "consistent-hash-prefix", label: "Consistent hash on the prefix", standard: true },
-    { name: "radix-affinity", label: "Prefix affinity", standard: true },
-    { name: "radix-affinity-balanced", label: "Prefix affinity with a load weight", standard: true },
-    { name: "session-sticky", label: "Session sticky", standard: true },
+    { name: "round-robin", label: "round-robin", standard: true },
+    { name: "least-loaded", label: "least-loaded", standard: true },
+    { name: "power-of-two", label: "power of two choices", standard: true },
+    { name: "consistent-hash-prefix", label: "consistent hash on the prefix", standard: true },
+    { name: "radix-affinity", label: "pure prefix-affinity", standard: true },
+    { name: "radix-affinity-balanced", label: "prefix-affinity, load weight 1", standard: true },
+    { name: "session-sticky", label: "session-sticky", standard: true },
     { name: "lmetric", label: "LMetric, ported", standard: false },
     { name: "smetric-local", label: "SMetric's session rule, ported", standard: false },
   ];
@@ -207,7 +209,7 @@
     if (chosen && chosen.meets_slo) {
       $("answer").innerHTML = `Use <strong>${escapeHtml(labelOf(chosen.policy))}</strong> on ` +
         `<strong>${replicas(chosen.n_replicas)}</strong>: ${rupees(chosen.inr_per_1k_requests)} per ` +
-        `1,000 requests, p95 first token ${milliseconds(chosen.p95_ttft_ms)}.`;
+        `1,000 requests that met the target, p95 first token ${milliseconds(chosen.p95_ttft_ms)}.`;
     } else if (chosen) {
       $("answer").innerHTML = `No configuration meets the target on up to ${replicas(swept)}. ` +
         `The lowest p95 first-token latency is ${escapeHtml(labelOf(chosen.policy))} on ` +
@@ -244,7 +246,7 @@
     if (settings.tpot_slo_ms > 0) {
       parts.push(`p95 time per output token at most ${settings.tpot_slo_ms.toLocaleString()} ms`);
     }
-    return `Target: ${parts.join(" and ")}. Costs are rupees per 1,000 successful requests.`;
+    return `Target: ${parts.join(" and ")}. Costs are rupees per 1,000 requests that met the target.`;
   }
 
   function summaryTable(points, chosen, swept) {
