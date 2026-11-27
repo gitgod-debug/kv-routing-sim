@@ -233,7 +233,19 @@
     const swept = Math.max(...report.points.map((p) => p.n_replicas));
     $("results").hidden = false;
 
-    if (chosen && chosen.meets_slo) {
+    // Policies that hold the target on the same replica count as the package's pick. The rupee gap
+    // between them is noise, so a tie names them all and no winner. The pick is the cheapest.
+    const tied = new Set(chosen && chosen.meets_slo ? rec.tied_with || [] : []);
+    if (tied.size) {
+      const names = [...new Set(report.points.map((p) => p.policy))]
+        .filter((name) => name === chosen.policy || tied.has(name))
+        .map((name) => escapeHtml(labelOf(name)));
+      $("answer").innerHTML = `<strong>${replicas(chosen.n_replicas)}</strong> ` +
+        `${chosen.n_replicas === 1 ? "is" : "are"} enough, with any of these policies: ` +
+        `${names.join(" · ")}. The cheapest costs ${rupees(chosen.inr_per_1k_requests)} per 1,000 ` +
+        `requests that met the target, and the rupee gap between them is noise. The table shows ` +
+        `how they differ in latency and hit rate.`;
+    } else if (chosen && chosen.meets_slo) {
       // With a per-token limit, that limit is part of the answer, so the banner shows both.
       const perToken = settings.tpot_slo_ms > 0 ? `, p95 per token ${milliseconds(chosen.p95_tpot_ms)}` : "";
       $("answer").innerHTML = `Use <strong>${escapeHtml(labelOf(chosen.policy))}</strong> on ` +
@@ -248,7 +260,12 @@
       $("answer").textContent = "No configuration could be simulated.";
     }
 
-    const info = result.notes.filter((n) => !n.warning).map((n) => n.text);
+    let info = result.notes.filter((n) => !n.warning).map((n) => n.text);
+    if (tied.size) {
+      // The banner states the tie. The package's other notes are about its pick.
+      info = info.filter((text) => !text.startsWith("tied on replicas with"));
+      info.unshift(`The notes below are for ${labelOf(chosen.policy)}, the cheapest of them.`);
+    }
     const cautions = result.notes.filter((n) => n.warning).map((n) => n.text);
     if (rec.WARNING) cautions.push(rec.WARNING);
     if (settings.profile.source === "shipped") {
@@ -263,11 +280,13 @@
         ? `<div class="note caveats">${cautions.map((n) => `<p>${prose(n)}</p>`).join("")}</div>`
         : "");
 
-    $("summary").innerHTML = summaryTable(report.points, chosen, swept);
+    $("summary").innerHTML = summaryTable(report.points, chosen, swept, tied);
     $("target").textContent = targetSentence(settings, result.cost);
     $("spread-section").innerHTML = spreadTable(report.replica_spread);
-    $("table").innerHTML = fullTable(report.points, chosen);
-    $("command").textContent = result.command;
+    $("table").innerHTML = fullTable(report.points, chosen, tied);
+    // One block per command, so that a long command wraps with its later lines indented.
+    $("command").innerHTML = result.command.split("\n")
+      .map((line) => `<span class="cmd">${escapeHtml(line)}</span>`).join("");
     $("results").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -285,7 +304,7 @@
     return `Target: ${parts.join(" and ")}. ${costs}.`;
   }
 
-  function summaryTable(points, chosen, swept) {
+  function summaryTable(points, chosen, swept, tied) {
     const byPolicy = new Map();
     for (const p of points) {
       if (!byPolicy.has(p.policy)) byPolicy.set(p.policy, null);
@@ -296,7 +315,8 @@
       "<th class=\"num\">p95 first token</th><th class=\"num\">p95 per token</th>" +
       "<th class=\"num opt\">Hit rate</th></tr></thead><tbody>";
     for (const [policy, best] of byPolicy) {
-      const isChosen = chosen && best && chosen.policy === policy && chosen.n_replicas === best.n_replicas;
+      const isChosen = chosen && best && chosen.n_replicas === best.n_replicas &&
+        (chosen.policy === policy || tied.has(policy));
       rows += `<tr${isChosen ? " class=\"chosen\"" : ""}><td>${escapeHtml(labelOf(policy))}</td>`;
       rows += best
         ? `<td class="num">${best.n_replicas}</td><td class="num">${rupees(best.inr_per_1k_requests)}</td>` +
@@ -309,13 +329,14 @@
     return rows + "</tbody>";
   }
 
-  function fullTable(points, chosen) {
+  function fullTable(points, chosen, tied) {
     let rows = "<thead><tr><th>Policy</th><th class=\"num\">Replicas</th><th class=\"num\">Hit rate</th>" +
       "<th class=\"num opt\">p50 first token</th><th class=\"num\">p95 first token</th>" +
       "<th class=\"num\">p95 per token</th><th class=\"num\">₹ per 1k</th><th class=\"num\">Imbalance</th>" +
       "<th>Meets target</th></tr></thead><tbody>";
     for (const p of points) {
-      const isChosen = chosen && chosen.policy === p.policy && chosen.n_replicas === p.n_replicas;
+      const isChosen = chosen && chosen.n_replicas === p.n_replicas &&
+        (chosen.policy === p.policy || tied.has(p.policy));
       rows += `<tr${isChosen ? " class=\"chosen\"" : ""}><td>${escapeHtml(labelOf(p.policy))}</td>` +
         `<td class="num">${p.n_replicas}</td><td class="num">${p.hit_rate.toFixed(3)}</td>` +
         `<td class="num opt">${milliseconds(p.p50_ttft_ms)}</td><td class="num">${milliseconds(p.p95_ttft_ms)}</td>` +

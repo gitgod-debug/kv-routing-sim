@@ -158,7 +158,8 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
     seg($("loads"), A.loads, (v) => v + "/s", "load");
     seg($("reps"), A.replicas, (v) => String(v), "rep");
     const k = state.k, l = state.load, r = state.rep;
-    // The recommendation: fewest T4s that hold the target, then the cheaper of those.
+    // The answer: the fewest T4s that hold the target. Several policies often need the same count,
+    // and the rupee gap between those is noise, so a tie names them all and no winner.
     let best = null;
     A.policies.forEach((name, p) => {
       const ri = needed(k, l, p);
@@ -166,18 +167,23 @@ kvsim replay your-trace.jsonl --policies all --replicas 1-16 \
       const inr = cell(k, l, p, ri)[3];
       if (!best || ri < best.ri || (ri === best.ri && inr < best.inr)) best = { name, ri, inr, p };
     });
+    const most = A.replicas[A.replicas.length - 1];
     let msg;
     if (!best) {
-      msg = `Nothing holds the 2 s target on ${A.replicas[A.replicas.length - 1]} T4s at this point.`;
+      msg = `Nothing holds the 2 s target on ${most} T4s at this point.`;
     } else {
-      const ties = A.policies.filter((n, p) => p !== best.p && needed(k, l, p) === best.ri);
-      const rrNeed = needed(k, l, A.policies.indexOf("round-robin"));
-      msg = `Use <strong>${nice(best.name)}</strong> on <strong>${t4s(A.replicas[best.ri])}</strong>` +
-            `, at ₹${best.inr.toFixed(2)} per 1,000 requests that met the target.`;
-      msg += rrNeed < 0 ? ` Round-robin does not hold the target on ${A.replicas[A.replicas.length - 1]}.` :
-             ` Round-robin needs ${A.replicas[rrNeed]}.`;
-      if (ties.length) {
-        msg += ` <span class="muted">Same T4 count: ${ties.map(nice).join(", ")}. The rupee gap between them is noise.</span>`;
+      const tied = A.policies.filter((n, p) => needed(k, l, p) === best.ri);  // best is one of them
+      const count = A.replicas[best.ri];
+      const cost = `₹${best.inr.toFixed(2)} per 1,000 requests that met the target`;
+      msg = tied.length === 1
+        ? `Use <strong>${nice(best.name)}</strong> on <strong>${t4s(count)}</strong>, at ${cost}.`
+        : `<strong>${t4s(count)}</strong> ${count === 1 ? "is" : "are"} enough, with any of these ` +
+          `policies: ${tied.map(nice).join(" · ")}. The cheapest costs ${cost}, and the rupee gap ` +
+          `between them is noise.`;
+      if (!tied.includes("round-robin")) {
+        const rrNeed = needed(k, l, A.policies.indexOf("round-robin"));
+        msg += rrNeed < 0 ? ` Round-robin does not hold the target on ${most}.`
+                          : ` Round-robin needs ${A.replicas[rrNeed]}.`;
       }
     }
     $("answer").innerHTML = msg;
