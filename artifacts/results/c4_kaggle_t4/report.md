@@ -90,75 +90,72 @@ Requests · invalid · with a time per token · worst send lag: `long_below` 240
 
 ## E — does one run's spread cover another run's count?
 
-3 runs of the command (s0, s1, s2), each with its pooled fit and its repeats; firmness grid, both targets: the other run's count is inside the range in **178 of 216** cases (**82.4%**; needed ≥ 90%). Widened by one replica each way: 94.9%. Profile A's count is inside a fresh run's range in 79.6% of cases.
+3 runs of the command (s0, s1, s2), each with its pooled fit and its repeats; firmness grid, both targets: the other run's count is inside the range in **181 of 216** cases (**83.8%**; needed ≥ 90%). Widened by one replica each way: 95.4%. Profile A's count is inside a fresh run's range in 81.5% of cases.
 
 | target | range from | other run | K | load | policy | range | its count |
 |---|---|---|---|---|---|---|---:|
-| first_token | s0 | s1 | 1 | 2 | radix-affinity-balanced@16 | 8–9 | 25 |
-| first_token | s0 | s2 | 1 | 2 | radix-affinity-balanced@16 | 8–9 | 25 |
-| first_token | s0 | s2 | 64 | 1 | session-sticky | 5–5 | 6 |
+| first_token | s0 | s1 | 1 | 2 | radix-affinity-balanced@16 | 9–11 | 25 |
 | first_token | s0 | s1 | 64 | 1 | round-robin | 8–8 | 9 |
 | first_token | s0 | s2 | 64 | 1 | round-robin | 8–8 | 9 |
+| first_token | s0 | s1 | 64 | 1 | radix-affinity-balanced@16 | 5–5 | 6 |
+| first_token | s0 | s2 | 64 | 2 | session-sticky | 9–11 | 12 |
 | first_token | s0 | s1 | 64 | 2 | round-robin | 13–14 | 16 |
 | first_token | s0 | s2 | 64 | 2 | round-robin | 13–14 | 16 |
-| first_token | s1 | s0 | 1 | 2 | radix-affinity-balanced@16 | 15–25 | 8 |
+| first_token | s0 | s2 | 64 | 2 | radix-affinity-balanced@16 | 9–10 | 11 |
+| first_token | s1 | s0 | 1 | 2 | radix-affinity-balanced@16 | 11–25 | 9 |
+| first_token | s1 | s2 | 1 | 2 | radix-affinity-balanced@16 | 11–25 | 9 |
 | first_token | s1 | s0 | 64 | 1 | round-robin | 9–9 | 8 |
-| first_token | s1 | s0 | 64 | 2 | session-sticky | 10–13 | 9 |
 | first_token | s1 | s0 | 64 | 2 | round-robin | 16–16 | 14 |
-| first_token | s2 | s0 | 1 | 2 | radix-affinity-balanced@16 | 10–25 | 8 |
+| first_token | s1 | s0 | 64 | 2 | radix-affinity-balanced@16 | 10–11 | 9 |
 | first_token | s2 | s0 | 64 | 1 | round-robin | 9–9 | 8 |
-| first_token | s2 | s0 | 64 | 2 | session-sticky | 10–10 | 9 |
 | first_token | s2 | s0 | 64 | 2 | round-robin | 16–17 | 14 |
-| two_part | s0 | s1 | 1 | 1 | radix-affinity-balanced@16 | 6–15 | 25 |
-| two_part | s0 | s2 | 1 | 1 | radix-affinity-balanced@16 | 6–15 | 25 |
+| first_token | s2 | s0 | 64 | 2 | radix-affinity-balanced@16 | 11–11 | 9 |
+| first_token | s2 | s1 | 64 | 2 | radix-affinity-balanced@16 | 11–11 | 10 |
+| two_part | s0 | s1 | 1 | 1 | radix-affinity-balanced@16 | 6–12 | 25 |
+| two_part | s0 | s2 | 1 | 1 | radix-affinity-balanced@16 | 6–12 | 25 |
+| two_part | s0 | s1 | 1 | 2 | session-sticky | 10–11 | 12 |
 | two_part | s0 | s1 | 1 | 2 | round-robin | 14–14 | 15 |
 | two_part | s0 | s2 | 1 | 2 | round-robin | 14–14 | 15 |
 | two_part | s0 | s1 | 64 | 0.5 | round-robin | 7–7 | 8 |
 | two_part | s0 | s2 | 64 | 0.5 | round-robin | 7–7 | 8 |
-| two_part | s0 | s2 | 64 | 2 | session-sticky | 13–14 | 15 |
-| two_part | s0 | s1 | 64 | 2 | radix-affinity-balanced@16 | 13–13 | 15 |
-| two_part | s0 | s2 | 64 | 2 | radix-affinity-balanced@16 | 13–13 | 14 |
+| two_part | s0 | s1 | 64 | 0.5 | radix-affinity-balanced@16 | 4–4 | 5 |
+| two_part | s0 | s2 | 64 | 0.5 | radix-affinity-balanced@16 | 4–4 | 5 |
 | two_part | s1 | s0 | 1 | 2 | round-robin | 15–15 | 14 |
-| two_part | s1 | s0 | 64 | 0.5 | session-sticky | 5–5 | 4 |
-| two_part | s1 | s2 | 64 | 0.5 | session-sticky | 5–5 | 4 |
 | two_part | s1 | s0 | 64 | 0.5 | round-robin | 8–8 | 7 |
 | two_part | s1 | s0 | 64 | 1 | round-robin | 14–14 | 13 |
-| two_part | s1 | s0 | 64 | 2 | session-sticky | 14–14 | 13 |
-| two_part | s1 | s2 | 64 | 2 | session-sticky | 14–14 | 15 |
-| two_part | s1 | s0 | 64 | 2 | radix-affinity-balanced@16 | 14–15 | 13 |
+| two_part | s1 | s0 | 64 | 2 | radix-affinity-balanced@16 | 14–14 | 13 |
+| two_part | s2 | s1 | 1 | 2 | session-sticky | 11–11 | 12 |
 | two_part | s2 | s0 | 1 | 2 | round-robin | 15–15 | 14 |
 | two_part | s2 | s0 | 64 | 0.5 | round-robin | 8–8 | 7 |
-| two_part | s2 | s0 | 64 | 1 | session-sticky | 8–8 | 7 |
 | two_part | s2 | s0 | 64 | 1 | round-robin | 14–14 | 13 |
-| two_part | s2 | s0 | 64 | 2 | session-sticky | 14–15 | 13 |
-| two_part | s2 | s0 | 64 | 2 | radix-affinity-balanced@16 | 14–15 | 13 |
+| two_part | s2 | s0 | 64 | 2 | radix-affinity-balanced@16 | 14–14 | 13 |
 
 ## F — the 64-prompt question on the fresh calibrations
 
 | fit | F1: first token, sticky · load weight 1 | F2: both halves — weight 1 · loads where balanced α16 needs fewer · where sticky does |
 |---|---|---|
-| s0 | 9 · 8 ✅ | — · ['4'] · none ✅ |
-| s1 | 10 · 7 ✅ | — · ['0.5', '1', '4'] · ['2'] ⛔ |
-| s2 | 10 · 8 ✅ | — · ['1', '2', '3', '4'] · none ⛔ |
+| s0 | 11 · 7 ✅ | — · ['0.5', '1', '2', '4'] · none ⛔ |
+| s1 | 10 · 7 ✅ | — · ['1', '3'] · ['4'] ✅ |
+| s2 | 12 · 7 ✅ | — · ['1', '4'] · none ✅ |
 
 Replicas at 64 prompts, target on both halves — s0 / s1 / s2 (— = not held on 32):
 
 | sessions/s | sticky | balanced α16 | balanced α1 |
 |---|---|---|---|
-| 0.25 | 3 / 3 / 3 | 3 / 3 / 3 | 4 / 4 / 3 |
-| 0.5 | 4 / 5 / 4 | 4 / 4 / 4 | 6 / 6 / 6 |
-| 1 | 7 / 8 / 8 | 7 / 7 / 7 | — / — / — |
-| 2 | 13 / 14 / 15 | 13 / 15 / 14 | — / — / — |
-| 3 | 20 / 21 / 20 | 20 / 21 / 19 | — / — / — |
-| 4 | 26 / 27 / 27 | 25 / 26 / 26 | — / — / — |
+| 0.25 | 3 / 3 / 3 | 3 / 3 / 3 | 4 / 3 / 3 |
+| 0.5 | 5 / 5 / 5 | 4 / 5 / 5 | 6 / 6 / 6 |
+| 1 | 8 / 8 / 8 | 7 / 7 / 7 | — / — / — |
+| 2 | 14 / 14 / 14 | 13 / 14 / 14 | — / — / — |
+| 3 | 20 / 21 / 20 | 20 / 20 / 20 | — / — / — |
+| 4 | 26 / 27 / 27 | 24 / 28 / 26 | — / — / — |
 
 Replicas at 64 prompts, target on the first token — s0 / s1 / s2 (— = not held on 32):
 
 | sessions/s | sticky | balanced α16 | balanced α1 |
 |---|---|---|---|
 | 0.25 | 2 / 2 / 2 | 2 / 2 / 2 | 2 / 2 / 2 |
-| 0.5 | 3 / 3 / 3 | 3 / 3 / 3 | 3 / 3 / 3 |
-| 1 | 5 / 5 / 6 | 5 / 5 / 5 | 4 / 4 / 4 |
-| 2 | 9 / 10 / 10 | 10 / 10 / 10 | 8 / 7 / 8 |
-| 3 | 17 / 18 / 19 | 16 / 16 / 17 | — / — / — |
-| 4 | 22 / 27 / 27 | 23 / 26 / 24 | — / — / — |
+| 0.5 | 3 / 3 / 3 | 3 / 3 / 3 | 2 / 2 / 3 |
+| 1 | 5 / 5 / 6 | 5 / 6 / 5 | 4 / 4 / 4 |
+| 2 | 11 / 10 / 12 | 9 / 10 / 11 | 7 / 7 / 7 |
+| 3 | 14 / 19 / 19 | 16 / 17 / 17 | — / — / — |
+| 4 | 25 / 27 / 27 | 22 / 24 / 23 | — / — / — |
