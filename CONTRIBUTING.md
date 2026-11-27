@@ -9,7 +9,7 @@ reason its numbers can be trusted, so a pull request is checked against them fir
 git clone <this repo> && cd kv-routing-sim
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"          # Python 3.11+; the core needs only PyYAML
-pytest -q && ruff check .        # both must pass; CI runs them on 3.11, 3.12 and 3.13
+pytest -q && ruff check .        # both must pass; CI runs them on Python 3.11 to 3.14
 ```
 
 No GPU is needed for anything except calibrating against a live engine.
