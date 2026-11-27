@@ -34,11 +34,11 @@ W3 spent nearly all its time at large batches, where the line is within a few pe
 | run | model timing | cache hits | max CDF distance | ≤ 2 s cumulative, engine/model |
 |---|---|---|---|---|
 | W1_long_r1 | pre-registered fit | 28,304 | 0.042 | ≤0.2s 29/0 · ≤0.5s 79/0 · ≤1s 96/79 · ≤2s 119/117 |
-| W1_long_r1 | batch-1 step = measured (post-hoc) | 28,304 | 0.015 | ≤0.1s 0/10 · ≤0.2s 29/26 · ≤0.5s 79/50 · ≤1s 96/67 · ≤2s 119/119 |
+| W1_long_r1 | batch-1 step = measured (post-hoc) | 28,304 | 0.019 | ≤0.2s 29/24 · ≤0.5s 79/44 · ≤1s 96/65 · ≤2s 119/119 |
 | W1_long_r2 | pre-registered fit | 28,304 | 0.042 | ≤0.2s 33/0 · ≤0.5s 79/0 · ≤1s 93/79 · ≤2s 119/118 |
-| W1_long_r2 | batch-1 step = measured (post-hoc) | 28,304 | 0.014 | ≤0.1s 0/8 · ≤0.2s 33/25 · ≤0.5s 79/52 · ≤1s 93/68 · ≤2s 119/119 |
+| W1_long_r2 | batch-1 step = measured (post-hoc) | 28,304 | 0.019 | ≤0.2s 33/23 · ≤0.5s 79/44 · ≤1s 93/64 · ≤2s 119/119 |
 | W1_long_r3 | pre-registered fit | 28,304 | 0.042 | ≤0.2s 30/0 · ≤0.5s 79/0 · ≤1s 89/79 · ≤2s 119/118 |
-| W1_long_r3 | batch-1 step = measured (post-hoc) | 28,304 | 0.018 | ≤0.1s 0/11 · ≤0.2s 30/25 · ≤0.5s 79/46 · ≤1s 89/65 · ≤2s 119/119 |
+| W1_long_r3 | batch-1 step = measured (post-hoc) | 28,304 | 0.019 | ≤0.2s 30/21 · ≤0.5s 79/44 · ≤1s 89/67 · ≤2s 119/119 |
 
 The residual sits entirely in the ~119 shortest-lived events: each request's last decode blocks, recycled by the next request. The fitted batch-1 step is too short, so in the simulation every request finishes early and idles until the next real send — ageing exactly those blocks. Replacing that one number with its measured value moves them back; **the cache hits do not change under either timing**, as the pre-registration claimed.
 
