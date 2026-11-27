@@ -1,0 +1,79 @@
+# Release 0.2.0: every stored result that the engine fix can change, derived again.
+# Written and committed before any of these runs, like every registered test in this folder.
+#
+# The defect. The engine let a replica start a step before its last step had ended, when that last
+# step finished all the work the replica had. A real engine runs one forward pass at a time. In the
+# same case the router saw the replica as idle while it was still computing, and a completion was
+# counted when its last step started instead of when it ended. The defect was found on 27 November
+# 2026 by a review of the engine's code against its own rules. Release 0.2.0 fixes all three parts
+# (src/kv_routing_sim/sim/engine.py, tests/test_engine_steps.py).
+#
+# What stays the same: every config in this folder, the seeds, the traces, the profiles, the cost
+# model and every registered rule. Only the engine changes.
+#
+# The record. The engine of 0.1.2 stays in the code: run(..., engine_version="0.1.2"), checked to
+# give the same numbers as release 0.1.2 on 360 varied runs. Each stored file that a step below
+# changes is copied first, unchanged, to artifacts/results/v0.1.2/. Release 0.1.2 is also on PyPI.
+#
+# Known before this file was written. A scratch run of the fixed engine on H2b-C2's cells at 64
+# prompts and 2 sessions/s gave these T4 counts, session-sticky against balanced prefix-affinity:
+#   calibration A: 14 against 9 (0.1.2: 10 against 11)
+#   calibration B: 12 against 11 (the same as 0.1.2)
+#   calibration C: 12 against 10 (the same as 0.1.2)
+# So H2b-C2's rule (b) holds on all three calibrations with the fixed engine. Also, the reproduce
+# tool, run once with a first version of the fix, showed which stored files change. No other
+# result had been read.
+#
+# A check of the fix, registered here: the cache counters must not change. The hit rates and the
+# cached tokens of H3, H4, V1, C1 and Phase 6 come from requests sent one at a time or from counts
+# that time cannot move. If one of them changes, the fix is wrong.
+
+engine_version: "0.2.0"
+
+# In this order. Each step is a script run with its registered config and nothing else. The
+# steps that read the public traces come last.
+rederive:
+  - {test: "H2b-C2 on calibration A", run: [scripts/run_h2b_c2.py]}
+  - {test: "C3 and H2b-C2 on calibration B", run: [scripts/c3_analyze.py, --grid]}
+  - {test: "H2b-C2 on calibration C",
+     run: [scripts/run_h2b_c2.py, --config, artifacts/results/c3_kaggle_t4/h2b_grid_seed1/config.yaml,
+           --out, artifacts/results/c3_kaggle_t4/h2b_grid_seed1]}
+  - {test: "the three calibrations side by side", run: [scripts/c3_posthoc_grid.py]}
+  - {test: "Phase 3 calibration report (H3, H4)", run: [scripts/phase3_analyze.py]}
+  - {test: "V1 calibration report",
+     run: [scripts/phase3_analyze.py, artifacts/results/v034_kaggle_t4,
+           --prereg, artifacts/results/v034_prereg/predictions.json]}
+  - {test: "Phase 3 post hoc", run: [scripts/phase3_posthoc.py]}
+  - {test: "C2 post hoc on Phase 6", run: [scripts/c2_posthoc_phase6.py]}
+  - {test: "C4 grids", run: [scripts/c4_grids.py]}
+  - {test: "C4", run: [scripts/c4_analyze.py]}
+  - {test: "C4 post hoc", run: [scripts/c4_posthoc_fresh_cells.py]}
+  - {test: "T1 post hoc (edge)", run: [scripts/edge_posthoc_t1.py]}
+  - {test: "T1 post hoc (range)", run: [scripts/t1_posthoc_range.py]}
+  - {test: "Phase 4 (H1)", run: [scripts/run_phase4_sweep.py]}
+  - {test: "Phase 5 (H2, H2b, H5)", run: [scripts/run_phase5.py]}
+  - {test: "demo grid on the first timing model", run: [scripts/build_grid.py]}
+  - {test: "demo grid on the checked timing model", run: [scripts/build_grid.py, --source, h2b_c2]}
+  - {test: "T2 grids", run: [scripts/run_t2_grid.py]}
+  - {test: "T2", run: [scripts/t2_analyze.py]}
+  - {test: "T2 verification", run: [scripts/t2_verify_grid.py]}
+  - {test: "S1", run: [scripts/session_cost.py]}
+  - {test: "R1", run: [scripts/run_realtrace.py]}
+  - {test: "R2", run: [scripts/run_realtrace.py, --config, configs/realtrace_agentx.yaml]}
+  - {test: "R1 and R2 again", run: [scripts/run_realtrace_ctx.py]}
+  - {test: "R3", run: [scripts/run_r3.py]}
+  - {test: "R3 analysis", run: [scripts/r3_analyze.py]}
+  - {test: "the README's figure", run: [scripts/make_figures.py]}
+
+# Not derived again, and why.
+keep:
+  - {result: "H6", why: "Not run again, as decided after it failed: a failed test is not repeated
+      until it passes. It ran on the engine of 0.1.2, and its row says so."}
+  - {result: "L1", why: "Its profile has no timing: every step takes 0 s, so the fix cannot change it."}
+  - {result: "What breaks at 10× and 100×", why: "It measures this machine's time and memory."}
+  - {result: "the speed probes of R1, R2 and R3", why: "They chose those tests' speeds before the
+      tests were registered. They are part of the designs."}
+  - {result: "sweep_agentic_s06.json", why: "An exploratory sweep of 20 September, before any test
+      was registered. No result in the README uses it."}
+  - {result: "the GPU runs", why: "Measurements of a live engine. Only their analyses are derived
+      again above."}
