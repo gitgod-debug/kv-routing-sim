@@ -17,13 +17,13 @@ The first model's speeds were 1×, 2×, 4×: the two tables are not at the same 
 | policy | A | s0 | first model | hit rate at 4, A |
 |---|---|---|---|---|
 | round-robin | 5 5 6 | 5 5 6 | 4 5 8 | 0.371 0.371 0.371 |
-| least-loaded | 5 5 6 | 5 5 6 | 4 5 7 | 0.371 0.370 0.370 |
-| power-of-two | 6 6 6 | 5 5 6 | 4 5 7 | 0.370 0.371 0.369 |
+| least-loaded | 5 6 6 | 5 5 6 | 4 5 7 | 0.371 0.370 0.370 |
+| power-of-two | 6 6 6 | 5 5 6 | 4 5 7 | 0.370 0.371 0.370 |
 | consistent-hash-prefix | 7 7 7 | 6 6 7 | 5 6 — | 0.430 0.430 0.430 |
 | radix-affinity | — — — | — — — | — — — | 0.358 0.358 0.356 |
-| session-sticky | 5 5 5 | 5 5 5 | 4 4 6 | 0.423 0.423 0.422 |
-| radix-affinity-balanced@16 | 5 5 5 | 5 5 5 | 4 5 6 | 0.419 0.420 0.420 |
-| radix-affinity-balanced@1 | 5 5 5 | 5 5 5 | 4 5 6 | 0.419 0.422 0.420 |
+| session-sticky | 5 5 5 | 5 5 5 | 4 4 6 | 0.423 0.423 0.423 |
+| radix-affinity-balanced@16 | 5 5 5 | 5 5 5 | 4 5 6 | 0.420 0.420 0.420 |
+| radix-affinity-balanced@1 | 5 5 5 | 5 5 5 | 4 5 6 | 0.418 0.422 0.419 |
 
 Balanced affinity (α 16) against session-sticky — A: 0.25× tie, 0.5× tie, 1× tie · s0: 0.25× tie, 0.5× tie, 1× tie.
 
@@ -31,14 +31,14 @@ Balanced affinity (α 16) against session-sticky — A: 0.25× tie, 0.5× tie, 1
 
 | policy | A | s0 | first model | hit rate at 4, A |
 |---|---|---|---|---|
-| round-robin | 6 6 7 | 6 6 7 | 5 5 8 | 0.071 0.071 0.071 |
-| least-loaded | 7 6 7 | 6 6 7 | 5 5 8 | 0.070 0.071 0.069 |
-| power-of-two | 7 7 8 | 7 7 8 | 5 6 8 | 0.068 0.068 0.069 |
+| round-robin | 6 6 8 | 6 6 7 | 5 5 8 | 0.071 0.071 0.071 |
+| least-loaded | 7 7 7 | 6 6 7 | 5 6 8 | 0.070 0.071 0.070 |
+| power-of-two | 7 7 8 | 7 7 8 | 5 6 8 | 0.068 0.068 0.070 |
 | consistent-hash-prefix | — — — | 8 8 — | 6 7 — | 0.142 0.142 0.143 |
 | radix-affinity | — — — | — — — | — — — | 0.050 0.050 0.049 |
-| session-sticky | 6 6 7 | 6 6 6 | 5 5 7 | 0.138 0.137 0.138 |
-| radix-affinity-balanced@16 | 6 6 6 | 6 6 6 | 4 5 7 | 0.136 0.133 0.133 |
-| radix-affinity-balanced@1 | 6 6 7 | 6 6 6 | 5 5 7 | 0.144 0.142 0.144 |
+| session-sticky | 6 6 7 | 6 6 6 | 5 5 7 | 0.138 0.138 0.139 |
+| radix-affinity-balanced@16 | 6 6 6 | 6 6 6 | 5 5 7 | 0.136 0.134 0.133 |
+| radix-affinity-balanced@1 | 6 6 7 | 6 6 6 | 5 5 7 | 0.144 0.145 0.144 |
 
 Balanced affinity (α 16) against session-sticky — A: 0.25× tie, 0.5× tie, 1× affinity · s0: 0.25× tie, 0.5× tie, 1× tie.
 

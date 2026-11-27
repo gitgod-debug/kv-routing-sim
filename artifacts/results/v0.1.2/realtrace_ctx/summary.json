@@ -1,0 +1,497 @@
+{
+ "script": "scripts/run_realtrace_ctx.py",
+ "tests": {
+  "R1": {
+   "first_model": {
+    "holds": false,
+    "speeds": [
+     1,
+     2,
+     4
+    ],
+    "required_replicas": {
+     "toolagent": {
+      "1": {
+       "round-robin": 4,
+       "least-loaded": 4,
+       "power-of-two": 4,
+       "consistent-hash-prefix": 5,
+       "radix-affinity": 9,
+       "session-sticky": 4,
+       "radix-affinity-balanced@16": 4,
+       "radix-affinity-balanced@1": 4
+      },
+      "2": {
+       "round-robin": 5,
+       "least-loaded": 5,
+       "power-of-two": 5,
+       "consistent-hash-prefix": 6,
+       "radix-affinity": 9,
+       "session-sticky": 4,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 5
+      },
+      "4": {
+       "round-robin": 8,
+       "least-loaded": 7,
+       "power-of-two": 7,
+       "consistent-hash-prefix": 9,
+       "radix-affinity": 9,
+       "session-sticky": 6,
+       "radix-affinity-balanced@16": 6,
+       "radix-affinity-balanced@1": 6
+      }
+     },
+     "conversation": {
+      "1": {
+       "round-robin": 5,
+       "least-loaded": 5,
+       "power-of-two": 5,
+       "consistent-hash-prefix": 6,
+       "radix-affinity": 9,
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 4,
+       "radix-affinity-balanced@1": 5
+      },
+      "2": {
+       "round-robin": 5,
+       "least-loaded": 5,
+       "power-of-two": 6,
+       "consistent-hash-prefix": 7,
+       "radix-affinity": 9,
+       "session-sticky": 5,
+       "radix-affinity-balanced@16": 5,
+       "radix-affinity-balanced@1": 5
+      },
+      "4": {
+       "round-robin": 8,
+       "least-loaded": 8,
+       "power-of-two": 8,
+       "consistent-hash-prefix": 9,
+       "radix-affinity": 9,
+       "session-sticky": 7,
+       "radix-affinity-balanced@16": 7,
+       "radix-affinity-balanced@1": 7
+      }
+     }
+    },
+    "winner_by_speed": {
+     "toolagent": {
+      "1": "tie",
+      "2": "sticky",
+      "4": "tie"
+     },
+     "conversation": {
+      "1": "affinity",
+      "2": "tie",
+      "4": "tie"
+     }
+    }
+   },
+   "calibrations": {
+    "A": {
+     "holds": false,
+     "git_sha": "3fd95df",
+     "git_dirty": false,
+     "n_runs": 1152,
+     "required_replicas": {
+      "toolagent": {
+       "0.25": {
+        "round-robin": 5,
+        "least-loaded": 5,
+        "power-of-two": 6,
+        "consistent-hash-prefix": 7,
+        "radix-affinity": 9,
+        "session-sticky": 5,
+        "radix-affinity-balanced@16": 5,
+        "radix-affinity-balanced@1": 5
+       },
+       "0.5": {
+        "round-robin": 5,
+        "least-loaded": 5,
+        "power-of-two": 6,
+        "consistent-hash-prefix": 7,
+        "radix-affinity": 9,
+        "session-sticky": 5,
+        "radix-affinity-balanced@16": 5,
+        "radix-affinity-balanced@1": 5
+       },
+       "1": {
+        "round-robin": 6,
+        "least-loaded": 6,
+        "power-of-two": 6,
+        "consistent-hash-prefix": 7,
+        "radix-affinity": 9,
+        "session-sticky": 5,
+        "radix-affinity-balanced@16": 5,
+        "radix-affinity-balanced@1": 5
+       }
+      },
+      "conversation": {
+       "0.25": {
+        "round-robin": 6,
+        "least-loaded": 7,
+        "power-of-two": 7,
+        "consistent-hash-prefix": 9,
+        "radix-affinity": 9,
+        "session-sticky": 6,
+        "radix-affinity-balanced@16": 6,
+        "radix-affinity-balanced@1": 6
+       },
+       "0.5": {
+        "round-robin": 6,
+        "least-loaded": 6,
+        "power-of-two": 7,
+        "consistent-hash-prefix": 9,
+        "radix-affinity": 9,
+        "session-sticky": 6,
+        "radix-affinity-balanced@16": 6,
+        "radix-affinity-balanced@1": 6
+       },
+       "1": {
+        "round-robin": 7,
+        "least-loaded": 7,
+        "power-of-two": 8,
+        "consistent-hash-prefix": 9,
+        "radix-affinity": 9,
+        "session-sticky": 7,
+        "radix-affinity-balanced@16": 6,
+        "radix-affinity-balanced@1": 7
+       }
+      }
+     },
+     "hit_rate_at_4": {
+      "toolagent": {
+       "0.25": {
+        "round-robin": 0.3707,
+        "least-loaded": 0.3712,
+        "power-of-two": 0.3704,
+        "consistent-hash-prefix": 0.43,
+        "radix-affinity": 0.3577,
+        "session-sticky": 0.4226,
+        "radix-affinity-balanced@16": 0.4193,
+        "radix-affinity-balanced@1": 0.4186
+       },
+       "0.5": {
+        "round-robin": 0.3709,
+        "least-loaded": 0.3702,
+        "power-of-two": 0.3709,
+        "consistent-hash-prefix": 0.43,
+        "radix-affinity": 0.3576,
+        "session-sticky": 0.4232,
+        "radix-affinity-balanced@16": 0.4204,
+        "radix-affinity-balanced@1": 0.422
+       },
+       "1": {
+        "round-robin": 0.3711,
+        "least-loaded": 0.37,
+        "power-of-two": 0.3688,
+        "consistent-hash-prefix": 0.4302,
+        "radix-affinity": 0.3565,
+        "session-sticky": 0.422,
+        "radix-affinity-balanced@16": 0.4197,
+        "radix-affinity-balanced@1": 0.4202
+       }
+      },
+      "conversation": {
+       "0.25": {
+        "round-robin": 0.0711,
+        "least-loaded": 0.0698,
+        "power-of-two": 0.0676,
+        "consistent-hash-prefix": 0.142,
+        "radix-affinity": 0.0495,
+        "session-sticky": 0.1383,
+        "radix-affinity-balanced@16": 0.1359,
+        "radix-affinity-balanced@1": 0.1436
+       },
+       "0.5": {
+        "round-robin": 0.0711,
+        "least-loaded": 0.0714,
+        "power-of-two": 0.0676,
+        "consistent-hash-prefix": 0.1419,
+        "radix-affinity": 0.05,
+        "session-sticky": 0.1367,
+        "radix-affinity-balanced@16": 0.1329,
+        "radix-affinity-balanced@1": 0.1425
+       },
+       "1": {
+        "round-robin": 0.0714,
+        "least-loaded": 0.0685,
+        "power-of-two": 0.0693,
+        "consistent-hash-prefix": 0.1431,
+        "radix-affinity": 0.0488,
+        "session-sticky": 0.138,
+        "radix-affinity-balanced@16": 0.1331,
+        "radix-affinity-balanced@1": 0.1442
+       }
+      }
+     },
+     "winner_by_speed": {
+      "toolagent": {
+       "0.25": "tie",
+       "0.5": "tie",
+       "1": "tie"
+      },
+      "conversation": {
+       "0.25": "tie",
+       "0.5": "tie",
+       "1": "affinity"
+      }
+     },
+     "rules": {
+      "toolagent": {
+       "affinity_wins": false
+      },
+      "conversation": {
+       "affinity_never_wins": false
+      }
+     },
+     "within": {
+      "testable": 6,
+      "apart": [],
+      "decided": true,
+      "holds": true
+     }
+    },
+    "s0": {
+     "holds": false,
+     "git_sha": "3fd95df",
+     "git_dirty": false,
+     "n_runs": 1152,
+     "required_replicas": {
+      "toolagent": {
+       "0.25": {
+        "round-robin": 5,
+        "least-loaded": 5,
+        "power-of-two": 5,
+        "consistent-hash-prefix": 6,
+        "radix-affinity": 9,
+        "session-sticky": 5,
+        "radix-affinity-balanced@16": 5,
+        "radix-affinity-balanced@1": 5
+       },
+       "0.5": {
+        "round-robin": 5,
+        "least-loaded": 5,
+        "power-of-two": 5,
+        "consistent-hash-prefix": 6,
+        "radix-affinity": 9,
+        "session-sticky": 5,
+        "radix-affinity-balanced@16": 5,
+        "radix-affinity-balanced@1": 5
+       },
+       "1": {
+        "round-robin": 6,
+        "least-loaded": 6,
+        "power-of-two": 6,
+        "consistent-hash-prefix": 7,
+        "radix-affinity": 9,
+        "session-sticky": 5,
+        "radix-affinity-balanced@16": 5,
+        "radix-affinity-balanced@1": 5
+       }
+      },
+      "conversation": {
+       "0.25": {
+        "round-robin": 6,
+        "least-loaded": 6,
+        "power-of-two": 7,
+        "consistent-hash-prefix": 8,
+        "radix-affinity": 9,
+        "session-sticky": 6,
+        "radix-affinity-balanced@16": 6,
+        "radix-affinity-balanced@1": 6
+       },
+       "0.5": {
+        "round-robin": 6,
+        "least-loaded": 6,
+        "power-of-two": 7,
+        "consistent-hash-prefix": 8,
+        "radix-affinity": 9,
+        "session-sticky": 6,
+        "radix-affinity-balanced@16": 6,
+        "radix-affinity-balanced@1": 6
+       },
+       "1": {
+        "round-robin": 7,
+        "least-loaded": 7,
+        "power-of-two": 8,
+        "consistent-hash-prefix": 9,
+        "radix-affinity": 9,
+        "session-sticky": 6,
+        "radix-affinity-balanced@16": 6,
+        "radix-affinity-balanced@1": 6
+       }
+      }
+     },
+     "hit_rate_at_4": {
+      "toolagent": {
+       "0.25": {
+        "round-robin": 0.3707,
+        "least-loaded": 0.3712,
+        "power-of-two": 0.3704,
+        "consistent-hash-prefix": 0.43,
+        "radix-affinity": 0.3577,
+        "session-sticky": 0.4226,
+        "radix-affinity-balanced@16": 0.4193,
+        "radix-affinity-balanced@1": 0.4186
+       },
+       "0.5": {
+        "round-robin": 0.3709,
+        "least-loaded": 0.3702,
+        "power-of-two": 0.3716,
+        "consistent-hash-prefix": 0.43,
+        "radix-affinity": 0.3576,
+        "session-sticky": 0.4231,
+        "radix-affinity-balanced@16": 0.42,
+        "radix-affinity-balanced@1": 0.4219
+       },
+       "1": {
+        "round-robin": 0.371,
+        "least-loaded": 0.3695,
+        "power-of-two": 0.3701,
+        "consistent-hash-prefix": 0.4302,
+        "radix-affinity": 0.3568,
+        "session-sticky": 0.4219,
+        "radix-affinity-balanced@16": 0.4204,
+        "radix-affinity-balanced@1": 0.421
+       }
+      },
+      "conversation": {
+       "0.25": {
+        "round-robin": 0.0711,
+        "least-loaded": 0.0698,
+        "power-of-two": 0.0676,
+        "consistent-hash-prefix": 0.142,
+        "radix-affinity": 0.0495,
+        "session-sticky": 0.1383,
+        "radix-affinity-balanced@16": 0.1359,
+        "radix-affinity-balanced@1": 0.1436
+       },
+       "0.5": {
+        "round-robin": 0.0711,
+        "least-loaded": 0.0718,
+        "power-of-two": 0.0687,
+        "consistent-hash-prefix": 0.1419,
+        "radix-affinity": 0.0499,
+        "session-sticky": 0.1369,
+        "radix-affinity-balanced@16": 0.1322,
+        "radix-affinity-balanced@1": 0.1435
+       },
+       "1": {
+        "round-robin": 0.0714,
+        "least-loaded": 0.07,
+        "power-of-two": 0.0708,
+        "consistent-hash-prefix": 0.1433,
+        "radix-affinity": 0.0494,
+        "session-sticky": 0.1387,
+        "radix-affinity-balanced@16": 0.1324,
+        "radix-affinity-balanced@1": 0.1455
+       }
+      }
+     },
+     "winner_by_speed": {
+      "toolagent": {
+       "0.25": "tie",
+       "0.5": "tie",
+       "1": "tie"
+      },
+      "conversation": {
+       "0.25": "tie",
+       "0.5": "tie",
+       "1": "tie"
+      }
+     },
+     "rules": {
+      "toolagent": {
+       "affinity_wins": false
+      },
+      "conversation": {
+       "affinity_never_wins": true
+      }
+     },
+     "within": {
+      "testable": 6,
+      "apart": [],
+      "decided": true,
+      "holds": true
+     }
+    }
+   },
+   "verdict": "FALSIFIED"
+  },
+  "R2": {
+   "first_model": {
+    "holds": true,
+    "speeds": [
+     0.5,
+     1,
+     2
+    ],
+    "required_replicas": {
+     "agentx": {
+      "0.5": {
+       "round-robin": 2,
+       "least-loaded": 2,
+       "power-of-two": 2,
+       "consistent-hash-prefix": 2,
+       "radix-affinity": 2,
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2
+      },
+      "1": {
+       "round-robin": 2,
+       "least-loaded": 2,
+       "power-of-two": 2,
+       "consistent-hash-prefix": 2,
+       "radix-affinity": 2,
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2
+      },
+      "2": {
+       "round-robin": 5,
+       "least-loaded": 3,
+       "power-of-two": 3,
+       "consistent-hash-prefix": 3,
+       "radix-affinity": 2,
+       "session-sticky": 2,
+       "radix-affinity-balanced@16": 2,
+       "radix-affinity-balanced@1": 2
+      }
+     }
+    },
+    "winner_by_speed": {
+     "agentx": {
+      "0.5": "tie",
+      "1": "tie",
+      "2": "tie"
+     }
+    }
+   },
+   "calibrations": {},
+   "verdict": "UNTESTABLE"
+  }
+ },
+ "predicted_outcomes": {
+  "R1": "falsified",
+  "R1w": "holds",
+  "R2": "holds"
+ },
+ "speeds": {
+  "R1": [
+   0.25,
+   0.5,
+   1
+  ],
+  "R2": []
+ },
+ "R1w": {
+  "by_calibration": {
+   "A": true,
+   "s0": true
+  },
+  "verdict": "HOLDS"
+ }
+}

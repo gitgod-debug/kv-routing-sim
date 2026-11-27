@@ -50,12 +50,12 @@
        "consistent-hash-prefix": 6,
        "radix-affinity": 9,
        "session-sticky": 5,
-       "radix-affinity-balanced@16": 4,
+       "radix-affinity-balanced@16": 5,
        "radix-affinity-balanced@1": 5
       },
       "2": {
        "round-robin": 5,
-       "least-loaded": 5,
+       "least-loaded": 6,
        "power-of-two": 6,
        "consistent-hash-prefix": 7,
        "radix-affinity": 9,
@@ -82,7 +82,7 @@
       "4": "tie"
      },
      "conversation": {
-      "1": "affinity",
+      "1": "tie",
       "2": "tie",
       "4": "tie"
      }
@@ -91,7 +91,7 @@
    "calibrations": {
     "A": {
      "holds": false,
-     "git_sha": "3fd95df",
+     "git_sha": "47761da",
      "git_dirty": false,
      "n_runs": 1152,
      "required_replicas": {
@@ -108,7 +108,7 @@
        },
        "0.5": {
         "round-robin": 5,
-        "least-loaded": 5,
+        "least-loaded": 6,
         "power-of-two": 6,
         "consistent-hash-prefix": 7,
         "radix-affinity": 9,
@@ -140,7 +140,7 @@
        },
        "0.5": {
         "round-robin": 6,
-        "least-loaded": 6,
+        "least-loaded": 7,
         "power-of-two": 7,
         "consistent-hash-prefix": 9,
         "radix-affinity": 9,
@@ -149,7 +149,7 @@
         "radix-affinity-balanced@1": 6
        },
        "1": {
-        "round-robin": 7,
+        "round-robin": 8,
         "least-loaded": 7,
         "power-of-two": 8,
         "consistent-hash-prefix": 9,
@@ -165,39 +165,39 @@
        "0.25": {
         "round-robin": 0.3707,
         "least-loaded": 0.3712,
-        "power-of-two": 0.3704,
+        "power-of-two": 0.3705,
         "consistent-hash-prefix": 0.43,
         "radix-affinity": 0.3577,
-        "session-sticky": 0.4226,
-        "radix-affinity-balanced@16": 0.4193,
-        "radix-affinity-balanced@1": 0.4186
+        "session-sticky": 0.4227,
+        "radix-affinity-balanced@16": 0.4196,
+        "radix-affinity-balanced@1": 0.4183
        },
        "0.5": {
         "round-robin": 0.3709,
-        "least-loaded": 0.3702,
+        "least-loaded": 0.3704,
         "power-of-two": 0.3709,
         "consistent-hash-prefix": 0.43,
         "radix-affinity": 0.3576,
-        "session-sticky": 0.4232,
-        "radix-affinity-balanced@16": 0.4204,
-        "radix-affinity-balanced@1": 0.422
+        "session-sticky": 0.4227,
+        "radix-affinity-balanced@16": 0.4197,
+        "radix-affinity-balanced@1": 0.4223
        },
        "1": {
         "round-robin": 0.3711,
-        "least-loaded": 0.37,
-        "power-of-two": 0.3688,
+        "least-loaded": 0.3701,
+        "power-of-two": 0.3696,
         "consistent-hash-prefix": 0.4302,
         "radix-affinity": 0.3565,
-        "session-sticky": 0.422,
-        "radix-affinity-balanced@16": 0.4197,
-        "radix-affinity-balanced@1": 0.4202
+        "session-sticky": 0.4228,
+        "radix-affinity-balanced@16": 0.4199,
+        "radix-affinity-balanced@1": 0.4193
        }
       },
       "conversation": {
        "0.25": {
         "round-robin": 0.0711,
         "least-loaded": 0.0698,
-        "power-of-two": 0.0676,
+        "power-of-two": 0.0675,
         "consistent-hash-prefix": 0.142,
         "radix-affinity": 0.0495,
         "session-sticky": 0.1383,
@@ -206,23 +206,23 @@
        },
        "0.5": {
         "round-robin": 0.0711,
-        "least-loaded": 0.0714,
-        "power-of-two": 0.0676,
+        "least-loaded": 0.0715,
+        "power-of-two": 0.0677,
         "consistent-hash-prefix": 0.1419,
         "radix-affinity": 0.05,
-        "session-sticky": 0.1367,
-        "radix-affinity-balanced@16": 0.1329,
-        "radix-affinity-balanced@1": 0.1425
+        "session-sticky": 0.1383,
+        "radix-affinity-balanced@16": 0.1341,
+        "radix-affinity-balanced@1": 0.1452
        },
        "1": {
         "round-robin": 0.0714,
-        "least-loaded": 0.0685,
-        "power-of-two": 0.0693,
+        "least-loaded": 0.0698,
+        "power-of-two": 0.0695,
         "consistent-hash-prefix": 0.1431,
         "radix-affinity": 0.0488,
-        "session-sticky": 0.138,
-        "radix-affinity-balanced@16": 0.1331,
-        "radix-affinity-balanced@1": 0.1442
+        "session-sticky": 0.1392,
+        "radix-affinity-balanced@16": 0.133,
+        "radix-affinity-balanced@1": 0.1438
        }
       }
      },
@@ -255,7 +255,7 @@
     },
     "s0": {
      "holds": false,
-     "git_sha": "3fd95df",
+     "git_sha": "47761da",
      "git_dirty": false,
      "n_runs": 1152,
      "required_replicas": {
@@ -329,39 +329,39 @@
        "0.25": {
         "round-robin": 0.3707,
         "least-loaded": 0.3712,
-        "power-of-two": 0.3704,
+        "power-of-two": 0.3705,
         "consistent-hash-prefix": 0.43,
         "radix-affinity": 0.3577,
-        "session-sticky": 0.4226,
-        "radix-affinity-balanced@16": 0.4193,
-        "radix-affinity-balanced@1": 0.4186
+        "session-sticky": 0.4227,
+        "radix-affinity-balanced@16": 0.4196,
+        "radix-affinity-balanced@1": 0.4183
        },
        "0.5": {
         "round-robin": 0.3709,
-        "least-loaded": 0.3702,
-        "power-of-two": 0.3716,
+        "least-loaded": 0.371,
+        "power-of-two": 0.3712,
         "consistent-hash-prefix": 0.43,
         "radix-affinity": 0.3576,
-        "session-sticky": 0.4231,
-        "radix-affinity-balanced@16": 0.42,
-        "radix-affinity-balanced@1": 0.4219
+        "session-sticky": 0.423,
+        "radix-affinity-balanced@16": 0.4201,
+        "radix-affinity-balanced@1": 0.4225
        },
        "1": {
         "round-robin": 0.371,
-        "least-loaded": 0.3695,
+        "least-loaded": 0.3702,
         "power-of-two": 0.3701,
         "consistent-hash-prefix": 0.4302,
         "radix-affinity": 0.3568,
-        "session-sticky": 0.4219,
-        "radix-affinity-balanced@16": 0.4204,
-        "radix-affinity-balanced@1": 0.421
+        "session-sticky": 0.4234,
+        "radix-affinity-balanced@16": 0.4191,
+        "radix-affinity-balanced@1": 0.4183
        }
       },
       "conversation": {
        "0.25": {
         "round-robin": 0.0711,
         "least-loaded": 0.0698,
-        "power-of-two": 0.0676,
+        "power-of-two": 0.0675,
         "consistent-hash-prefix": 0.142,
         "radix-affinity": 0.0495,
         "session-sticky": 0.1383,
@@ -370,23 +370,23 @@
        },
        "0.5": {
         "round-robin": 0.0711,
-        "least-loaded": 0.0718,
-        "power-of-two": 0.0687,
+        "least-loaded": 0.0717,
+        "power-of-two": 0.0675,
         "consistent-hash-prefix": 0.1419,
         "radix-affinity": 0.0499,
-        "session-sticky": 0.1369,
-        "radix-affinity-balanced@16": 0.1322,
-        "radix-affinity-balanced@1": 0.1435
+        "session-sticky": 0.1366,
+        "radix-affinity-balanced@16": 0.1328,
+        "radix-affinity-balanced@1": 0.1459
        },
        "1": {
         "round-robin": 0.0714,
-        "least-loaded": 0.07,
-        "power-of-two": 0.0708,
+        "least-loaded": 0.0689,
+        "power-of-two": 0.071,
         "consistent-hash-prefix": 0.1433,
         "radix-affinity": 0.0494,
-        "session-sticky": 0.1387,
-        "radix-affinity-balanced@16": 0.1324,
-        "radix-affinity-balanced@1": 0.1455
+        "session-sticky": 0.139,
+        "radix-affinity-balanced@16": 0.1311,
+        "radix-affinity-balanced@1": 0.1437
        }
       }
      },
@@ -453,7 +453,7 @@
       "2": {
        "round-robin": 5,
        "least-loaded": 3,
-       "power-of-two": 3,
+       "power-of-two": 5,
        "consistent-hash-prefix": 3,
        "radix-affinity": 2,
        "session-sticky": 2,
