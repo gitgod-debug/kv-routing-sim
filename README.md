@@ -290,7 +290,7 @@ failed. L1 has no timing, so the fix cannot change it. The scale test measures t
 | 7 | Rupees per what, and over what time? | Per agent session in the cost table near the top. Per 1,000 requests that met the target on the demo page and in `kvsim replay`. Both for a T4 at $0.526 an hour and ₹95.87 a dollar, cited and dated in `configs/cost_model.yaml` | Counted over the whole run of a short trace. A service that ran all day would pay about a quarter less |
 | 8 | Real traffic? | Three public traces, each test registered before it ran. One of them (AgentX, 739 coding-agent sessions) was also replayed whole, at its recorded size. The cache model served exactly what the raw file allows. With 1 Mi tokens of cache per replica, round-robin computed 46.64% of the prompt tokens again, and session-sticky 1.32% (L1) | The time-based tests ran on traces scaled down 16 to 64 times. R1 failed twice, R2 could not be tested on the checked timing model, and R3 held in 2 of 4 rules. The full-size replay has no timing, because no GPU here was timed on prompts that long |
 | 9 | What breaks first at 100×? | Memory for block hashes: 537 MiB for 80,000 requests, before the simulation starts | Whether many real replicas stay matched cannot be answered on a CPU. Two live replicas are the most that was measured |
-| 10 | Can I rebuild your tables myself? | `python scripts/reproduce.py`: thirteen steps, about 20 minutes on a laptop. Every file a step writes is compared with the committed one | It runs the analysis of each GPU run again, on the raw files stored here. It cannot repeat a GPU measurement. Not covered yet: the first two sweeps, H6, the scale test, the real-trace runs, and the stored grids that some analyses start from |
+| 10 | Can I rebuild your tables myself? | `python scripts/reproduce.py`: thirteen steps, about 12 minutes on a laptop. Every file a step writes is compared with the committed one | It runs the analysis of each GPU run again, on the raw files stored here. It cannot repeat a GPU measurement. Not covered yet: the first two sweeps, H6, the scale test, the real-trace runs, and the stored grids that some analyses start from |
 
 ---
 
@@ -710,7 +710,7 @@ is the only edit, and the analysis gives the same bytes with and without it.
 **One command checks it.** `python scripts/reproduce.py` copies the files of the repository to a
 temporary folder and runs thirteen steps there. It compares every file a step writes with the
 committed one. The steps cover the analysis of each GPU run (from the raw files it left here), the
-grid behind the finding, the session cost table and the evidence ledger. It takes about 20 minutes
+grid behind the finding, the session cost table and the evidence ledger. It takes about 12 minutes
 on a 12-thread laptop. `--quick` leaves out the three slow steps and takes about 20 seconds. Fields
 that say when and where a file was made are left out of the comparison. Where the script makes one
 more exception, it says so and says why. **Not covered yet:** the first two sweeps (Phase 4 and
