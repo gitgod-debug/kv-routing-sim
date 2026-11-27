@@ -4,6 +4,11 @@ Three events drive a run: a request arriving, a replica finishing an iteration, 
 that listen for them, a notification of first tokens and completions at the time they happen.
 Events are ordered by (time, sequence number), so simultaneous events are handled in the order
 they were scheduled and every run is reproducible from its seed.
+
+A replica runs one step at a time, as vLLM runs one forward pass at a time: a request that arrives
+during a step waits for the step's end, and a sequence that finishes in a step counts as running
+until that end. Release 0.1.2 broke both rules when a step finished all the work a replica had.
+`engine_version="0.1.2"` keeps that engine, so that results recorded with it can be checked again.
 """
 
 from __future__ import annotations
@@ -11,7 +16,8 @@ from __future__ import annotations
 import heapq
 import itertools
 import random
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from typing import Any
 
 from ..policies import build as build_policy
@@ -24,6 +30,27 @@ from .replica import InFlight, Replica
 _ARRIVAL = 0
 _ITERATION_DONE = 1
 _NOTIFY = 2
+_RECORD = 3
+
+ENGINE_VERSIONS = ("0.2.0", "0.1.2")
+"""The engines `run` can use: the current one first, then the ones kept for the record."""
+_default_engine = ENGINE_VERSIONS[0]
+
+
+@contextmanager
+def use_engine(version: str) -> Iterator[None]:
+    """Run every simulation started inside the block with the engine of an earlier release.
+
+    For checking results and registered predictions that were made with that engine.
+    """
+    global _default_engine
+    if version not in ENGINE_VERSIONS:
+        raise ValueError(f"engine_version must be one of {ENGINE_VERSIONS}, got {version!r}")
+    previous, _default_engine = _default_engine, version
+    try:
+        yield
+    finally:
+        _default_engine = previous
 
 
 class Simulation:
@@ -42,7 +69,14 @@ class Simulation:
         cache_model: str,
         track_block_metrics: bool,
         record_per_request: bool,
+        engine_version: str | None = None,
     ) -> None:
+        engine_version = engine_version or _default_engine
+        if engine_version not in ENGINE_VERSIONS:
+            raise ValueError(f"engine_version must be one of {ENGINE_VERSIONS}, "
+                             f"got {engine_version!r}")
+        self.engine_version = engine_version
+        self._as_0_1_2 = engine_version == "0.1.2"
         self.policy = policy
         self.n_replicas = n_replicas
         self.profile = profile
@@ -77,11 +111,18 @@ class Simulation:
             _ARRIVAL: self._on_arrival,
             _ITERATION_DONE: self._on_iteration_done,
             _NOTIFY: self._on_notify,
+            _RECORD: self._on_record,
         }
 
     def run(self, trace: Iterable[NormalizedRequest]) -> RunResult:
         """Replay the trace to completion and return the collected metrics."""
+        seen: set[str] = set()
         for request in trace:
+            # Per-request state is kept by id, so a repeated id would mix two requests.
+            if request.request_id in seen:
+                raise ValueError(f"request id {request.request_id!r} appears more than once. "
+                                 "Ids must be unique: the trace readers rename repeated ones.")
+            seen.add(request.request_id)
             self._check_fits(request)
             self._push(request.arrival_ts, _ARRIVAL, request)
             self.result.arrived += 1
@@ -99,6 +140,8 @@ class Simulation:
         if replica in self._scheduled:
             return
         self._scheduled.add(replica)
+        if not self._as_0_1_2:
+            at = max(at, self.replicas[replica].next_free_ts)  # one step at a time
         self._push(at, _ITERATION_DONE, replica)
 
     def _check_fits(self, request: NormalizedRequest) -> None:
@@ -120,16 +163,22 @@ class Simulation:
         return len(self.replicas[replica].pool.lookup(request.block_hashes,
                                                       request.prompt_tokens))
 
-    def _fleet_state(self) -> FleetState:
+    def _fleet_state(self, now: float) -> FleetState:
         return FleetState(
             n_replicas=self.n_replicas,
-            running=[len(r.running) for r in self.replicas],
+            running=[len(r.running) + self._finishing(r, now) for r in self.replicas],
             queued=[len(r.queue) for r in self.replicas],
             hit_blocks=self._cache_probe,
         )
 
+    def _finishing(self, replica: Replica, now: float) -> int:
+        """Sequences in the replica's batch that finish at the end of the step in progress."""
+        if self._as_0_1_2 or now >= replica.next_free_ts:
+            return 0
+        return replica.finishing
+
     def _on_arrival(self, now: float, request: NormalizedRequest) -> None:
-        idx = self.router.choose(self._fleet_state(), request, self._rng)
+        idx = self.router.choose(self._fleet_state(now), request, self._rng)
         if not 0 <= idx < self.n_replicas:
             raise RuntimeError(
                 f"policy {self.policy!r} returned replica {idx}, outside 0..{self.n_replicas - 1}"
@@ -160,10 +209,20 @@ class Simulation:
             first_tokens += [s.request for s in replica.running if s.tokens_emitted == 1]
             if first_tokens or finished:
                 self._push(end, _NOTIFY, (idx, first_tokens, [s.request for s in finished]))
-        for seq in finished:
-            self._record(seq, idx, end)
+        if self._as_0_1_2:
+            for seq in finished:
+                self._record(seq, idx, end)
+        elif finished:
+            # A request completes when its last token lands, at the step's end. Recording it then
+            # keeps completions in time order, which the warm-up count relies on.
+            self._push(end, _RECORD, (idx, finished))
         if replica.has_work:
             self._schedule_iteration(idx, end)
+
+    def _on_record(self, now: float, payload: tuple[int, list[InFlight]]) -> None:
+        idx, finished = payload
+        for seq in finished:
+            self._record(seq, idx, now)
 
     def _record(self, seq: InFlight, replica: int, end: float) -> None:
         """Record a finished request. Its last token lands at the end of the step."""
@@ -223,6 +282,7 @@ def run(
     cache_model: str = "vllm",
     track_block_metrics: bool = False,
     record_per_request: bool = False,
+    engine_version: str | None = None,
 ) -> RunResult:
     """Replay a trace through one policy on `n_replicas` replicas.
 
@@ -234,6 +294,8 @@ def run(
         track_block_metrics: record vLLM-style eviction events; off by default because a long run
             produces one per recycled block.
         record_per_request: keep cached tokens, latencies and the serving replica per request.
+        engine_version: "0.1.2" runs the engine of that release, kept for the record (see the
+            module docstring). By default the current engine, or the one `use_engine` selects.
     """
     simulation = Simulation(
         policy=policy,
@@ -246,5 +308,6 @@ def run(
         cache_model=cache_model,
         track_block_metrics=track_block_metrics,
         record_per_request=record_per_request,
+        engine_version=engine_version,
     )
     return simulation.run(trace)

@@ -45,6 +45,7 @@ class Replica:
     __slots__ = (
         "cache",
         "cache_model",
+        "finishing",
         "index",
         "iterations",
         "next_free_ts",
@@ -75,7 +76,10 @@ class Replica:
         # Fresh requests wait as NormalizedRequest; a preempted one waits as its InFlight, so it
         # keeps the tokens it has already generated (scheduler.py `_preempt_request`).
         self.queue: deque[NormalizedRequest | InFlight] = deque()
+        # The step in progress: when it ends, and how many sequences finish at its end. Those are
+        # out of `running` already, but the replica is still computing their last token.
         self.next_free_ts = 0.0
+        self.finishing = 0
         self.iterations = 0
         self.preemptions = 0
 
@@ -89,8 +93,12 @@ class Replica:
     def step(self, now: float) -> tuple[float, list[InFlight]]:
         """Run one iteration. Returns (duration, sequences that finished)."""
         if self.cache_model == "lru":
-            return self._step_lru(now)
-        return self._step_vllm(now)
+            duration, finished = self._step_lru(now)
+        else:
+            duration, finished = self._step_vllm(now)
+        self.next_free_ts = now + duration
+        self.finishing = len(finished)
+        return duration, finished
 
     def _step_lru(self, now: float) -> tuple[float, list[InFlight]]:
         """Run one iteration of the LRU model: admit, then one decode step for the whole batch."""

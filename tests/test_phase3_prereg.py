@@ -19,9 +19,12 @@ sys.path.insert(0, str(REPO / "scripts"))
 
 import phase3_prepare as prep
 
+from kv_routing_sim.sim.engine import use_engine
+
 PREREG = json.loads(prep.PREREG.read_text())
 
 
+@use_engine("0.1.2")  # registered with the engine of release 0.1.2, so checked with it
 def test_committed_predictions_reproduce_from_the_committed_code():
     _, _, fp, predictions = prep.make_predictions(PREREG["config"])
     assert fp == PREREG["trace_fingerprint_sha256"]

@@ -17,7 +17,7 @@ import pytest
 import yaml
 
 from kv_routing_sim.sim.cost_model import load_profile
-from kv_routing_sim.sim.engine import run
+from kv_routing_sim.sim.engine import run, use_engine
 from kv_routing_sim.traces.generator import AgenticWorkload
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
@@ -79,6 +79,7 @@ def test_the_dirty_headers_are_what_the_record_says_and_the_cells_were_run_again
     ("A", 1, 2, STICKY, 10, 0), ("B", 64, 1, BAL16, 8, 2), ("C", 16, 0.5, RR, 6, 1),
     ("A", 4, 4, LL, 25, 1), ("B", 1, 0.25, BAL1, 3, 0), ("C", 64, 3, STICKY, 21, 2),
 ])
+@use_engine("0.1.2")  # the stored grid is release 0.1.2's until it is derived again
 def test_a_stored_cell_is_what_the_simulator_gives(name, k, load, policy, n, seed):
     """Six cells, two per calibration, rerun from the committed code, match the stored values."""
     grid = GRIDS[name]

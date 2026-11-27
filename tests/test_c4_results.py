@@ -17,6 +17,7 @@ import tempfile
 import pytest
 
 from kv_routing_sim.sim.cost_model import load_profile
+from kv_routing_sim.sim.engine import use_engine
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 RESULTS = REPO / "artifacts" / "results" / "c4_kaggle_t4"
@@ -160,6 +161,7 @@ def test_the_grids_are_the_registered_design_from_a_clean_tree():
     ("firmness", "s0r2", 1, 2, "radix-affinity-balanced", 16.0, 9, 0),
     ("prompts64", "s2", 64, 3, "radix-affinity-balanced", 1.0, 20, 2),
 ])
+@use_engine("0.1.2")  # the stored grid is release 0.1.2's until it is derived again
 def test_a_stored_cell_is_what_the_simulator_gives(name, fit, k, load, policy, alpha, n, seed):
     """Ties the grids to the code: one cell of each kind, run again here."""
     cfg = PREREG["config"]

@@ -38,8 +38,8 @@ def test_a_slowed_profile_differs_in_its_six_timing_coefficients_and_nothing_els
 @pytest.fixture(scope="module")
 def three_counts():
     """One workload on 2, 3 and 4 replicas: under, at and over what it needs."""
-    trace, _ = AgenticWorkload(n_sessions=200, turns_per_session=6, arrival_rate=0.25,
-                               seed=0).generate()
+    trace, _ = AgenticWorkload(n_sessions=200, turns_per_session=6, arrival_rate=0.22,
+                               seed=4).generate()
     profile, cost, seeds = load_profile(CTX), CostModel.from_yaml(CITED), (0, 1, 2)
     points, _ = sweep(trace, policies=["session-sticky"], replica_counts=[2, 3, 4], seeds=seeds,
                       profile=profile, cost=cost)

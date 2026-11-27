@@ -15,7 +15,7 @@ import re
 import yaml
 
 from kv_routing_sim.sim.cost_model import load_profile
-from kv_routing_sim.sim.engine import run
+from kv_routing_sim.sim.engine import run, use_engine
 from kv_routing_sim.traces.generator import AgenticWorkload
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
@@ -37,6 +37,7 @@ def test_the_notebook_carries_exactly_the_committed_predictions_and_fingerprints
         assert fp in src
 
 
+@use_engine("0.1.2")  # registered with the engine of release 0.1.2, so checked with it
 def test_committed_predictions_reproduce_from_the_committed_code():
     profile = load_profile(REPO / CONFIG["profile"])
     for name, spec in CONFIG["workloads"].items():
