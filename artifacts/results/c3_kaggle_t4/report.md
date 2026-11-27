@@ -58,29 +58,26 @@ Hit rate against the registered prediction: K1_half 0.0%, K64_quarter 0.0%, T6_K
 
 ### The same GPU counts from a second calibration?
 
-H2b-C2's registered grid, re-run on the profile the command wrote (seed 0), against the committed table from C2's profile: **122 of 144** (K, load, policy) cells need the same number of replicas, 141 are within one; the largest difference where both hold the SLO is 2. Session-sticky needs the fewest replicas or ties at 20 of 24 points (22 in the committed table). H2b's verdict: holds (falsified in the committed run).
+H2b-C2's registered grid, re-run on the profile the command wrote (seed 0), against the committed table from C2's profile: **125 of 144** (K, load, policy) cells need the same number of replicas, 141 are within one; the largest difference where both hold the SLO is 2. Session-sticky needs the fewest replicas or ties at 20 of 24 points (20 in the committed table). H2b's verdict: holds (falsified in the committed run).
 
 | K | load | policy | committed | command |
 |---|---|---|---:|---:|
 | 1 | 2 | radix-affinity-balanced@16 | 10 | 17 |
-| 1 | 2 | least-loaded | 11 | 10 |
-| 1 | 3 | least-loaded | 14 | 13 |
-| 4 | 1 | least-loaded | 5 | 6 |
-| 4 | 3 | radix-affinity-balanced@16 | 16 | 17 |
-| 4 | 3 | least-loaded | 15 | 16 |
-| 4 | 4 | session-sticky | 9 | 8 |
+| 1 | 2 | least-loaded | 10 | 11 |
+| 1 | 3 | least-loaded | 12 | 13 |
+| 1 | 4 | least-loaded | 15 | 16 |
+| 4 | 1 | radix-affinity-balanced@16 | 5 | 3 |
+| 4 | 1 | least-loaded | 4 | 5 |
+| 4 | 3 | least-loaded | 16 | 17 |
+| 4 | 4 | session-sticky | 8 | 9 |
 | 16 | 0.5 | radix-affinity-balanced@16 | 3 | 2 |
 | 16 | 0.5 | least-loaded | 4 | 5 |
 | 16 | 1 | round-robin | 6 | 5 |
-| 16 | 1 | least-loaded | 9 | 10 |
+| 16 | 2 | session-sticky | 8 | 7 |
 | 16 | 2 | round-robin | 11 | 12 |
-| 64 | 0.25 | least-loaded | 3 | 4 |
-| 64 | 0.5 | radix-affinity-balanced@1 | 3 | 2 |
-| 64 | 0.5 | radix-affinity | 3 | 2 |
-| 64 | 1 | session-sticky | 5 | 6 |
-| 64 | 1 | radix-affinity-balanced@16 | 5 | 6 |
-| 64 | 1 | radix-affinity-balanced@1 | 5 | 4 |
-| 64 | 1 | least-loaded | 13 | 14 |
-| 64 | 1 | radix-affinity | 5 | 4 |
+| 16 | 3 | radix-affinity-balanced@16 | 16 | 17 |
+| 16 | 4 | session-sticky | 16 | 17 |
+| 64 | 1 | session-sticky | 6 | 5 |
 | 64 | 2 | session-sticky | 10 | 12 |
-| 64 | 3 | session-sticky | 17 | 13 |
+| 64 | 2 | radix-affinity-balanced@1 | 8 | 7 |
+| 64 | 3 | session-sticky | 17 | 16 |

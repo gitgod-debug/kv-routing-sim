@@ -1,0 +1,532 @@
+{
+ "script": "scripts/c3_analyze.py",
+ "commands": {
+  "0": {
+   "decided": true,
+   "holds": true,
+   "conditions": {
+    "exits 0": true,
+    "the profile is marked calibrated": true,
+    "check counters equal the registered prediction": true,
+    "every check request's cached tokens equal the model's": true,
+    "capacity read equals the engine log": true
+   },
+   "returncode": 0,
+   "wall_clock_s": 159.6,
+   "check_measured": {
+    "queries": 13776.0,
+    "hits": 9840.0,
+    "hit_rate": 0.7142857142857143
+   },
+   "cached_tokens_equal": 48,
+   "cached_tokens_compared": 48,
+   "read_blocks": 1537,
+   "log_blocks": 1537,
+   "fit": {
+    "decode_base_s": 0.04365727710318028,
+    "decode_per_seq_s": 0.0,
+    "decode_per_ctx_token_s": 3.6014948818147344e-06,
+    "prefill_base_s": 0.00221500183202165,
+    "prefill_per_token_s": 0.0002952542355017367,
+    "prefill_attn_s": 7.763206196511962e-07
+   },
+   "fit_quality": {
+    "decode_fit": {
+     "points": 15,
+     "r2": 0.8685256413487056
+    },
+    "prefill_fit": {
+     "points": 51,
+     "r2": 0.9984995795423933
+    }
+   },
+   "notes": []
+  },
+  "1": {
+   "decided": true,
+   "holds": true,
+   "conditions": {
+    "exits 0": true,
+    "the profile is marked calibrated": true,
+    "check counters equal the registered prediction": true,
+    "every check request's cached tokens equal the model's": true,
+    "capacity read equals the engine log": true
+   },
+   "returncode": 0,
+   "wall_clock_s": 154.1,
+   "check_measured": {
+    "queries": 13776.0,
+    "hits": 9840.0,
+    "hit_rate": 0.7142857142857143
+   },
+   "cached_tokens_equal": 48,
+   "cached_tokens_compared": 48,
+   "read_blocks": 1537,
+   "log_blocks": 1537,
+   "fit": {
+    "decode_base_s": 0.04249546863100731,
+    "decode_per_seq_s": 0.0,
+    "decode_per_ctx_token_s": 3.730857624604903e-06,
+    "prefill_base_s": 0.0018974317335806346,
+    "prefill_per_token_s": 0.000310775175270618,
+    "prefill_attn_s": 7.789077531732671e-07
+   },
+   "fit_quality": {
+    "decode_fit": {
+     "points": 15,
+     "r2": 0.9309105871306737
+    },
+    "prefill_fit": {
+     "points": 51,
+     "r2": 0.998801535051731
+    }
+   },
+   "notes": []
+  }
+ },
+ "c3a": {
+  "seed": 0,
+  "decided": true,
+  "holds": true
+ },
+ "holdout": [
+  {
+   "workload": "K1_half",
+   "measured": {
+    "hit_rate": 0.9230392156862746,
+    "preemptions": 0,
+    "ttft_p50_ms": 1431.2249239999346,
+    "ttft_p95_ms": 2615.0768079999125,
+    "requests": 480,
+    "invalid": 0,
+    "worst_send_lag_ms": 5.1165910000463555
+   },
+   "c2_registered": {
+    "hit_rate": 0.923039,
+    "prefix_cache_queries": 816000,
+    "prefix_cache_hits": 753200,
+    "preemptions": 6,
+    "ttft_p50_ms": 1443.497,
+    "ttft_p95_ms": 3277.207
+   },
+   "c2_factor": {
+    "p50": 1.0085745264732868,
+    "p95": 1.2531972254025319
+   },
+   "c2_at_send_times": {
+    "hit_rate": 0.9230392156862746,
+    "preemptions": 6,
+    "ttft_p50_ms": 1445.215640060411,
+    "ttft_p95_ms": 3277.565402630188
+   },
+   "c2_at_send_times_factor": {
+    "p50": 1.0097753440607893,
+    "p95": 1.2533342778321552
+   },
+   "hit_rate_error": 2.3366967604614386e-07,
+   "command": {
+    "0": {
+     "prediction": {
+      "hit_rate": 0.9230392156862746,
+      "preemptions": 4,
+      "ttft_p50_ms": 1373.1756074929676,
+      "ttft_p95_ms": 2834.353125562302
+     },
+     "factor": {
+      "p50": 1.0422737748837154,
+      "p95": 1.0838508134413454
+     }
+    },
+    "1": {
+     "prediction": {
+      "hit_rate": 0.9230392156862746,
+      "preemptions": 30,
+      "ttft_p50_ms": 1746.593718818076,
+      "ttft_p95_ms": 10894.903719134134
+     },
+     "factor": {
+      "p50": 1.2203488700691156,
+      "p95": 4.166188804017147
+     }
+    }
+   },
+   "command_factor": {
+    "p50": 1.0422737748837154,
+    "p95": 1.0838508134413454
+   }
+  },
+  {
+   "workload": "K64_quarter",
+   "measured": {
+    "hit_rate": 0.8304313725490196,
+    "preemptions": 0,
+    "ttft_p50_ms": 566.2996439998551,
+    "ttft_p95_ms": 2295.4967070002112,
+    "requests": 480,
+    "invalid": 0,
+    "worst_send_lag_ms": 1.5241699999251068
+   },
+   "c2_registered": {
+    "hit_rate": 0.830431,
+    "prefix_cache_queries": 816000,
+    "prefix_cache_hits": 677632,
+    "preemptions": 0,
+    "ttft_p50_ms": 420.081,
+    "ttft_p95_ms": 1891.794
+   },
+   "c2_factor": {
+    "p50": 1.348072500303168,
+    "p95": 1.2133967583152347
+   },
+   "c2_at_send_times": {
+    "hit_rate": 0.8304313725490196,
+    "preemptions": 0,
+    "ttft_p50_ms": 420.1770131836895,
+    "ttft_p95_ms": 1891.6719843000892
+   },
+   "c2_at_send_times_factor": {
+    "p50": 1.347764456958251,
+    "p95": 1.2134750242386951
+   },
+   "hit_rate_error": 4.486210803660129e-07,
+   "command": {
+    "0": {
+     "prediction": {
+      "hit_rate": 0.8304313725490196,
+      "preemptions": 0,
+      "ttft_p50_ms": 427.60904844928405,
+      "ttft_p95_ms": 1908.6066510366209
+     },
+     "factor": {
+      "p50": 1.3243397118314728,
+      "p95": 1.2027081147147103
+     }
+    },
+    "1": {
+     "prediction": {
+      "hit_rate": 0.8304313725490196,
+      "preemptions": 0,
+      "ttft_p50_ms": 442.5287197818193,
+      "ttft_p95_ms": 1962.9611566197696
+     },
+     "factor": {
+      "p50": 1.2796901504586162,
+      "p95": 1.1694050589126632
+     }
+    }
+   },
+   "command_factor": {
+    "p50": 1.3243397118314728,
+    "p95": 1.2027081147147103
+   }
+  },
+  {
+   "workload": "T6_K8",
+   "measured": {
+    "hit_rate": 0.8517424242424242,
+    "preemptions": 0,
+    "ttft_p50_ms": 420.2701049998723,
+    "ttft_p95_ms": 774.0924709999035,
+    "requests": 720,
+    "invalid": 0,
+    "worst_send_lag_ms": 2.896450999969602
+   },
+   "c2_registered": {
+    "hit_rate": 0.851742,
+    "prefix_cache_queries": 633600,
+    "prefix_cache_hits": 539664,
+    "preemptions": 0,
+    "ttft_p50_ms": 303.568,
+    "ttft_p95_ms": 658.561
+   },
+   "c2_factor": {
+    "p50": 1.3844348053809108,
+    "p95": 1.1754301742737627
+   },
+   "c2_at_send_times": {
+    "hit_rate": 0.8517424242424242,
+    "preemptions": 0,
+    "ttft_p50_ms": 303.4974662184595,
+    "ttft_p95_ms": 658.6208667199571
+   },
+   "c2_at_send_times_factor": {
+    "p50": 1.3847565524562206,
+    "p95": 1.1753233310918532
+   },
+   "hit_rate_error": 4.980876989519935e-07,
+   "command": {
+    "0": {
+     "prediction": {
+      "hit_rate": 0.8517424242424242,
+      "preemptions": 0,
+      "ttft_p50_ms": 298.815551017924,
+      "ttft_p95_ms": 642.2138040116181
+     },
+     "factor": {
+      "p50": 1.406453257095254,
+      "p95": 1.205350097061912
+     }
+    },
+    "1": {
+     "prediction": {
+      "hit_rate": 0.8517424242424242,
+      "preemptions": 0,
+      "ttft_p50_ms": 311.05369247930525,
+      "ttft_p95_ms": 671.8172322186291
+     },
+     "factor": {
+      "p50": 1.3511175567473237,
+      "p95": 1.1522367005137955
+     }
+    }
+   },
+   "command_factor": {
+    "p50": 1.406453257095254,
+    "p95": 1.205350097061912
+   }
+  }
+ ],
+ "c3b": {
+  "seed": 0,
+  "max_factor": 2.0,
+  "decided": true,
+  "holds": true
+ },
+ "c3c": {
+  "max_factor": 2.0,
+  "decided": true,
+  "holds": true
+ },
+ "c2_fit": {
+  "decode_base_s": 0.040134812311633544,
+  "decode_per_seq_s": 0.00033595622179426437,
+  "decode_per_ctx_token_s": 3.4952927062706023e-06,
+  "prefill_base_s": 0.0,
+  "prefill_per_token_s": 0.00031888614178891746,
+  "prefill_attn_s": 7.575762731263971e-07
+ },
+ "predicted_outcomes": {
+  "c3a": "holds",
+  "c3b": "holds",
+  "c3c": "holds"
+ },
+ "software": {
+  "python": "3.13.15",
+  "packages": {
+   "vllm": "0.30.0",
+   "torch": "2.13.0",
+   "transformers": "5.16.1",
+   "triton": "3.7.1"
+  },
+  "torch_cuda_build": "13.0",
+  "torch_family": {
+   "torchaudio": "2.11.0",
+   "torchvision": "0.28.0",
+   "torchcodec": "0.17.0"
+  },
+  "repairs": [
+   {
+    "package": "torchaudio",
+    "was": "2.11.0+cu128",
+    "error": "RuntimeError: Detected that PyTorch and TorchAudio were compiled with different CUDA versions. PyTorch has CUDA version 13.0 whereas TorchAudio has CUDA version 12.8. Please install the TorchAudio version that matches your PyTorch version.",
+    "did": "install -q --no-deps --force-reinstall --index-url https://pypi.org/simple torchaudio==2.11.0",
+    "now": "2.11.0",
+    "imports": true
+   }
+  ]
+ },
+ "c2_software": {
+  "python": "3.12.13",
+  "packages": {
+   "vllm": "0.30.0",
+   "torch": "2.13.0",
+   "transformers": "5.17.0",
+   "triton": "3.7.1"
+  },
+  "torch_cuda_build": null,
+  "torch_family": {},
+  "repairs": []
+ },
+ "c2_session": {
+  "K1_half": {
+   "p50": 1316.1282230003053,
+   "p95": 2324.7621290001916
+  },
+  "K64_quarter": {
+   "p50": 551.0856240002795,
+   "p95": 2090.831961999811
+  }
+ },
+ "grid": {
+  "ran": true,
+  "seed": 0,
+  "cells": 144,
+  "equal": 122,
+  "within_one": 141,
+  "held_in_both": 97,
+  "largest_difference": 2,
+  "sticky_best_or_tied": {
+   "committed": 22,
+   "command": 20,
+   "points": 24
+  },
+  "verdict_committed": false,
+  "verdict_command": true,
+  "differences": [
+   {
+    "K": "1",
+    "load": "2",
+    "policy": "radix-affinity-balanced@16",
+    "committed": 10,
+    "command": 17
+   },
+   {
+    "K": "1",
+    "load": "2",
+    "policy": "least-loaded",
+    "committed": 11,
+    "command": 10
+   },
+   {
+    "K": "1",
+    "load": "3",
+    "policy": "least-loaded",
+    "committed": 14,
+    "command": 13
+   },
+   {
+    "K": "4",
+    "load": "1",
+    "policy": "least-loaded",
+    "committed": 5,
+    "command": 6
+   },
+   {
+    "K": "4",
+    "load": "3",
+    "policy": "radix-affinity-balanced@16",
+    "committed": 16,
+    "command": 17
+   },
+   {
+    "K": "4",
+    "load": "3",
+    "policy": "least-loaded",
+    "committed": 15,
+    "command": 16
+   },
+   {
+    "K": "4",
+    "load": "4",
+    "policy": "session-sticky",
+    "committed": 9,
+    "command": 8
+   },
+   {
+    "K": "16",
+    "load": "0.5",
+    "policy": "radix-affinity-balanced@16",
+    "committed": 3,
+    "command": 2
+   },
+   {
+    "K": "16",
+    "load": "0.5",
+    "policy": "least-loaded",
+    "committed": 4,
+    "command": 5
+   },
+   {
+    "K": "16",
+    "load": "1",
+    "policy": "round-robin",
+    "committed": 6,
+    "command": 5
+   },
+   {
+    "K": "16",
+    "load": "1",
+    "policy": "least-loaded",
+    "committed": 9,
+    "command": 10
+   },
+   {
+    "K": "16",
+    "load": "2",
+    "policy": "round-robin",
+    "committed": 11,
+    "command": 12
+   },
+   {
+    "K": "64",
+    "load": "0.25",
+    "policy": "least-loaded",
+    "committed": 3,
+    "command": 4
+   },
+   {
+    "K": "64",
+    "load": "0.5",
+    "policy": "radix-affinity-balanced@1",
+    "committed": 3,
+    "command": 2
+   },
+   {
+    "K": "64",
+    "load": "0.5",
+    "policy": "radix-affinity",
+    "committed": 3,
+    "command": 2
+   },
+   {
+    "K": "64",
+    "load": "1",
+    "policy": "session-sticky",
+    "committed": 5,
+    "command": 6
+   },
+   {
+    "K": "64",
+    "load": "1",
+    "policy": "radix-affinity-balanced@16",
+    "committed": 5,
+    "command": 6
+   },
+   {
+    "K": "64",
+    "load": "1",
+    "policy": "radix-affinity-balanced@1",
+    "committed": 5,
+    "command": 4
+   },
+   {
+    "K": "64",
+    "load": "1",
+    "policy": "least-loaded",
+    "committed": 13,
+    "command": 14
+   },
+   {
+    "K": "64",
+    "load": "1",
+    "policy": "radix-affinity",
+    "committed": 5,
+    "command": 4
+   },
+   {
+    "K": "64",
+    "load": "2",
+    "policy": "session-sticky",
+    "committed": 10,
+    "command": 12
+   },
+   {
+    "K": "64",
+    "load": "3",
+    "policy": "session-sticky",
+    "committed": 17,
+    "command": 13
+   }
+  ]
+ }
+}

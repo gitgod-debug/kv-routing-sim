@@ -361,12 +361,12 @@
   "ran": true,
   "seed": 0,
   "cells": 144,
-  "equal": 122,
+  "equal": 125,
   "within_one": 141,
-  "held_in_both": 97,
+  "held_in_both": 95,
   "largest_difference": 2,
   "sticky_best_or_tied": {
-   "committed": 22,
+   "committed": 20,
    "command": 20,
    "points": 24
   },
@@ -384,43 +384,50 @@
     "K": "1",
     "load": "2",
     "policy": "least-loaded",
-    "committed": 11,
-    "command": 10
+    "committed": 10,
+    "command": 11
    },
    {
     "K": "1",
     "load": "3",
     "policy": "least-loaded",
-    "committed": 14,
+    "committed": 12,
     "command": 13
    },
    {
-    "K": "4",
-    "load": "1",
-    "policy": "least-loaded",
-    "committed": 5,
-    "command": 6
-   },
-   {
-    "K": "4",
-    "load": "3",
-    "policy": "radix-affinity-balanced@16",
-    "committed": 16,
-    "command": 17
-   },
-   {
-    "K": "4",
-    "load": "3",
+    "K": "1",
+    "load": "4",
     "policy": "least-loaded",
     "committed": 15,
     "command": 16
    },
    {
     "K": "4",
+    "load": "1",
+    "policy": "radix-affinity-balanced@16",
+    "committed": 5,
+    "command": 3
+   },
+   {
+    "K": "4",
+    "load": "1",
+    "policy": "least-loaded",
+    "committed": 4,
+    "command": 5
+   },
+   {
+    "K": "4",
+    "load": "3",
+    "policy": "least-loaded",
+    "committed": 16,
+    "command": 17
+   },
+   {
+    "K": "4",
     "load": "4",
     "policy": "session-sticky",
-    "committed": 9,
-    "command": 8
+    "committed": 8,
+    "command": 9
    },
    {
     "K": "16",
@@ -445,10 +452,10 @@
    },
    {
     "K": "16",
-    "load": "1",
-    "policy": "least-loaded",
-    "committed": 9,
-    "command": 10
+    "load": "2",
+    "policy": "session-sticky",
+    "committed": 8,
+    "command": 7
    },
    {
     "K": "16",
@@ -458,60 +465,25 @@
     "command": 12
    },
    {
-    "K": "64",
-    "load": "0.25",
-    "policy": "least-loaded",
-    "committed": 3,
-    "command": 4
+    "K": "16",
+    "load": "3",
+    "policy": "radix-affinity-balanced@16",
+    "committed": 16,
+    "command": 17
    },
    {
-    "K": "64",
-    "load": "0.5",
-    "policy": "radix-affinity-balanced@1",
-    "committed": 3,
-    "command": 2
-   },
-   {
-    "K": "64",
-    "load": "0.5",
-    "policy": "radix-affinity",
-    "committed": 3,
-    "command": 2
+    "K": "16",
+    "load": "4",
+    "policy": "session-sticky",
+    "committed": 16,
+    "command": 17
    },
    {
     "K": "64",
     "load": "1",
     "policy": "session-sticky",
-    "committed": 5,
-    "command": 6
-   },
-   {
-    "K": "64",
-    "load": "1",
-    "policy": "radix-affinity-balanced@16",
-    "committed": 5,
-    "command": 6
-   },
-   {
-    "K": "64",
-    "load": "1",
-    "policy": "radix-affinity-balanced@1",
-    "committed": 5,
-    "command": 4
-   },
-   {
-    "K": "64",
-    "load": "1",
-    "policy": "least-loaded",
-    "committed": 13,
-    "command": 14
-   },
-   {
-    "K": "64",
-    "load": "1",
-    "policy": "radix-affinity",
-    "committed": 5,
-    "command": 4
+    "committed": 6,
+    "command": 5
    },
    {
     "K": "64",
@@ -522,10 +494,17 @@
    },
    {
     "K": "64",
+    "load": "2",
+    "policy": "radix-affinity-balanced@1",
+    "committed": 8,
+    "command": 7
+   },
+   {
+    "K": "64",
     "load": "3",
     "policy": "session-sticky",
     "committed": 17,
-    "command": 13
+    "command": 16
    }
   ]
  }
