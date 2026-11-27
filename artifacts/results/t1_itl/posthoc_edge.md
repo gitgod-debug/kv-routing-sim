@@ -2,7 +2,7 @@
 
 ⚠️ **Written after T1's result was known; the check's threshold (1.5×) was chosen after seeing these numbers.** Nothing here was registered. Five runs of three workloads on one GPU: an indication, not a validation.
 
-T1's five held-out runs, replayed with T1's own function on profile A and again with every timing coefficient 5% larger · generated `2026-10-08T07:30:00+00:00` at `903ecdd` by `scripts/edge_posthoc_t1.py`.
+T1's five held-out runs, replayed with T1's own function on profile A and again with every timing coefficient 5% larger · generated `2026-11-27T18:24:42+00:00` at `846ec00` by `scripts/edge_posthoc_t1.py`.
 
 | session · workload | simulator ÷ engine, per token (T1) | p95 TTFT, base → 5% slower | p95 time per token, base → 5% slower | preemptions | flagged |
 |---|---:|---|---|---|:---:|
