@@ -78,20 +78,44 @@
       replicas: $("replicas").value.trim(),
       seeds: number("seeds"),
       ttft_slo_ms: number("ttft"),
-      tpot_slo_ms: number("tpot") ?? 0,
+      tpot_slo_ms: number("tpot"),
       gpu_price_per_hour_usd: number("price"),
       edge_check: $("edge").checked,
       spread: $("spread").checked,
     };
   }
 
+  // Every field is checked here, in the page's own words, before Python sees it. An empty or
+  // mistyped number would otherwise come back as a Python message, or crash the result view.
   function validate(settings) {
-    if (settings.traffic.source === "file" && !$("trace-file").files.length) {
-      return "Choose a log file, or switch to generated traffic.";
+    const is = (v) => typeof v === "number" && Number.isFinite(v);
+    const whole = (v, least, most = Infinity) => Number.isInteger(v) && v >= least && v <= most;
+    const t = settings.traffic;
+    if (t.source === "file") {
+      if (!$("trace-file").files.length) return "Choose a log file, or switch to generated traffic.";
+    } else {
+      if (!whole(t.sessions, 1)) return "Sessions must be a whole number of at least 1.";
+      if (!whole(t.turns, 1)) return "Turns per session must be a whole number of at least 1.";
+      if (!is(t.rate) || t.rate <= 0) return "New sessions per second must be a number above 0.";
+      if (!is(t.sharing) || t.sharing < 0 || t.sharing > 0.95) {
+        return "Shared system prompt must be a number from 0 to 0.95.";
+      }
+      if (!whole(t.system_prompts, 1, 100)) return "Distinct system prompts must be a whole number from 1 to 100.";
+      if (!whole(t.seed, 0)) return "Random seed must be a whole number of at least 0.";
     }
     if (settings.profile.source === "file" && !$("profile-file").files.length) {
       return "Choose a profile file, or use the measured T4.";
     }
+    const price = settings.gpu_price_per_hour_usd;
+    if (price !== null && (!is(price) || price <= 0)) return "Price per GPU-hour must be a number above 0, or empty.";
+    if (!is(settings.ttft_slo_ms) || settings.ttft_slo_ms <= 0) {
+      return "Time to first token must be a number of milliseconds above 0.";
+    }
+    if (!is(settings.tpot_slo_ms) || settings.tpot_slo_ms < 0) {
+      return "Time per output token must be 0 or more milliseconds. 0 sizes on the first token alone.";
+    }
+    if (!settings.replicas) return "Replica counts must be a range such as 1-8, or a list such as 1,2,4.";
+    if (!whole(settings.seeds, 1, 10)) return "Seeds per configuration must be a whole number from 1 to 10.";
     if (!settings.policies) return "Choose at least one routing policy.";
     return null;
   }
@@ -105,6 +129,7 @@
       return;
     }
     activeSettings = settings;
+    $("results").hidden = true;  // the last answer was for other settings
     setRunning(true);
     startedAt = performance.now();
     worker = worker || createWorker();

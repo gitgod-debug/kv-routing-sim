@@ -81,6 +81,10 @@ self.onmessage = async (event) => {
     const result = JSON.parse(output);
     post(result.error ? { type: "error", message: plain(result.error) } : { type: "result", result: { ...result, cost } });
   } catch (err) {
-    post({ type: "error", message: `Unexpected error: ${plain(lastLine(err && err.message ? err.message : err))}` });
+    // A ValueError from the simulator is about the input, for example a prompt too long for the
+    // profile's cache. Its message says what is wrong, so it is shown as it is.
+    const last = plain(lastLine(err && err.message ? err.message : err));
+    const input = /^ValueError: (.+)$/.exec(last);
+    post({ type: "error", message: input ? input[1] : `Unexpected error: ${last}` });
   }
 };
