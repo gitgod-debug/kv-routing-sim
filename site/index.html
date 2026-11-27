@@ -21,7 +21,7 @@
     the same GPU type (a T4). Session-sticky routing needs the fewest GPUs, or ties for the fewest, at
     every load, with one shared system prompt and with four. It never needs more GPUs than round-robin
     or least-loaded. With 64 tenants' prompts, it is <strong>not settled</strong> whether routing by
-    prefix saves GPUs. The registered test said no on one calibration and yes on two others. Another
+    prefix saves GPUs. The registered test said no on two calibrations and yes on one. Another
     calibration usually gives a count within one GPU of each count shown here.</div>
 
   <p class="note"><strong>This is not a new result.</strong> SMetric (Wang et al., arXiv 2607.08565,
@@ -30,7 +30,7 @@
     an independent agreement on a small calibrated model, from tests registered before they ran. Both
     published policies were then ported and run here on a public production trace. Under a
     first-token target, neither needed more GPUs than session-sticky. SMetric's rule needed one fewer
-    at the highest load on all four calibrations, and LMetric on one.
+    at the highest load on three calibrations of four, and LMetric on one.
     SMetric also names a weakness that these grids cannot show. Real sessions differ a lot in size,
     and plain session-sticky routing then leaves the load unbalanced. Every generated session here has
     the same number of turns. NVIDIA's Dynamo ships a larger simulator for the same question (AISim).
@@ -44,7 +44,7 @@
         <th>Fewest T4s that hold a 2 s p95 time-to-first-token at 2 sessions/s, on calibrations A · B · C</th></tr></thead>
       <tbody>
         <tr><td>1</td><td class="num">0.06</td><td>session-sticky <strong>5 · 5 · 5</strong> · round-robin 7 · 7 · 7 · balanced prefix-affinity (load&nbsp;weight&nbsp;16) 10 · not held on 16 · not held</td></tr>
-        <tr><td>64 offered, 48 used</td><td class="num">2.66</td><td>session-sticky 10 · 12 · 12 · balanced prefix-affinity (load&nbsp;weight&nbsp;16) 11 · 11 · 10 · round-robin 16 · 16 · not held (prefix-affinity, load&nbsp;weight&nbsp;1: 8 · 8 · 8, a weight found after the tests)</td></tr>
+        <tr><td>64 offered, 48 used</td><td class="num">2.66</td><td>session-sticky 10 · 12 · 10 · balanced prefix-affinity (load&nbsp;weight&nbsp;16) 10 · 10 · 10 · round-robin 16 · 16 · not held (prefix-affinity, load&nbsp;weight&nbsp;1: 8 · 7 · 8, a weight found after the tests)</td></tr>
       </tbody>
     </table>
   </div>
@@ -53,16 +53,17 @@
     live T4s within 1.02–1.79×. The target on this page is on the first token only. With a limit on
     the time per token as well (100 ms), which <code>kvsim replay</code> applies by default, the
     simulator needs about twice as many GPUs. Its per-token model was checked on a live T4: within 7%
-    on three workloads around that limit, on one replica. <strong>This finding changed twice.</strong>
+    on three workloads around that limit, on one replica. <strong>This finding changed three times.</strong>
     On the first timing model, which had no context term and was 5–222× optimistic on live GPUs,
     prefix routing won once prompts outgrew one GPU's cache. Tested again on the validated model
     (calibration A), that half was falsified. On two more calibrations of the same GPU type (B and C,
-    measured with <code>kvsim calibrate</code> on a live engine), it held. Where all three
-    calibrations give a GPU count (92 of 144 points), they agree within one at 89, and that half of
-    the finding was decided by one GPU. At 8 more points they disagree on whether the target can be
-    held at all. The explorer below shows calibration A. On Mooncake's real traces, run again on the
-    validated model on two calibrations, session-sticky and prefix-affinity are within one replica of
-    each other at every speed.</p>
+    measured with <code>kvsim calibrate</code> on a live engine), it held. Then a defect of the
+    simulator's engine was found and fixed (release 0.2.0), and with the fixed engine it holds on B
+    and fails on C. Where all three calibrations give a GPU count (91 of 144 points), they agree
+    within one at 86, and that half of the finding is decided by up to two GPUs. At 9 more points
+    they disagree on whether the target can be held at all. The explorer below shows calibration A.
+    On Mooncake's real traces, run again on the validated model on two calibrations,
+    session-sticky and prefix-affinity are within one replica of each other at every speed.</p>
 
   <h2>Checked against a live vLLM</h2>
   <p>vLLM 0.30.0, Qwen3-4B (fp16), and a small cache of 512 blocks, chosen so that it overflows. Each

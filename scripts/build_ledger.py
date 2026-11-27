@@ -83,6 +83,15 @@ def _across_calibrations(doc: dict) -> str:
             f"{within} within one; {disagree} more disagree on holding the target")
 
 
+def _two_part_ratio(doc: dict) -> str:
+    """The median factor from first-token to two-part GPU counts, as a range over calibrations."""
+    lo, hi = (f(c["median_ratio"] for c in doc["t2c"]["by_calibration"].values())
+              for f in (min, max))
+    if f"{lo:.2f}" == f"{hi:.2f}":
+        return f"a median of {lo:.2f}× the first-token counts, on each calibration"
+    return f"a median of {lo:.2f}–{hi:.2f}× the first-token counts"
+
+
 ROWS = [
     Row("Cache model exact with 1-token and with 64-token answers", "3 of 3 runs, on both",
         f"{RESULTS}/phase3_kaggle_t4/phase3.json", "notebooks/phase3_calibration.ipynb", _exact),
@@ -97,6 +106,11 @@ ROWS = [
     Row("Hit rates on two live replicas (Phase 6)", "within 1.4%",
         f"{RESULTS}/phase6_kaggle_t4/analysis.json", "scripts/phase6_analyze.py",
         lambda d: f"within {max(d['verdict_run1']['s1_max'], d['verdict_run2']['s1_max']):.1%}"),
+    Row("The same hit rates with the engine fixed in 0.2.0 (post hoc)", "within 1.6%",
+        f"{RESULTS}/engine_0_2_0/registered_predictions.json",
+        "scripts/registered_predictions_again.py",
+        lambda d: "within {:.1%}".format(
+            max(r["s1_max_engine_0_2_0"] for r in d["phase6_rules"].values()))),
     Row("Latency on those two replicas, first timing model", "5–222× off",
         f"{RESULTS}/phase6_kaggle_t4/analysis.json", "scripts/phase6_analyze.py",
         lambda d: "{:.0f}–{:.0f}× off".format(*d["p95_ratio_measured_over_predicted"])),
@@ -129,7 +143,7 @@ ROWS = [
             sum(bool(d[k]["holds"]) for k in d["predicted_outcomes"]),
             len(d["predicted_outcomes"]))),
     Row("One calibration's own spread covers the next one's GPU count (C4, rule E)",
-        "82.4% of cases",
+        "83.8% of cases",
         f"{RESULTS}/c4_kaggle_t4/analysis.json", "scripts/c4_analyze.py",
         lambda d: f"{d['e']['coverage']:.1%} of cases"),
     Row("Per-token latency at the knee of the load curve (T1)", "1.54× and 1.71×",
@@ -141,13 +155,10 @@ ROWS = [
         lambda d: "within {:.2f}×".format(
             max(r["A"]["factor"] for r in d["runs"] if r["A"]["factor"] <= 1.5))),
     Row("GPU counts under the two-part target (T2)",
-        "a median of 1.93–2.00× the first-token counts",
-        f"{RESULTS}/t2_two_part_slo/analysis.json", "scripts/t2_analyze.py",
-        lambda d: "a median of {:.2f}–{:.2f}× the first-token counts".format(
-            min(c["median_ratio"] for c in d["t2c"]["by_calibration"].values()),
-            max(c["median_ratio"] for c in d["t2c"]["by_calibration"].values()))),
+        "a median of 2.00× the first-token counts, on each calibration",
+        f"{RESULTS}/t2_two_part_slo/analysis.json", "scripts/t2_analyze.py", _two_part_ratio),
     Row("GPU counts from three calibrations of one GPU type",
-        "92 of 144 cells have a count on all three: 58 equal, 89 within one; 8 more disagree on "
+        "91 of 144 cells have a count on all three: 62 equal, 86 within one; 9 more disagree on "
         "holding the target",
         f"{RESULTS}/c3_kaggle_t4/posthoc_three_calibrations.json", "scripts/c3_posthoc_grid.py",
         _across_calibrations),
@@ -163,28 +174,28 @@ ROWS = [
         lambda d: "{:.0f} of {:,.0f}".format(
             _session(d, "first_token", "session-sticky")["new_tokens_per_session"],
             _session(d, "first_token", "session-sticky")["prompt_tokens_per_session"])),
-    Row("Session-sticky, first-token target", "5 T4s, 27 tokens, ₹0.047",
+    Row("Session-sticky, first-token target", "5 T4s, 27 tokens, ₹0.046",
         f"{RESULTS}/session_cost/session_cost.json", "scripts/session_cost.py",
         lambda d: _cost(d, "first_token", "session-sticky")),
     Row("Round-robin, first-token target", "7 T4s, 669 tokens, ₹0.063",
         f"{RESULTS}/session_cost/session_cost.json", "scripts/session_cost.py",
         lambda d: _cost(d, "first_token", "round-robin")),
-    Row("Balanced prefix-affinity, first-token target", "10 T4s, 438 tokens, ₹0.091",
+    Row("Balanced prefix-affinity, first-token target", "10 T4s, 431 tokens, ₹0.091",
         f"{RESULTS}/session_cost/session_cost.json", "scripts/session_cost.py",
         lambda d: _cost(d, "first_token", "radix-affinity-balanced@16")),
-    Row("Least-loaded, first-token target", "11 T4s, 777 tokens, ₹0.098",
+    Row("Least-loaded, first-token target", "10 T4s, 761 tokens, ₹0.089",
         f"{RESULTS}/session_cost/session_cost.json", "scripts/session_cost.py",
         lambda d: _cost(d, "first_token", "least-loaded")),
-    Row("Session-sticky, two-part target", "10 T4s, 61 tokens, ₹0.091",
+    Row("Session-sticky, two-part target", "10 T4s, 61 tokens, ₹0.092",
         f"{RESULTS}/session_cost/session_cost.json", "scripts/session_cost.py",
         lambda d: _cost(d, "two_part", "session-sticky")),
     Row("Round-robin, two-part target", "14 T4s, 834 tokens, ₹0.126",
         f"{RESULTS}/session_cost/session_cost.json", "scripts/session_cost.py",
         lambda d: _cost(d, "two_part", "round-robin")),
-    Row("Least-loaded, two-part target", "13 T4s, 805 tokens, ₹0.118",
+    Row("Least-loaded, two-part target", "13 T4s, 787 tokens, ₹0.118",
         f"{RESULTS}/session_cost/session_cost.json", "scripts/session_cost.py",
         lambda d: _cost(d, "two_part", "least-loaded")),
-    Row("S1's rupee rule outside its registered cell", "more than 10% off in 4 of 86 cells",
+    Row("S1's rupee rule outside its registered cell", "more than 10% off in 5 of 86 cells",
         f"{RESULTS}/session_cost/session_cost.json", "scripts/session_cost.py",
         lambda d: f"more than 10% off in {_rule_outside_its_cell(d)}"),
     Row("Memory for the block hashes of a 100× trace", "537 MiB for 80,000 requests",
