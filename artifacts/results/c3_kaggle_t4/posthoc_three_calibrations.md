@@ -24,9 +24,9 @@ Same GPU type, model and engine version. Their coefficients:
 | rule | A | B | C |
 |---|---|---|---|
 | (a) at K = 1, balanced affinity wins at no load | ✅ | ✅ | ✅ |
-| (b) at K = 64, balanced affinity wins at one load or more | ⛔ nowhere | ✅ at [2] | ✅ at [1, 2] |
+| (b) at K = 64, balanced affinity wins at one load or more | ⛔ nowhere | ✅ at [2] | ⛔ nowhere |
 | (c) no reversal along K | ✅ | ✅ | ✅ |
-| **H2b** | **FALSIFIED** | **HOLDS** | **HOLDS** |
+| **H2b** | **FALSIFIED** | **HOLDS** | **FALSIFIED** |
 
 ## Replicas needed to hold the SLO — A / B / C (— = not held on 16; bold = the three differ)
 
@@ -37,9 +37,9 @@ Same GPU type, model and engine version. Their coefficients:
 | 0.25 | 1 / 1 / 1 | 1 / 1 / 1 | 1 / 1 / 1 | 1 / 1 / 1 | 1 / 1 / 1 | 1 / 1 / 1 |
 | 0.5 | 2 / 2 / 2 | 2 / 2 / 2 | 2 / 2 / 2 | 2 / 2 / 2 | 2 / 2 / 2 | — / — / — |
 | 1 | 3 / 3 / 3 | 4 / 4 / 4 | — / — / — | **3 / 3 / 4** | **4 / 4 / 5** | — / — / — |
-| 2 | 5 / 5 / 5 | **10 / — / —** | — / — / — | 7 / 7 / 7 | **11 / 10 / 10** | — / — / — |
-| 3 | 6 / 6 / 6 | — / — / — | — / — / — | 9 / 9 / 9 | **14 / 13 / 14** | — / — / — |
-| 4 | **7 / 7 / 8** | — / — / — | — / — / — | 12 / 12 / 12 | — / — / — | — / — / — |
+| 2 | 5 / 5 / 5 | **10 / — / —** | — / — / — | 7 / 7 / 7 | **10 / 11 / 10** | — / — / — |
+| 3 | 6 / 6 / 6 | — / — / — | — / — / — | 9 / 9 / 9 | **12 / 13 / 14** | — / — / — |
+| 4 | **7 / 7 / 8** | — / — / — | — / — / — | 12 / 12 / 12 | **15 / 16 / —** | — / — / — |
 
 ### K = 4
 
@@ -47,40 +47,40 @@ Same GPU type, model and engine version. Their coefficients:
 |---|---|---|---|---|---|---|
 | 0.25 | 1 / 1 / 1 | 1 / 1 / 1 | 1 / 1 / 1 | 1 / 1 / 1 | 1 / 1 / 1 | 1 / 1 / 1 |
 | 0.5 | 2 / 2 / 2 | 2 / 2 / 2 | 2 / 2 / 2 | 2 / 2 / 2 | 2 / 2 / 2 | 2 / 2 / 2 |
-| 1 | 3 / 3 / 3 | **4 / 4 / 5** | **3 / 3 / 4** | 4 / 4 / 4 | **5 / 6 / 5** | **3 / 3 / —** |
-| 2 | 5 / 5 / 5 | **9 / 9 / 10** | — / — / — | 7 / 7 / 7 | **10 / 10 / 11** | — / — / — |
-| 3 | **6 / 6 / 7** | **16 / — / —** | — / — / — | 9 / 9 / 9 | **15 / 16 / 16** | — / — / — |
-| 4 | **9 / 8 / 9** | — / — / — | — / — / — | **12 / 12 / 13** | — / — / — | — / — / — |
+| 1 | 3 / 3 / 3 | **5 / 3 / 5** | **3 / 3 / 4** | 4 / 4 / 4 | **4 / 5 / 4** | **3 / 3 / —** |
+| 2 | 5 / 5 / 5 | 9 / 9 / 9 | — / — / — | 7 / 7 / 7 | **10 / 10 / 12** | — / — / — |
+| 3 | **6 / 6 / 7** | — / — / — | — / — / — | 9 / 9 / 9 | **16 / — / —** | — / — / — |
+| 4 | **8 / 9 / 9** | — / — / — | — / — / — | **12 / 12 / 13** | — / — / — | — / — / — |
 
 ### K = 16
 
 | sessions/s | sticky | balanced α16 | balanced α1 | round-robin | least-loaded | pure affinity |
 |---|---|---|---|---|---|---|
 | 0.25 | 1 / 1 / 1 | 1 / 1 / 1 | 1 / 1 / 1 | 1 / 1 / 1 | 1 / 1 / 1 | 1 / 1 / 1 |
-| 0.5 | **2 / 2 / 3** | **3 / 2 / 3** | 2 / 2 / 2 | 3 / 3 / 3 | **4 / 5 / 5** | 2 / 2 / 2 |
-| 1 | 4 / 4 / 4 | 5 / 5 / 5 | **3 / 3 / 4** | **6 / 5 / 6** | **9 / 10 / 10** | 3 / 3 / 3 |
-| 2 | **7 / 7 / 8** | 9 / 9 / 9 | — / — / — | **11 / 12 / 13** | — / — / — | — / — / — |
-| 3 | 12 / 12 / 12 | **16 / 16 / —** | — / — / — | **16 / 16 / —** | — / — / — | — / — / — |
-| 4 | **16 / 16 / —** | — / — / — | — / — / — | — / — / — | — / — / — | — / — / — |
+| 0.5 | 2 / 2 / 2 | **3 / 2 / 2** | 2 / 2 / 2 | 3 / 3 / 3 | **4 / 5 / 5** | 2 / 2 / 2 |
+| 1 | 4 / 4 / 4 | 5 / 5 / 5 | 3 / 3 / 3 | **6 / 5 / 6** | **9 / 9 / 10** | 3 / 3 / 3 |
+| 2 | **8 / 7 / 8** | **9 / 9 / 10** | — / — / — | **11 / 12 / 13** | — / — / — | — / — / — |
+| 3 | **12 / 12 / 11** | **16 / — / —** | — / — / — | **16 / 16 / —** | — / — / — | — / — / — |
+| 4 | **16 / — / —** | — / — / — | — / — / — | — / — / — | — / — / — | — / — / — |
 
 ### K = 64
 
 | sessions/s | sticky | balanced α16 | balanced α1 | round-robin | least-loaded | pure affinity |
 |---|---|---|---|---|---|---|
-| 0.25 | 2 / 2 / 2 | 2 / 2 / 2 | 2 / 2 / 2 | 2 / 2 / 2 | **3 / 4 / 4** | 2 / 2 / 2 |
-| 0.5 | 3 / 3 / 3 | 3 / 3 / 3 | **3 / 2 / 3** | **4 / 4 / 5** | **7 / 7 / 8** | **3 / 2 / 3** |
-| 1 | **5 / 6 / 6** | **5 / 6 / 5** | **5 / 4 / 4** | 9 / 9 / 9 | **13 / 14 / 16** | **5 / 4 / 4** |
-| 2 | **10 / 12 / 12** | **11 / 11 / 10** | 8 / 8 / 8 | **16 / 16 / —** | — / — / — | — / — / — |
-| 3 | **— / 13 / —** | — / — / — | — / — / — | — / — / — | — / — / — | — / — / — |
+| 0.25 | 2 / 2 / 2 | 2 / 2 / 2 | 2 / 2 / 2 | 2 / 2 / 2 | **3 / 3 / 4** | 2 / 2 / 2 |
+| 0.5 | 3 / 3 / 3 | 3 / 3 / 3 | **2 / 2 / 3** | **4 / 4 / 5** | **7 / 7 / 8** | **2 / 2 / 3** |
+| 1 | **6 / 5 / 5** | 6 / 6 / 6 | 4 / 4 / 4 | 9 / 9 / 9 | **14 / 14 / 15** | 4 / 4 / 4 |
+| 2 | **10 / 12 / 10** | 10 / 10 / 10 | **8 / 7 / 8** | **16 / 16 / —** | — / — / — | — / — / — |
+| 3 | **— / 16 / 14** | — / — / — | — / — / — | — / — / — | — / — / — | — / — / — |
 | 4 | — / — / — | — / — / — | — / — / — | — / — / — | — / — / — | — / — / — |
 
 ## How much does a calibration move the counts?
 
-- **102 of 144** (K, load, policy) cells need the same number of replicas on all three; **138** differ by at most one. Where all three hold the SLO, the largest spread is 3 replicas.
-- At **8** cells the calibrations disagree on whether the SLO can be held on 16 replicas at all.
-- Session-sticky needs the fewest replicas, or ties for them: A 22 of 24 · B 20 of 24 · C 20 of 24; on all three at the same point: **19 of 24**.
-- By number of prompts, the points where sticky is best or tied on all three: K 1: 6 of 6 · K 4: 6 of 6 · K 16: 4 of 6 · K 64: 3 of 6.
-- Points where sticky needs **no more** replicas than the other policy on every calibration: balanced α16 22 of 24 · balanced α1 19 of 24 · round-robin 24 of 24 · least-loaded 24 of 24 · pure affinity 20 of 24.
+- **106 of 144** (K, load, policy) cells need the same number of replicas on all three; **135** differ by at most one. Where all three hold the SLO, the largest spread is 2 replicas.
+- At **9** cells the calibrations disagree on whether the SLO can be held on 16 replicas at all.
+- Session-sticky needs the fewest replicas, or ties for them: A 20 of 24 · B 20 of 24 · C 21 of 24; on all three at the same point: **20 of 24**.
+- By number of prompts, the points where sticky is best or tied on all three: K 1: 6 of 6 · K 4: 6 of 6 · K 16: 5 of 6 · K 64: 3 of 6.
+- Points where sticky needs **no more** replicas than the other policy on every calibration: balanced α16 23 of 24 · balanced α1 20 of 24 · round-robin 24 of 24 · least-loaded 24 of 24 · pure affinity 21 of 24.
 
 ## Which comparisons come out the same on all three
 
@@ -88,8 +88,8 @@ For each pair, the (K, load) points where all three calibrations agree on who ne
 
 | pair | first fewer | tie | second fewer | calibrations disagree |
 |---|---:|---:|---:|---|
-| sticky vs balanced α16 | 11 | 8 | 0 | K 16 @ 0.5/s (A 2 v 3, B 2 v 2, C 3 v 3); K 16 @ 4/s (A 16 v —, B 16 v —, C — v —); K 64 @ 1/s (A 5 v 5, B 6 v 6, C 6 v 5); K 64 @ 2/s (A 10 v 11, B 12 v 11, C 12 v 10); K 64 @ 3/s (A — v —, B 13 v —, C — v —) |
-| sticky vs balanced α1 | 9 | 7 | 1 | K 4 @ 1/s (A 3 v 3, B 3 v 3, C 3 v 4); K 16 @ 0.5/s (A 2 v 2, B 2 v 2, C 3 v 2); K 16 @ 1/s (A 4 v 3, B 4 v 3, C 4 v 4); K 16 @ 4/s (A 16 v —, B 16 v —, C — v —); K 64 @ 0.5/s (A 3 v 3, B 3 v 2, C 3 v 3); K 64 @ 1/s (A 5 v 5, B 6 v 4, C 6 v 4); K 64 @ 3/s (A — v —, B 13 v —, C — v —) |
-| sticky vs round-robin | 13 | 7 | 0 | K 1 @ 1/s (A 3 v 3, B 3 v 3, C 3 v 4); K 16 @ 0.5/s (A 2 v 3, B 2 v 3, C 3 v 3); K 16 @ 4/s (A 16 v —, B 16 v —, C — v —); K 64 @ 3/s (A — v —, B 13 v —, C — v —) |
-| sticky vs least-loaded | 16 | 6 | 0 | K 16 @ 4/s (A 16 v —, B 16 v —, C — v —); K 64 @ 3/s (A — v —, B 13 v —, C — v —) |
-| sticky vs pure affinity | 11 | 6 | 1 | K 4 @ 1/s (A 3 v 3, B 3 v 3, C 3 v —); K 16 @ 0.5/s (A 2 v 2, B 2 v 2, C 3 v 2); K 16 @ 4/s (A 16 v —, B 16 v —, C — v —); K 64 @ 0.5/s (A 3 v 3, B 3 v 2, C 3 v 3); K 64 @ 1/s (A 5 v 5, B 6 v 4, C 6 v 4); K 64 @ 3/s (A — v —, B 13 v —, C — v —) |
+| sticky vs balanced α16 | 10 | 8 | 0 | K 4 @ 1/s (A 3 v 5, B 3 v 3, C 3 v 5); K 16 @ 0.5/s (A 2 v 3, B 2 v 2, C 2 v 2); K 16 @ 4/s (A 16 v —, B — v —, C — v —); K 64 @ 1/s (A 6 v 6, B 5 v 6, C 5 v 6); K 64 @ 2/s (A 10 v 10, B 12 v 10, C 10 v 10); K 64 @ 3/s (A — v —, B 16 v —, C 14 v —) |
+| sticky vs balanced α1 | 9 | 8 | 3 | K 4 @ 1/s (A 3 v 3, B 3 v 3, C 3 v 4); K 16 @ 4/s (A 16 v —, B — v —, C — v —); K 64 @ 0.5/s (A 3 v 2, B 3 v 2, C 3 v 3); K 64 @ 3/s (A — v —, B 16 v —, C 14 v —) |
+| sticky vs round-robin | 14 | 7 | 0 | K 1 @ 1/s (A 3 v 3, B 3 v 3, C 3 v 4); K 16 @ 4/s (A 16 v —, B — v —, C — v —); K 64 @ 3/s (A — v —, B 16 v —, C 14 v —) |
+| sticky vs least-loaded | 16 | 6 | 0 | K 16 @ 4/s (A 16 v —, B — v —, C — v —); K 64 @ 3/s (A — v —, B 16 v —, C 14 v —) |
+| sticky vs pure affinity | 11 | 7 | 2 | K 4 @ 1/s (A 3 v 3, B 3 v 3, C 3 v —); K 16 @ 4/s (A 16 v —, B — v —, C — v —); K 64 @ 0.5/s (A 3 v 2, B 3 v 2, C 3 v 3); K 64 @ 3/s (A — v —, B 16 v —, C 14 v —) |
