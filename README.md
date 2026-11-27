@@ -58,8 +58,14 @@ would have saved them.
 | | round-robin | 14 | 80.1% | 834 (785 to 889) | 0.126 |
 
 These numbers are simulated, on calibration A of one T4 (vLLM 0.30.0, Qwen3-4B), with generated
-traffic. The intervals are bootstrap intervals over sessions. A policy with no row did not meet the
-target at any GPU count of the grid. Session-sticky's 27 tokens are the shared prompt, computed once
+traffic. The intervals are bootstrap intervals over sessions. Rupees are for a T4 at $0.526 an hour
+and ₹95.87 a dollar, both cited and dated in `configs/cost_model.yaml`. The grid ran six policies.
+A policy with no row did not meet the target at any GPU count of the grid: pure prefix-affinity and
+prefix-affinity with a load weight of 1 under the first-token target, and every form of
+prefix-affinity under both targets. A higher hit rate does not mean fewer GPUs. Prefix-affinity
+sends the sessions that share a prompt to the GPUs that already hold it. Those GPUs get more of the
+load, and the p95 time to first token follows the busiest one. `kvsim replay` checks both targets
+by default (`--tpot-slo-ms 0` sizes on the first token alone). Session-sticky's 27 tokens are the shared prompt, computed once
 on each extra GPU. That is a one-time cost of 4 × 1,360 tokens, not a rate. Per session it would be
 half as much in a trace twice as long, and its interval only shows which sessions paid it.
 Round-robin's 669 is mostly a rate. Rupees are counted over the whole run of a short trace. A
@@ -193,7 +199,7 @@ is on PyPI: `pip install kv-routing-sim` (see Install).
 | 4 | How good is a GPU count from this? | Where three calibrations all give a count (92 of 144 cells), they are equal in 58 and within one in 89 | In 3 cells they are two or three apart. In 8 more they disagree on whether the target can be held at all, once 10 GPUs against "not on 16". The spread of one calibration covers the next one's count in 82.4% of cases, where the rule was 90% (C4). All of this compares calibrations with each other. No count above two replicas has been checked on a live fleet |
 | 5 | Is the routing result new? | No. SMetric and LMetric published it first. This project agrees with them, independently, on a small calibrated model | Of four rules for those two policies, ported and run on a production trace, 2 held (R3) |
 | 6 | Does session-sticky always win? | With one shared prompt or with four, on all three calibrations, it needs the fewest GPUs or ties | With 64 tenant prompts it is not settled (H2b). Sessions of unequal length are not tested here. SMetric measured a 2.17× imbalance |
-| 7 | Rupees per what, and over what time? | Per 1,000 requests that met the target, for a T4 at $0.526 an hour and ₹95.87 a dollar. Both are cited and dated in `configs/cost_model.yaml` | Counted over the whole run of a short trace. A service that ran all day would pay about a quarter less |
+| 7 | Rupees per what, and over what time? | Per agent session in the cost table near the top. Per 1,000 requests that met the target on the demo page and in `kvsim replay`. Both for a T4 at $0.526 an hour and ₹95.87 a dollar, cited and dated in `configs/cost_model.yaml` | Counted over the whole run of a short trace. A service that ran all day would pay about a quarter less |
 | 8 | Real traffic? | Three public traces, each test registered before it ran. One of them (AgentX, 739 coding-agent sessions) was also replayed whole, at its recorded size. The cache model served exactly what the raw file allows. With 1 Mi tokens of cache per replica, round-robin computed 46.64% of the prompt tokens again, and session-sticky 1.32% (L1) | The time-based tests ran on traces scaled down 16 to 64 times. R1 failed twice, R2 could not be tested on the checked timing model, and R3 held in 2 of 4 rules. The full-size replay has no timing, because no GPU here was timed on prompts that long |
 | 9 | What breaks first at 100×? | Memory for block hashes: 537 MiB for 80,000 requests, before the simulation starts | Whether many real replicas stay matched cannot be answered on a CPU. Two live replicas are the most that was measured |
 | 10 | Can I rebuild your tables myself? | `python scripts/reproduce.py`: thirteen steps, about 20 minutes on a laptop. Every file a step writes is compared with the committed one | It runs the analysis of each GPU run again, on the raw files stored here. It cannot repeat a GPU measurement. Not covered yet: the first two sweeps, H6, the scale test, the real-trace runs, and the stored grids that some analyses start from |
