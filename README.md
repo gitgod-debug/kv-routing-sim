@@ -110,40 +110,40 @@ Of 21 rows, 11 held (H4 only in an amended form), 4 failed, and 6 held in part o
 <!-- ledger:start -->
 | Claim | Number | Results file | Made by | Commit |
 |---|---|---|---|---|
-| Cache model exact with 1-token and with 64-token answers | 3 of 3 runs, on both | [`phase3.json`](artifacts/results/phase3_kaggle_t4/phase3.json) | `notebooks/phase3_calibration.ipynb` | `a3112cd` |
-| The same test on vLLM 0.34.0 (V1) | 3 of 3 runs, on both | [`phase3.json`](artifacts/results/v034_kaggle_t4/phase3.json) | `notebooks/v034_recheck_t4.ipynb` | `4eb4dc1` |
-| A third, concurrent workload (H3) | +0.3% | [`fitted_profile.json`](artifacts/results/phase3_kaggle_t4/fitted_profile.json) | `scripts/phase3_analyze.py` | `a3112cd` |
-| What a naive cache model misses (H4) | −11.9 points | [`phase3.json`](artifacts/results/phase3_kaggle_t4/phase3.json) | `notebooks/phase3_calibration.ipynb` | `a3112cd` |
-| Hit rates on two live replicas (Phase 6) | within 1.4% | [`analysis.json`](artifacts/results/phase6_kaggle_t4/analysis.json) | `scripts/phase6_analyze.py` | `760e508` |
-| Latency on those two replicas, first timing model | 5–222× off | [`analysis.json`](artifacts/results/phase6_kaggle_t4/analysis.json) | `scripts/phase6_analyze.py` | `760e508` |
-| The calibration command's cache check (C1) | 48 of 48 requests | [`c1.json`](artifacts/results/c1_kaggle_t4/c1.json) | `notebooks/c1_calibrate_t4.ipynb` | `760e508` |
-| Timing: three predictions (C2) | 1.92×, 1.00×, within 1.41× | [`analysis.json`](artifacts/results/c2_kaggle_t4/analysis.json) | `scripts/c2_analyze.py` | `43dd893` |
-| p95 time to first token on traffic the fit never saw | within 1.41× | [`analysis.json`](artifacts/results/c2_kaggle_t4/analysis.json) | `scripts/c2_analyze.py` | `43dd893` |
-| One p95 time to first token at the knee, on a second calibration (C3) | 4.17× off | [`analysis.json`](artifacts/results/c3_kaggle_t4/analysis.json) | `scripts/c3_analyze.py` | `4d277f7` |
-| A profile fitted on a real GPU, on traffic it never saw; an older profile, another day (C3) | within 1.41× and 1.38× | [`analysis.json`](artifacts/results/c3_kaggle_t4/analysis.json) | `scripts/c3_analyze.py` | `4d277f7` |
-| p95 time per output token around the limit (C4) | within 7% | [`analysis.json`](artifacts/results/c4_kaggle_t4/analysis.json) | `scripts/c4_analyze.py` | `68196ca` |
-| Nine rules for per-token timing (C4) | 7 of 9 held | [`analysis.json`](artifacts/results/c4_kaggle_t4/analysis.json) | `scripts/c4_analyze.py` | `68196ca` |
-| One calibration's own spread covers the next one's GPU count (C4, rule E) | 82.4% of cases | [`analysis.json`](artifacts/results/c4_kaggle_t4/analysis.json) | `scripts/c4_analyze.py` | `68196ca` |
-| Per-token latency at the knee of the load curve (T1) | 1.54× and 1.71× | [`t1.json`](artifacts/results/t1_itl/t1.json) | `scripts/t1_itl_check.py` | `c6305ec` |
-| Per-token latency off the knee (T1) | within 1.07× | [`t1.json`](artifacts/results/t1_itl/t1.json) | `scripts/t1_itl_check.py` | `c6305ec` |
-| GPU counts under the two-part target (T2) | a median of 1.93–2.00× the first-token counts | [`analysis.json`](artifacts/results/t2_two_part_slo/analysis.json) | `scripts/t2_analyze.py` | `c6305ec` |
-| GPU counts from three calibrations of one GPU type | 92 of 144 cells have a count on all three: 58 equal, 89 within one; 8 more disagree on holding the target | [`posthoc_three_calibrations.json`](artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.json) | `scripts/c3_posthoc_grid.py` | `4d277f7` |
-| Ranking of policies across hardware (H6) | τ-b down to 0.51 | [`h6.json`](artifacts/results/h6_ranking/h6.json) | `scripts/run_h6.py` | `e17bc76` |
-| Two published policies on a production trace (R3) | 2 of 4 held | [`analysis.json`](artifacts/results/r3_bailian/analysis.json) | `scripts/r3_analyze.py` | `065d078` |
-| New tokens in a session | 519 of 6,800 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `406a986` |
-| Session-sticky, first-token target | 5 T4s, 27 tokens, ₹0.047 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `406a986` |
-| Round-robin, first-token target | 7 T4s, 669 tokens, ₹0.063 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `406a986` |
-| Balanced prefix-affinity, first-token target | 10 T4s, 438 tokens, ₹0.091 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `406a986` |
-| Least-loaded, first-token target | 11 T4s, 777 tokens, ₹0.098 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `406a986` |
-| Session-sticky, two-part target | 10 T4s, 61 tokens, ₹0.091 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `406a986` |
-| Round-robin, two-part target | 14 T4s, 834 tokens, ₹0.126 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `406a986` |
-| Least-loaded, two-part target | 13 T4s, 805 tokens, ₹0.118 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `406a986` |
-| S1's rupee rule outside its registered cell | more than 10% off in 4 of 86 cells | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `406a986` |
-| Memory for the block hashes of a 100× trace | 537 MiB for 80,000 requests | [`scale.json`](artifacts/results/scale/scale.json) | `scripts/measure_scale.py` | `e1b9f8b` |
-| A public trace replayed whole, at its recorded size (L1) | 739 sessions, 53,967 requests, 7.8 billion prompt tokens | [`l1.json`](artifacts/results/l1_agentx_full/l1.json) | `scripts/run_l1.py` | `2f5dd79` |
-| At that size, one replica that never evicts against the raw file (L1a) | 53,967 of 53,967 requests exact | [`l1.json`](artifacts/results/l1_agentx_full/l1.json) | `scripts/run_l1.py` | `2f5dd79` |
-| Computed again with 1 Mi tokens of cache per replica: round-robin, session-sticky (L1) | 46.64% and 1.32% of prompt tokens | [`l1.json`](artifacts/results/l1_agentx_full/l1.json) | `scripts/run_l1.py` | `2f5dd79` |
-| Engine, block size and cache of the timing profile | vLLM 0.30.0, 16 tokens, 1,537 blocks | [`t4-qwen3-4b-vllm0.30.0-ctx.json`](configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json) | `scripts/c2_analyze.py` | `bb6137e` |
+| Cache model exact with 1-token and with 64-token answers | 3 of 3 runs, on both | [`phase3.json`](artifacts/results/phase3_kaggle_t4/phase3.json) | `notebooks/phase3_calibration.ipynb` | `f7f089e` |
+| The same test on vLLM 0.34.0 (V1) | 3 of 3 runs, on both | [`phase3.json`](artifacts/results/v034_kaggle_t4/phase3.json) | `notebooks/v034_recheck_t4.ipynb` | `a5bcb8d` |
+| A third, concurrent workload (H3) | +0.3% | [`fitted_profile.json`](artifacts/results/phase3_kaggle_t4/fitted_profile.json) | `scripts/phase3_analyze.py` | `f7f089e` |
+| What a naive cache model misses (H4) | −11.9 points | [`phase3.json`](artifacts/results/phase3_kaggle_t4/phase3.json) | `notebooks/phase3_calibration.ipynb` | `f7f089e` |
+| Hit rates on two live replicas (Phase 6) | within 1.4% | [`analysis.json`](artifacts/results/phase6_kaggle_t4/analysis.json) | `scripts/phase6_analyze.py` | `a025690` |
+| Latency on those two replicas, first timing model | 5–222× off | [`analysis.json`](artifacts/results/phase6_kaggle_t4/analysis.json) | `scripts/phase6_analyze.py` | `a025690` |
+| The calibration command's cache check (C1) | 48 of 48 requests | [`c1.json`](artifacts/results/c1_kaggle_t4/c1.json) | `notebooks/c1_calibrate_t4.ipynb` | `a025690` |
+| Timing: three predictions (C2) | 1.92×, 1.00×, within 1.41× | [`analysis.json`](artifacts/results/c2_kaggle_t4/analysis.json) | `scripts/c2_analyze.py` | `27b8958` |
+| p95 time to first token on traffic the fit never saw | within 1.41× | [`analysis.json`](artifacts/results/c2_kaggle_t4/analysis.json) | `scripts/c2_analyze.py` | `27b8958` |
+| One p95 time to first token at the knee, on a second calibration (C3) | 4.17× off | [`analysis.json`](artifacts/results/c3_kaggle_t4/analysis.json) | `scripts/c3_analyze.py` | `38e6a1b` |
+| A profile fitted on a real GPU, on traffic it never saw; an older profile, another day (C3) | within 1.41× and 1.38× | [`analysis.json`](artifacts/results/c3_kaggle_t4/analysis.json) | `scripts/c3_analyze.py` | `38e6a1b` |
+| p95 time per output token around the limit (C4) | within 7% | [`analysis.json`](artifacts/results/c4_kaggle_t4/analysis.json) | `scripts/c4_analyze.py` | `8df8343` |
+| Nine rules for per-token timing (C4) | 7 of 9 held | [`analysis.json`](artifacts/results/c4_kaggle_t4/analysis.json) | `scripts/c4_analyze.py` | `8df8343` |
+| One calibration's own spread covers the next one's GPU count (C4, rule E) | 82.4% of cases | [`analysis.json`](artifacts/results/c4_kaggle_t4/analysis.json) | `scripts/c4_analyze.py` | `8df8343` |
+| Per-token latency at the knee of the load curve (T1) | 1.54× and 1.71× | [`t1.json`](artifacts/results/t1_itl/t1.json) | `scripts/t1_itl_check.py` | `326fadf` |
+| Per-token latency off the knee (T1) | within 1.07× | [`t1.json`](artifacts/results/t1_itl/t1.json) | `scripts/t1_itl_check.py` | `326fadf` |
+| GPU counts under the two-part target (T2) | a median of 1.93–2.00× the first-token counts | [`analysis.json`](artifacts/results/t2_two_part_slo/analysis.json) | `scripts/t2_analyze.py` | `326fadf` |
+| GPU counts from three calibrations of one GPU type | 92 of 144 cells have a count on all three: 58 equal, 89 within one; 8 more disagree on holding the target | [`posthoc_three_calibrations.json`](artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.json) | `scripts/c3_posthoc_grid.py` | `38e6a1b` |
+| Ranking of policies across hardware (H6) | τ-b down to 0.51 | [`h6.json`](artifacts/results/h6_ranking/h6.json) | `scripts/run_h6.py` | `a090ca0` |
+| Two published policies on a production trace (R3) | 2 of 4 held | [`analysis.json`](artifacts/results/r3_bailian/analysis.json) | `scripts/r3_analyze.py` | `567b666` |
+| New tokens in a session | 519 of 6,800 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `ba8e4b6` |
+| Session-sticky, first-token target | 5 T4s, 27 tokens, ₹0.047 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `ba8e4b6` |
+| Round-robin, first-token target | 7 T4s, 669 tokens, ₹0.063 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `ba8e4b6` |
+| Balanced prefix-affinity, first-token target | 10 T4s, 438 tokens, ₹0.091 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `ba8e4b6` |
+| Least-loaded, first-token target | 11 T4s, 777 tokens, ₹0.098 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `ba8e4b6` |
+| Session-sticky, two-part target | 10 T4s, 61 tokens, ₹0.091 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `ba8e4b6` |
+| Round-robin, two-part target | 14 T4s, 834 tokens, ₹0.126 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `ba8e4b6` |
+| Least-loaded, two-part target | 13 T4s, 805 tokens, ₹0.118 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `ba8e4b6` |
+| S1's rupee rule outside its registered cell | more than 10% off in 4 of 86 cells | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `ba8e4b6` |
+| Memory for the block hashes of a 100× trace | 537 MiB for 80,000 requests | [`scale.json`](artifacts/results/scale/scale.json) | `scripts/measure_scale.py` | `fde6cf6` |
+| A public trace replayed whole, at its recorded size (L1) | 739 sessions, 53,967 requests, 7.8 billion prompt tokens | [`l1.json`](artifacts/results/l1_agentx_full/l1.json) | `scripts/run_l1.py` | `07d0913` |
+| At that size, one replica that never evicts against the raw file (L1a) | 53,967 of 53,967 requests exact | [`l1.json`](artifacts/results/l1_agentx_full/l1.json) | `scripts/run_l1.py` | `07d0913` |
+| Computed again with 1 Mi tokens of cache per replica: round-robin, session-sticky (L1) | 46.64% and 1.32% of prompt tokens | [`l1.json`](artifacts/results/l1_agentx_full/l1.json) | `scripts/run_l1.py` | `07d0913` |
+| Engine, block size and cache of the timing profile | vLLM 0.30.0, 16 tokens, 1,537 blocks | [`t4-qwen3-4b-vllm0.30.0-ctx.json`](configs/profiles/t4-qwen3-4b-vllm0.30.0-ctx.json) | `scripts/c2_analyze.py` | `30e689d` |
 <!-- ledger:end -->
 
 `python scripts/build_ledger.py --check` reads every number from its file again and compares it
