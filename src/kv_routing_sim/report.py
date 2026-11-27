@@ -162,10 +162,10 @@ def _spread_section(report: dict[str, Any]) -> list[str]:
         "",
         ("This is how much one calibration's own repeats disagree: a floor on the uncertainty, "
          "not a confidence interval. On a live T4, another calibration run within the hour gave "
-         "a count outside a run's own range in 18% of cases, and outside it by more than one "
+         "a count outside a run's own range in 16% of cases, and outside it by more than one "
          "replica in 5%, so size for the top of the range, plus one. The range says nothing "
          "about another day or another software image. Three calibrations of one GPU type all "
-         "gave a count at 92 of 144 points: the same one at 58 and within one replica at 89. At 8 "
+         "gave a count at 91 of 144 points: the same one at 62 and within one replica at 86. At 9 "
          "more points they disagreed on whether the target could be held at all."),
         "",
     ]

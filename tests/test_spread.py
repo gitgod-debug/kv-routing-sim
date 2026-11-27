@@ -96,10 +96,10 @@ def test_replay_shows_how_firm_its_recommendation_is(tmp_path, capsys):
     assert "How firm: 3 to 4 replicas across the calibration's 3 repeats" in out
     assert "| session-sticky | 3 | 3 · 4 · 3 |" in out and "| round-robin | 5 | 5 · 7 · 5 |" in out
     assert "a floor on the uncertainty, not a confidence interval" in out
-    # A run's own range covers another run's count in 82% of cases, so the report says to add
+    # A run's own range covers another run's count in 84% of cases, so the report says to add
     # one replica and cites that figure.
     assert "size for the larger, plus one" in out
-    assert "outside a run's own range in 18% of cases" in out and "plus one." in out
+    assert "outside a run's own range in 16% of cases" in out and "plus one." in out
 
     # Repeats that agree say so in one line and still allow one replica more: most misses on a
     # live T4 were of ranges that were a single count.
@@ -138,3 +138,26 @@ def test_the_spread_reaches_the_json_output(tmp_path):
                  "--out", str(out)]) == 0
     payload = json.loads(out.read_text())
     assert payload["replica_spread"] is None and payload["replica_spread_note"] is None
+
+
+
+def test_the_notes_quote_the_stored_comparisons():
+    """Two fixed notes of the report quote stored results. They must change when those do."""
+    from kv_routing_sim import report, service
+
+    results = REPO / "artifacts" / "results"
+    three = json.loads((results / "c3_kaggle_t4" / "posthoc_three_calibrations.json").read_text())
+    cells = [c for row in three["required_replicas"].values() for c in row.values()]
+    held = [c for c in cells if max(c) <= 16]  # 17 means not held on 16
+    words = (f"{len(held)} of {len(cells)} points",
+             f"the same one at {sum(len(set(c)) == 1 for c in held)}",
+             f"within one replica at {sum(max(c) - min(c) <= 1 for c in held)}",
+             f"{sum(min(c) <= 16 < max(c) for c in cells)} more")
+    spread = {"repeats": 3, "swept_up_to": 8, "replicas": {"session-sticky": {
+        "pooled": 3, "repeats": [3, 4, 3]}}}
+    shown = " ".join(report._spread_section({"replica_spread": spread}))
+    for text in (service.SPREAD_UNAVAILABLE, shown):
+        assert all(w in text for w in words), text
+    e = json.loads((results / "c4_kaggle_t4" / "analysis.json").read_text())["e"]
+    assert f"outside a run's own range in {round((1 - e['coverage']) * 100)}% of cases" in shown
+    assert f"more than one replica in {round((1 - e['coverage_within_one']) * 100)}%" in shown
