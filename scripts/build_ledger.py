@@ -162,7 +162,7 @@ ROWS = [
         "holding the target",
         f"{RESULTS}/c3_kaggle_t4/posthoc_three_calibrations.json", "scripts/c3_posthoc_grid.py",
         _across_calibrations),
-    Row("Ranking of policies across hardware (H6)", "τ-b down to 0.51",
+    Row("Ranking of policies across hardware (H6, engine of 0.1.2)", "τ-b down to 0.51",
         f"{RESULTS}/h6_ranking/h6.json", "scripts/run_h6.py",
         lambda d: f"τ-b down to {min(v['min_tau_b'] for v in d['verdicts'].values()):.2f}"),
     Row("Two published policies on a production trace (R3)", "2 of 4 held",

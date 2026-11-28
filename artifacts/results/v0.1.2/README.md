@@ -14,6 +14,8 @@ usual paths under `artifacts/results/`. The README says what changed.
 
 To compute these numbers again, check out tag `v0.1.2` and run the same script, or install
 release 0.1.2 (`pip install kv-routing-sim==0.1.2`). In the current code the old engine is still
-there: `run(..., engine_version="0.1.2")`, or `with use_engine("0.1.2"):` around a script's code.
+there for single runs: `run(..., engine_version="0.1.2")`, or `with use_engine("0.1.2"):` in the
+same process. The grid scripts start worker processes. From Python 3.14 on, and on macOS, those
+do not inherit it. So use the tag for a grid.
 
 A file that 0.2.0 did not change is not copied here. It is the same in both releases.

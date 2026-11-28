@@ -86,7 +86,7 @@ Of 21 rows, 11 held (H4 only in an amended form), 4 failed, and 6 held in part o
 | **H3** | calibration error in single digits (%) on two workload shapes | ✅ held: zero error on two shapes, +0.3% on a third |
 | **H4** | the residual of a naive cache model is eviction-order skew | ✅ held, in an amended form: it is capacity skew (−11.9 points) |
 | **H5** | the cost win is one fewer replica at a fixed target | ✅⛔ in part: only for balanced prefix-affinity at low sharing |
-| **H6** | the ranking of policies does not depend on the hardware | ✅⛔ in part: the ranking moves (τ-b down to 0.51), but the direction of the flip does not. First timing model only |
+| **H6** | the ranking of policies does not depend on the hardware | ✅⛔ in part: the ranking moves (τ-b down to 0.51), but the direction of the flip does not. First timing model only, and stored from the engine of 0.1.2 |
 | **R1** | on the Mooncake trace, prefix-affinity beats session-sticky on tool-agent traffic and never on conversation | ⛔ failed: prefix-affinity did not win on tool-agent traffic. The conversation half held (it failed with the engine of 0.1.2) |
 | **R2** | on the AgentX trace, session-sticky and balanced prefix-affinity tie | ✅ held, on the first timing model |
 | **R1, R2 again** | the same two on the checked timing model: R1 fails again, R2 holds | ✅⛔ in part: R1 failed again, as predicted. R2 could not be tested as designed |
@@ -136,7 +136,7 @@ Of 21 rows, 11 held (H4 only in an amended form), 4 failed, and 6 held in part o
 | Per-token latency off the knee (T1) | within 1.07× | [`t1.json`](artifacts/results/t1_itl/t1.json) | `scripts/t1_itl_check.py` | `326fadf` |
 | GPU counts under the two-part target (T2) | a median of 2.00× the first-token counts, on each calibration | [`analysis.json`](artifacts/results/t2_two_part_slo/analysis.json) | `scripts/t2_analyze.py` | `f14fb99` |
 | GPU counts from three calibrations of one GPU type | 91 of 144 cells have a count on all three: 62 equal, 86 within one; 9 more disagree on holding the target | [`posthoc_three_calibrations.json`](artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.json) | `scripts/c3_posthoc_grid.py` | `080f615` |
-| Ranking of policies across hardware (H6) | τ-b down to 0.51 | [`h6.json`](artifacts/results/h6_ranking/h6.json) | `scripts/run_h6.py` | `a090ca0` |
+| Ranking of policies across hardware (H6, engine of 0.1.2) | τ-b down to 0.51 | [`h6.json`](artifacts/results/h6_ranking/h6.json) | `scripts/run_h6.py` | `a090ca0` |
 | Two published policies on a production trace (R3) | 2 of 4 held | [`analysis.json`](artifacts/results/r3_bailian/analysis.json) | `scripts/r3_analyze.py` | `20a6821` |
 | New tokens in a session | 519 of 6,800 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `eac9db9` |
 | Session-sticky, first-token target | 5 T4s, 27 tokens, ₹0.046 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `eac9db9` |
@@ -226,13 +226,14 @@ of them one part changed: H2b on calibration C, and the conversation half of R1.
   target can be held at all.
 - C4: seven of its nine rules hold, as before. Rule E: one run's own range covers another run's
   count in 83.8% of cases (82.4%). The rule asked for 90%, so it still fails. Rule F2 still fails,
-  now on another of the three fits.
+  now on one of the three fits. It was two.
 - T2: its three rules still hold. With both targets, the GPU counts are a median of 2.00 times
   the first-token counts on each calibration (1.93 to 2.00). H2b's rules under both targets, looked
   at after the test and not registered there, now hold on all three calibrations (C failed).
 - S1, the session cost table: its three predictions still hold. At one prompt and 2 sessions/s,
-  least-loaded now needs 10 T4s, not 11 (₹0.089 a session, not ₹0.098). Other cells moved by a
-  few tokens or a paisa. Its rupee rule fails in 5 of 86 cells outside the registered one (4).
+  least-loaded now needs 10 T4s, not 11 (₹0.089 a session, not ₹0.098). The other rows of that
+  table moved by at most 18 tokens and ₹0.001. Its rupee rule fails in 5 of 86 cells outside the
+  registered one (4).
 - R1, on the first timing model: still failed. Prefix-affinity still does not win on tool-agent
   traffic. On conversation it now never wins, as predicted. With the old engine it won at one
   speed, so that half failed too.
@@ -274,8 +275,29 @@ scratch run of the fixed engine had given H2b's rule as holding on all three cal
 run had only the first part of the fix. With the whole fix, the rule holds on B only. The file
 stays as it was written.
 
-**Not derived again.** H6 ran on the engine of 0.1.2 and is not run again, as decided when it
-failed. L1 has no timing, so the fix cannot change it. The scale test measures this machine.
+**Not derived again.** H6 is stored from the engine of 0.1.2. It is not run again, as decided when
+it failed: a failed test is not repeated until it passes. Its two scripts were run once with the
+fixed engine, to see, and that run was not stored. Each half kept its verdict, and the H6 numbers
+in this README came out the same. L1 was kept by the registration, which says that its steps take
+no time. That is not exact: they take a nanosecond. So L1 was run again with the fixed engine.
+Every count came out the same, and only the run times differ, so its stored files stay. The scale
+test measures this machine. The speed probes of R1, R2 and R3 chose those tests' speeds before the
+tests were registered, so they stay as they are.
+
+**How a log is read.** Release 0.1.3 fixed the reading of a user's own log. A second review before
+this release found more gaps, and 0.2.0 closes them:
+- A log with timestamps in milliseconds was read as seconds, which made the load a thousand times
+  lower. Such a log is refused now.
+- When lines are skipped, or when a request's `max_tokens` stands in for a missing answer length,
+  the report says so next to its recommendation. Before, only the statistics at its end did.
+- AgentX sessions that share an id are kept apart and counted. Before, they were read as one
+  session that re-read its own blocks.
+- A copy of a shipped profile, given as a file, warns about prompts outside its measured range,
+  as the profile does when it is given by name.
+- A value of the wrong type is refused: `true` where a count belongs, or `"false"` in quotes for
+  `calibrated`.
+- The fleet size, the token scale and the arrival rate have limits. An unwritable output path, a
+  malformed engine address and a line nested too deep now end in one line, not in a traceback.
 
 ## Ten questions a skeptic should ask
 
@@ -290,7 +312,7 @@ failed. L1 has no timing, so the fix cannot change it. The scale test measures t
 | 7 | Rupees per what, and over what time? | Per agent session in the cost table near the top. Per 1,000 requests that met the target on the demo page and in `kvsim replay`. Both for a T4 at $0.526 an hour and ₹95.87 a dollar, cited and dated in `configs/cost_model.yaml` | Counted over the whole run of a short trace. A service that ran all day would pay about a quarter less |
 | 8 | Real traffic? | Three public traces, each test registered before it ran. One of them (AgentX, 739 coding-agent sessions) was also replayed whole, at its recorded size. The cache model served exactly what the raw file allows. With 1 Mi tokens of cache per replica, round-robin computed 46.64% of the prompt tokens again, and session-sticky 1.32% (L1) | The time-based tests ran on traces scaled down 16 to 64 times. R1 failed twice, R2 could not be tested on the checked timing model, and R3 held in 2 of 4 rules. The full-size replay has no timing, because no GPU here was timed on prompts that long |
 | 9 | What breaks first at 100×? | Memory for block hashes: 537 MiB for 80,000 requests, before the simulation starts | Whether many real replicas stay matched cannot be answered on a CPU. Two live replicas are the most that was measured |
-| 10 | Can I rebuild your tables myself? | `python scripts/reproduce.py`: thirteen steps, about 12 minutes on a laptop. Every file a step writes is compared with the committed one | It runs the analysis of each GPU run again, on the raw files stored here. It cannot repeat a GPU measurement. Not covered yet: the first two sweeps, H6, the scale test, the real-trace runs, and the stored grids that some analyses start from |
+| 10 | Can I rebuild your tables myself? | `python scripts/reproduce.py`: twenty-one steps, about 13 minutes on a laptop. Every file a step writes is compared with the committed one | It runs the analysis of each GPU run again, on the raw files stored here. It cannot repeat a GPU measurement. Not covered yet: the first two sweeps, H6, the scale test, the real-trace runs, and the stored grids that some analyses start from |
 
 ---
 
@@ -384,7 +406,7 @@ above says something about the world. The two are kept apart here.
 | **The same test on a later engine** | vLLM 0.34.0, 2026-11-25 (V1, registered first): the same notebook, with only the engine version changed. Zero error again on both sequential shapes × 3 runs, and +0.7% on the concurrent shape ([report](artifacts/results/v034_kaggle_t4/calibration_report.md)). Timing was fitted on it but not checked |
 | **Check on 2 replicas** | Round-robin across two physical T4s: 1,088 prefill tokens computed, 1,088 predicted (Phase 0 v2). Under cache pressure (Phase 6, run twice), the hit rates of all 12 runs were within 1.4% (K1 to four decimals), and within 1.6% with the predictions of the engine fixed in 0.2.0. There were 1,537 blocks per replica and three routers. The engines preempted requests in 8 of the 10 runs where the model predicted none |
 | **Timing under load** | The first profile had no context term and was optimistic. On Phase 6's prompts of ~1,700 tokens, p95 TTFT came out 5–222× its prediction. ✅ Fixed by C2 (2026-09-30, registered): decode cost grows with context (1.92× from 128 to 1,536 tokens), and CPU contention was ruled out (1.00×). The context-aware profile `t4-qwen3-4b-vllm0.30.0-ctx`, fitted on micro-benchmarks, predicted held-out traffic within 1.10–1.41×. Post hoc, it also predicted Phase 6's two live replicas within 1.02–1.79× ([report](artifacts/results/c2_kaggle_t4/report.md)) |
-| **Reproduce** | The analysis: `python scripts/reproduce.py --quick` rebuilds this report from the raw files that the GPU run left in this repository, and compares it with the committed one (seconds, no GPU). The measurement: [`notebooks/phase3_calibration.ipynb`](notebooks/phase3_calibration.ipynb) on a Kaggle T4, about 40 minutes (its first cells say how to run it) |
+| **Reproduce** | The analysis: `python scripts/reproduce.py --quick` rebuilds this report from the raw files that the GPU run left in this repository, and compares it with the committed one (about a minute, no GPU). The measurement: [`notebooks/phase3_calibration.ipynb`](notebooks/phase3_calibration.ipynb) on a Kaggle T4, about 40 minutes (its first cells say how to run it) |
 
 **`/metrics` fields used, by name:** `vllm:prefix_cache_queries` · `vllm:prefix_cache_hits` ·
 `vllm:prompt_tokens_by_source{source="local_compute"|"local_cache_hit"}` · `vllm:num_preemptions` ·
@@ -487,6 +509,22 @@ boundary, so prompt text never enters the simulator. One caution: a log that has
 ids (`--format-in openai-log`) is hashed with about four characters counted as one token. The block
 boundaries then differ from the engine's, and this biases the hit rate. If you can, use a log with
 token ids or block hashes.
+
+**What your own log needs.** `kvsim replay` reads one request per line. For a vLLM-style log
+(`--format-in vllm-jsonl`, the default), each line is a JSON object with these fields:
+
+| Field | What it is |
+|---|---|
+| `timestamp` | When the request arrived, in seconds. Seconds since the epoch, seconds from any start, and ISO 8601 times all work. Milliseconds are refused: read as seconds, they would make the load a thousand times lower |
+| `prompt_token_ids` | The prompt as the engine's own token ids, after the chat template. A `prompt` given as text also works, with the caution above |
+| `num_generated_tokens` | How many tokens the answer had. A line without it is skipped. If the line has only the request's `max_tokens`, that limit stands in, and the report says so |
+| `session_id` | Optional. Session-sticky routing needs it |
+| `request_id` | Optional. A repeated id is renamed |
+
+The lines can be in any order. The report counts every line it could not use, by reason. It also
+warns next to its recommendation when lines were skipped, because the fleet is then sized for less
+traffic than the log had. `--format-in openai-log` reads chat-completion logs with a `usage` block.
+Three public trace formats are read as they are published: `mooncake`, `agentx` and `bailian`.
 
 The profile in that command was measured for this project, on a Tesla T4 with Qwen3-4B and vLLM
 0.30.0. It ships with the package, and so does the cited cost model. Without `--profile`, the
@@ -698,9 +736,11 @@ The rule: everything in `artifacts/results/` must be reproducible by running a s
 
 **Two engines.** The stored results come from the engine of release 0.2.0. The files that release
 0.1.2 wrote and 0.2.0 changed are kept in `artifacts/results/v0.1.2/`, byte for byte. The old
-engine is still in the code: `run(..., engine_version="0.1.2")`, or `with use_engine("0.1.2"):`
-around a script's code. The predictions that were registered before the GPU runs were made with
-it, and the tests check them with it. H6 ran on it and was not run again.
+engine is still in the code, for single runs and for the tests: `run(..., engine_version="0.1.2")`,
+or `with use_engine("0.1.2"):` in the same process. The grid scripts start worker processes, and
+from Python 3.14 on, and on macOS, those do not inherit it. To compute a grid of 0.1.2 again,
+check out tag `v0.1.2` or install release 0.1.2. The predictions that were registered before the GPU runs were
+made with the old engine, and the tests check them with it. H6 ran on it and was not run again.
 
 **One edit to stored outputs.** In 13 stored files of the GPU runs (Phase 3, Phase 6, C1 to C4 and
 V1), one path of vLLM's source tree is written `entrypoints/.../serving.py`, with a folder name left
@@ -708,10 +748,11 @@ out. It is a line of the notebooks' check of vLLM's source, not a measurement. I
 is the only edit, and the analysis gives the same bytes with and without it.
 
 **One command checks it.** `python scripts/reproduce.py` copies the files of the repository to a
-temporary folder and runs thirteen steps there. It compares every file a step writes with the
+temporary folder and runs twenty-one steps there. It compares every file a step writes with the
 committed one. The steps cover the analysis of each GPU run (from the raw files it left here), the
-grid behind the finding, the session cost table and the evidence ledger. It takes about 12 minutes
-on a 12-thread laptop. `--quick` leaves out the three slow steps and takes about 20 seconds. Fields
+grid behind the finding, the session cost table, the analyses made after results were seen, and
+the evidence ledger. It takes about 13 minutes on a 12-thread laptop. `--quick` leaves out the
+three slow steps and takes about a minute. Fields
 that say when and where a file was made are left out of the comparison. Where the script makes one
 more exception, it says so and says why. **Not covered yet:** the first two sweeps (Phase 4 and
 Phase 5), H6, the scale test, the real-trace runs (R1 to R3, and the full-size run L1, whose traces
