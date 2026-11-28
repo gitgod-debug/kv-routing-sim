@@ -1,0 +1,4 @@
+# Every notebook in this repository is built by a script (scripts/*_prepare.py), or is the stored
+# copy of a GPU run. They are marked as generated so that GitHub's language bar counts the code
+# that is written by hand.
+*.ipynb linguist-generated=true
