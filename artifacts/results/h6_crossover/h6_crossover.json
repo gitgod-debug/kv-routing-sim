@@ -1,7 +1,7 @@
 {
  "script": "scripts/run_h6_crossover.py",
- "date_utc": "2026-09-27T19:34:42+00:00",
- "git_sha": "16fcc53",
+ "date_utc": "2026-11-28T10:00:02+00:00",
+ "git_sha": "35200a9",
  "git_dirty": false,
  "seed": 0,
  "hardware_path": "cpu-only",
@@ -47,7 +47,7 @@
    "radix-affinity"
   ]
  },
- "runtime_s": 570.5,
+ "runtime_s": 572.2,
  "n_runs": 14400,
  "profiles": {
   "t4": {
@@ -64,6 +64,8 @@
    "engine_version": "0.30.0",
    "calibrated": true,
    "calibration_error": 0.002901,
+   "prefill_attn_s": 0.0,
+   "decode_per_ctx_token_s": 0.0,
    "WARNING": "calibrated on Tesla T4 / Qwen/Qwen3-4B / 0.30.0"
   },
   "faster_2x": {
@@ -80,7 +82,9 @@
    "engine_version": "0.30.0",
    "calibrated": false,
    "calibration_error": null,
-   "WARNING": "UNCALIBRATED \u2014 timings are plausible shapes, not measurements. Policy RANKING may still be informative (H6); absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
+   "prefill_attn_s": 0.0,
+   "decode_per_ctx_token_s": 0.0,
+   "WARNING": "UNCALIBRATED: timings are plausible shapes, not measurements. The ranking of policies may still be informative, though it changes with the hardware; absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
   },
   "faster_4x": {
    "name": "t4-qwen3-4b-vllm0.30.0+faster_4x",
@@ -96,7 +100,9 @@
    "engine_version": "0.30.0",
    "calibrated": false,
    "calibration_error": null,
-   "WARNING": "UNCALIBRATED \u2014 timings are plausible shapes, not measurements. Policy RANKING may still be informative (H6); absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
+   "prefill_attn_s": 0.0,
+   "decode_per_ctx_token_s": 0.0,
+   "WARNING": "UNCALIBRATED: timings are plausible shapes, not measurements. The ranking of policies may still be informative, though it changes with the hardware; absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
   },
   "cheap_prefill": {
    "name": "t4-qwen3-4b-vllm0.30.0+cheap_prefill",
@@ -112,7 +118,9 @@
    "engine_version": "0.30.0",
    "calibrated": false,
    "calibration_error": null,
-   "WARNING": "UNCALIBRATED \u2014 timings are plausible shapes, not measurements. Policy RANKING may still be informative (H6); absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
+   "prefill_attn_s": 0.0,
+   "decode_per_ctx_token_s": 0.0,
+   "WARNING": "UNCALIBRATED: timings are plausible shapes, not measurements. The ranking of policies may still be informative, though it changes with the hardware; absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
   },
   "dear_prefill": {
    "name": "t4-qwen3-4b-vllm0.30.0+dear_prefill",
@@ -128,7 +136,9 @@
    "engine_version": "0.30.0",
    "calibrated": false,
    "calibration_error": null,
-   "WARNING": "UNCALIBRATED \u2014 timings are plausible shapes, not measurements. Policy RANKING may still be informative (H6); absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
+   "prefill_attn_s": 0.0,
+   "decode_per_ctx_token_s": 0.0,
+   "WARNING": "UNCALIBRATED: timings are plausible shapes, not measurements. The ranking of policies may still be informative, though it changes with the hardware; absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
   }
  },
  "required_replicas": {
@@ -143,7 +153,7 @@
     },
     "2": {
      "session-sticky": 2,
-     "radix-affinity-balanced@16": 3,
+     "radix-affinity-balanced@16": 2,
      "round-robin": 3,
      "least-loaded": 3,
      "radix-affinity": 9
@@ -164,14 +174,14 @@
     },
     "6": {
      "session-sticky": 4,
-     "radix-affinity-balanced@16": 6,
+     "radix-affinity-balanced@16": 5,
      "round-robin": 7,
      "least-loaded": 7,
      "radix-affinity": 9
     },
     "8": {
      "session-sticky": 5,
-     "radix-affinity-balanced@16": 7,
+     "radix-affinity-balanced@16": 6,
      "round-robin": 9,
      "least-loaded": 8,
      "radix-affinity": 9
@@ -194,7 +204,7 @@
     },
     "3": {
      "session-sticky": 3,
-     "radix-affinity-balanced@16": 5,
+     "radix-affinity-balanced@16": 4,
      "round-robin": 4,
      "least-loaded": 4,
      "radix-affinity": 3
@@ -224,14 +234,14 @@
    "16": {
     "1": {
      "session-sticky": 2,
-     "radix-affinity-balanced@16": 2,
+     "radix-affinity-balanced@16": 3,
      "round-robin": 3,
      "least-loaded": 3,
      "radix-affinity": 2
     },
     "2": {
-     "session-sticky": 3,
-     "radix-affinity-balanced@16": 3,
+     "session-sticky": 4,
+     "radix-affinity-balanced@16": 4,
      "round-robin": 6,
      "least-loaded": 8,
      "radix-affinity": 3
@@ -268,21 +278,21 @@
    "64": {
     "1": {
      "session-sticky": 3,
-     "radix-affinity-balanced@16": 3,
+     "radix-affinity-balanced@16": 4,
      "round-robin": 5,
      "least-loaded": 8,
-     "radix-affinity": 3
+     "radix-affinity": 2
     },
     "2": {
      "session-sticky": 9,
-     "radix-affinity-balanced@16": 5,
+     "radix-affinity-balanced@16": 6,
      "round-robin": 9,
      "least-loaded": 9,
      "radix-affinity": 4
     },
     "3": {
      "session-sticky": 9,
-     "radix-affinity-balanced@16": 8,
+     "radix-affinity-balanced@16": 9,
      "round-robin": 9,
      "least-loaded": 9,
      "radix-affinity": 5
@@ -409,7 +419,7 @@
     },
     "2": {
      "session-sticky": 3,
-     "radix-affinity-balanced@16": 3,
+     "radix-affinity-balanced@16": 2,
      "round-robin": 3,
      "least-loaded": 3,
      "radix-affinity": 2
@@ -437,7 +447,7 @@
     },
     "8": {
      "session-sticky": 8,
-     "radix-affinity-balanced@16": 5,
+     "radix-affinity-balanced@16": 6,
      "round-robin": 8,
      "least-loaded": 8,
      "radix-affinity": 9
@@ -452,17 +462,17 @@
      "radix-affinity": 2
     },
     "2": {
-     "session-sticky": 3,
+     "session-sticky": 4,
      "radix-affinity-balanced@16": 3,
      "round-robin": 4,
-     "least-loaded": 5,
+     "least-loaded": 4,
      "radix-affinity": 4
     },
     "3": {
      "session-sticky": 5,
      "radix-affinity-balanced@16": 4,
      "round-robin": 6,
-     "least-loaded": 7,
+     "least-loaded": 6,
      "radix-affinity": 4
     },
     "4": {
@@ -473,18 +483,18 @@
      "radix-affinity": 5
     },
     "6": {
-     "session-sticky": 9,
-     "radix-affinity-balanced@16": 7,
+     "session-sticky": 8,
+     "radix-affinity-balanced@16": 6,
      "round-robin": 9,
      "least-loaded": 9,
      "radix-affinity": 5
     },
     "8": {
      "session-sticky": 9,
-     "radix-affinity-balanced@16": 7,
+     "radix-affinity-balanced@16": 9,
      "round-robin": 9,
      "least-loaded": 9,
-     "radix-affinity": 7
+     "radix-affinity": 6
     }
    }
   },
@@ -596,12 +606,12 @@
      "session-sticky": 3,
      "radix-affinity-balanced@16": 2,
      "round-robin": 2,
-     "least-loaded": 2,
+     "least-loaded": 3,
      "radix-affinity": 2
     },
     "4": {
      "session-sticky": 3,
-     "radix-affinity-balanced@16": 2,
+     "radix-affinity-balanced@16": 3,
      "round-robin": 3,
      "least-loaded": 3,
      "radix-affinity": 2
@@ -631,7 +641,7 @@
     },
     "2": {
      "session-sticky": 3,
-     "radix-affinity-balanced@16": 3,
+     "radix-affinity-balanced@16": 2,
      "round-robin": 3,
      "least-loaded": 3,
      "radix-affinity": 2
@@ -644,7 +654,7 @@
      "radix-affinity": 3
     },
     "4": {
-     "session-sticky": 4,
+     "session-sticky": 5,
      "radix-affinity-balanced@16": 4,
      "round-robin": 4,
      "least-loaded": 4,
@@ -652,9 +662,9 @@
     },
     "6": {
      "session-sticky": 6,
-     "radix-affinity-balanced@16": 5,
+     "radix-affinity-balanced@16": 4,
      "round-robin": 6,
-     "least-loaded": 6,
+     "least-loaded": 5,
      "radix-affinity": 4
     },
     "8": {
@@ -662,7 +672,7 @@
      "radix-affinity-balanced@16": 5,
      "round-robin": 7,
      "least-loaded": 7,
-     "radix-affinity": 4
+     "radix-affinity": 5
     }
    }
   },
@@ -751,7 +761,7 @@
      "session-sticky": 5,
      "radix-affinity-balanced@16": 5,
      "round-robin": 7,
-     "least-loaded": 7,
+     "least-loaded": 6,
      "radix-affinity": 9
     }
    },
@@ -785,8 +795,8 @@
      "radix-affinity": 4
     },
     "6": {
-     "session-sticky": 6,
-     "radix-affinity-balanced@16": 6,
+     "session-sticky": 7,
+     "radix-affinity-balanced@16": 5,
      "round-robin": 9,
      "least-loaded": 9,
      "radix-affinity": 9
@@ -815,14 +825,14 @@
      "radix-affinity": 3
     },
     "3": {
-     "session-sticky": 6,
+     "session-sticky": 5,
      "radix-affinity-balanced@16": 5,
      "round-robin": 8,
      "least-loaded": 8,
      "radix-affinity": 4
     },
     "4": {
-     "session-sticky": 6,
+     "session-sticky": 7,
      "radix-affinity-balanced@16": 6,
      "round-robin": 9,
      "least-loaded": 9,
@@ -848,7 +858,7 @@
    "1": {
     "1": {
      "session-sticky": 2,
-     "radix-affinity-balanced@16": 3,
+     "radix-affinity-balanced@16": 2,
      "round-robin": 2,
      "least-loaded": 3,
      "radix-affinity": 9
@@ -857,7 +867,7 @@
      "session-sticky": 3,
      "radix-affinity-balanced@16": 9,
      "round-robin": 4,
-     "least-loaded": 9,
+     "least-loaded": 8,
      "radix-affinity": 9
     },
     "3": {
@@ -894,7 +904,7 @@
      "session-sticky": 2,
      "radix-affinity-balanced@16": 4,
      "round-robin": 2,
-     "least-loaded": 2,
+     "least-loaded": 3,
      "radix-affinity": 2
     },
     "2": {
@@ -905,7 +915,7 @@
      "radix-affinity": 3
     },
     "3": {
-     "session-sticky": 9,
+     "session-sticky": 6,
      "radix-affinity-balanced@16": 9,
      "round-robin": 7,
      "least-loaded": 9,
@@ -1026,7 +1036,7 @@
  "winner": {
   "t4": {
    "1@1": "tie",
-   "1@2": "sticky",
+   "1@2": "tie",
    "1@3": "tie",
    "1@4": "sticky",
    "1@6": "sticky",
@@ -1037,15 +1047,15 @@
    "4@4": "sticky",
    "4@6": "sticky",
    "4@8": "sticky",
-   "16@1": "tie",
+   "16@1": "sticky",
    "16@2": "tie",
    "16@3": "sticky",
    "16@4": "sticky",
    "16@6": "tie",
    "16@8": "tie",
-   "64@1": "tie",
+   "64@1": "sticky",
    "64@2": "affinity",
-   "64@3": "affinity",
+   "64@3": "tie",
    "64@4": "tie",
    "64@6": "tie",
    "64@8": "tie"
@@ -1064,17 +1074,17 @@
    "4@6": "tie",
    "4@8": "tie",
    "16@1": "tie",
-   "16@2": "tie",
+   "16@2": "affinity",
    "16@3": "affinity",
    "16@4": "affinity",
    "16@6": "affinity",
    "16@8": "affinity",
    "64@1": "tie",
-   "64@2": "tie",
+   "64@2": "affinity",
    "64@3": "affinity",
    "64@4": "affinity",
    "64@6": "affinity",
-   "64@8": "affinity"
+   "64@8": "tie"
   },
   "faster_4x": {
    "1@1": "tie",
@@ -1092,13 +1102,13 @@
    "16@1": "tie",
    "16@2": "tie",
    "16@3": "affinity",
-   "16@4": "affinity",
+   "16@4": "tie",
    "16@6": "affinity",
    "16@8": "affinity",
    "64@1": "tie",
-   "64@2": "tie",
+   "64@2": "affinity",
    "64@3": "affinity",
-   "64@4": "tie",
+   "64@4": "affinity",
    "64@6": "affinity",
    "64@8": "affinity"
   },
@@ -1119,17 +1129,17 @@
    "16@2": "tie",
    "16@3": "tie",
    "16@4": "affinity",
-   "16@6": "tie",
+   "16@6": "affinity",
    "16@8": "affinity",
    "64@1": "tie",
    "64@2": "tie",
-   "64@3": "affinity",
-   "64@4": "tie",
+   "64@3": "tie",
+   "64@4": "affinity",
    "64@6": "affinity",
    "64@8": "tie"
   },
   "dear_prefill": {
-   "1@1": "sticky",
+   "1@1": "tie",
    "1@2": "sticky",
    "1@3": "sticky",
    "1@4": "sticky",
@@ -1137,7 +1147,7 @@
    "1@8": "sticky",
    "4@1": "sticky",
    "4@2": "sticky",
-   "4@3": "tie",
+   "4@3": "sticky",
    "4@4": "tie",
    "4@6": "tie",
    "4@8": "tie",
@@ -1158,9 +1168,11 @@
  "verdicts": {
   "t4": {
    "affinity_wins_at_smallest_k": [],
-   "sticky_wins_at_largest_k": [],
+   "sticky_wins_at_largest_k": [
+    1
+   ],
    "violations_monotone_in_k": [],
-   "holds": true,
+   "holds": false,
    "flip_visible": true
   },
   "faster_2x": {
