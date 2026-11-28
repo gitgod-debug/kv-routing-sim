@@ -1,5 +1,6 @@
 # Lint and tests on every push and pull request, on CPU only: the core install must never need a
-# GPU wheel (ADR-009).
+# GPU wheel. A second job derives the stored results again and compares them with the committed
+# files, so that "one command checks it" is tested on a machine that is not the author's.
 name: ci
 
 on:
@@ -28,3 +29,17 @@ jobs:
         run: ruff check .
       - name: Tests
         run: pytest -q
+
+  # Quick mode leaves out the three steps that take minutes. They are run by hand before a release.
+  reproduce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install the package with numpy
+        run: python -m pip install -e ".[analysis]"
+      - name: Derive the stored results again and compare them with the committed files
+        run: python scripts/reproduce.py --quick

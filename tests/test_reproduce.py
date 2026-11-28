@@ -10,6 +10,8 @@ import json
 import pathlib
 import sys
 
+import pytest
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
 
@@ -99,3 +101,49 @@ def test_a_path_into_the_repository_is_compared_from_the_repositorys_root(tmp_pa
     again = {"config": {"profile": "/x/artifacts/results/c3/profile.json"}, "replicas": 5}
     assert rep.same_result(*_pair(tmp_path, again, stored))
     assert not rep.same_result(*_pair(tmp_path, {**again, "replicas": 6}, stored))
+
+
+def test_a_fitted_number_may_differ_after_the_twelfth_digit_and_nowhere_else(tmp_path):
+    """A line fit gives other last digits on another CPU or numpy. Nothing else may move.
+
+    The two slopes are what numpy 2.5.3 and numpy 1.26.4 gave for Phase 3's decode fit.
+    """
+    stored = {"slope": 0.001232162611867379, "replicas": 5, "holds": True, "name": "t4",
+              "rows": [{"fitted_ms": 54.14340141121524}]}
+    again = {"slope": 0.001232162611867377, "replicas": 5, "holds": True, "name": "t4",
+             "rows": [{"fitted_ms": 54.14340141121526}]}
+    new, old = _pair(tmp_path, again, stored)
+    assert rep.compare(new, old) == 2
+    assert rep.same_result(new, old)
+    assert rep.compare(old, old) == 0
+    for changed in (
+        {**again, "slope": 0.0012321626128},        # the tenth digit
+        {**again, "replicas": 6},                   # a count
+        {**again, "replicas": 5.000000000000001},   # a count that became a fraction
+        {**again, "holds": 1},                      # true is not 1
+        {**again, "name": "t5"},
+        {**again, "rows": []},
+        {k: v for k, v in again.items() if k != "name"},
+    ):
+        assert rep.compare(*_pair(tmp_path, changed, stored)) is None, changed
+    # A value that is not a number in both files is the same result.
+    nan_old = {"x": float("nan"), "date_utc": "2026-10-05"}
+    nan_new = {"x": float("nan"), "date_utc": "2026-11-28"}
+    assert rep.compare(*_pair(tmp_path, nan_new, nan_old)) == 0
+
+
+def test_a_missing_module_is_named_before_any_step_runs(monkeypatch, capsys):
+    # Every step whose script imports numpy, itself or through the analysis it reuses, says so.
+    for step in rep.STEPS:
+        source = (REPO / step.argv[0]).read_text()
+        uses = "import numpy" in source or "import phase3_analyze" in source
+        assert uses == ("numpy" in step.needs), step.argv[0]
+    assert rep.missing_modules([s for s in rep.STEPS if not s.needs]) == []
+    with monkeypatch.context() as patch:
+        patch.setattr(rep.importlib.util, "find_spec", lambda name: None)
+        patch.setattr(sys, "argv", ["reproduce.py", "--quick"])
+        patch.setattr(rep, "tracked_files", lambda: pytest.fail("copied before the check"))
+        assert rep.main() == 2
+    err = capsys.readouterr().err
+    assert "numpy is not installed here, and 3 of these 18 steps need it" in err
+    assert 'pip install -e ".[analysis]"' in err
