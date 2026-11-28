@@ -45,7 +45,11 @@
         </label>
       </div>
       <p id="file-hint" class="hint" hidden>Prompts become block hashes as the file is read; their text
-        is never kept. Large logs take longer: the page shows progress and you can cancel.</p>
+        is never kept. Large logs take longer: the page shows progress and you can cancel. A vLLM
+        JSONL log has one request per line, with <code>timestamp</code> in seconds,
+        <code>prompt_token_ids</code> and <code>num_generated_tokens</code>, and best also
+        <code>session_id</code>. A line without an answer length is skipped, and the result says how
+        many were.</p>
     </fieldset>
 
     <fieldset>

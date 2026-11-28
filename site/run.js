@@ -21,6 +21,8 @@
     edge: "Checking the margin to saturation",
   };
 
+  // Generated traffic above this size would freeze the tab for many minutes.
+  const MAX_REQUESTS = 20000;
   const $ = (id) => document.getElementById(id);
   let worker = null;
   let lastResult = null;
@@ -96,6 +98,10 @@
     } else {
       if (!whole(t.sessions, 1)) return "Sessions must be a whole number of at least 1.";
       if (!whole(t.turns, 1)) return "Turns per session must be a whole number of at least 1.";
+      if (t.sessions * t.turns > MAX_REQUESTS) {
+        return `This page runs at most ${MAX_REQUESTS.toLocaleString()} requests (sessions × turns). ` +
+          "For more, install the package and use the command line.";
+      }
       if (!is(t.rate) || t.rate <= 0) return "New sessions per second must be a number above 0.";
       if (!is(t.sharing) || t.sharing < 0 || t.sharing > 0.95) {
         return "Shared system prompt must be a number from 0 to 0.95.";
@@ -124,12 +130,12 @@
     const settings = readSettings();
     const problem = validate(settings);
     showError(problem);
+    $("results").hidden = true;  // the last answer was for other settings
     if (problem) {
       setStatus("");
       return;
     }
     activeSettings = settings;
-    $("results").hidden = true;  // the last answer was for other settings
     setRunning(true);
     startedAt = performance.now();
     worker = worker || createWorker();
