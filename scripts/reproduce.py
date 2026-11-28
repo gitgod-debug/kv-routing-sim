@@ -81,6 +81,22 @@ STEPS = (
     Step("the grid behind the finding and the demo page (H2b on the checked timing model)",
          ("scripts/build_grid.py", "--source", "h2b_c2"), slow=True),
     Step("what one agent session costs (S1)", ("scripts/session_cost.py",), slow=True),
+    # Analyses made after their results were seen. Each is quick, and none was covered until one
+    # of them was found stale: a stored file that no check runs again can drift unseen.
+    Step("Phase 3's two limits, measured (post hoc)", ("scripts/phase3_posthoc.py",)),
+    Step("the checked timing model against Phase 6's two replicas (post hoc)",
+         ("scripts/c2_posthoc_phase6.py",)),
+    Step("whether the cells the calibration command measures are enough (C3's pre-check)",
+         ("scripts/c3_precheck.py",)),
+    Step("each fresh C4 calibration on the micro-benchmark cells (post hoc)",
+         ("scripts/c4_posthoc_fresh_cells.py",)),
+    Step("the edge check on T1's five runs (post hoc)", ("scripts/edge_posthoc_t1.py",)),
+    Step("T1's replays against the range the model was fitted on (post hoc)",
+         ("scripts/t1_posthoc_range.py",)),
+    Step("two published policies on a production trace, from the stored grid (R3)",
+         ("scripts/r3_analyze.py",)),
+    Step("every registered prediction, computed again with both engines (post hoc)",
+         ("scripts/registered_predictions_again.py",)),
     Step("the README's evidence ledger against the files it names",
          ("scripts/build_ledger.py", "--check"), writes=False),
 )
