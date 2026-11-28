@@ -1,0 +1,36 @@
+# Release 0.2.0, an addendum to configs/rederive_0_2_0.yaml: H6 derived again with the fixed engine.
+# Written and committed before these runs.
+#
+# Why. configs/rederive_0_2_0.yaml kept H6 on the engine of 0.1.2. Its reason was the rule made when
+# H6 failed: a failed test is not repeated until it passes. That rule is about running a test again
+# to get a new verdict. This is a different thing. The verdict is decided by the registered rules,
+# and these runs only replace numbers that came from an engine with a known defect, as was done for
+# every other result of 0.2.0. Decided on 28 November 2026, after a second review of the release, so
+# that no stored result of 0.2.0 comes from the old engine.
+#
+# What stays the same: configs/h6_ranking.yaml and configs/h6_crossover.yaml, their rules and
+# thresholds, the regimes, the seeds, the profile and the cost model. Only the engine changes.
+#
+# The record. The two stored folders of H6 are copied first, unchanged, to
+# artifacts/results/v0.1.2/h6_ranking/ and artifacts/results/v0.1.2/h6_crossover/.
+#
+# Known before this file was written. During the second review, on 28 November, both scripts were
+# run once with the fixed engine in a scratch folder, at commit 96d06e7. That run was not stored. It
+# gave:
+#   ranking half: does not hold, as before. The lowest tau-b of each regime is the same as in 0.1.2
+#     (0.516, 0.653, 0.653, 0.510). Flips: 0 in every regime (0.1.2: 1, in dear_prefill). Strict
+#     flips: 12 (0.1.2: 15). Lenient flips: 0, as before.
+#   crossover half: holds on all four rescaled regimes, as before. In the t4 baseline, which is not
+#     tested, session-sticky now wins at 64 prompts and 1 session/s (3 replicas against 4).
+# So the outcome of these runs is known before they run. They are registered so that the files they
+# write are made the same way as every other result of 0.2.0.
+#
+# A check, registered here: both scripts' own guards must pass. Their t4 regime must give the stored
+# tables of Phase 4 and Phase 5 exactly (both derived again with the fixed engine). If a guard stops
+# a script, nothing is stored.
+
+engine_version: "0.2.0"
+
+rederive:
+  - {test: "H6, ranking half", run: [scripts/run_h6.py]}
+  - {test: "H6, crossover half", run: [scripts/run_h6_crossover.py]}
