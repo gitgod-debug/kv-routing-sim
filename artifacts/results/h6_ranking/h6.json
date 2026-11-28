@@ -1,7 +1,7 @@
 {
  "script": "scripts/run_h6.py",
- "date_utc": "2026-09-27T19:01:41+00:00",
- "git_sha": "ff2ba87",
+ "date_utc": "2026-11-28T09:51:56+00:00",
+ "git_sha": "8bff5af",
  "git_dirty": false,
  "seed": 0,
  "hardware_path": "cpu-only",
@@ -151,7 +151,7 @@
    "versus": "round-robin"
   }
  },
- "runtime_s": 690.0,
+ "runtime_s": 483.4,
  "policies": [
   "round-robin",
   "least-loaded",
@@ -176,6 +176,8 @@
    "engine_version": "0.30.0",
    "calibrated": true,
    "calibration_error": 0.002901,
+   "prefill_attn_s": 0.0,
+   "decode_per_ctx_token_s": 0.0,
    "WARNING": "calibrated on Tesla T4 / Qwen/Qwen3-4B / 0.30.0"
   },
   "faster_2x": {
@@ -192,7 +194,9 @@
    "engine_version": "0.30.0",
    "calibrated": false,
    "calibration_error": null,
-   "WARNING": "UNCALIBRATED \u2014 timings are plausible shapes, not measurements. Policy RANKING may still be informative (H6); absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
+   "prefill_attn_s": 0.0,
+   "decode_per_ctx_token_s": 0.0,
+   "WARNING": "UNCALIBRATED: timings are plausible shapes, not measurements. The ranking of policies may still be informative, though it changes with the hardware; absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
   },
   "faster_4x": {
    "name": "t4-qwen3-4b-vllm0.30.0+faster_4x",
@@ -208,7 +212,9 @@
    "engine_version": "0.30.0",
    "calibrated": false,
    "calibration_error": null,
-   "WARNING": "UNCALIBRATED \u2014 timings are plausible shapes, not measurements. Policy RANKING may still be informative (H6); absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
+   "prefill_attn_s": 0.0,
+   "decode_per_ctx_token_s": 0.0,
+   "WARNING": "UNCALIBRATED: timings are plausible shapes, not measurements. The ranking of policies may still be informative, though it changes with the hardware; absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
   },
   "cheap_prefill": {
    "name": "t4-qwen3-4b-vllm0.30.0+cheap_prefill",
@@ -224,7 +230,9 @@
    "engine_version": "0.30.0",
    "calibrated": false,
    "calibration_error": null,
-   "WARNING": "UNCALIBRATED \u2014 timings are plausible shapes, not measurements. Policy RANKING may still be informative (H6); absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
+   "prefill_attn_s": 0.0,
+   "decode_per_ctx_token_s": 0.0,
+   "WARNING": "UNCALIBRATED: timings are plausible shapes, not measurements. The ranking of policies may still be informative, though it changes with the hardware; absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
   },
   "dear_prefill": {
    "name": "t4-qwen3-4b-vllm0.30.0+dear_prefill",
@@ -240,7 +248,9 @@
    "engine_version": "0.30.0",
    "calibrated": false,
    "calibration_error": null,
-   "WARNING": "UNCALIBRATED \u2014 timings are plausible shapes, not measurements. Policy RANKING may still be informative (H6); absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
+   "prefill_attn_s": 0.0,
+   "decode_per_ctx_token_s": 0.0,
+   "WARNING": "UNCALIBRATED: timings are plausible shapes, not measurements. The ranking of policies may still be informative, though it changes with the hardware; absolute latency and cost are not. Run `kvsim calibrate` against a live engine."
   }
  },
  "cost_model": {
@@ -734,7 +744,7 @@
     "1": {
      "round-robin": 2,
      "least-loaded": 2,
-     "power-of-two": 3,
+     "power-of-two": 2,
      "consistent-hash-prefix": 9,
      "radix-affinity": 9,
      "radix-affinity-balanced": 2,
@@ -742,8 +752,8 @@
     },
     "2": {
      "round-robin": 4,
-     "least-loaded": 9,
-     "power-of-two": 7,
+     "least-loaded": 8,
+     "power-of-two": 8,
      "consistent-hash-prefix": 9,
      "radix-affinity": 9,
      "radix-affinity-balanced": 3,
@@ -755,7 +765,7 @@
      "power-of-two": 9,
      "consistent-hash-prefix": 9,
      "radix-affinity": 9,
-     "radix-affinity-balanced": 5,
+     "radix-affinity-balanced": 4,
      "session-sticky": 4
     },
     "4": {
@@ -790,7 +800,7 @@
     "1": {
      "round-robin": 2,
      "least-loaded": 3,
-     "power-of-two": 4,
+     "power-of-two": 3,
      "consistent-hash-prefix": 9,
      "radix-affinity": 9,
      "radix-affinity-balanced": 9,
@@ -798,7 +808,7 @@
     },
     "2": {
      "round-robin": 4,
-     "least-loaded": 9,
+     "least-loaded": 8,
      "power-of-two": 8,
      "consistent-hash-prefix": 9,
      "radix-affinity": 9,
@@ -812,7 +822,7 @@
      "consistent-hash-prefix": 9,
      "radix-affinity": 9,
      "radix-affinity-balanced": 9,
-     "session-sticky": 5
+     "session-sticky": 4
     },
     "4": {
      "round-robin": 9,
@@ -854,6 +864,7 @@
       "hit_rate": 0.74037,
       "p50_ttft_ms": 309.44,
       "p95_ttft_ms": 610.149,
+      "p95_tpot_ms": 248.644,
       "inr_per_1k_requests": 4.015,
       "throughput_rps": 3.4889,
       "load_imbalance": 1.0,
@@ -866,6 +877,7 @@
       "hit_rate": 0.74037,
       "p50_ttft_ms": 309.44,
       "p95_ttft_ms": 610.149,
+      "p95_tpot_ms": 248.644,
       "inr_per_1k_requests": 4.015,
       "throughput_rps": 3.4889,
       "load_imbalance": 1.0,
@@ -875,19 +887,28 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": 0.0,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 15,
-     "calibrated": true
+     "frontier_size": 16,
+     "calibrated": true,
+     "tied_with": [
+      "consistent-hash-prefix",
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ]
     },
     "2": {
      "recommended": {
       "policy": "radix-affinity-balanced",
       "n_replicas": 2,
-      "hit_rate": 0.738321,
-      "p50_ttft_ms": 294.911,
-      "p95_ttft_ms": 614.999,
-      "inr_per_1k_requests": 4.3994,
-      "throughput_rps": 6.368,
-      "load_imbalance": 1.005,
+      "hit_rate": 0.737531,
+      "p50_ttft_ms": 298.697,
+      "p95_ttft_ms": 646.918,
+      "p95_tpot_ms": 199.099,
+      "inr_per_1k_requests": 4.3966,
+      "throughput_rps": 6.372,
+      "load_imbalance": 1.0065,
       "meets_slo": true,
       "calibrated": true
      },
@@ -897,6 +918,7 @@
       "hit_rate": 0.49716,
       "p50_ttft_ms": 312.075,
       "p95_ttft_ms": 594.204,
+      "p95_tpot_ms": 195.006,
       "inr_per_1k_requests": 6.5866,
       "throughput_rps": 6.3801,
       "load_imbalance": 1.0012,
@@ -904,21 +926,25 @@
       "calibrated": true
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -33.21,
+     "inr_delta_pct_vs_baseline": -33.25,
      "replica_delta_vs_baseline": -1,
-     "frontier_size": 17,
-     "calibrated": true
+     "frontier_size": 18,
+     "calibrated": true,
+     "tied_with": [
+      "session-sticky"
+     ]
     },
     "3": {
      "recommended": {
       "policy": "radix-affinity-balanced",
       "n_replicas": 3,
-      "hit_rate": 0.73563,
-      "p50_ttft_ms": 293.542,
-      "p95_ttft_ms": 638.497,
-      "inr_per_1k_requests": 4.7796,
-      "throughput_rps": 8.7921,
-      "load_imbalance": 1.0192,
+      "hit_rate": 0.735679,
+      "p50_ttft_ms": 289.166,
+      "p95_ttft_ms": 640.847,
+      "p95_tpot_ms": 176.402,
+      "inr_per_1k_requests": 4.7798,
+      "throughput_rps": 8.7918,
+      "load_imbalance": 1.0155,
       "meets_slo": true,
       "calibrated": true
      },
@@ -928,6 +954,7 @@
       "hit_rate": 0.448395,
       "p50_ttft_ms": 357.719,
       "p95_ttft_ms": 767.711,
+      "p95_tpot_ms": 256.215,
       "inr_per_1k_requests": 6.3893,
       "throughput_rps": 8.7695,
       "load_imbalance": 1.0,
@@ -937,19 +964,23 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": -25.19,
      "replica_delta_vs_baseline": -1,
-     "frontier_size": 8,
-     "calibrated": true
+     "frontier_size": 6,
+     "calibrated": true,
+     "tied_with": [
+      "session-sticky"
+     ]
     },
     "4": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 3,
       "hit_rate": 0.73963,
-      "p50_ttft_ms": 390.126,
-      "p95_ttft_ms": 935.33,
-      "inr_per_1k_requests": 3.8898,
-      "throughput_rps": 10.8035,
-      "load_imbalance": 1.02,
+      "p50_ttft_ms": 393.552,
+      "p95_ttft_ms": 941.796,
+      "p95_tpot_ms": 272.543,
+      "inr_per_1k_requests": 3.9067,
+      "throughput_rps": 10.7568,
+      "load_imbalance": 1.032,
       "meets_slo": true,
       "calibrated": true
      },
@@ -959,6 +990,7 @@
       "hit_rate": 0.428272,
       "p50_ttft_ms": 394.625,
       "p95_ttft_ms": 1058.404,
+      "p95_tpot_ms": 289.966,
       "inr_per_1k_requests": 6.4767,
       "throughput_rps": 10.8139,
       "load_imbalance": 1.0,
@@ -966,21 +998,25 @@
       "calibrated": true
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -39.94,
+     "inr_delta_pct_vs_baseline": -39.68,
      "replica_delta_vs_baseline": -2,
-     "frontier_size": 6,
-     "calibrated": true
+     "frontier_size": 4,
+     "calibrated": true,
+     "tied_with": [
+      "radix-affinity-balanced"
+     ]
     },
     "6": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 4,
       "hit_rate": 0.739259,
-      "p50_ttft_ms": 385.789,
-      "p95_ttft_ms": 822.035,
-      "inr_per_1k_requests": 3.9975,
-      "throughput_rps": 14.0167,
-      "load_imbalance": 1.036,
+      "p50_ttft_ms": 383.644,
+      "p95_ttft_ms": 817.57,
+      "p95_tpot_ms": 272.056,
+      "inr_per_1k_requests": 3.9979,
+      "throughput_rps": 14.0153,
+      "load_imbalance": 1.032,
       "meets_slo": true,
       "calibrated": true
      },
@@ -990,6 +1026,7 @@
       "hit_rate": 0.407284,
       "p50_ttft_ms": 408.568,
       "p95_ttft_ms": 747.383,
+      "p95_tpot_ms": 296.784,
       "inr_per_1k_requests": 6.9357,
       "throughput_rps": 14.1374,
       "load_imbalance": 1.0062,
@@ -1000,18 +1037,22 @@
      "inr_delta_pct_vs_baseline": -42.36,
      "replica_delta_vs_baseline": -3,
      "frontier_size": 6,
-     "calibrated": true
+     "calibrated": true,
+     "tied_with": [
+      "radix-affinity-balanced"
+     ]
     },
     "8": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 5,
       "hit_rate": 0.738889,
-      "p50_ttft_ms": 354.25,
-      "p95_ttft_ms": 727.038,
-      "inr_per_1k_requests": 4.2447,
-      "throughput_rps": 16.5005,
-      "load_imbalance": 1.045,
+      "p50_ttft_ms": 351.858,
+      "p95_ttft_ms": 700.757,
+      "p95_tpot_ms": 236.579,
+      "inr_per_1k_requests": 4.2326,
+      "throughput_rps": 16.5474,
+      "load_imbalance": 1.035,
       "meets_slo": true,
       "calibrated": true
      },
@@ -1021,6 +1062,7 @@
       "hit_rate": 0.35358,
       "p50_ttft_ms": 536.41,
       "p95_ttft_ms": 1567.793,
+      "p95_tpot_ms": 345.535,
       "inr_per_1k_requests": 7.2487,
       "throughput_rps": 15.9376,
       "load_imbalance": 1.0,
@@ -1028,10 +1070,13 @@
       "calibrated": true
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -41.44,
+     "inr_delta_pct_vs_baseline": -41.61,
      "replica_delta_vs_baseline": -3,
      "frontier_size": 6,
-     "calibrated": true
+     "calibrated": true,
+     "tied_with": [
+      "radix-affinity-balanced"
+     ]
     }
    },
    "high_sharing": {
@@ -1042,6 +1087,7 @@
       "hit_rate": 0.923706,
       "p50_ttft_ms": 315.919,
       "p95_ttft_ms": 622.413,
+      "p95_tpot_ms": 252.636,
       "inr_per_1k_requests": 4.0143,
       "throughput_rps": 3.4894,
       "load_imbalance": 1.0,
@@ -1054,6 +1100,7 @@
       "hit_rate": 0.923706,
       "p50_ttft_ms": 315.919,
       "p95_ttft_ms": 622.413,
+      "p95_tpot_ms": 252.636,
       "inr_per_1k_requests": 4.0143,
       "throughput_rps": 3.4894,
       "load_imbalance": 1.0,
@@ -1063,19 +1110,28 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": 0.0,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 14,
-     "calibrated": true
+     "frontier_size": 15,
+     "calibrated": true,
+     "tied_with": [
+      "consistent-hash-prefix",
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ]
     },
     "2": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 2,
       "hit_rate": 0.922706,
-      "p50_ttft_ms": 298.078,
-      "p95_ttft_ms": 639.068,
-      "inr_per_1k_requests": 4.3986,
-      "throughput_rps": 6.3692,
-      "load_imbalance": 1.012,
+      "p50_ttft_ms": 299.68,
+      "p95_ttft_ms": 611.677,
+      "p95_tpot_ms": 201.775,
+      "inr_per_1k_requests": 4.3972,
+      "throughput_rps": 6.3712,
+      "load_imbalance": 1.014,
       "meets_slo": true,
       "calibrated": true
      },
@@ -1085,6 +1141,7 @@
       "hit_rate": 0.853106,
       "p50_ttft_ms": 315.103,
       "p95_ttft_ms": 596.161,
+      "p95_tpot_ms": 197.048,
       "inr_per_1k_requests": 6.5855,
       "throughput_rps": 6.3812,
       "load_imbalance": 1.0012,
@@ -1092,21 +1149,23 @@
       "calibrated": true
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -33.21,
+     "inr_delta_pct_vs_baseline": -33.23,
      "replica_delta_vs_baseline": -1,
      "frontier_size": 15,
-     "calibrated": true
+     "calibrated": true,
+     "tied_with": []
     },
     "3": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 3,
       "hit_rate": 0.921706,
-      "p50_ttft_ms": 280.966,
-      "p95_ttft_ms": 572.756,
+      "p50_ttft_ms": 287.383,
+      "p95_ttft_ms": 666.206,
+      "p95_tpot_ms": 183.45,
       "inr_per_1k_requests": 4.7869,
-      "throughput_rps": 8.7788,
-      "load_imbalance": 1.026,
+      "throughput_rps": 8.7789,
+      "load_imbalance": 1.053,
       "meets_slo": true,
       "calibrated": true
      },
@@ -1116,6 +1175,7 @@
       "hit_rate": 0.838576,
       "p50_ttft_ms": 356.383,
       "p95_ttft_ms": 754.478,
+      "p95_tpot_ms": 257.108,
       "inr_per_1k_requests": 6.3897,
       "throughput_rps": 8.7689,
       "load_imbalance": 1.0,
@@ -1126,18 +1186,20 @@
      "inr_delta_pct_vs_baseline": -25.08,
      "replica_delta_vs_baseline": -1,
      "frontier_size": 4,
-     "calibrated": true
+     "calibrated": true,
+     "tied_with": []
     },
     "4": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 3,
       "hit_rate": 0.921706,
-      "p50_ttft_ms": 414.23,
-      "p95_ttft_ms": 1041.195,
-      "inr_per_1k_requests": 3.9013,
-      "throughput_rps": 10.7716,
-      "load_imbalance": 1.02,
+      "p50_ttft_ms": 419.383,
+      "p95_ttft_ms": 1115.187,
+      "p95_tpot_ms": 284.873,
+      "inr_per_1k_requests": 3.9659,
+      "throughput_rps": 10.6712,
+      "load_imbalance": 1.05,
       "meets_slo": true,
       "calibrated": true
      },
@@ -1147,6 +1209,7 @@
       "hit_rate": 0.832282,
       "p50_ttft_ms": 402.854,
       "p95_ttft_ms": 1085.53,
+      "p95_tpot_ms": 288.03,
       "inr_per_1k_requests": 6.4775,
       "throughput_rps": 10.8126,
       "load_imbalance": 1.0,
@@ -1154,21 +1217,23 @@
       "calibrated": true
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -39.77,
+     "inr_delta_pct_vs_baseline": -38.77,
      "replica_delta_vs_baseline": -2,
      "frontier_size": 4,
-     "calibrated": true
+     "calibrated": true,
+     "tied_with": []
     },
     "6": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 4,
       "hit_rate": 0.920706,
-      "p50_ttft_ms": 392.347,
-      "p95_ttft_ms": 847.219,
-      "inr_per_1k_requests": 4.0114,
-      "throughput_rps": 13.9759,
-      "load_imbalance": 1.028,
+      "p50_ttft_ms": 394.954,
+      "p95_ttft_ms": 998.696,
+      "p95_tpot_ms": 279.587,
+      "inr_per_1k_requests": 4.066,
+      "throughput_rps": 13.9235,
+      "load_imbalance": 1.044,
       "meets_slo": true,
       "calibrated": true
      },
@@ -1178,6 +1243,7 @@
       "hit_rate": 0.824671,
       "p50_ttft_ms": 410.757,
       "p95_ttft_ms": 766.103,
+      "p95_tpot_ms": 295.924,
       "inr_per_1k_requests": 6.9411,
       "throughput_rps": 14.1265,
       "load_imbalance": 1.0062,
@@ -1185,21 +1251,23 @@
       "calibrated": true
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -42.21,
+     "inr_delta_pct_vs_baseline": -41.42,
      "replica_delta_vs_baseline": -3,
      "frontier_size": 6,
-     "calibrated": true
+     "calibrated": true,
+     "tied_with": []
     },
     "8": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 5,
       "hit_rate": 0.919706,
-      "p50_ttft_ms": 361.161,
-      "p95_ttft_ms": 762.758,
-      "inr_per_1k_requests": 4.2322,
-      "throughput_rps": 16.549,
-      "load_imbalance": 1.04,
+      "p50_ttft_ms": 366.887,
+      "p95_ttft_ms": 778.111,
+      "p95_tpot_ms": 248.741,
+      "inr_per_1k_requests": 4.262,
+      "throughput_rps": 16.4336,
+      "load_imbalance": 1.06,
       "meets_slo": true,
       "calibrated": true
      },
@@ -1209,6 +1277,7 @@
       "hit_rate": 0.808588,
       "p50_ttft_ms": 567.448,
       "p95_ttft_ms": 2045.55,
+      "p95_tpot_ms": 335.481,
       "inr_per_1k_requests": 7.4124,
       "throughput_rps": 15.9348,
       "load_imbalance": 1.0,
@@ -1216,10 +1285,11 @@
       "calibrated": true
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -42.9,
+     "inr_delta_pct_vs_baseline": -42.5,
      "replica_delta_vs_baseline": -3,
      "frontier_size": 6,
-     "calibrated": true
+     "calibrated": true,
+     "tied_with": []
     }
    }
   },
@@ -1232,6 +1302,7 @@
       "hit_rate": 0.74037,
       "p50_ttft_ms": 96.923,
       "p95_ttft_ms": 170.375,
+      "p95_tpot_ms": 47.315,
       "inr_per_1k_requests": 3.9786,
       "throughput_rps": 3.5208,
       "load_imbalance": 1.0,
@@ -1244,6 +1315,7 @@
       "hit_rate": 0.74037,
       "p50_ttft_ms": 96.923,
       "p95_ttft_ms": 170.375,
+      "p95_tpot_ms": 47.315,
       "inr_per_1k_requests": 3.9786,
       "throughput_rps": 3.5208,
       "load_imbalance": 1.0,
@@ -1253,9 +1325,17 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": 0.0,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 14,
+     "frontier_size": 17,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "consistent-hash-prefix",
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "2": {
      "recommended": {
@@ -1264,6 +1344,7 @@
       "hit_rate": 0.74037,
       "p50_ttft_ms": 145.572,
       "p95_ttft_ms": 318.022,
+      "p95_tpot_ms": 107.552,
       "inr_per_1k_requests": 2.1645,
       "throughput_rps": 6.4715,
       "load_imbalance": 1.0,
@@ -1276,6 +1357,7 @@
       "hit_rate": 0.74037,
       "p50_ttft_ms": 145.572,
       "p95_ttft_ms": 318.022,
+      "p95_tpot_ms": 107.552,
       "inr_per_1k_requests": 2.1645,
       "throughput_rps": 6.4715,
       "load_imbalance": 1.0,
@@ -1285,20 +1367,29 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": 0.0,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 20,
+     "frontier_size": 17,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "consistent-hash-prefix",
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "3": {
      "recommended": {
       "policy": "least-loaded",
       "n_replicas": 2,
-      "hit_rate": 0.573366,
-      "p50_ttft_ms": 176.057,
-      "p95_ttft_ms": 459.718,
+      "hit_rate": 0.571901,
+      "p50_ttft_ms": 175.599,
+      "p95_ttft_ms": 430.335,
+      "p95_tpot_ms": 108.735,
       "inr_per_1k_requests": 3.1185,
-      "throughput_rps": 8.9836,
-      "load_imbalance": 1.006,
+      "throughput_rps": 8.9837,
+      "load_imbalance": 1.004,
       "meets_slo": true,
       "calibrated": false
      },
@@ -1308,6 +1399,7 @@
       "hit_rate": 0.564198,
       "p50_ttft_ms": 148.986,
       "p95_ttft_ms": 388.004,
+      "p95_tpot_ms": 124.416,
       "inr_per_1k_requests": 3.12,
       "throughput_rps": 8.9792,
       "load_imbalance": 1.0,
@@ -1317,19 +1409,26 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": -0.05,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 10,
+     "frontier_size": 12,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "power-of-two",
+      "radix-affinity-balanced",
+      "round-robin",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "4": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 2,
       "hit_rate": 0.74,
-      "p50_ttft_ms": 136.088,
-      "p95_ttft_ms": 308.154,
-      "inr_per_1k_requests": 2.515,
-      "throughput_rps": 11.1395,
+      "p50_ttft_ms": 137.071,
+      "p95_ttft_ms": 306.299,
+      "p95_tpot_ms": 83.876,
+      "inr_per_1k_requests": 2.5136,
+      "throughput_rps": 11.1457,
       "load_imbalance": 1.008,
       "meets_slo": true,
       "calibrated": false
@@ -1340,6 +1439,7 @@
       "hit_rate": 0.508519,
       "p50_ttft_ms": 149.219,
       "p95_ttft_ms": 308.425,
+      "p95_tpot_ms": 83.106,
       "inr_per_1k_requests": 3.7653,
       "throughput_rps": 11.1605,
       "load_imbalance": 1.0012,
@@ -1347,22 +1447,26 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -33.21,
+     "inr_delta_pct_vs_baseline": -33.24,
      "replica_delta_vs_baseline": -1,
-     "frontier_size": 7,
+     "frontier_size": 9,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "radix-affinity-balanced"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "6": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 3,
       "hit_rate": 0.73963,
-      "p50_ttft_ms": 124.171,
-      "p95_ttft_ms": 251.649,
-      "inr_per_1k_requests": 2.8638,
-      "throughput_rps": 14.6738,
-      "load_imbalance": 1.017,
+      "p50_ttft_ms": 124.032,
+      "p95_ttft_ms": 251.589,
+      "p95_tpot_ms": 76.619,
+      "inr_per_1k_requests": 2.8622,
+      "throughput_rps": 14.6822,
+      "load_imbalance": 1.014,
       "meets_slo": true,
       "calibrated": false
      },
@@ -1372,6 +1476,7 @@
       "hit_rate": 0.435309,
       "p50_ttft_ms": 170.861,
       "p95_ttft_ms": 312.257,
+      "p95_tpot_ms": 112.31,
       "inr_per_1k_requests": 3.8222,
       "throughput_rps": 14.6591,
       "load_imbalance": 1.0,
@@ -1379,22 +1484,26 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -25.08,
+     "inr_delta_pct_vs_baseline": -25.12,
      "replica_delta_vs_baseline": -1,
      "frontier_size": 6,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "radix-affinity-balanced"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "8": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 3,
       "hit_rate": 0.73963,
-      "p50_ttft_ms": 148.985,
-      "p95_ttft_ms": 368.746,
-      "inr_per_1k_requests": 2.4128,
-      "throughput_rps": 17.4166,
-      "load_imbalance": 1.029,
+      "p50_ttft_ms": 149.176,
+      "p95_ttft_ms": 359.027,
+      "p95_tpot_ms": 111.65,
+      "inr_per_1k_requests": 2.4132,
+      "throughput_rps": 17.4138,
+      "load_imbalance": 1.02,
       "meets_slo": true,
       "calibrated": false
      },
@@ -1404,6 +1513,7 @@
       "hit_rate": 0.416914,
       "p50_ttft_ms": 168.317,
       "p95_ttft_ms": 342.275,
+      "p95_tpot_ms": 117.086,
       "inr_per_1k_requests": 4.0204,
       "throughput_rps": 17.4207,
       "load_imbalance": 1.0,
@@ -1411,11 +1521,14 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -39.99,
+     "inr_delta_pct_vs_baseline": -39.98,
      "replica_delta_vs_baseline": -2,
      "frontier_size": 6,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "radix-affinity-balanced"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     }
    },
    "high_sharing": {
@@ -1426,6 +1539,7 @@
       "hit_rate": 0.923706,
       "p50_ttft_ms": 98.702,
       "p95_ttft_ms": 170.973,
+      "p95_tpot_ms": 47.732,
       "inr_per_1k_requests": 3.9787,
       "throughput_rps": 3.5206,
       "load_imbalance": 1.0,
@@ -1438,6 +1552,7 @@
       "hit_rate": 0.923706,
       "p50_ttft_ms": 98.702,
       "p95_ttft_ms": 170.973,
+      "p95_tpot_ms": 47.732,
       "inr_per_1k_requests": 3.9787,
       "throughput_rps": 3.5206,
       "load_imbalance": 1.0,
@@ -1449,7 +1564,15 @@
      "replica_delta_vs_baseline": 0,
      "frontier_size": 14,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "consistent-hash-prefix",
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "2": {
      "recommended": {
@@ -1458,6 +1581,7 @@
       "hit_rate": 0.923706,
       "p50_ttft_ms": 147.772,
       "p95_ttft_ms": 355.908,
+      "p95_tpot_ms": 112.066,
       "inr_per_1k_requests": 2.1646,
       "throughput_rps": 6.4712,
       "load_imbalance": 1.0,
@@ -1470,6 +1594,7 @@
       "hit_rate": 0.923706,
       "p50_ttft_ms": 147.772,
       "p95_ttft_ms": 355.908,
+      "p95_tpot_ms": 112.066,
       "inr_per_1k_requests": 2.1646,
       "throughput_rps": 6.4712,
       "load_imbalance": 1.0,
@@ -1479,20 +1604,29 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": 0.0,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 16,
+     "frontier_size": 15,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "consistent-hash-prefix",
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "3": {
      "recommended": {
-      "policy": "least-loaded",
+      "policy": "session-sticky",
       "n_replicas": 2,
-      "hit_rate": 0.874311,
-      "p50_ttft_ms": 174.95,
-      "p95_ttft_ms": 431.1,
-      "inr_per_1k_requests": 3.1175,
-      "throughput_rps": 8.9866,
-      "load_imbalance": 1.005,
+      "hit_rate": 0.922706,
+      "p50_ttft_ms": 117.3,
+      "p95_ttft_ms": 234.453,
+      "p95_tpot_ms": 62.841,
+      "inr_per_1k_requests": 3.118,
+      "throughput_rps": 8.9849,
+      "load_imbalance": 1.02,
       "meets_slo": true,
       "calibrated": false
      },
@@ -1502,6 +1636,7 @@
       "hit_rate": 0.871412,
       "p50_ttft_ms": 148.747,
       "p95_ttft_ms": 394.094,
+      "p95_tpot_ms": 124.864,
       "inr_per_1k_requests": 3.12,
       "throughput_rps": 8.9792,
       "load_imbalance": 1.0,
@@ -1509,22 +1644,29 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -0.08,
+     "inr_delta_pct_vs_baseline": -0.06,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 8,
+     "frontier_size": 7,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity-balanced",
+      "round-robin"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "4": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 2,
       "hit_rate": 0.922706,
-      "p50_ttft_ms": 137.293,
-      "p95_ttft_ms": 319.87,
-      "inr_per_1k_requests": 2.5133,
-      "throughput_rps": 11.1467,
-      "load_imbalance": 1.012,
+      "p50_ttft_ms": 137.659,
+      "p95_ttft_ms": 302.87,
+      "p95_tpot_ms": 85.795,
+      "inr_per_1k_requests": 2.514,
+      "throughput_rps": 11.1438,
+      "load_imbalance": 1.008,
       "meets_slo": true,
       "calibrated": false
      },
@@ -1534,6 +1676,7 @@
       "hit_rate": 0.855871,
       "p50_ttft_ms": 152.691,
       "p95_ttft_ms": 323.446,
+      "p95_tpot_ms": 86.967,
       "inr_per_1k_requests": 3.7661,
       "throughput_rps": 11.1582,
       "load_imbalance": 1.0012,
@@ -1541,22 +1684,26 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -33.26,
+     "inr_delta_pct_vs_baseline": -33.25,
      "replica_delta_vs_baseline": -1,
-     "frontier_size": 5,
+     "frontier_size": 6,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "radix-affinity-balanced"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "6": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 3,
       "hit_rate": 0.921706,
-      "p50_ttft_ms": 127.272,
-      "p95_ttft_ms": 278.442,
-      "inr_per_1k_requests": 2.8635,
-      "throughput_rps": 14.6756,
-      "load_imbalance": 1.011,
+      "p50_ttft_ms": 127.388,
+      "p95_ttft_ms": 268.942,
+      "p95_tpot_ms": 77.399,
+      "inr_per_1k_requests": 2.8613,
+      "throughput_rps": 14.6866,
+      "load_imbalance": 1.017,
       "meets_slo": true,
       "calibrated": false
      },
@@ -1566,6 +1713,7 @@
       "hit_rate": 0.833471,
       "p50_ttft_ms": 173.792,
       "p95_ttft_ms": 326.062,
+      "p95_tpot_ms": 116.456,
       "inr_per_1k_requests": 3.8221,
       "throughput_rps": 14.6598,
       "load_imbalance": 1.0,
@@ -1573,22 +1721,24 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -25.08,
+     "inr_delta_pct_vs_baseline": -25.14,
      "replica_delta_vs_baseline": -1,
-     "frontier_size": 4,
+     "frontier_size": 5,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "8": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 3,
-      "hit_rate": 0.921652,
-      "p50_ttft_ms": 161.448,
-      "p95_ttft_ms": 727.798,
-      "inr_per_1k_requests": 2.4109,
-      "throughput_rps": 17.4302,
-      "load_imbalance": 1.014,
+      "hit_rate": 0.921529,
+      "p50_ttft_ms": 159.388,
+      "p95_ttft_ms": 759.737,
+      "p95_tpot_ms": 112.614,
+      "inr_per_1k_requests": 2.4129,
+      "throughput_rps": 17.4292,
+      "load_imbalance": 1.017,
       "meets_slo": true,
       "calibrated": false
      },
@@ -1598,6 +1748,7 @@
       "hit_rate": 0.827541,
       "p50_ttft_ms": 176.194,
       "p95_ttft_ms": 373.905,
+      "p95_tpot_ms": 120.792,
       "inr_per_1k_requests": 4.0214,
       "throughput_rps": 17.4165,
       "load_imbalance": 1.0,
@@ -1605,11 +1756,12 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -40.05,
+     "inr_delta_pct_vs_baseline": -40.0,
      "replica_delta_vs_baseline": -2,
      "frontier_size": 6,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     }
    }
   },
@@ -1620,8 +1772,9 @@
       "policy": "round-robin",
       "n_replicas": 1,
       "hit_rate": 0.74037,
-      "p50_ttft_ms": 43.361,
-      "p95_ttft_ms": 67.701,
+      "p50_ttft_ms": 42.951,
+      "p95_ttft_ms": 67.207,
+      "p95_tpot_ms": 18.056,
       "inr_per_1k_requests": 3.9622,
       "throughput_rps": 3.5353,
       "load_imbalance": 1.0,
@@ -1632,8 +1785,9 @@
       "policy": "round-robin",
       "n_replicas": 1,
       "hit_rate": 0.74037,
-      "p50_ttft_ms": 43.361,
-      "p95_ttft_ms": 67.701,
+      "p50_ttft_ms": 42.951,
+      "p95_ttft_ms": 67.207,
+      "p95_tpot_ms": 18.056,
       "inr_per_1k_requests": 3.9622,
       "throughput_rps": 3.5353,
       "load_imbalance": 1.0,
@@ -1645,7 +1799,15 @@
      "replica_delta_vs_baseline": 0,
      "frontier_size": 11,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "consistent-hash-prefix",
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "2": {
      "recommended": {
@@ -1654,6 +1816,7 @@
       "hit_rate": 0.74037,
       "p50_ttft_ms": 49.471,
       "p95_ttft_ms": 96.24,
+      "p95_tpot_ms": 23.573,
       "inr_per_1k_requests": 2.1469,
       "throughput_rps": 6.5247,
       "load_imbalance": 1.0,
@@ -1666,6 +1829,7 @@
       "hit_rate": 0.74037,
       "p50_ttft_ms": 49.471,
       "p95_ttft_ms": 96.24,
+      "p95_tpot_ms": 23.573,
       "inr_per_1k_requests": 2.1469,
       "throughput_rps": 6.5247,
       "load_imbalance": 1.0,
@@ -1675,20 +1839,29 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": 0.0,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 16,
+     "frontier_size": 14,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "consistent-hash-prefix",
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "3": {
      "recommended": {
       "policy": "radix-affinity-balanced",
       "n_replicas": 2,
       "hit_rate": 0.74,
-      "p50_ttft_ms": 46.217,
-      "p95_ttft_ms": 76.186,
+      "p50_ttft_ms": 46.296,
+      "p95_ttft_ms": 80.639,
+      "p95_tpot_ms": 19.343,
       "inr_per_1k_requests": 3.0833,
-      "throughput_rps": 9.086,
-      "load_imbalance": 1.068,
+      "throughput_rps": 9.0862,
+      "load_imbalance": 1.066,
       "meets_slo": true,
       "calibrated": false
      },
@@ -1698,6 +1871,7 @@
       "hit_rate": 0.564198,
       "p50_ttft_ms": 57.039,
       "p95_ttft_ms": 112.39,
+      "p95_tpot_ms": 24.348,
       "inr_per_1k_requests": 3.0845,
       "throughput_rps": 9.0828,
       "load_imbalance": 1.0,
@@ -1709,7 +1883,13 @@
      "replica_delta_vs_baseline": 0,
      "frontier_size": 16,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "least-loaded",
+      "power-of-two",
+      "round-robin",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "4": {
      "recommended": {
@@ -1718,6 +1898,7 @@
       "hit_rate": 0.537531,
       "p50_ttft_ms": 61.77,
       "p95_ttft_ms": 144.681,
+      "p95_tpot_ms": 34.549,
       "inr_per_1k_requests": 2.4779,
       "throughput_rps": 11.3061,
       "load_imbalance": 1.0,
@@ -1730,6 +1911,7 @@
       "hit_rate": 0.537531,
       "p50_ttft_ms": 61.77,
       "p95_ttft_ms": 144.681,
+      "p95_tpot_ms": 34.549,
       "inr_per_1k_requests": 2.4779,
       "throughput_rps": 11.3061,
       "load_imbalance": 1.0,
@@ -1739,20 +1921,27 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": 0.0,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 12,
+     "frontier_size": 10,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "6": {
      "recommended": {
-      "policy": "radix-affinity-balanced",
+      "policy": "session-sticky",
       "n_replicas": 2,
-      "hit_rate": 0.57949,
-      "p50_ttft_ms": 69.631,
-      "p95_ttft_ms": 403.001,
-      "inr_per_1k_requests": 1.8738,
-      "throughput_rps": 14.9508,
-      "load_imbalance": 1.011,
+      "hit_rate": 0.593992,
+      "p50_ttft_ms": 67.271,
+      "p95_ttft_ms": 390.739,
+      "p95_tpot_ms": 88.029,
+      "inr_per_1k_requests": 1.8737,
+      "throughput_rps": 14.9516,
+      "load_imbalance": 1.01,
       "meets_slo": true,
       "calibrated": false
      },
@@ -1762,6 +1951,7 @@
       "hit_rate": 0.465226,
       "p50_ttft_ms": 92.354,
       "p95_ttft_ms": 317.102,
+      "p95_tpot_ms": 89.874,
       "inr_per_1k_requests": 1.8756,
       "throughput_rps": 14.9364,
       "load_imbalance": 1.0,
@@ -1773,7 +1963,13 @@
      "replica_delta_vs_baseline": 0,
      "frontier_size": 11,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity-balanced",
+      "round-robin"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "8": {
      "recommended": {
@@ -1782,6 +1978,7 @@
       "hit_rate": 0.44823,
       "p50_ttft_ms": 75.422,
       "p95_ttft_ms": 155.938,
+      "p95_tpot_ms": 45.928,
       "inr_per_1k_requests": 2.3557,
       "throughput_rps": 17.8392,
       "load_imbalance": 1.0012,
@@ -1794,6 +1991,7 @@
       "hit_rate": 0.44823,
       "p50_ttft_ms": 75.422,
       "p95_ttft_ms": 155.938,
+      "p95_tpot_ms": 45.928,
       "inr_per_1k_requests": 2.3557,
       "throughput_rps": 17.8392,
       "load_imbalance": 1.0012,
@@ -1803,9 +2001,15 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": 0.0,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 8,
+     "frontier_size": 6,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     }
    },
    "high_sharing": {
@@ -1814,8 +2018,9 @@
       "policy": "round-robin",
       "n_replicas": 1,
       "hit_rate": 0.923706,
-      "p50_ttft_ms": 44.457,
-      "p95_ttft_ms": 69.634,
+      "p50_ttft_ms": 44.564,
+      "p95_ttft_ms": 68.384,
+      "p95_tpot_ms": 18.121,
       "inr_per_1k_requests": 3.9622,
       "throughput_rps": 3.5353,
       "load_imbalance": 1.0,
@@ -1826,8 +2031,9 @@
       "policy": "round-robin",
       "n_replicas": 1,
       "hit_rate": 0.923706,
-      "p50_ttft_ms": 44.457,
-      "p95_ttft_ms": 69.634,
+      "p50_ttft_ms": 44.564,
+      "p95_ttft_ms": 68.384,
+      "p95_tpot_ms": 18.121,
       "inr_per_1k_requests": 3.9622,
       "throughput_rps": 3.5353,
       "load_imbalance": 1.0,
@@ -1839,7 +2045,15 @@
      "replica_delta_vs_baseline": 0,
      "frontier_size": 11,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "consistent-hash-prefix",
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "2": {
      "recommended": {
@@ -1848,6 +2062,7 @@
       "hit_rate": 0.923694,
       "p50_ttft_ms": 50.369,
       "p95_ttft_ms": 93.192,
+      "p95_tpot_ms": 23.671,
       "inr_per_1k_requests": 2.1471,
       "throughput_rps": 6.5241,
       "load_imbalance": 1.0,
@@ -1860,6 +2075,7 @@
       "hit_rate": 0.923694,
       "p50_ttft_ms": 50.369,
       "p95_ttft_ms": 93.192,
+      "p95_tpot_ms": 23.671,
       "inr_per_1k_requests": 2.1471,
       "throughput_rps": 6.5241,
       "load_imbalance": 1.0,
@@ -1871,17 +2087,26 @@
      "replica_delta_vs_baseline": 0,
      "frontier_size": 14,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "consistent-hash-prefix",
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "3": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 2,
       "hit_rate": 0.922706,
-      "p50_ttft_ms": 46.512,
-      "p95_ttft_ms": 81.333,
-      "inr_per_1k_requests": 3.0829,
-      "throughput_rps": 9.0873,
+      "p50_ttft_ms": 46.296,
+      "p95_ttft_ms": 81.751,
+      "p95_tpot_ms": 19.604,
+      "inr_per_1k_requests": 3.0832,
+      "throughput_rps": 9.0866,
       "load_imbalance": 1.008,
       "meets_slo": true,
       "calibrated": false
@@ -1892,6 +2117,7 @@
       "hit_rate": 0.871212,
       "p50_ttft_ms": 57.889,
       "p95_ttft_ms": 113.953,
+      "p95_tpot_ms": 24.308,
       "inr_per_1k_requests": 3.0843,
       "throughput_rps": 9.0831,
       "load_imbalance": 1.0,
@@ -1899,11 +2125,17 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -0.05,
+     "inr_delta_pct_vs_baseline": -0.04,
      "replica_delta_vs_baseline": 0,
      "frontier_size": 14,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity-balanced",
+      "round-robin"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "4": {
      "recommended": {
@@ -1912,6 +2144,7 @@
       "hit_rate": 0.865141,
       "p50_ttft_ms": 61.649,
       "p95_ttft_ms": 143.133,
+      "p95_tpot_ms": 34.633,
       "inr_per_1k_requests": 2.4779,
       "throughput_rps": 11.3061,
       "load_imbalance": 1.0,
@@ -1924,6 +2157,7 @@
       "hit_rate": 0.865141,
       "p50_ttft_ms": 61.649,
       "p95_ttft_ms": 143.133,
+      "p95_tpot_ms": 34.633,
       "inr_per_1k_requests": 2.4779,
       "throughput_rps": 11.3061,
       "load_imbalance": 1.0,
@@ -1935,18 +2169,25 @@
      "replica_delta_vs_baseline": 0,
      "frontier_size": 8,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "6": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 2,
-      "hit_rate": 0.857696,
-      "p50_ttft_ms": 96.339,
-      "p95_ttft_ms": 638.993,
-      "inr_per_1k_requests": 1.8739,
-      "throughput_rps": 14.9501,
-      "load_imbalance": 1.01,
+      "hit_rate": 0.858193,
+      "p50_ttft_ms": 94.972,
+      "p95_ttft_ms": 596.138,
+      "p95_tpot_ms": 88.777,
+      "inr_per_1k_requests": 1.874,
+      "throughput_rps": 14.9493,
+      "load_imbalance": 1.006,
       "meets_slo": true,
       "calibrated": false
      },
@@ -1956,6 +2197,7 @@
       "hit_rate": 0.836765,
       "p50_ttft_ms": 107.439,
       "p95_ttft_ms": 695.666,
+      "p95_tpot_ms": 89.682,
       "inr_per_1k_requests": 1.8757,
       "throughput_rps": 14.9362,
       "load_imbalance": 1.0,
@@ -1965,9 +2207,14 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": -0.09,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 8,
+     "frontier_size": 6,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "least-loaded",
+      "power-of-two",
+      "round-robin"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "8": {
      "recommended": {
@@ -1976,6 +2223,7 @@
       "hit_rate": 0.835894,
       "p50_ttft_ms": 79.358,
       "p95_ttft_ms": 157.998,
+      "p95_tpot_ms": 47.453,
       "inr_per_1k_requests": 2.3555,
       "throughput_rps": 17.8403,
       "load_imbalance": 1.0012,
@@ -1988,6 +2236,7 @@
       "hit_rate": 0.835894,
       "p50_ttft_ms": 79.358,
       "p95_ttft_ms": 157.998,
+      "p95_tpot_ms": 47.453,
       "inr_per_1k_requests": 2.3555,
       "throughput_rps": 17.8403,
       "load_imbalance": 1.0012,
@@ -1997,9 +2246,14 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": 0.0,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 5,
+     "frontier_size": 7,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "least-loaded",
+      "power-of-two",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     }
    }
   },
@@ -2012,6 +2266,7 @@
       "hit_rate": 0.74037,
       "p50_ttft_ms": 188.011,
       "p95_ttft_ms": 298.025,
+      "p95_tpot_ms": 134.702,
       "inr_per_1k_requests": 4.013,
       "throughput_rps": 3.4906,
       "load_imbalance": 1.0,
@@ -2024,6 +2279,7 @@
       "hit_rate": 0.74037,
       "p50_ttft_ms": 188.011,
       "p95_ttft_ms": 298.025,
+      "p95_tpot_ms": 134.702,
       "inr_per_1k_requests": 4.013,
       "throughput_rps": 3.4906,
       "load_imbalance": 1.0,
@@ -2035,18 +2291,27 @@
      "replica_delta_vs_baseline": 0,
      "frontier_size": 17,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "consistent-hash-prefix",
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "2": {
      "recommended": {
-      "policy": "radix-affinity-balanced",
+      "policy": "round-robin",
       "n_replicas": 2,
-      "hit_rate": 0.739753,
-      "p50_ttft_ms": 185.859,
-      "p95_ttft_ms": 310.697,
-      "inr_per_1k_requests": 4.3935,
-      "throughput_rps": 6.3766,
-      "load_imbalance": 1.0095,
+      "hit_rate": 0.590123,
+      "p50_ttft_ms": 215.162,
+      "p95_ttft_ms": 359.807,
+      "p95_tpot_ms": 154.617,
+      "inr_per_1k_requests": 4.3938,
+      "throughput_rps": 6.3761,
+      "load_imbalance": 1.0,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2056,6 +2321,7 @@
       "hit_rate": 0.590123,
       "p50_ttft_ms": 215.162,
       "p95_ttft_ms": 359.807,
+      "p95_tpot_ms": 154.617,
       "inr_per_1k_requests": 4.3938,
       "throughput_rps": 6.3761,
       "load_imbalance": 1.0,
@@ -2063,22 +2329,29 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -0.01,
+     "inr_delta_pct_vs_baseline": 0.0,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 18,
+     "frontier_size": 21,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "3": {
      "recommended": {
       "policy": "radix-affinity-balanced",
       "n_replicas": 2,
-      "hit_rate": 0.736395,
-      "p50_ttft_ms": 263.587,
-      "p95_ttft_ms": 485.43,
-      "inr_per_1k_requests": 3.1983,
-      "throughput_rps": 8.7594,
-      "load_imbalance": 1.013,
+      "hit_rate": 0.736988,
+      "p50_ttft_ms": 265.166,
+      "p95_ttft_ms": 500.054,
+      "p95_tpot_ms": 201.917,
+      "inr_per_1k_requests": 3.1965,
+      "throughput_rps": 8.7645,
+      "load_imbalance": 1.0095,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2088,6 +2361,7 @@
       "hit_rate": 0.492963,
       "p50_ttft_ms": 228.284,
       "p95_ttft_ms": 409.752,
+      "p95_tpot_ms": 172.535,
       "inr_per_1k_requests": 4.7813,
       "throughput_rps": 8.7891,
       "load_imbalance": 1.0012,
@@ -2095,21 +2369,25 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -33.11,
+     "inr_delta_pct_vs_baseline": -33.15,
      "replica_delta_vs_baseline": -1,
-     "frontier_size": 11,
+     "frontier_size": 12,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "4": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 3,
       "hit_rate": 0.73963,
-      "p50_ttft_ms": 216.714,
-      "p95_ttft_ms": 381.185,
-      "inr_per_1k_requests": 3.8711,
-      "throughput_rps": 10.8556,
+      "p50_ttft_ms": 219.116,
+      "p95_ttft_ms": 384.356,
+      "p95_tpot_ms": 147.849,
+      "inr_per_1k_requests": 3.8733,
+      "throughput_rps": 10.8494,
       "load_imbalance": 1.017,
       "meets_slo": true,
       "calibrated": false
@@ -2120,6 +2398,7 @@
       "hit_rate": 0.444198,
       "p50_ttft_ms": 232.572,
       "p95_ttft_ms": 422.182,
+      "p95_tpot_ms": 171.374,
       "inr_per_1k_requests": 5.1648,
       "throughput_rps": 10.8486,
       "load_imbalance": 1.0,
@@ -2127,22 +2406,26 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -25.05,
+     "inr_delta_pct_vs_baseline": -25.01,
      "replica_delta_vs_baseline": -1,
      "frontier_size": 8,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "radix-affinity-balanced"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "6": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 4,
       "hit_rate": 0.739259,
-      "p50_ttft_ms": 216.325,
-      "p95_ttft_ms": 367.035,
-      "inr_per_1k_requests": 3.9562,
-      "throughput_rps": 14.1627,
-      "load_imbalance": 1.02,
+      "p50_ttft_ms": 215.266,
+      "p95_ttft_ms": 357.359,
+      "p95_tpot_ms": 154.763,
+      "inr_per_1k_requests": 3.9582,
+      "throughput_rps": 14.1556,
+      "load_imbalance": 1.024,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2152,6 +2435,7 @@
       "hit_rate": 0.431481,
       "p50_ttft_ms": 258.687,
       "p95_ttft_ms": 411.84,
+      "p95_tpot_ms": 203.153,
       "inr_per_1k_requests": 4.959,
       "throughput_rps": 14.1234,
       "load_imbalance": 1.0,
@@ -2159,22 +2443,26 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -20.22,
+     "inr_delta_pct_vs_baseline": -20.18,
      "replica_delta_vs_baseline": -1,
      "frontier_size": 6,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "radix-affinity-balanced"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "8": {
      "recommended": {
-      "policy": "radix-affinity-balanced",
+      "policy": "session-sticky",
       "n_replicas": 4,
-      "hit_rate": 0.727802,
-      "p50_ttft_ms": 283.104,
-      "p95_ttft_ms": 551.075,
-      "inr_per_1k_requests": 3.3941,
-      "throughput_rps": 16.5208,
-      "load_imbalance": 1.048,
+      "hit_rate": 0.739259,
+      "p50_ttft_ms": 266.822,
+      "p95_ttft_ms": 461.31,
+      "p95_tpot_ms": 196.32,
+      "inr_per_1k_requests": 3.3815,
+      "throughput_rps": 16.5697,
+      "load_imbalance": 1.02,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2184,6 +2472,7 @@
       "hit_rate": 0.396543,
       "p50_ttft_ms": 275.721,
       "p95_ttft_ms": 515.823,
+      "p95_tpot_ms": 215.031,
       "inr_per_1k_requests": 5.0557,
       "throughput_rps": 16.624,
       "load_imbalance": 1.005,
@@ -2191,11 +2480,14 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -32.87,
+     "inr_delta_pct_vs_baseline": -33.11,
      "replica_delta_vs_baseline": -2,
-     "frontier_size": 7,
+     "frontier_size": 6,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "radix-affinity-balanced"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     }
    },
    "high_sharing": {
@@ -2206,6 +2498,7 @@
       "hit_rate": 0.923706,
       "p50_ttft_ms": 191.525,
       "p95_ttft_ms": 301.743,
+      "p95_tpot_ms": 135.993,
       "inr_per_1k_requests": 4.0127,
       "throughput_rps": 3.4908,
       "load_imbalance": 1.0,
@@ -2218,6 +2511,7 @@
       "hit_rate": 0.923706,
       "p50_ttft_ms": 191.525,
       "p95_ttft_ms": 301.743,
+      "p95_tpot_ms": 135.993,
       "inr_per_1k_requests": 4.0127,
       "throughput_rps": 3.4908,
       "load_imbalance": 1.0,
@@ -2227,20 +2521,29 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": 0.0,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 16,
+     "frontier_size": 17,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "consistent-hash-prefix",
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "2": {
      "recommended": {
-      "policy": "round-robin",
+      "policy": "radix-affinity-balanced",
       "n_replicas": 2,
-      "hit_rate": 0.879788,
-      "p50_ttft_ms": 217.786,
-      "p95_ttft_ms": 376.875,
-      "inr_per_1k_requests": 4.3937,
-      "throughput_rps": 6.3763,
-      "load_imbalance": 1.0,
+      "hit_rate": 0.913864,
+      "p50_ttft_ms": 216.876,
+      "p95_ttft_ms": 486.042,
+      "p95_tpot_ms": 180.01,
+      "inr_per_1k_requests": 4.393,
+      "throughput_rps": 6.3773,
+      "load_imbalance": 1.19,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2250,6 +2553,7 @@
       "hit_rate": 0.879788,
       "p50_ttft_ms": 217.786,
       "p95_ttft_ms": 376.875,
+      "p95_tpot_ms": 156.148,
       "inr_per_1k_requests": 4.3937,
       "throughput_rps": 6.3763,
       "load_imbalance": 1.0,
@@ -2257,22 +2561,29 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": 0.0,
+     "inr_delta_pct_vs_baseline": -0.02,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 18,
+     "frontier_size": 19,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "least-loaded",
+      "power-of-two",
+      "round-robin",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "3": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 2,
       "hit_rate": 0.922706,
-      "p50_ttft_ms": 273.815,
-      "p95_ttft_ms": 491.932,
-      "inr_per_1k_requests": 3.2025,
-      "throughput_rps": 8.757,
-      "load_imbalance": 1.018,
+      "p50_ttft_ms": 267.957,
+      "p95_ttft_ms": 494.651,
+      "p95_tpot_ms": 205.451,
+      "inr_per_1k_requests": 3.2019,
+      "throughput_rps": 8.7563,
+      "load_imbalance": 1.022,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2282,6 +2593,7 @@
       "hit_rate": 0.851482,
       "p50_ttft_ms": 232.159,
       "p95_ttft_ms": 428.538,
+      "p95_tpot_ms": 174.575,
       "inr_per_1k_requests": 4.7827,
       "throughput_rps": 8.7865,
       "load_imbalance": 1.0012,
@@ -2289,22 +2601,24 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -33.04,
+     "inr_delta_pct_vs_baseline": -33.05,
      "replica_delta_vs_baseline": -1,
      "frontier_size": 6,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "4": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 3,
       "hit_rate": 0.921706,
-      "p50_ttft_ms": 221.611,
-      "p95_ttft_ms": 396.406,
-      "inr_per_1k_requests": 3.8749,
-      "throughput_rps": 10.845,
-      "load_imbalance": 1.023,
+      "p50_ttft_ms": 220.557,
+      "p95_ttft_ms": 398.455,
+      "p95_tpot_ms": 148.913,
+      "inr_per_1k_requests": 3.8732,
+      "throughput_rps": 10.8498,
+      "load_imbalance": 1.014,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2314,6 +2628,7 @@
       "hit_rate": 0.837318,
       "p50_ttft_ms": 235.415,
       "p95_ttft_ms": 439.788,
+      "p95_tpot_ms": 171.26,
       "inr_per_1k_requests": 5.1643,
       "throughput_rps": 10.8497,
       "load_imbalance": 1.0,
@@ -2321,22 +2636,24 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -24.97,
+     "inr_delta_pct_vs_baseline": -25.0,
      "replica_delta_vs_baseline": -1,
-     "frontier_size": 6,
+     "frontier_size": 5,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "6": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 4,
       "hit_rate": 0.920706,
-      "p50_ttft_ms": 219.531,
-      "p95_ttft_ms": 385.592,
-      "inr_per_1k_requests": 3.9566,
-      "throughput_rps": 14.1614,
-      "load_imbalance": 1.02,
+      "p50_ttft_ms": 217.974,
+      "p95_ttft_ms": 375.077,
+      "p95_tpot_ms": 156.734,
+      "inr_per_1k_requests": 3.9607,
+      "throughput_rps": 14.1465,
+      "load_imbalance": 1.028,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2346,6 +2663,7 @@
       "hit_rate": 0.8326,
       "p50_ttft_ms": 260.698,
       "p95_ttft_ms": 413.592,
+      "p95_tpot_ms": 203.25,
       "inr_per_1k_requests": 4.9571,
       "throughput_rps": 14.1288,
       "load_imbalance": 1.0,
@@ -2353,22 +2671,24 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -20.18,
+     "inr_delta_pct_vs_baseline": -20.1,
      "replica_delta_vs_baseline": -1,
      "frontier_size": 6,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "8": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 4,
       "hit_rate": 0.920706,
-      "p50_ttft_ms": 273.376,
-      "p95_ttft_ms": 506.527,
-      "inr_per_1k_requests": 3.4013,
-      "throughput_rps": 16.4737,
-      "load_imbalance": 1.04,
+      "p50_ttft_ms": 269.936,
+      "p95_ttft_ms": 470.576,
+      "p95_tpot_ms": 199.448,
+      "inr_per_1k_requests": 3.3888,
+      "throughput_rps": 16.5343,
+      "load_imbalance": 1.024,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2378,6 +2698,7 @@
       "hit_rate": 0.821729,
       "p50_ttft_ms": 281.681,
       "p95_ttft_ms": 554.77,
+      "p95_tpot_ms": 213.177,
       "inr_per_1k_requests": 5.0538,
       "throughput_rps": 16.6302,
       "load_imbalance": 1.005,
@@ -2385,11 +2706,12 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -32.7,
+     "inr_delta_pct_vs_baseline": -32.95,
      "replica_delta_vs_baseline": -2,
      "frontier_size": 5,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     }
    }
   },
@@ -2402,6 +2724,7 @@
       "hit_rate": 0.584691,
       "p50_ttft_ms": 509.82,
       "p95_ttft_ms": 1296.0,
+      "p95_tpot_ms": 341.006,
       "inr_per_1k_requests": 8.0245,
       "throughput_rps": 3.4912,
       "load_imbalance": 1.0,
@@ -2414,6 +2737,7 @@
       "hit_rate": 0.584691,
       "p50_ttft_ms": 509.82,
       "p95_ttft_ms": 1296.0,
+      "p95_tpot_ms": 341.006,
       "inr_per_1k_requests": 8.0245,
       "throughput_rps": 3.4912,
       "load_imbalance": 1.0,
@@ -2423,20 +2747,27 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": 0.0,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 14,
+     "frontier_size": 17,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "least-loaded",
+      "power-of-two",
+      "radix-affinity-balanced",
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "2": {
      "recommended": {
-      "policy": "session-sticky",
+      "policy": "radix-affinity-balanced",
       "n_replicas": 3,
-      "hit_rate": 0.73963,
-      "p50_ttft_ms": 405.598,
-      "p95_ttft_ms": 1081.966,
-      "inr_per_1k_requests": 6.6118,
-      "throughput_rps": 6.3686,
-      "load_imbalance": 1.029,
+      "hit_rate": 0.738395,
+      "p50_ttft_ms": 427.666,
+      "p95_ttft_ms": 1089.405,
+      "p95_tpot_ms": 212.885,
+      "inr_per_1k_requests": 6.6058,
+      "throughput_rps": 6.3664,
+      "load_imbalance": 1.0268,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2446,6 +2777,7 @@
       "hit_rate": 0.468642,
       "p50_ttft_ms": 645.354,
       "p95_ttft_ms": 1529.666,
+      "p95_tpot_ms": 481.223,
       "inr_per_1k_requests": 8.9883,
       "throughput_rps": 6.3367,
       "load_imbalance": 1.0,
@@ -2453,22 +2785,26 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -26.44,
+     "inr_delta_pct_vs_baseline": -26.51,
      "replica_delta_vs_baseline": -1,
      "frontier_size": 12,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "3": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 4,
       "hit_rate": 0.739259,
-      "p50_ttft_ms": 472.995,
-      "p95_ttft_ms": 1380.582,
-      "inr_per_1k_requests": 6.4471,
-      "throughput_rps": 8.7635,
-      "load_imbalance": 1.06,
+      "p50_ttft_ms": 481.213,
+      "p95_ttft_ms": 1382.847,
+      "p95_tpot_ms": 239.158,
+      "inr_per_1k_requests": 6.4398,
+      "throughput_rps": 8.7712,
+      "load_imbalance": 1.028,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2478,6 +2814,7 @@
       "hit_rate": 0.411975,
       "p50_ttft_ms": 555.645,
       "p95_ttft_ms": 1116.013,
+      "p95_tpot_ms": 329.515,
       "inr_per_1k_requests": 11.1992,
       "throughput_rps": 8.7554,
       "load_imbalance": 1.0062,
@@ -2485,22 +2822,26 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -42.43,
+     "inr_delta_pct_vs_baseline": -42.5,
      "replica_delta_vs_baseline": -3,
-     "frontier_size": 6,
+     "frontier_size": 5,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "radix-affinity-balanced"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "4": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 5,
       "hit_rate": 0.738889,
-      "p50_ttft_ms": 482.263,
-      "p95_ttft_ms": 1421.309,
-      "inr_per_1k_requests": 6.5712,
-      "throughput_rps": 10.8032,
-      "load_imbalance": 1.08,
+      "p50_ttft_ms": 465.155,
+      "p95_ttft_ms": 1270.982,
+      "p95_tpot_ms": 250.045,
+      "inr_per_1k_requests": 6.5382,
+      "throughput_rps": 10.7937,
+      "load_imbalance": 1.085,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2510,6 +2851,7 @@
       "hit_rate": 0.376543,
       "p50_ttft_ms": 709.684,
       "p95_ttft_ms": 2426.433,
+      "p95_tpot_ms": 493.659,
       "inr_per_1k_requests": 11.4848,
       "throughput_rps": 10.5915,
       "load_imbalance": 1.0,
@@ -2517,22 +2859,24 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -42.78,
+     "inr_delta_pct_vs_baseline": -43.07,
      "replica_delta_vs_baseline": -3,
-     "frontier_size": 6,
+     "frontier_size": 7,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "6": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 6,
       "hit_rate": 0.738519,
-      "p50_ttft_ms": 542.167,
-      "p95_ttft_ms": 1345.004,
-      "inr_per_1k_requests": 6.0417,
-      "throughput_rps": 14.0343,
-      "load_imbalance": 1.068,
+      "p50_ttft_ms": 529.974,
+      "p95_ttft_ms": 1370.018,
+      "p95_tpot_ms": 310.775,
+      "inr_per_1k_requests": 6.0036,
+      "throughput_rps": 14.0816,
+      "load_imbalance": 1.044,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2542,6 +2886,7 @@
       "hit_rate": 0.369383,
       "p50_ttft_ms": 4712.127,
       "p95_ttft_ms": 15991.564,
+      "p95_tpot_ms": 611.135,
       "inr_per_1k_requests": 30.0127,
       "throughput_rps": 11.0631,
       "load_imbalance": 1.0,
@@ -2549,21 +2894,25 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -79.87,
+     "inr_delta_pct_vs_baseline": -80.0,
      "replica_delta_vs_baseline": -2,
      "frontier_size": 6,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "radix-affinity-balanced"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "8": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 7,
       "hit_rate": 0.738148,
-      "p50_ttft_ms": 526.747,
-      "p95_ttft_ms": 1350.63,
-      "inr_per_1k_requests": 5.9946,
-      "throughput_rps": 16.4154,
+      "p50_ttft_ms": 528.253,
+      "p95_ttft_ms": 1343.435,
+      "p95_tpot_ms": 306.637,
+      "inr_per_1k_requests": 5.9846,
+      "throughput_rps": 16.4444,
       "load_imbalance": 1.064,
       "meets_slo": true,
       "calibrated": false
@@ -2574,6 +2923,7 @@
       "hit_rate": 0.35358,
       "p50_ttft_ms": 7663.279,
       "p95_ttft_ms": 22040.206,
+      "p95_tpot_ms": 616.705,
       "inr_per_1k_requests": 32.9088,
       "throughput_rps": 11.0738,
       "load_imbalance": 1.0,
@@ -2581,11 +2931,12 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -81.78,
+     "inr_delta_pct_vs_baseline": -81.81,
      "replica_delta_vs_baseline": -1,
      "frontier_size": 6,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     }
    },
    "high_sharing": {
@@ -2596,6 +2947,7 @@
       "hit_rate": 0.878635,
       "p50_ttft_ms": 521.578,
       "p95_ttft_ms": 1352.025,
+      "p95_tpot_ms": 348.282,
       "inr_per_1k_requests": 8.043,
       "throughput_rps": 3.4919,
       "load_imbalance": 1.0,
@@ -2608,6 +2960,7 @@
       "hit_rate": 0.878635,
       "p50_ttft_ms": 521.578,
       "p95_ttft_ms": 1352.025,
+      "p95_tpot_ms": 348.282,
       "inr_per_1k_requests": 8.043,
       "throughput_rps": 3.4919,
       "load_imbalance": 1.0,
@@ -2617,20 +2970,24 @@
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
      "inr_delta_pct_vs_baseline": 0.0,
      "replica_delta_vs_baseline": 0,
-     "frontier_size": 14,
+     "frontier_size": 15,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [
+      "session-sticky"
+     ],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "2": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 3,
       "hit_rate": 0.921706,
-      "p50_ttft_ms": 435.779,
-      "p95_ttft_ms": 1264.533,
-      "inr_per_1k_requests": 6.6481,
-      "throughput_rps": 6.3624,
-      "load_imbalance": 1.02,
+      "p50_ttft_ms": 432.91,
+      "p95_ttft_ms": 1348.517,
+      "p95_tpot_ms": 222.924,
+      "inr_per_1k_requests": 6.6806,
+      "throughput_rps": 6.3621,
+      "load_imbalance": 1.023,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2640,6 +2997,7 @@
       "hit_rate": 0.844365,
       "p50_ttft_ms": 657.109,
       "p95_ttft_ms": 1573.258,
+      "p95_tpot_ms": 480.084,
       "inr_per_1k_requests": 9.0268,
       "throughput_rps": 6.3338,
       "load_imbalance": 1.0,
@@ -2647,22 +3005,24 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -26.35,
+     "inr_delta_pct_vs_baseline": -25.99,
      "replica_delta_vs_baseline": -1,
      "frontier_size": 11,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "3": {
      "recommended": {
       "policy": "session-sticky",
-      "n_replicas": 5,
-      "hit_rate": 0.919706,
-      "p50_ttft_ms": 387.997,
-      "p95_ttft_ms": 1034.269,
-      "inr_per_1k_requests": 8.0303,
-      "throughput_rps": 8.7811,
-      "load_imbalance": 1.065,
+      "n_replicas": 4,
+      "hit_rate": 0.920706,
+      "p50_ttft_ms": 522.431,
+      "p95_ttft_ms": 1564.82,
+      "p95_tpot_ms": 256.28,
+      "inr_per_1k_requests": 6.5139,
+      "throughput_rps": 8.7784,
+      "load_imbalance": 1.048,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2672,6 +3032,7 @@
       "hit_rate": 0.825788,
       "p50_ttft_ms": 568.824,
       "p95_ttft_ms": 1143.419,
+      "p95_tpot_ms": 328.565,
       "inr_per_1k_requests": 11.2968,
       "throughput_rps": 8.7564,
       "load_imbalance": 1.0062,
@@ -2679,22 +3040,24 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -28.92,
-     "replica_delta_vs_baseline": -2,
+     "inr_delta_pct_vs_baseline": -42.34,
+     "replica_delta_vs_baseline": -3,
      "frontier_size": 5,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "4": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 5,
       "hit_rate": 0.919706,
-      "p50_ttft_ms": 517.33,
-      "p95_ttft_ms": 1566.153,
-      "inr_per_1k_requests": 6.6492,
-      "throughput_rps": 10.7723,
-      "load_imbalance": 1.075,
+      "p50_ttft_ms": 506.053,
+      "p95_ttft_ms": 1505.783,
+      "p95_tpot_ms": 261.966,
+      "inr_per_1k_requests": 6.6889,
+      "throughput_rps": 10.7237,
+      "load_imbalance": 1.09,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2704,6 +3067,7 @@
       "hit_rate": 0.815047,
       "p50_ttft_ms": 732.736,
       "p95_ttft_ms": 2396.806,
+      "p95_tpot_ms": 497.531,
       "inr_per_1k_requests": 11.6669,
       "throughput_rps": 10.5696,
       "load_imbalance": 1.0,
@@ -2711,22 +3075,24 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -43.01,
+     "inr_delta_pct_vs_baseline": -42.67,
      "replica_delta_vs_baseline": -3,
      "frontier_size": 7,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "6": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 6,
       "hit_rate": 0.918706,
-      "p50_ttft_ms": 581.688,
-      "p95_ttft_ms": 1638.96,
-      "inr_per_1k_requests": 6.1253,
-      "throughput_rps": 14.0629,
-      "load_imbalance": 1.044,
+      "p50_ttft_ms": 554.901,
+      "p95_ttft_ms": 1548.635,
+      "p95_tpot_ms": 325.399,
+      "inr_per_1k_requests": 6.1032,
+      "throughput_rps": 14.0523,
+      "load_imbalance": 1.05,
       "meets_slo": true,
       "calibrated": false
      },
@@ -2736,6 +3102,7 @@
       "hit_rate": 0.813012,
       "p50_ttft_ms": 4677.514,
       "p95_ttft_ms": 15833.423,
+      "p95_tpot_ms": 579.063,
       "inr_per_1k_requests": 30.5613,
       "throughput_rps": 11.1962,
       "load_imbalance": 1.0,
@@ -2743,21 +3110,23 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -79.96,
+     "inr_delta_pct_vs_baseline": -80.03,
      "replica_delta_vs_baseline": -2,
      "frontier_size": 6,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     },
     "8": {
      "recommended": {
       "policy": "session-sticky",
       "n_replicas": 7,
       "hit_rate": 0.917706,
-      "p50_ttft_ms": 559.328,
-      "p95_ttft_ms": 1469.765,
-      "inr_per_1k_requests": 6.052,
-      "throughput_rps": 16.4531,
+      "p50_ttft_ms": 551.593,
+      "p95_ttft_ms": 1464.673,
+      "p95_tpot_ms": 316.496,
+      "inr_per_1k_requests": 6.0427,
+      "throughput_rps": 16.4576,
       "load_imbalance": 1.057,
       "meets_slo": true,
       "calibrated": false
@@ -2768,6 +3137,7 @@
       "hit_rate": 0.808459,
       "p50_ttft_ms": 7564.792,
       "p95_ttft_ms": 21757.008,
+      "p95_tpot_ms": 583.515,
       "inr_per_1k_requests": 34.1008,
       "throughput_rps": 11.1396,
       "load_imbalance": 1.0,
@@ -2775,11 +3145,12 @@
       "calibrated": false
      },
      "reason": "cheapest configuration meeting the p95 TTFT SLO",
-     "inr_delta_pct_vs_baseline": -82.25,
+     "inr_delta_pct_vs_baseline": -82.28,
      "replica_delta_vs_baseline": -1,
      "frontier_size": 6,
      "calibrated": false,
-     "WARNING": "UNCALIBRATED. The recommended POLICY and REPLICA COUNT are the usable output (ADR-010 tier 1, pending H6). The latency and rupee figures are shapes from an unmeasured cost profile and are NOT predictions for any real fleet. Run `kvsim calibrate` against your own engine for tier-3 numbers."
+     "tied_with": [],
+     "WARNING": "UNCALIBRATED. The latency and rupee figures are shapes from an unmeasured cost profile, not predictions for any real fleet. The recommended policy and replica count depend on the hardware too: the full ranking of policies changes with it. Measure your own profile with kvsim calibrate."
     }
    }
   }
@@ -3136,7 +3507,7 @@
     "session-sticky": 2
    },
    "our_pick": "session-sticky",
-   "regime_pick": "least-loaded",
+   "regime_pick": "session-sticky",
    "best_set_baseline": [
     "session-sticky"
    ],
@@ -3149,7 +3520,7 @@
    ],
    "tau_b": 0.6532,
    "flip": false,
-   "strict_flip": true,
+   "strict_flip": false,
    "lenient_flip": false
   },
   {
@@ -3450,7 +3821,7 @@
     "session-sticky": 2
    },
    "our_pick": "session-sticky",
-   "regime_pick": "radix-affinity-balanced",
+   "regime_pick": "session-sticky",
    "best_set_baseline": [
     "radix-affinity-balanced",
     "session-sticky"
@@ -3464,7 +3835,7 @@
    ],
    "tau_b": 0.7906,
    "flip": false,
-   "strict_flip": true,
+   "strict_flip": false,
    "lenient_flip": false
   },
   {
@@ -3819,7 +4190,7 @@
     "session-sticky": 2
    },
    "our_pick": "radix-affinity-balanced",
-   "regime_pick": "radix-affinity-balanced",
+   "regime_pick": "round-robin",
    "best_set_baseline": [
     "radix-affinity-balanced",
     "session-sticky"
@@ -3833,7 +4204,7 @@
    ],
    "tau_b": 0.7906,
    "flip": false,
-   "strict_flip": false,
+   "strict_flip": true,
    "lenient_flip": false
   },
   {
@@ -3970,7 +4341,7 @@
     "session-sticky": 4
    },
    "our_pick": "session-sticky",
-   "regime_pick": "radix-affinity-balanced",
+   "regime_pick": "session-sticky",
    "best_set_baseline": [
     "radix-affinity-balanced",
     "session-sticky"
@@ -3981,7 +4352,7 @@
    ],
    "tau_b": 1.0,
    "flip": false,
-   "strict_flip": true,
+   "strict_flip": false,
    "lenient_flip": false
   },
   {
@@ -4054,7 +4425,7 @@
     "session-sticky": 2
    },
    "our_pick": "session-sticky",
-   "regime_pick": "round-robin",
+   "regime_pick": "radix-affinity-balanced",
    "best_set_baseline": [
     "session-sticky"
    ],
@@ -4226,7 +4597,7 @@
    "required_regime": {
     "round-robin": 2,
     "least-loaded": 2,
-    "power-of-two": 3,
+    "power-of-two": 2,
     "consistent-hash-prefix": 9,
     "radix-affinity": 9,
     "radix-affinity-balanced": 2,
@@ -4245,6 +4616,7 @@
    ],
    "best_set_regime": [
     "least-loaded",
+    "power-of-two",
     "radix-affinity-balanced",
     "round-robin",
     "session-sticky"
@@ -4269,15 +4641,15 @@
    },
    "required_regime": {
     "round-robin": 4,
-    "least-loaded": 9,
-    "power-of-two": 7,
+    "least-loaded": 8,
+    "power-of-two": 8,
     "consistent-hash-prefix": 9,
     "radix-affinity": 9,
     "radix-affinity-balanced": 3,
     "session-sticky": 3
    },
    "our_pick": "radix-affinity-balanced",
-   "regime_pick": "session-sticky",
+   "regime_pick": "radix-affinity-balanced",
    "best_set_baseline": [
     "radix-affinity-balanced",
     "session-sticky"
@@ -4286,9 +4658,9 @@
     "radix-affinity-balanced",
     "session-sticky"
    ],
-   "tau_b": 0.8489,
+   "tau_b": 0.9428,
    "flip": false,
-   "strict_flip": true,
+   "strict_flip": false,
    "lenient_flip": false
   },
   {
@@ -4310,7 +4682,7 @@
     "power-of-two": 9,
     "consistent-hash-prefix": 9,
     "radix-affinity": 9,
-    "radix-affinity-balanced": 5,
+    "radix-affinity-balanced": 4,
     "session-sticky": 4
    },
    "our_pick": "radix-affinity-balanced",
@@ -4320,10 +4692,11 @@
     "session-sticky"
    ],
    "best_set_regime": [
+    "radix-affinity-balanced",
     "session-sticky"
    ],
-   "tau_b": 0.7746,
-   "flip": true,
+   "tau_b": 0.8018,
+   "flip": false,
    "strict_flip": true,
    "lenient_flip": false
   },
@@ -4452,7 +4825,7 @@
    "required_regime": {
     "round-robin": 2,
     "least-loaded": 3,
-    "power-of-two": 4,
+    "power-of-two": 3,
     "consistent-hash-prefix": 9,
     "radix-affinity": 9,
     "radix-affinity-balanced": 9,
@@ -4493,7 +4866,7 @@
    },
    "required_regime": {
     "round-robin": 4,
-    "least-loaded": 9,
+    "least-loaded": 8,
     "power-of-two": 8,
     "consistent-hash-prefix": 9,
     "radix-affinity": 9,
@@ -4508,7 +4881,7 @@
    "best_set_regime": [
     "session-sticky"
    ],
-   "tau_b": 0.8,
+   "tau_b": 0.9393,
    "flip": false,
    "strict_flip": false,
    "lenient_flip": false
@@ -4533,7 +4906,7 @@
     "consistent-hash-prefix": 9,
     "radix-affinity": 9,
     "radix-affinity-balanced": 9,
-    "session-sticky": 5
+    "session-sticky": 4
    },
    "our_pick": "session-sticky",
    "regime_pick": "session-sticky",
@@ -4659,7 +5032,7 @@
    "points": 12,
    "flips": 0,
    "flips_not_applicable": 0,
-   "strict_flips": 4,
+   "strict_flips": 3,
    "lenient_flips": 0,
    "points_with_tau": 8,
    "min_tau_b": 0.5164,
@@ -4670,7 +5043,7 @@
    "points": 12,
    "flips": 0,
    "flips_not_applicable": 0,
-   "strict_flips": 7,
+   "strict_flips": 6,
    "lenient_flips": 0,
    "points_with_tau": 8,
    "min_tau_b": 0.6532,
@@ -4690,9 +5063,9 @@
   },
   "dear_prefill": {
    "points": 12,
-   "flips": 1,
+   "flips": 0,
    "flips_not_applicable": 0,
-   "strict_flips": 2,
+   "strict_flips": 1,
    "lenient_flips": 0,
    "points_with_tau": 10,
    "min_tau_b": 0.5103,

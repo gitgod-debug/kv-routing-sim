@@ -1,6 +1,6 @@
 # H6, ranking half — does the order of the policies survive a change of hardware?
 
-Phase 4's design (2 traces × 6 loads × 7 policies × replicas 1–8 × 5 seeds) under 5 regimes · SLO p95 TTFT ≤ 2,000 ms · generated `2026-09-27T19:01:41+00:00` at `ff2ba87`.
+Phase 4's design (2 traces × 6 loads × 7 policies × replicas 1–8 × 5 seeds) under 5 regimes · SLO p95 TTFT ≤ 2,000 ms · generated `2026-11-28T09:51:56+00:00` at `8bff5af`.
 
 ⚠️ **Only `t4` is a measured profile.** Every other regime rescales its timings and describes no real GPU, so its milliseconds and rupees are not predictions. Only the ORDER of the policies is under test.
 
@@ -11,7 +11,7 @@ Phase 4's design (2 traces × 6 loads × 7 policies × replicas 1–8 × 5 seeds
 | faster_2x | 0.5 | 0.5 | 0 | 0.516 | 8 of 12 | FALSIFIED |
 | faster_4x | 0.25 | 0.25 | 0 | 0.653 | 8 of 12 | FALSIFIED |
 | cheap_prefill | 0.5 | 1.0 | 0 | 0.653 | 10 of 12 | FALSIFIED |
-| dear_prefill | 2.0 | 1.0 | 1 | 0.510 | 10 of 12 | FALSIFIED |
+| dear_prefill | 2.0 | 1.0 | 0 | 0.510 | 10 of 12 | FALSIFIED |
 
 **H6, ranking half: DOES NOT HOLD.** It holds only if every rescaled regime has zero flips and every τ-b is at least 0.8.
 
@@ -21,10 +21,10 @@ Reported, not tested: the literal reading (the regime's own pick names a differe
 
 | regime | strict flips | lenient flips |
 |---|---:|---:|
-| faster_2x | 4 | 0 |
-| faster_4x | 7 | 0 |
+| faster_2x | 3 | 0 |
+| faster_4x | 6 | 0 |
 | cheap_prefill | 2 | 0 |
-| dear_prefill | 2 | 0 |
+| dear_prefill | 1 | 0 |
 
 ## Replicas each policy needs to hold the SLO
 
@@ -145,11 +145,11 @@ Reported, not tested: the literal reading (the regime's own pick names a differe
 | policy | 1/s | 2/s | 3/s | 4/s | 6/s | 8/s |
 |---|---|---|---|---|---|---|
 | round-robin | 2 | 4 | 7 | — | — | — |
-| least-loaded | 2 | — | — | — | — | — |
-| power-of-two | 3 | 7 | — | — | — | — |
+| least-loaded | 2 | 8 | — | — | — | — |
+| power-of-two | 2 | 8 | — | — | — | — |
 | consistent-hash-prefix | — | — | — | — | — | — |
 | radix-affinity | — | — | — | — | — | — |
-| radix-affinity-balanced | 2 | 3 | 5 | 6 | 6 | — |
+| radix-affinity-balanced | 2 | 3 | 4 | 6 | 6 | — |
 | session-sticky | 2 | 3 | 4 | 5 | 6 | 7 |
 
 — = not met at 8 replicas.
@@ -159,12 +159,12 @@ Reported, not tested: the literal reading (the regime's own pick names a differe
 | policy | 1/s | 2/s | 3/s | 4/s | 6/s | 8/s |
 |---|---|---|---|---|---|---|
 | round-robin | 2 | 4 | 7 | — | — | — |
-| least-loaded | 3 | — | — | — | — | — |
-| power-of-two | 4 | 8 | — | — | — | — |
+| least-loaded | 3 | 8 | — | — | — | — |
+| power-of-two | 3 | 8 | — | — | — | — |
 | consistent-hash-prefix | — | — | — | — | — | — |
 | radix-affinity | — | — | — | — | — | — |
 | radix-affinity-balanced | — | — | — | — | — | — |
-| session-sticky | 2 | 3 | 5 | 5 | 6 | 7 |
+| session-sticky | 2 | 3 | 4 | 5 | 6 | 7 |
 
 — = not met at 8 replicas.
 
@@ -208,14 +208,14 @@ Reported, not tested: the literal reading (the regime's own pick names a differe
 | cheap_prefill | high_sharing @ 4/s | session-sticky | session-sticky | 1.000 | no |
 | cheap_prefill | high_sharing @ 6/s | session-sticky | session-sticky | 1.000 | no |
 | cheap_prefill | high_sharing @ 8/s | session-sticky | session-sticky | 0.828 | no |
-| dear_prefill | low_sharing @ 1/s | round-robin | least-loaded, radix-affinity-balanced, round-robin, session-sticky | — | no |
-| dear_prefill | low_sharing @ 2/s | radix-affinity-balanced | radix-affinity-balanced, session-sticky | 0.849 | no |
-| dear_prefill | low_sharing @ 3/s | radix-affinity-balanced | session-sticky | 0.775 | ⛔ yes |
+| dear_prefill | low_sharing @ 1/s | round-robin | least-loaded, power-of-two, radix-affinity-balanced, round-robin, session-sticky | — | no |
+| dear_prefill | low_sharing @ 2/s | radix-affinity-balanced | radix-affinity-balanced, session-sticky | 0.943 | no |
+| dear_prefill | low_sharing @ 3/s | radix-affinity-balanced | radix-affinity-balanced, session-sticky | 0.802 | no |
 | dear_prefill | low_sharing @ 4/s | session-sticky | session-sticky | 0.754 | no |
 | dear_prefill | low_sharing @ 6/s | session-sticky | radix-affinity-balanced, session-sticky | 0.791 | no |
 | dear_prefill | low_sharing @ 8/s | session-sticky | session-sticky | 0.510 | no |
 | dear_prefill | high_sharing @ 1/s | round-robin | round-robin, session-sticky | — | no |
-| dear_prefill | high_sharing @ 2/s | session-sticky | session-sticky | 0.800 | no |
+| dear_prefill | high_sharing @ 2/s | session-sticky | session-sticky | 0.939 | no |
 | dear_prefill | high_sharing @ 3/s | session-sticky | session-sticky | 0.701 | no |
 | dear_prefill | high_sharing @ 4/s | session-sticky | session-sticky | 0.632 | no |
 | dear_prefill | high_sharing @ 6/s | session-sticky | session-sticky | 0.632 | no |
