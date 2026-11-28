@@ -88,6 +88,10 @@ def test_what_survives_three_calibrations_and_what_does_not():
     a = posthoc.analyze(tables)
     assert a == json.loads((RESULTS / "posthoc_three_calibrations.json").read_text())
     assert (a["cells"], a["cells_identical_on_all"], a["cells_within_one"]) == (144, 106, 135)
+    # The careful counts leave out the cells that no calibration holds.
+    assert (a["cells_with_a_count_on_all"], a["cells_equal_where_all_hold"],
+            a["cells_within_one_where_all_hold"], a["cells_where_holding_the_slo_differs"],
+            a["cells_none_holds"]) == (91, 62, 86, 9, 44)
     # Does not survive: H2b's verdict.
     assert [a["h2b_verdict"][t]["holds"] for t in "ABC"] == [False, True, False]
     # Holds on all three: sticky best or tied at every load with 1 prompt and with 4,

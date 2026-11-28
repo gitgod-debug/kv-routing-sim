@@ -88,6 +88,15 @@ def analyze(tables: dict[str, dict]) -> dict:
     return {
         "script": "scripts/c3_posthoc_grid.py", "post_hoc": True, "tables": names,
         "not_met": nm, "policies": pols, "points": len(points), "cells": len(cells),
+        # Cells where every calibration gives a count, and how those counts compare.
+        "cells_with_a_count_on_all": sum(1 for v in cells.values() if nm not in v),
+        "cells_equal_where_all_hold": sum(
+            1 for c, v in cells.items() if nm not in v and spread[c] == 0),
+        "cells_within_one_where_all_hold": sum(
+            1 for c, v in cells.items() if nm not in v and spread[c] <= 1),
+        "cells_none_holds": sum(1 for v in cells.values() if all(x == nm for x in v)),
+        # The same two counts over all cells. They count a cell that no calibration holds as
+        # agreement, so they say more than the three above. Kept because earlier reports used them.
         "cells_identical_on_all": sum(1 for v in spread.values() if v == 0),
         "cells_within_one": sum(1 for v in spread.values() if v <= 1),
         "cells_where_holding_the_slo_differs": sum(
@@ -165,12 +174,17 @@ def markdown(a: dict) -> str:
     b = a["sticky_best_or_tied"]
     lines += [
         "## How much does a calibration move the counts?", "",
-        (f"- **{a['cells_identical_on_all']} of {a['cells']}** (K, load, policy) cells need the "
-         f"same number of replicas on all three; **{a['cells_within_one']}** differ by at most "
-         f"one. Where all three hold the SLO, the largest spread is "
+        (f"- **{a['cells_with_a_count_on_all']} of {a['cells']}** (K, load, policy) cells have a "
+         f"replica count on all three calibrations. The count is the same in "
+         f"**{a['cells_equal_where_all_hold']}** of them, and differs by at most one in "
+         f"**{a['cells_within_one_where_all_hold']}**. The largest spread is "
          f"{a['largest_spread_where_all_hold']} replicas."),
         (f"- At **{a['cells_where_holding_the_slo_differs']}** cells the calibrations disagree on "
          f"whether the SLO can be held on {nm - 1} replicas at all."),
+        (f"- At the other **{a['cells_none_holds']}** cells no calibration holds the SLO. They are "
+         f"not counted as agreement above. Counted that way, as earlier versions of this report "
+         f"did, {a['cells_identical_on_all']} of {a['cells']} cells would be the same and "
+         f"{a['cells_within_one']} within one."),
         ("- Session-sticky needs the fewest replicas, or ties for them: " + " · ".join(
             f"{t} {b[t]} of {a['points']}" for t in names)
          + f"; on all three at the same point: **{a['sticky_best_or_tied_on_all']} of "

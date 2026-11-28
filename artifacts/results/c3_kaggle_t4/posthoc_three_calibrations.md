@@ -76,8 +76,9 @@ Same GPU type, model and engine version. Their coefficients:
 
 ## How much does a calibration move the counts?
 
-- **106 of 144** (K, load, policy) cells need the same number of replicas on all three; **135** differ by at most one. Where all three hold the SLO, the largest spread is 2 replicas.
+- **91 of 144** (K, load, policy) cells have a replica count on all three calibrations. The count is the same in **62** of them, and differs by at most one in **86**. The largest spread is 2 replicas.
 - At **9** cells the calibrations disagree on whether the SLO can be held on 16 replicas at all.
+- At the other **44** cells no calibration holds the SLO. They are not counted as agreement above. Counted that way, as earlier versions of this report did, 106 of 144 cells would be the same and 135 within one.
 - Session-sticky needs the fewest replicas, or ties for them: A 20 of 24 · B 20 of 24 · C 21 of 24; on all three at the same point: **20 of 24**.
 - By number of prompts, the points where sticky is best or tied on all three: K 1: 6 of 6 · K 4: 6 of 6 · K 16: 5 of 6 · K 64: 3 of 6.
 - Points where sticky needs **no more** replicas than the other policy on every calibration: balanced α16 23 of 24 · balanced α1 20 of 24 · round-robin 24 of 24 · least-loaded 24 of 24 · pure affinity 21 of 24.
