@@ -9,6 +9,7 @@ reason its numbers can be trusted, so a pull request is checked against them fir
 git clone <this repo> && cd kv-routing-sim
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"          # Python 3.11+; the core needs only PyYAML
+pip install -e ".[analysis]"     # numpy and matplotlib, for scripts/reproduce.py and the figures
 pytest -q && ruff check .        # both must pass; CI runs them on Python 3.11 to 3.14
 ```
 
@@ -25,14 +26,15 @@ No GPU is needed for anything except calibrating against a live engine.
    unchanged while a registered run is in progress: nothing under `src/`, `scripts/` or `configs/`
    is edited until the run has finished. A results file records whether the tree was clean when
    the run started. A claim that "the edit could not have mattered" is only an argument, and it
-   does not replace that record. (Learned on 2026-10-05: T2's grids B and C carry a dirty header
-   for this reason. To show that it did not matter, 720 of their cells had to be run again.)
+   does not replace that record. (Learned on 2026-10-05: T2's grids B and C carried a dirty header
+   for this reason, until release 0.2.0 derived them again. To show that it did not matter, 720
+   cells had to be run again.)
 3. **No prompt text, ever.** Traces enter as chains of block hashes. An adapter hashes at its
    boundary and never writes text anywhere.
 4. **No uncited constants.** Every cost constant lives in `configs/cost_model.yaml` with a source and
    a date.
 5. **Clear errors at startup.** A bad config or an unknown name stops the program before any work
-   is done (ADR-004).
+   is done.
 6. **Ties are broken by the injected `rng`**, never by `min()` over a list. `min()` quietly prefers
    replica 0, and so it creates artificial cache locality
    ([`policies/base.py`](src/kv_routing_sim/policies/base.py)).

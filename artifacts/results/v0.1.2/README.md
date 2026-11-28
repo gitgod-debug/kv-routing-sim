@@ -19,4 +19,5 @@ there for single runs: `run(..., engine_version="0.1.2")`, or `with use_engine("
 same process. The grid scripts start worker processes. From Python 3.14 on, and on macOS, those
 do not inherit it. So use the tag for a grid.
 
-A file that 0.2.0 did not change is not copied here. It is the same in both releases.
+A file that 0.2.0 did not change is not copied here. It is the same in both releases. A relative
+link inside a copied file still points from the file's old place, one folder higher.

@@ -53,10 +53,12 @@ def _cost(doc: dict, target: str, policy: str) -> str:
 
 
 def _rule_outside_its_cell(doc: dict) -> str:
-    """S1c's ratio over every cell that has a row under both targets."""
+    """S1c's ratio over every cell outside the registered one that has a row under both targets."""
+    cell = doc["headline_cell"]
     both: dict[tuple, dict[str, dict]] = {}
     for r in doc["rows"]:
-        both.setdefault((r["prompts"], r["load"], r["policy"]), {})[r["target"]] = r
+        if (r["prompts"], r["load"]) != (cell["prompts"], cell["load"]):
+            both.setdefault((r["prompts"], r["load"], r["policy"]), {})[r["target"]] = r
     pairs = [v for v in both.values() if len(v) == 2]
     off = sum(
         1 for v in pairs
@@ -195,7 +197,7 @@ ROWS = [
     Row("Least-loaded, two-part target", "13 T4s, 787 tokens, ₹0.118",
         f"{RESULTS}/session_cost/session_cost.json", "scripts/session_cost.py",
         lambda d: _cost(d, "two_part", "least-loaded")),
-    Row("S1's rupee rule outside its registered cell", "more than 10% off in 5 of 86 cells",
+    Row("S1's rupee rule outside its registered cell", "more than 10% off in 5 of 83 cells",
         f"{RESULTS}/session_cost/session_cost.json", "scripts/session_cost.py",
         lambda d: f"more than 10% off in {_rule_outside_its_cell(d)}"),
     Row("Memory for the block hashes of a 100× trace", "537 MiB for 80,000 requests",
