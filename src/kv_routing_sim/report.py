@@ -60,7 +60,7 @@ def recommendation_notes(report: dict[str, Any]) -> list[Note]:
     rec = report.get("recommendation") or {}
     chosen = rec.get("recommended")
     if not chosen:
-        return []
+        return _trace_notes(report)
     notes = []
     if rec.get("tied_with"):
         tied = ", ".join(rec["tied_with"])
@@ -94,6 +94,38 @@ def recommendation_notes(report: dict[str, Any]) -> list[Note]:
     if scaling.get("token_scale", 1) != 1:
         block_size = (report.get("profile") or {}).get("block_size", 16)
         notes.append(Note(_scale_line(scaling, block_size), warning=True))
+    return notes + _trace_notes(report)
+
+
+def _trace_notes(report: dict[str, Any]) -> list[Note]:
+    """Say what the reader skipped or assumed. The fleet is sized for what was read.
+
+    A log with many skipped records is replayed at a lower load than it had, and an answer length
+    taken from `max_tokens` is the longest the answer could be. Both change the answer, so both
+    are said next to it and not only in the trace's statistics.
+    """
+    trace = report.get("trace") or {}
+    notes = []
+    skipped, read = trace.get("skipped_lines") or 0, trace.get("requests") or 0
+    if skipped:
+        reasons = ", ".join(f"{n:,} {reason}" for reason, n
+                            in sorted((trace.get("skip_reasons") or {}).items()))
+        notes.append(Note(
+            f"Skipped records: {skipped:,} of the log's records were not used ({reasons}). "
+            f"This answer is for the {read:,} requests that were read, so the log's real load is "
+            "higher than the load simulated.", warning=True))
+    assumed = trace.get("assumed") or {}
+    limits = assumed.get("max_tokens_as_output_length")
+    if limits:
+        notes.append(Note(
+            f"Answer lengths: {limits:,} of {read:,} requests had no answer length in the log. "
+            "Their `max_tokens` limit was used, which is the longest the answer could be. Real "
+            "answers are usually shorter, so the load simulated is too high.", warning=True))
+    sessions = assumed.get("repeated_session_id_renamed")
+    if sessions:
+        notes.append(Note(
+            f"Session ids: {sessions:,} sessions had an id that an earlier session already had. "
+            "Each was read as a separate session.", warning=True))
     return notes
 
 
@@ -205,6 +237,9 @@ def _scale_line(scaling: dict[str, Any], block_size: int) -> str:
 def _firmness_line(row: dict[str, Any], spread: dict[str, Any]) -> str:
     """Describe how the recommended policy's replica count varies across calibration repeats."""
     top, repeats = spread["swept_up_to"], spread["repeats"]
+    if row["firm"] and row["max"] is None:
+        return (f"How firm: the target is not met on up to {top} replicas with any of the "
+                f"calibration's {repeats} repeats taken alone either.")
     if row["firm"]:
         return (f"How firm: the same count on each of the calibration's {repeats} repeats taken "
                 "alone; still allow one more, because another calibration run can differ by a "

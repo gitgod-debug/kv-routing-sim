@@ -57,12 +57,11 @@ def _map(obj: dict[str, Any], index: int) -> dict[str, Any]:
 
     usage = obj.get("usage") if isinstance(obj.get("usage"), dict) else {}
     body = obj.get("body") if isinstance(obj.get("body"), dict) else {}
-    # The answer's length: what the engine reported, else the limit the request set.
-    output_tokens = _first_present(usage, ("completion_tokens",))
-    if output_tokens is None:
-        output_tokens = _first_present(obj, ("max_tokens",))
-    if output_tokens is None:
-        output_tokens = _first_present(body, ("max_tokens",))
+    # The answer's length is what the engine reported. Without it, the limit the request set
+    # stands in, and the reader counts how often.
+    limit = _first_present(obj, ("max_tokens",))
+    if limit is None:
+        limit = _first_present(body, ("max_tokens",))
     return {
         "arrival_ts": ts,
         "token_ids": obj.get("prompt_token_ids"),
@@ -70,7 +69,8 @@ def _map(obj: dict[str, Any], index: int) -> dict[str, Any]:
         "request_id": _first_present(obj, ("id", "request_id")) or f"r{index}",
         "session_id": _first_present(obj, ("session_id", "conversation_id", "user")),
         "prompt_tokens": usage.get("prompt_tokens"),
-        "output_tokens": output_tokens,
+        "output_tokens": _first_present(usage, ("completion_tokens",)),
+        "output_limit": limit,
     }
 
 

@@ -113,3 +113,15 @@ def test_short_answers_queue_on_a_busy_replica():
                  engine_version="0.1.2")
     # 800 one-token requests at 16 sessions a second are more than one T4 can serve: they queue.
     assert now.ttft_percentiles()["p95_ms"] > 100 * before.ttft_percentiles()["p95_ms"]
+
+
+def test_a_profile_built_in_code_that_admits_nothing_is_refused():
+    """The file loader refuses a batch limit of 0. A profile built in code used to reach the
+    engine, which then admitted nothing and never ended."""
+    import dataclasses
+
+    from kv_routing_sim.sim.cost_model import UNCALIBRATED_DEFAULT
+
+    stuck = dataclasses.replace(UNCALIBRATED_DEFAULT, max_num_seqs=0)
+    with pytest.raises(ValueError, match="max_num_seqs and block_size must be at least 1"):
+        run([], policy="round-robin", n_replicas=1, profile=stuck)

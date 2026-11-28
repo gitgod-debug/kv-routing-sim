@@ -36,6 +36,12 @@ def run(
         `kvsim` commands that reproduce the run. For invalid settings, {"error": message}.
     """
     try:
+        # The page always sends objects. Anything else gets the promised error, not a traceback.
+        if not isinstance(settings, dict):
+            raise ConfigError("the settings must be a JSON object")
+        for part in ("traffic", "profile"):
+            if settings.get(part) is not None and not isinstance(settings[part], dict):
+                raise ConfigError(f"the {part} settings must be a JSON object")
         trace_path, trace_format, generated = _prepare_traffic(settings.get("traffic") or {},
                                                                Path(work_dir))
         options = _replay_options(settings, trace_format)
@@ -106,8 +112,11 @@ def reproduce_command(settings: dict[str, Any]) -> str:
 def _prepare_traffic(traffic: dict[str, Any],
                      work_dir: Path) -> tuple[Path, str, dict[str, Any] | None]:
     """Return the trace file to replay, its format, and a summary when it was generated."""
-    if traffic.get("source", "generate") == "file":
-        if not traffic.get("path"):
+    source = traffic.get("source", "generate")
+    if source not in ("generate", "file"):
+        raise ConfigError(f"the traffic source must be 'generate' or 'file', got {source!r}")
+    if source == "file":
+        if not traffic.get("path") or not isinstance(traffic["path"], str):
             raise ConfigError("choose a trace file")
         return Path(traffic["path"]), traffic.get("format", "vllm-jsonl"), None
     params = {

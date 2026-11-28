@@ -53,10 +53,16 @@ class TraceStats:
     # How the reader changed the trace, when it did: the factor on every token count and, for a
     # replay of separately recorded sessions, how many run at once and how their starts are spread.
     scaling: dict[str, float] | None = None
+    # What the reader had to assume, counted by kind: an answer length taken from the request's
+    # `max_tokens` limit, or a session id that repeated and was renamed.
+    assumed: dict[str, int] = field(default_factory=dict)
 
     def skip(self, reason: str) -> None:
         self.skipped_lines += 1
         self.skip_reasons[reason] = self.skip_reasons.get(reason, 0) + 1
+
+    def assume(self, kind: str) -> None:
+        self.assumed[kind] = self.assumed.get(kind, 0) + 1
 
     def as_dict(self) -> dict[str, object]:
         out: dict[str, object] = {
@@ -68,4 +74,6 @@ class TraceStats:
         }
         if self.scaling is not None:
             out["scaling"] = dict(self.scaling)
+        if self.assumed:
+            out["assumed"] = dict(self.assumed)
         return out

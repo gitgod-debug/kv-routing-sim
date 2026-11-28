@@ -65,10 +65,16 @@ def _flat(d: Any) -> Iterator[tuple[float, str, dict[str, Any]]]:
     """Yield (time from session start, session id, request); a sub-agent is its own session.
 
     Raises _Malformed for a line that is not an object, a `models` that is not a list, a request
-    that is not an object, and a `t` that is negative or not finite.
+    that is not an object, and a `t` that is negative or not finite. Raises KeyError for a line
+    without an id or without a list of requests: its hash ids could not be kept apart from another
+    session's, or it is a record of some other format.
     """
     if not isinstance(d, dict) or not isinstance(d.get("models") or [], list):
         raise _Malformed("not a session")
+    if d.get("id") is None:
+        raise KeyError("id")
+    if not isinstance(d.get("requests"), list):
+        raise KeyError("requests")
     for r in d.get("requests") or []:
         if not isinstance(r, dict):
             raise _Malformed("a request is not an object")
@@ -82,9 +88,16 @@ def _flat(d: Any) -> Iterator[tuple[float, str, dict[str, Any]]]:
             yield _seconds(r["t"]), str(d["id"]), r
 
 
-def _index(path: str | Path, stats: TraceStats) -> list[tuple[int, float]]:
-    """First pass: (line number, span in seconds) per session. Memory: two numbers per session."""
-    out = []
+def _index(path: str | Path, stats: TraceStats) -> tuple[list[tuple[int, float]], dict[int, str]]:
+    """First pass: (line number, span in seconds) per session, and new ids for repeated ones.
+
+    Hash ids are local to a session, and the session's id is what keeps them apart. Two sessions
+    with one id (two files joined, say) would look like one session that re-reads its own blocks.
+    So a session whose id an earlier line already has gets #2, #3, ... appended, and is counted.
+    Memory: two numbers per session, and its id.
+    """
+    out, renamed = [], {}
+    taken: dict[str, int] = {}
     with _open(path) as fh:
         for line, raw in enumerate(fh):
             if not raw.strip():
@@ -96,11 +109,22 @@ def _index(path: str | Path, stats: TraceStats) -> list[tuple[int, float]]:
             except _Malformed:
                 stats.skip("invalid_record")
                 continue
-            except (KeyError, TypeError, ValueError):  # including a line that is not JSON
+            except (KeyError, TypeError, ValueError, RecursionError):  # also a line not in JSON
                 stats.skip("bad_session")
                 continue
+            sid = str(d["id"])
+            if sid in taken:
+                n = taken[sid]
+                while True:
+                    n += 1
+                    if f"{sid}#{n}" not in taken:
+                        break
+                taken[sid] = n
+                renamed[line] = sid = f"{sid}#{n}"
+                stats.assume("repeated_session_id_renamed")
+            taken[sid] = 1
             out.append((line, span))
-    return out
+    return out, renamed
 
 
 def read(
@@ -154,7 +178,7 @@ def read(
                      "stagger_s": float(stagger_s)}
 
     # The schedule: which session starts when. Seeded, and decided before any session is parsed.
-    index = _index(path, stats)
+    index, renamed = _index(path, stats)
     order = list(range(len(index)))
     random.Random(f"agentx-{seed}").shuffle(order)
     rng = random.Random(f"agentx-slots-{seed}")
@@ -178,6 +202,8 @@ def read(
                 continue
             rank, start = scheduled[line]
             d = json.loads(raw)
+            if line in renamed:
+                d = {**d, "id": renamed[line]}
             main = (d.get("models") or [None])[0]
             # A session sends the same leading blocks on nearly every turn. Each distinct block is
             # hashed once, and its value is one shared object, so a full-size trace fits in memory.

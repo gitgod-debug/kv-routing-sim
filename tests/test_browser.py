@@ -112,3 +112,16 @@ def test_run_json_writes_strict_json(tmp_path, monkeypatch):
 
     out = json.loads(browser.run_json("{}", None, str(tmp_path)), parse_constant=refuse)
     assert out == {"report": {"x": None}, "y": [None]}
+
+
+def test_settings_of_the_wrong_shape_come_back_as_an_error_message(tmp_path):
+    """The page always sends objects. Anything else must still give {"error"}, as promised."""
+    listed = json.loads(browser.run_json("[]", work_dir=str(tmp_path)))
+    assert "must be a JSON object" in listed["error"]
+    for part in ("traffic", "profile"):
+        assert f"the {part} settings must be a JSON object" in browser.run(
+            {**SETTINGS, part: "text"}, work_dir=tmp_path)["error"]
+    assert "the traffic source must be 'generate' or 'file'" in browser.run(
+        {**SETTINGS, "traffic": {"source": "upload"}}, work_dir=tmp_path)["error"]
+    assert "choose a trace file" in browser.run(
+        {**SETTINGS, "traffic": {"source": "file", "path": 7}}, work_dir=tmp_path)["error"]

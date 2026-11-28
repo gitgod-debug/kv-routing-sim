@@ -27,6 +27,7 @@ _PREFIX_STRIDE = 100_000  # shared prefix k lives at [k * stride, k * stride + l
 _SESSION_BASE = 10_000_000
 _TURN_BASE = 500_000_000
 MAX_SHARED_PREFIXES = _SESSION_BASE // _PREFIX_STRIDE  # 100: the namespaces must stay disjoint
+MIN_ARRIVAL_RATE = 1e-9  # one session in thirty years; below it, arrival times stop being finite
 
 # The raw ids are far outside any real vocabulary and a live engine rejects them, so by default each
 # is mapped into ENGINE_SAFE_IDS: ordinary text tokens in Qwen3 (whose special tokens start at
@@ -74,9 +75,11 @@ class AgenticWorkload:
             raise ValueError(f"prefix_sharing_ratio must be in [0, 1), got {prefix_sharing_ratio}")
         if turns_per_session < 1:
             raise ValueError("turns_per_session must be >= 1")
-        # NaN would pass a plain `<= 0` and write NaN timestamps.
-        if not (math.isfinite(arrival_rate) and arrival_rate > 0):
-            raise ValueError(f"arrival_rate must be a finite number > 0, got {arrival_rate}")
+        # NaN would pass a plain `<= 0` and write NaN timestamps. A rate so small that the time
+        # between sessions overflows would write infinite ones.
+        if not (math.isfinite(arrival_rate) and arrival_rate >= MIN_ARRIVAL_RATE):
+            raise ValueError(f"arrival_rate must be a finite number of at least "
+                             f"{MIN_ARRIVAL_RATE:g} sessions per second, got {arrival_rate}")
         if not 1 <= n_shared_prefixes <= MAX_SHARED_PREFIXES:
             raise ValueError(
                 f"n_shared_prefixes must be in [1, {MAX_SHARED_PREFIXES}], got {n_shared_prefixes}"

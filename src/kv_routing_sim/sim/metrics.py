@@ -12,10 +12,11 @@ from typing import Any
 
 
 def percentile(sorted_values: list[float], q: float) -> float:
-    """Return the nearest-rank percentile of an already sorted list, without interpolation.
+    """Return the value at index round(q * (n - 1)) of an already sorted list of n values.
 
-    An interpolated p99 can be a latency no request experienced; nearest rank always returns a value
-    some request saw.
+    No interpolation: an interpolated p99 can be a latency no request experienced, and this always
+    returns a value some request saw. It is not the textbook nearest rank, ceil(q * n). For p95 it
+    gives that value or the one just below it.
     """
     if not sorted_values:
         return float("nan")

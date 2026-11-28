@@ -41,7 +41,10 @@ _default_engine = ENGINE_VERSIONS[0]
 def use_engine(version: str) -> Iterator[None]:
     """Run every simulation started inside the block with the engine of an earlier release.
 
-    For checking results and registered predictions that were made with that engine.
+    For checking results and registered predictions that were made with that engine. It covers
+    this process only. A worker process started under the spawn or forkserver method (the default
+    from Python 3.14, and on macOS) does not inherit it, so a script that starts workers is not
+    switched this way. For such a script, use the tagged release.
     """
     global _default_engine
     if version not in ENGINE_VERSIONS:
@@ -75,6 +78,11 @@ class Simulation:
         if engine_version not in ENGINE_VERSIONS:
             raise ValueError(f"engine_version must be one of {ENGINE_VERSIONS}, "
                              f"got {engine_version!r}")
+        if profile.max_num_seqs < 1 or profile.block_size < 1:
+            # The file loader checks this too. A profile built in code reaches the engine unchecked,
+            # and a batch limit of 0 would admit nothing and never end.
+            raise ValueError(f"profile {profile.name!r}: max_num_seqs and block_size must be at "
+                             f"least 1, got {profile.max_num_seqs} and {profile.block_size}")
         self.engine_version = engine_version
         self._as_0_1_2 = engine_version == "0.1.2"
         self.policy = policy

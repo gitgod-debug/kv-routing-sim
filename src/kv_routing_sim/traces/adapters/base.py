@@ -19,6 +19,12 @@ from ..schema import NormalizedRequest, TraceStats
 
 # What converting one record's fields can raise. Each skips that record, never the whole file.
 RECORD_ERRORS = (ValueError, TypeError, OverflowError, AttributeError, KeyError, IndexError)
+# What decoding one line can raise: text that is not JSON, an integer of thousands of digits, or
+# nesting so deep that the decoder gives up. Each skips that line.
+LINE_ERRORS = (ValueError, RecursionError)
+# Seconds since the epoch stay below this until the year 5138. A larger time is in milliseconds
+# or finer, or is not a time.
+LARGEST_SECONDS = 1e11
 
 
 class RecordMapper(Protocol):
@@ -46,6 +52,8 @@ def parse_timestamp(value: Any, *, per_second: float = 1.0) -> float | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, str):
+        if "_" in value:  # Python reads "1_0" as 10, and no log means that
+            return None
         try:
             ts = float(value)
         except ValueError:
@@ -64,6 +72,28 @@ def parse_timestamp(value: Any, *, per_second: float = 1.0) -> float | None:
     else:
         return None
     return ts if math.isfinite(ts) else None
+
+
+def whole_number(value: Any) -> int:
+    """Read a count: an integer, a float without a fraction, or a string of digits.
+
+    Raises ValueError or TypeError for anything else. A bool, 20.7 and "1_0" are refused, where
+    `int()` would give 1, 20 and 10.
+    """
+    if isinstance(value, bool):
+        raise TypeError("a boolean is not a count")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if not value.is_integer():  # also NaN and the infinities
+            raise ValueError(f"{value!r} is not a whole number")
+        return int(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if not (text.isascii() and text.lstrip("+-").isdigit()):
+            raise ValueError(f"{value!r} is not a whole number")
+        return int(text)
+    raise TypeError(f"a {type(value).__name__} is not a count")
 
 
 def unique_id(request_id: str, taken: dict[str, int], stats: TraceStats) -> str:
@@ -100,6 +130,10 @@ def stream_jsonl(
     The prompt is hashed here and discarded (ADR-002), so nothing downstream sees prompt text or
     token ids. Time starts at the earliest valid timestamp, so the file is read to the end before
     the first request is returned. Requests that arrive together keep the file's order.
+
+    Raises:
+        ValueError: a timestamp is too large to be seconds. Read as seconds, a log in milliseconds
+            would be replayed a thousand times slower, so it is refused.
     """
     stats = stats if stats is not None else TraceStats()
     rows = []  # (timestamp, request id, block hashes, prompt tokens, output tokens, session id)
@@ -111,7 +145,7 @@ def stream_jsonl(
                 continue
             try:
                 obj = json.loads(line)
-            except json.JSONDecodeError:
+            except LINE_ERRORS:
                 stats.skip("json_decode_error")
                 continue
             if not isinstance(obj, dict):
@@ -133,19 +167,31 @@ def stream_jsonl(
                 if text is None:
                     stats.skip("no_prompt_tokens_or_text")
                     continue
-                token_ids = approx_token_ids(str(text))
-            # A missing output length is unknown, not 0 tokens. An explicit 0 stays 0.
-            ot = fields.get("output_tokens")
+                try:
+                    token_ids = approx_token_ids(str(text))
+                except ValueError:  # text that cannot be encoded, such as half a surrogate pair
+                    stats.skip("invalid_record")
+                    continue
+            # A missing output length is unknown, not 0 tokens. An explicit 0 stays 0. Where the
+            # log has only the request's limit, the limit stands in, and that is counted.
+            ot, from_limit = fields.get("output_tokens"), False
+            if ot is None:
+                ot = fields.get("output_limit")
+                from_limit = ot is not None
             if ot is None:
                 stats.skip("no_output_length")
                 continue
             try:
                 # Every id, not only those in full blocks: a None or "n/a" anywhere is a bad record.
-                token_ids = [int(t) for t in token_ids]
+                # A string is not a list of ids, though Python would walk its characters.
+                if not isinstance(token_ids, (list, tuple)):
+                    raise TypeError("token ids must be a list")
+                if not all(type(t) is int for t in token_ids):  # plain integers need no reading
+                    token_ids = [whole_number(t) for t in token_ids]
                 # `or` would treat a legitimate 0 as missing; be explicit.
                 pt = fields.get("prompt_tokens")
-                prompt_tokens = int(pt) if pt is not None else len(token_ids)
-                output_tokens = int(ot)
+                prompt_tokens = whole_number(pt) if pt is not None else len(token_ids)
+                output_tokens = whole_number(ot)
                 hashes = chain_hashes(token_ids, block_size, salt)
                 request_id = str(fields.get("request_id") or f"r{index}")
                 sid = fields.get("session_id")
@@ -159,7 +205,17 @@ def stream_jsonl(
             if prompt_tokens == 0 or not token_ids:
                 stats.skip("empty_prompt")
                 continue
+            if from_limit:
+                stats.assume("max_tokens_as_output_length")
             rows.append((ts, request_id, hashes, prompt_tokens, output_tokens, session_id))
+
+    if rows:
+        largest = max((row[0] for row in rows), key=abs)
+        if abs(largest) >= LARGEST_SECONDS:
+            raise ValueError(
+                f"a timestamp of {largest:,.0f} is too large to be seconds. This format takes "
+                "seconds, since the epoch or from any start. If the log has milliseconds, divide "
+                "them by 1,000 first")
 
     # Elapsed time from the earliest request: absolute epochs differ between logs and are not
     # comparable. The sort is stable, so equal times keep the file's order.

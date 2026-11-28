@@ -161,3 +161,12 @@ def test_the_notes_quote_the_stored_comparisons():
     e = json.loads((results / "c4_kaggle_t4" / "analysis.json").read_text())["e"]
     assert f"outside a run's own range in {round((1 - e['coverage']) * 100)}% of cases" in shown
     assert f"more than one replica in {round((1 - e['coverage_within_one']) * 100)}%" in shown
+
+
+def test_the_firmness_line_does_not_call_a_missed_target_a_firm_count():
+    """When no swept count meets the target on any repeat, the counts agree, but on nothing."""
+    from kv_routing_sim import report
+
+    row = {"pooled": None, "repeats": [None, None, None], "min": None, "max": None, "firm": True}
+    line = report._firmness_line(row, {"repeats": 3, "swept_up_to": 4})
+    assert "not met on up to 4 replicas" in line and "same count" not in line

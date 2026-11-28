@@ -11,6 +11,7 @@ cache model's hit rate against the engine's prefix-cache counters.
 from __future__ import annotations
 
 import datetime
+import http.client
 import json
 import random
 import re
@@ -83,13 +84,15 @@ class Engine:
                 timeout: float = 30.0) -> tuple[int, str]:
         data = None if body is None else json.dumps(body).encode()
         headers = {"Content-Type": "application/json"} if data is not None else {}
-        req = urllib.request.Request(self.base + path, data=data, method=method, headers=headers)
         try:
+            req = urllib.request.Request(self.base + path, data=data, method=method,
+                                         headers=headers)
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return resp.status, resp.read().decode("utf-8", "replace")
         except urllib.error.HTTPError as exc:
             return exc.code, exc.read().decode("utf-8", "replace")
-        except (urllib.error.URLError, OSError) as exc:
+        except (urllib.error.URLError, OSError, http.client.HTTPException, ValueError) as exc:
+            # ValueError and InvalidURL: an address that is not one, such as a port of letters.
             raise CalibrationError(f"cannot reach the engine at {self.base}{path}: {exc}") from None
 
     def metrics(self) -> str:

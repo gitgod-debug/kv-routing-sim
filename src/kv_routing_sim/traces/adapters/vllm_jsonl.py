@@ -22,7 +22,8 @@ _TEXT = ("prompt", "text", "input")
 _RID = ("request_id", "id", "req_id")
 _SID = ("session_id", "conversation_id", "user_id", "session")
 _PTOK = ("num_prompt_tokens", "prompt_tokens", "n_prompt_tokens")
-_OTOK = ("num_generated_tokens", "output_tokens", "completion_tokens", "max_tokens")
+_OTOK = ("num_generated_tokens", "output_tokens", "completion_tokens")
+_LIMIT = ("max_tokens",)  # the request's limit: it stands in for a missing count, and is counted
 
 
 def _first(obj: dict[str, Any], keys: tuple[str, ...]) -> Any:
@@ -54,6 +55,7 @@ def _map(obj: dict[str, Any], index: int) -> dict[str, Any]:
         "session_id": _first(obj, _SID),
         "prompt_tokens": _first(obj, _PTOK),
         "output_tokens": _first(obj, _OTOK),
+        "output_limit": _first(obj, _LIMIT),
     }
 
 

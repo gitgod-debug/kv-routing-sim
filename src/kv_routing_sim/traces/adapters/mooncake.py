@@ -23,7 +23,7 @@ from pathlib import Path
 
 from ..hashing import DEFAULT_BLOCK_SIZE
 from ..schema import NormalizedRequest, TraceStats
-from .base import open_maybe_gzip, parse_timestamp
+from .base import LINE_ERRORS, open_maybe_gzip, parse_timestamp
 
 TRACE_BLOCK_TOKENS = 512  # FAST25-release/README.md: "The block size is 512 tokens."
 ID_LIMIT = 2**64  # a hash id is hashed as 8 bytes
@@ -49,7 +49,7 @@ def _rows(path: str | Path, stats: TraceStats | None) -> Iterator[tuple[int, dic
                 continue
             try:
                 obj = json.loads(line)
-            except json.JSONDecodeError:
+            except LINE_ERRORS:
                 skip("json_decode_error")
                 continue
             try:

@@ -14,7 +14,9 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
+import urllib.parse
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,7 @@ from .service import (
     DEFAULT_TPOT_SLO_MS,
     ConfigError,
     ReplayOptions,
+    check_fleet,
     load_profile,
     replay,
     resolve_policies,
@@ -72,7 +75,7 @@ def cmd_replay(args: argparse.Namespace) -> int:
 
 
 def cmd_generate(args: argparse.Namespace) -> int:
-    _check_out(args.out)
+    _check_out(args.out, required=True)
     try:
         workload = AgenticWorkload(
             n_sessions=args.sessions,
@@ -82,10 +85,12 @@ def cmd_generate(args: argparse.Namespace) -> int:
             seed=args.seed,
             n_shared_prefixes=args.system_prompts,
         )
+        summary = workload.write_jsonl(args.out)
     except ValueError as exc:
         raise ConfigError(str(exc)) from None
-    summary = workload.write_jsonl(args.out)
-    print(json.dumps(summary, indent=2))
+    except OSError as exc:
+        raise ConfigError(f"could not write {args.out!r}: {exc}") from None
+    print(to_json(summary, indent=2))
     print(f"\nwrote {args.out}")
     return 0
 
@@ -104,15 +109,19 @@ def cmd_crossover(args: argparse.Namespace) -> int:
             raise ConfigError(f"{flag} must be at least 1")
     _check_out(args.out)
     profile = load_profile(args.profile)
-    rows = crossover_sweep(
-        policies=names,
-        sharing_ratios=sharing,
-        arrival_rates=rates,
-        n_replicas=args.replicas,
-        seeds=tuple(range(args.seeds)),
-        n_sessions=args.sessions,
-        profile=profile,
-    )
+    check_fleet(args.replicas, profile)
+    try:
+        rows = crossover_sweep(
+            policies=names,
+            sharing_ratios=sharing,
+            arrival_rates=rates,
+            n_replicas=args.replicas,
+            seeds=tuple(range(args.seeds)),
+            n_sessions=args.sessions,
+            profile=profile,
+        )
+    except ValueError as exc:  # traffic the generator cannot build, or the profile cannot hold
+        raise ConfigError(str(exc)) from None
     if not profile.calibrated:
         print(UNCALIBRATED_BANNER, file=sys.stderr)
     payload: dict[str, Any] = {"profile": profile.provenance(), "crossover": rows}
@@ -126,22 +135,41 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
 
     _check_engine(args.engine)
     # Checked now: the measurements take minutes, and a profile that cannot be written loses them.
-    _check_out(args.out)
+    _check_out(args.out, required=True)
     lo_hi = _ints(args.token_range, "--token-range")
     if len(lo_hi) != 2 or not 0 <= lo_hi[0] < lo_hi[1]:
         raise ConfigError("--token-range must be two integers LO,HI with LO < HI")
     if args.decode_tokens < 2:
         raise ConfigError("--decode-tokens must be at least 2 (it measures between tokens)")
+    # The same for every other option: a bad value must not surface minutes into the run.
+    lists = {flag: _ints(getattr(args, flag.lstrip("-").replace("-", "_")), flag)
+             for flag in ("--prefill-lengths", "--prefill-cached", "--prefill-new",
+                          "--decode-batches", "--decode-contexts")}
+    for flag, values in lists.items():
+        if any(v < 1 for v in values):
+            raise ConfigError(f"{flag} must be whole numbers of at least 1")
+    for flag, value, least in (("--reps", args.reps, 1),
+                               ("--check-sessions", args.check_sessions, 1),
+                               ("--check-turns", args.check_turns, 1),
+                               ("--kv-blocks", args.kv_blocks, 2),
+                               ("--block-size", args.block_size, 1),
+                               ("--max-num-seqs", args.max_num_seqs, 1)):
+        if value is not None and value < least:
+            raise ConfigError(f"{flag} must be at least {least}")
+    if not (math.isfinite(args.timeout) and args.timeout > 0):
+        raise ConfigError("--timeout must be a number of seconds above 0")
+    if not (math.isfinite(args.max_error) and args.max_error >= 0):
+        raise ConfigError("--max-error must be a number of at least 0")
     try:
         profile, ok = calibrate(
             Engine(args.engine, timeout_s=args.timeout),
             model=args.model, gpu=args.gpu, name=args.name, kv_blocks=args.kv_blocks,
             block_size=args.block_size, max_num_seqs=args.max_num_seqs,
-            prefill_lengths=_ints(args.prefill_lengths, "--prefill-lengths"), reps=args.reps,
-            prefill_cached=_ints(args.prefill_cached, "--prefill-cached"),
-            prefill_new=_ints(args.prefill_new, "--prefill-new"),
-            decode_batches=_ints(args.decode_batches, "--decode-batches"),
-            decode_contexts=_ints(args.decode_contexts, "--decode-contexts"),
+            prefill_lengths=lists["--prefill-lengths"], reps=args.reps,
+            prefill_cached=lists["--prefill-cached"],
+            prefill_new=lists["--prefill-new"],
+            decode_batches=lists["--decode-batches"],
+            decode_contexts=lists["--decode-contexts"],
             decode_tokens=args.decode_tokens, check_sessions=args.check_sessions,
             check_turns=args.check_turns, max_error=args.max_error, seed=args.seed,
             token_range=(lo_hi[0], lo_hi[1]),
@@ -149,7 +177,15 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     except CalibrationError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    Path(args.out).write_text(json.dumps(profile, indent=1) + "\n", encoding="utf-8")
+    text = json.dumps(profile, indent=1) + "\n"
+    try:
+        Path(args.out).write_text(text, encoding="utf-8")
+    except OSError as exc:
+        # The measurements took minutes. Print the profile so that they are not lost.
+        print(text)
+        print(f"error: could not write {args.out!r}: {exc}. The profile is printed above: save "
+              "it to a file.", file=sys.stderr)
+        return 2
     if ok:
         print(f"wrote {args.out} — calibrated. Use it: kvsim replay <trace> --profile {args.out}")
         return 0
@@ -229,9 +265,11 @@ def _floats(spec: str, flag: str) -> tuple[float, ...]:
     return values
 
 
-def _check_out(out: str | None) -> None:
+def _check_out(out: str | None, *, required: bool = False) -> None:
     """Refuse an output path that cannot be written, before anything runs."""
     if not out:
+        if required:
+            raise ConfigError("--out needs a file name")
         return
     path = Path(out)
     if path.is_dir():
@@ -240,17 +278,29 @@ def _check_out(out: str | None) -> None:
         raise ConfigError(f"--out {out!r}: the folder {str(path.parent)!r} does not exist")
     if not path.parent.is_dir():
         raise ConfigError(f"--out {out!r}: {str(path.parent)!r} is not a folder")
+    if not os.access(path if path.exists() else path.parent, os.W_OK):
+        raise ConfigError(f"--out {out!r}: no permission to write there")
 
 
 def _check_engine(url: str) -> None:
+    example = "for example http://localhost:8000"
     if not url.lower().startswith(("http://", "https://")):
-        raise ConfigError(f"--engine {url!r} must start with http:// or https://, for example "
-                          "http://localhost:8000")
+        raise ConfigError(f"--engine {url!r} must start with http:// or https://, {example}")
+    try:
+        parts = urllib.parse.urlsplit(url)
+        host, _ = parts.hostname, parts.port  # .port raises for a port that is not a number
+    except ValueError:
+        host = None
+    if not host or any(c.isspace() for c in url):
+        raise ConfigError(f"--engine {url!r} is not a server address, {example}")
 
 
 def _emit(text: str, out: str | None) -> None:
     if out:
-        Path(out).write_text(text + "\n", encoding="utf-8")
+        try:
+            Path(out).write_text(text + "\n", encoding="utf-8")
+        except OSError as exc:
+            raise ConfigError(f"could not write {out!r}: {exc}") from None
         print(f"wrote {out}")
     else:
         print(text)
@@ -369,6 +419,10 @@ def main(argv: list[str] | None = None) -> int:
         return int(args.func(args))
     except ConfigError as exc:
         raise SystemExit(f"error: {exc}") from None
+    except MemoryError:
+        raise SystemExit("error: this run needs more memory than this machine has. Each replica "
+                         "keeps its own cache, so use fewer replicas, a shorter trace or a "
+                         "profile with fewer KV blocks.") from None
 
 
 if __name__ == "__main__":

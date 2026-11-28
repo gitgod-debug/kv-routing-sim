@@ -192,3 +192,126 @@ def test_an_agentx_replay_says_its_tokens_were_scaled(tmp_path):
     assert larger.trace["scaling"]["token_scale"] == 0.25
     with pytest.raises(ConfigError, match="does not divide a 16-token block"):
         replay(path, _options(trace_format="agentx", token_scale=1.0))
+
+
+# A second review before release 0.2.0.
+
+
+@pytest.mark.parametrize(("overrides", "message"), [
+    ({"replicas": "3000"}, "asks for a fleet of 3,000. The largest fleet is 1,024 replicas"),
+    ({"replicas": "1,2,300000"}, "The largest fleet is 1,024 replicas"),
+    ({"trace_format": "agentx", "token_scale": 1e-320}, "--token-scale must be a number from"),
+    ({"trace_format": "mooncake", "token_scale": 20000.0}, "--token-scale must be a number from"),
+    ({"trace_format": "bailian", "token_scale": float("inf")}, "--token-scale must be a number"),
+])
+def test_sizes_given_as_input_are_bounded(trace, overrides, message):
+    """A fleet of 300,000 or a token scale of 1e-320 would end in a MemoryError or a traceback."""
+    with pytest.raises(ConfigError, match=message):
+        replay(trace, _options(**overrides))
+
+
+def test_a_log_in_milliseconds_is_a_config_error(tmp_path):
+    rows = [{"request_id": f"r{i}", "timestamp": 1_795_000_000_000 + 250 * i,
+             "prompt_token_ids": list(range(64)), "num_generated_tokens": 8} for i in range(6)]
+    path = tmp_path / "ms.jsonl"
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    with pytest.raises(ConfigError, match="too large to be seconds.*divide them by 1,000"):
+        replay(path, _options())
+
+
+def test_skipped_records_are_said_next_to_the_answer(tmp_path):
+    """A log that lost two thirds of its lines is replayed at a third of its load. The trace's
+    statistics said so before, at the end of the report. Now the recommendation says it too."""
+    full = {"timestamp": 0.0, "prompt_token_ids": list(range(64)), "num_generated_tokens": 8}
+    rows = [{**full, "request_id": f"r{i}", "timestamp": float(i)} for i in range(6)]
+    rows += [{"request_id": f"x{i}", "timestamp": float(i), "prompt_token_ids": list(range(64))}
+             for i in range(12)]
+    path = tmp_path / "thin.jsonl"
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    report = replay(path, _options(replicas="1", seeds=1, edge_check=False, spread=False))
+    notes = [n for n in recommendation_notes(report.as_dict()) if n.text.startswith("Skipped")]
+    assert len(notes) == 1 and notes[0].warning
+    assert "12 of the log's records were not used (12 no_output_length)" in notes[0].text
+    assert "for the 6 requests that were read" in notes[0].text
+
+
+def test_the_notes_say_what_the_reader_assumed():
+    """`max_tokens` in place of an answer length, and sessions that shared an id."""
+    report = {"recommendation": {}, "trace": {
+        "requests": 60, "skipped_lines": 0, "skip_reasons": {},
+        "assumed": {"max_tokens_as_output_length": 40, "repeated_session_id_renamed": 3}}}
+    notes = recommendation_notes(report)
+    assert [n.warning for n in notes] == [True, True]
+    assert "40 of 60 requests had no answer length" in notes[0].text
+    assert "`max_tokens` limit was used" in notes[0].text
+    assert "3 sessions had an id that an earlier session already had" in notes[1].text
+    # A clean trace adds nothing.
+    assert recommendation_notes({"recommendation": {}, "trace": {"requests": 5}}) == []
+
+
+def test_a_copy_of_a_shipped_profile_keeps_its_measured_range(tmp_path):
+    """The same profile by name and by path must warn alike about prompts outside its range."""
+    from kv_routing_sim import data
+    from kv_routing_sim.profiles import longest_prompt_measured
+
+    copy = tmp_path / "copy.json"
+    copy.write_text(data.profiles()[PROFILE].read_text(encoding="utf-8"), encoding="utf-8")
+    assert longest_prompt_measured(copy) == longest_prompt_measured(PROFILE) is not None
+    # A profile that only looks like it says nothing.
+    other = json.loads(copy.read_text())
+    other["decode_base_s"] *= 2
+    copy.write_text(json.dumps(other))
+    assert longest_prompt_measured(copy) is None
+
+
+def test_a_profile_file_must_say_calibrated_as_true_or_false(tmp_path, trace):
+    from kv_routing_sim import data
+
+    raw = json.loads(data.profiles()[PROFILE].read_text(encoding="utf-8"))
+    path = tmp_path / "p.json"
+    path.write_text(json.dumps({**raw, "calibrated": "false"}))
+    with pytest.raises(ConfigError, match="calibrated must be true or false, got 'false'"):
+        replay(trace, _options(profile=str(path)))
+    # A byte-order mark in front of a good profile is no reason to refuse it.
+    path.write_text("﻿" + json.dumps(raw), encoding="utf-8")
+    report = replay(trace, _options(profile=str(path), replicas="1", seeds=1, edge_check=False,
+                                    spread=False))
+    assert report.calibrated is True
+
+
+@pytest.mark.parametrize(("change", "message"), [
+    ("usd_to_inr: yes", "fx.usd_to_inr must be a number, got True"),
+    ("tpot_p95_ms: 0", ("slo.tpot_p95_ms must be a number above 0, got 0.0. For no per-token "
+                        "limit, leave it out")),
+])
+def test_a_cost_model_value_that_is_not_what_it_seems_is_refused(tmp_path, trace, change, message):
+    """YAML reads `yes` as true, and float(True) is 1.0: a rupee rate of 1. A per-token limit of
+    0 would be a limit nothing can meet, while the option `--tpot-slo-ms 0` means no limit."""
+    from kv_routing_sim import data
+
+    text = data.cost_model().read_text(encoding="utf-8")
+    key = change.split(":")[0]
+    lines = [change if line.strip().startswith(f"{key}:") else line for line in text.splitlines()]
+    if key == "tpot_p95_ms":
+        at = next(i for i, line in enumerate(lines) if line.strip().startswith("ttft_p95_ms:"))
+        indent = lines[at][: len(lines[at]) - len(lines[at].lstrip())]
+        lines.insert(at + 1, indent + change)
+    else:
+        lines = [(line[: len(line) - len(line.lstrip())] + change)
+                 if line.strip().startswith(f"{key}:") else line for line in text.splitlines()]
+    path = tmp_path / "cost.yaml"
+    path.write_text("\n".join(lines) + "\n")
+    with pytest.raises(ConfigError, match=message):
+        replay(trace, _options(cost_model=str(path)))
+
+
+def test_a_profile_with_far_too_many_blocks_is_refused_before_it_fills_the_memory(tmp_path, trace):
+    """Every replica keeps its whole cache in memory. 200 million blocks would be 30 GB."""
+    from kv_routing_sim import data
+
+    raw = json.loads(data.profiles()[PROFILE].read_text(encoding="utf-8"))
+    path = tmp_path / "huge.json"
+    path.write_text(json.dumps({**raw, "kv_cache_blocks": 200_000_000}))
+    with pytest.raises(ConfigError, match="200,000,000 blocks to keep in memory. The most is"):
+        replay(trace, _options(profile=str(path), replicas="1"))
+

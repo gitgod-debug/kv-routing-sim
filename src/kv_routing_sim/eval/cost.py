@@ -42,8 +42,7 @@ class CostModel:
         Raises:
             UnfilledCostModel: If any constant is still `<TBD>`.
             ValueError: If a constant is missing, not a finite number, or out of range: the price,
-                the exchange rate and the first-token limit must be above 0, and a per-token limit
-                at least 0.
+                the exchange rate, the first-token limit and a per-token limit must be above 0.
             yaml.YAMLError: If the file is not valid YAML.
         """
         if str(path) == "default":
@@ -64,13 +63,14 @@ class CostModel:
                 isinstance(raw.get(s), dict) for s in ("fx", "compute", "slo")):
             raise ValueError("a cost model needs the sections fx, compute and slo")
         model = cls(
-            usd_to_inr=float(raw["fx"]["usd_to_inr"]),
-            price_per_hour_usd=float(raw["compute"]["price_per_hour_usd"]),
+            usd_to_inr=_number(raw["fx"], "usd_to_inr", "fx.usd_to_inr"),
+            price_per_hour_usd=_number(raw["compute"], "price_per_hour_usd",
+                                       "compute.price_per_hour_usd"),
             sku=str(raw["compute"]["sku"]),
-            ttft_p95_slo_ms=float(raw["slo"]["ttft_p95_ms"]),
+            ttft_p95_slo_ms=_number(raw["slo"], "ttft_p95_ms", "slo.ttft_p95_ms"),
             provenance=raw,
             tpot_p95_slo_ms=(None if raw["slo"].get("tpot_p95_ms") is None
-                             else float(raw["slo"]["tpot_p95_ms"])),
+                             else _number(raw["slo"], "tpot_p95_ms", "slo.tpot_p95_ms")),
         )
         for name, value in (("fx.usd_to_inr", model.usd_to_inr),
                             ("compute.price_per_hour_usd", model.price_per_hour_usd),
@@ -78,8 +78,11 @@ class CostModel:
             if not (math.isfinite(value) and value > 0):
                 raise ValueError(f"{name} must be a number above 0, got {value}")
         tpot = model.tpot_p95_slo_ms
-        if tpot is not None and not (math.isfinite(tpot) and tpot >= 0):
-            raise ValueError(f"slo.tpot_p95_ms must be a number of at least 0, got {tpot}")
+        if tpot is not None and not (math.isfinite(tpot) and tpot > 0):
+            # 0 would be a limit nothing can meet. The option --tpot-slo-ms 0 means "no limit",
+            # and in a file "no limit" is written by leaving the line out.
+            raise ValueError(f"slo.tpot_p95_ms must be a number above 0, got {tpot}. For no "
+                             "per-token limit, leave it out")
         return model
 
     @property
@@ -103,6 +106,14 @@ class CostModel:
             return float("inf")  # served nothing; cost per unit of useful work is undefined
         inr_per_hour = n_replicas * self.price_per_hour_usd * self.usd_to_inr
         return inr_per_hour / successful_requests_per_hour * 1000.0
+
+
+def _number(section: dict[str, Any], key: str, where: str) -> float:
+    """A number from the file. YAML reads `yes` as true, and float(True) would be 1.0."""
+    value = section[key]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(f"{where} must be a number, got {value!r}")
+    return float(value)
 
 
 def _find_tbd(node: Any, path: str = "") -> list[str]:

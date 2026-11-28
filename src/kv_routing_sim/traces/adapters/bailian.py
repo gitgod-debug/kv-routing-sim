@@ -28,7 +28,7 @@ from pathlib import Path
 
 from ..hashing import DEFAULT_BLOCK_SIZE
 from ..schema import NormalizedRequest, TraceStats
-from .base import open_maybe_gzip, parse_timestamp, unique_id
+from .base import LINE_ERRORS, open_maybe_gzip, parse_timestamp, unique_id
 
 TRACE_BLOCK_TOKENS = 16  # README.md: "Salted SipHash blocks (16 tokens per block)"
 ID_LIMIT = 2**64  # a hash id is hashed as 8 bytes
@@ -94,7 +94,7 @@ def read(
                 continue
             try:
                 obj = json.loads(line)
-            except json.JSONDecodeError:
+            except LINE_ERRORS:
                 stats.skip("json_decode_error")
                 continue
             try:

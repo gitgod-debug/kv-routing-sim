@@ -627,3 +627,129 @@ def test_the_generator_refuses_no_sessions_and_a_rate_that_is_not_a_number():
     for rate in (float("nan"), float("inf"), -1.0):
         with pytest.raises(ValueError, match="arrival_rate"):
             AgenticWorkload(arrival_rate=rate)
+
+
+# A second review before release 0.2.0: what a reader assumes or refuses must be said.
+
+
+def test_a_log_in_epoch_milliseconds_is_refused(tmp_path):
+    """Read as seconds, milliseconds stretch the log a thousand times and the load looks tiny."""
+    rows = [_vllm(f"r{i}", 1_795_000_000_000 + 100 * i) for i in range(4)]
+    with pytest.raises(ValueError, match="too large to be seconds"):
+        list(adapters.get("vllm-jsonl").read(_jsonl(tmp_path, rows)))
+    # Seconds since the epoch, and an ISO time, are fine.
+    rows = [_vllm("a", 1_795_000_000.0), _vllm("b", "2026-11-28T10:00:00Z")]
+    assert len(list(adapters.get("vllm-jsonl").read(_jsonl(tmp_path, rows)))) == 2
+
+
+def test_a_limit_that_stands_in_for_an_answer_length_is_counted(tmp_path):
+    """`max_tokens` is the longest an answer could be, not its length. The reader says how often
+    it had nothing better."""
+    base = {"timestamp": 1, "prompt_token_ids": list(range(32))}
+    rows = [{**base, "request_id": "real", "num_generated_tokens": 7, "max_tokens": 500},
+            {**base, "request_id": "limit", "max_tokens": 500},
+            {**base, "request_id": "none"}]
+    stats = TraceStats()
+    out = list(adapters.get("vllm-jsonl").read(_jsonl(tmp_path, rows), stats=stats))
+    assert [(r.request_id, r.output_tokens) for r in out] == [("real", 7), ("limit", 500)]
+    assert stats.assumed == {"max_tokens_as_output_length": 1}
+    assert stats.as_dict()["assumed"] == {"max_tokens_as_output_length": 1}
+    assert stats.skip_reasons == {"no_output_length": 1}
+    # A reader that assumed nothing writes no such key, so earlier results read the same.
+    clean = TraceStats()
+    list(adapters.get("vllm-jsonl").read(_jsonl(tmp_path, [_vllm("a", 1)], "c.jsonl"), stats=clean))
+    assert "assumed" not in clean.as_dict()
+
+
+def test_openai_limits_are_counted_too(tmp_path):
+    msgs = [{"role": "user", "content": "hello there " * 20}]
+    rows = [{"id": "usage", "created": 1, "messages": msgs, "max_tokens": 99,
+             "usage": {"prompt_tokens": 40, "completion_tokens": 7}},
+            {"id": "top", "created": 2, "messages": msgs, "max_tokens": 11},
+            {"id": "body", "created": 3, "body": {"messages": msgs, "max_tokens": 13}}]
+    stats = TraceStats()
+    list(adapters.get("openai-log").read(_jsonl(tmp_path, rows), stats=stats))
+    assert stats.assumed == {"max_tokens_as_output_length": 2}
+
+
+@pytest.mark.parametrize(("change", "reason"), [
+    ({"num_generated_tokens": True}, "invalid_record"),  # int(True) is 1
+    ({"num_generated_tokens": 20.7}, "invalid_record"),  # int(20.7) is 20
+    ({"num_generated_tokens": "2_0"}, "invalid_record"),  # int("2_0") is 20
+    ({"prompt_token_ids": "123456789"}, "invalid_record"),  # a string is not a list of ids
+    ({"prompt_token_ids": [1, True, 3] * 11}, "invalid_record"),
+    ({"timestamp": "1_0"}, "bad_timestamp"),  # float("1_0") is 10
+])
+def test_a_value_of_the_wrong_type_skips_the_record(tmp_path, change, reason):
+    """Python's int() and float() accept more than a log means. Such a record is skipped."""
+    stats = TraceStats()
+    rows = [_vllm("good", 1), {**_vllm("odd", 2), **change}]
+    out = list(adapters.get("vllm-jsonl").read(_jsonl(tmp_path, rows), stats=stats))
+    assert [r.request_id for r in out] == ["good"]
+    assert stats.skip_reasons == {reason: 1}
+
+
+def test_a_count_may_be_a_whole_float_or_a_string_of_digits(tmp_path):
+    rows = [{**_vllm("a", 1), "num_generated_tokens": 8.0}, {**_vllm("b", 2),
+                                                             "num_generated_tokens": " 9 "}]
+    out = list(adapters.get("vllm-jsonl").read(_jsonl(tmp_path, rows)))
+    assert [r.output_tokens for r in out] == [8, 9]
+
+
+@pytest.mark.parametrize("fmt", ["vllm-jsonl", "openai-log", "mooncake", "bailian", "agentx"])
+def test_a_line_the_decoder_gives_up_on_is_skipped(tmp_path, fmt):
+    """Nesting a hundred thousand deep, or an integer of thousands of digits, is one bad line."""
+    rows = ["[" * 100_000 + "]" * 100_000, '{"timestamp": ' + "9" * 5000 + "}"]
+    stats = TraceStats()
+    assert list(adapters.get(fmt).read(_jsonl(tmp_path, rows), stats=stats)) == []
+    assert stats.skipped_lines == 2
+
+
+def test_text_that_cannot_be_encoded_is_one_bad_record(tmp_path):
+    rows = [_vllm("good", 1),
+            '{"request_id": "odd", "timestamp": 2, "num_generated_tokens": 4, "prompt": "\\ud800"}']
+    stats = TraceStats()
+    out = list(adapters.get("vllm-jsonl").read(_jsonl(tmp_path, rows), stats=stats))
+    assert [r.request_id for r in out] == ["good"] and stats.skip_reasons == {"invalid_record": 1}
+
+
+def test_agentx_sessions_with_one_id_are_kept_apart(tmp_path):
+    """Hash ids are local to a session, and its id keeps them apart. Two sessions with one id,
+    as in two files joined, must not look like one session reading its own blocks again."""
+    def session(sid):
+        return {"id": sid, "models": ["m"], "requests": [
+            {"t": 0.0, "type": "n", "model": "m", "in": 1024, "out": 8,
+             "hash_ids": list(range(16)), "api_time": 1.0}]}
+
+    def read(rows):
+        stats = TraceStats()
+        out = list(adapters.get("agentx").read(_jsonl(tmp_path, rows, "x.jsonl"), stats=stats))
+        return out, stats
+
+    apart, stats = read([session("a"), session("b")])
+    assert set(apart[0].block_hashes).isdisjoint(apart[1].block_hashes)
+    assert "assumed" not in stats.as_dict()
+    same, stats = read([session("a"), session("a"), session("a#2")])
+    hashes = [set(r.block_hashes) for r in same]
+    assert all(x.isdisjoint(y) for x, y in itertools.combinations(hashes, 2))
+    assert len({r.session_id for r in same}) == 3
+    # The second "a" becomes "a#2", so the session that was named "a#2" is renamed as well.
+    assert stats.assumed == {"repeated_session_id_renamed": 2}
+
+
+def test_agentx_needs_an_id_and_a_list_of_requests(tmp_path):
+    """Without an id a session's blocks cannot be kept apart, and a line without `requests` is a
+    record of another format. Both are counted, so a wrong format is not a silent empty trace."""
+    good = {"id": "ok", "models": ["m"], "requests": [
+        {"t": 0.0, "type": "n", "model": "m", "in": 1024, "out": 8, "hash_ids": list(range(16)),
+         "api_time": 1.0}]}
+    rows = [{**good, "id": None},
+            {"request_id": "q", "timestamp": 1, "prompt_token_ids": [1]}, good]
+    stats = TraceStats()
+    out = list(adapters.get("agentx").read(_jsonl(tmp_path, rows, "x.jsonl"), stats=stats))
+    assert [r.session_id for r in out] == ["ok"] and stats.skip_reasons == {"bad_session": 2}
+
+
+def test_the_generator_refuses_a_rate_too_small_for_finite_times():
+    with pytest.raises(ValueError, match="at least 1e-09"):
+        AgenticWorkload(n_sessions=3, arrival_rate=1e-320)

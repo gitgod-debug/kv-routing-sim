@@ -60,6 +60,16 @@ DEFAULT_TPOT_SLO_MS = 100.0
 MAX_REPLICA_COUNTS = 1024
 """The most replica counts one sweep may ask for, so that a typo cannot exhaust the memory."""
 
+MAX_REPLICAS = 1024
+"""The largest fleet one run may simulate. Each replica holds its own cache in memory."""
+
+TOKEN_SCALE_RANGE = (1e-6, 1.0)
+"""A scale above 1 would invent tokens, and one below a millionth leaves nothing to replay."""
+
+MAX_FLEET_BLOCKS = 20_000_000
+"""Replicas times KV blocks, for the largest fleet of a run. A block costs about 150 bytes of
+memory, so this is about 3 GB. A T4 profile has 1,537 blocks: 1,024 replicas are 1.6 million."""
+
 SPREAD_UNAVAILABLE = (
     "This profile has no per-repeat fits, so the spread of these replica counts cannot be shown. "
     "For scale: three calibrations of one GPU type all gave a count at 91 of 144 points, the same "
@@ -147,6 +157,9 @@ def parse_replicas(spec: str) -> list[int]:
                           f"{MAX_REPLICA_COUNTS:,}.")
     if not counts or any(n < 1 for n in counts):
         raise ConfigError(f"replicas {spec!r} must be one or more positive integers")
+    if max(counts) > MAX_REPLICAS:
+        raise ConfigError(f"replicas {spec!r} asks for a fleet of {max(counts):,}. The largest "
+                          f"fleet is {MAX_REPLICAS:,} replicas.")
     return list(counts)
 
 
@@ -176,6 +189,9 @@ def load_cost_model(spec: str | None) -> CostModel | None:
                           f"YAML{where}") from None
     except (OSError, KeyError, TypeError, ValueError, AttributeError) as exc:
         raise ConfigError(f"could not read cost model {spec!r}: {exc}") from None
+    except RecursionError:
+        raise ConfigError(f"could not read cost model {spec!r}: it is nested too deeply to be "
+                          "one") from None
 
 
 def load_profile(spec: str | None) -> CostProfile:
@@ -186,6 +202,9 @@ def load_profile(spec: str | None) -> CostProfile:
         return resolve_profile(spec)
     except (OSError, TypeError, ValueError) as exc:
         raise ConfigError(f"could not read profile {spec!r}: {exc}") from None
+    except RecursionError:
+        raise ConfigError(f"could not read profile {spec!r}: it is nested too deeply to be "
+                          "one") from None
 
 
 def apply_overrides(
@@ -274,8 +293,9 @@ def read_trace(
             raise ConfigError(f"--token-scale works only with the {', '.join(scalable[:-1])} and "
                               f"{scalable[-1]} formats. A {trace_format} trace is read at its "
                               "recorded size.")
-        if not _finite_above(token_scale, 0):
-            raise ConfigError("--token-scale must be a number above 0")
+        low, high = TOKEN_SCALE_RANGE
+        if not (math.isfinite(token_scale) and low <= token_scale <= high):
+            raise ConfigError(f"--token-scale must be a number from {low:g} to {high:g}")
         kwargs["token_scale"] = token_scale
     stats = TraceStats()
     where = f"could not read trace {str(path)!r}"
@@ -288,12 +308,31 @@ def read_trace(
         raise ConfigError(f"{where}: the file ends early") from None
     except zlib.error:
         raise ConfigError(f"{where}: the file is damaged or ends early") from None
-    except ValueError as exc:  # a setting the reader cannot use, such as its token scale
+    except (ValueError, OverflowError) as exc:
+        # A setting the reader cannot use, such as its token scale, or times that are not seconds.
         raise ConfigError(f"{where}: {exc}") from None
     if not trace:
         raise ConfigError(f"no usable requests in {str(path)!r} ({stats.skipped_lines} line(s) "
                           f"skipped: {stats.skip_reasons})")
     return trace, stats.as_dict()
+
+
+def check_fleet(replicas: int, profile: CostProfile) -> None:
+    """Refuse a fleet that would not fit in memory: too many replicas, or too many KV blocks.
+
+    Every replica keeps its whole cache in memory from the start, however short the trace is. A
+    mistyped replica count, or a profile with a `kv_cache_blocks` a thousand times too large,
+    would otherwise fill the machine's memory before the first request.
+    """
+    if replicas > MAX_REPLICAS:
+        raise ConfigError(f"a fleet of {replicas:,} replicas was asked for. The largest fleet is "
+                          f"{MAX_REPLICAS:,} replicas.")
+    blocks = replicas * profile.kv_cache_blocks
+    if blocks > MAX_FLEET_BLOCKS:
+        raise ConfigError(
+            f"{replicas:,} replicas with {profile.kv_cache_blocks:,} KV blocks each are "
+            f"{blocks:,} blocks to keep in memory. The most is {MAX_FLEET_BLOCKS:,}, about 3 GB. "
+            "Use fewer replicas, or check the profile's kv_cache_blocks.")
 
 
 def check_fits(trace: list[NormalizedRequest], profile: CostProfile, trace_format: str) -> None:
@@ -346,6 +385,7 @@ def replay(
     if options.block_size != profile.block_size:
         raise ConfigError(f"block size {options.block_size} does not match the profile's block "
                           f"size {profile.block_size} ({profile.name})")
+    check_fleet(max(replica_counts), profile)
     trace, info = read_trace(trace_path, options.trace_format, options.block_size,
                              token_scale=options.token_scale)
     check_fits(trace, profile, options.trace_format)

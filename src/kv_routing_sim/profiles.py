@@ -104,17 +104,18 @@ def _normal(value: Any) -> str:
 def longest_prompt_measured(spec: str | Path) -> int | None:
     """The longest prompt whose timing a profile was fitted on, or None if it does not say.
 
-    A shipped profile has it in the index. One written by `kvsim calibrate` has it in its cells.
-    A `_source` that is not an object, and cells that are not, say nothing.
+    A shipped profile has it in the index, also when it is given as a file that is a copy of the
+    shipped one. One written by `kvsim calibrate` has it in its cells. A `_source` that is not an
+    object, and cells that are not, say nothing.
     """
     path = Path(spec)
     if not path.is_file():
         name = str(spec).removesuffix(".json")
         return next((p.longest_prompt for p in measured_profiles() if p.name == name), None)
-    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw = json.loads(path.read_text(encoding="utf-8-sig"))
     source = raw.get("_source") if isinstance(raw, dict) else None
     if not isinstance(source, dict):
-        return None
+        return _as_shipped(raw)
     seen = []
     for cells, length in (("decode_cells", "context"), ("prefill_points", "prompt_tokens")):
         found = source.get(cells)
@@ -123,7 +124,16 @@ def longest_prompt_measured(spec: str | Path) -> int | None:
             if (isinstance(value, (int, float)) and not isinstance(value, bool)
                     and math.isfinite(value)):
                 seen.append(value)
-    return max(seen, default=0) or None
+    return max(seen, default=0) or _as_shipped(raw)
+
+
+def _as_shipped(raw: Any) -> int | None:
+    """The index's value for a profile whose content is exactly a shipped profile's, or None."""
+    shipped = data.profiles()
+    for p in measured_profiles():
+        if p.name in shipped and json.loads(shipped[p.name].read_text(encoding="utf-8")) == raw:
+            return p.longest_prompt
+    return None
 
 
 def setup_of(**values: Any) -> Setup:

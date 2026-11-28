@@ -91,7 +91,7 @@ def load_profile(path: str | Path) -> CostProfile:
     KV blocks, or a timing coefficient that is negative or not a finite number. Keys starting with
     `_` are provenance for the reader and are ignored.
     """
-    return _profile_from_json(Path(path).read_text(encoding="utf-8"), str(path))
+    return _profile_from_json(Path(path).read_text(encoding="utf-8-sig"), str(path))
 
 
 def resolve_profile(spec: str | Path) -> CostProfile:
@@ -124,7 +124,7 @@ def replicate_profiles(spec: str | Path) -> list[CostProfile]:
     """
     path = Path(spec)
     if path.is_file():
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8-sig")
     else:
         from .. import data
 
@@ -177,6 +177,9 @@ def _profile_from_json(text: str, where: str) -> CostProfile:
                 or not math.isfinite(value) or value < 0):
             raise ValueError(f"{where}: {name} must be a finite number of at least 0, "
                              f"got {value!r}")
+    # "false" in quotes is a string, and a string would count as true.
+    if not isinstance(profile.calibrated, bool):
+        raise TypeError(f"{where}: calibrated must be true or false, got {profile.calibrated!r}")
     return profile
 
 

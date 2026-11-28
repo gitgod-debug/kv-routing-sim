@@ -261,8 +261,8 @@ def small_trace(tmp_path, capsys):
     (["--tpot-slo-ms", "-1"], "per-token limit"),
     (["--tpot-slo-ms", "nan"], "per-token limit"),
     (["--token-scale", "0.5"], "works only with the agentx, bailian and mooncake formats"),
-    (["--token-scale", "nan", "--format-in", "mooncake"], "--token-scale must be a number above 0"),
-    (["--token-scale", "0", "--format-in", "agentx"], "--token-scale must be a number above 0"),
+    (["--token-scale", "nan", "--format-in", "mooncake"], "--token-scale must be a number from"),
+    (["--token-scale", "0", "--format-in", "agentx"], "--token-scale must be a number from"),
     (["--token-scale", "0.3", "--format-in", "bailian"], "1/k for a whole number k"),
 ])
 def test_replay_options_are_checked_before_any_simulation_runs(small_trace, monkeypatch, args,
@@ -387,3 +387,95 @@ def test_json_output_writes_null_for_nan_and_infinity(small_trace, tmp_path, mon
     assert main(["crossover", "--out", str(out)]) == 0
     assert _strict(out.read_text())["crossover"] == [{"p95_by_policy_ms": {"round-robin": None}}]
     capsys.readouterr()
+
+
+def test_crossover_reports_traffic_it_cannot_build_in_one_line():
+    """A sharing ratio so high that the generator refuses it ends in a message, not a traceback."""
+    with pytest.raises(SystemExit) as stop:
+        main(["crossover", "--sharing", "0.999", "--rates", "1", "--sessions", "5"])
+    assert str(stop.value).startswith("error: a shared prefix of ")
+
+
+# A second review before release 0.2.0.
+
+
+def test_an_output_name_is_needed_and_must_be_writable(tmp_path, monkeypatch):
+    """An empty `--out` and a folder without write permission ended in tracebacks, the second one
+    after the whole run."""
+    import os
+
+    from kv_routing_sim import cli
+
+    monkeypatch.setattr(cli, "AgenticWorkload", lambda *a, **k: pytest.fail("traffic was made"))
+    with pytest.raises(SystemExit, match="--out needs a file name"):
+        main(["generate", "--out", ""])
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0o555)
+    try:
+        if os.access(locked, os.W_OK):
+            pytest.skip("this user can write anywhere")
+        with pytest.raises(SystemExit, match="no permission to write there"):
+            main(["generate", "--out", str(locked / "t.jsonl")])
+    finally:
+        locked.chmod(0o755)
+
+
+@pytest.mark.parametrize("url", ["http://localhost:abc", "http://local host:8000", "http://",
+                                 "http://[::1"])
+def test_an_engine_address_that_is_not_one_is_refused_in_one_line(url):
+    with pytest.raises(SystemExit, match="is not a server address"):
+        main(["profiles", "--engine", url])
+    with pytest.raises(SystemExit, match="is not a server address"):
+        main(["calibrate", "--engine", url, "--out", "unused.json"])
+
+
+@pytest.mark.parametrize(("args", "message"), [
+    (["--reps", "0"], "--reps must be at least 1"),
+    (["--check-sessions", "0"], "--check-sessions must be at least 1"),
+    (["--check-turns", "-1"], "--check-turns must be at least 1"),
+    (["--kv-blocks", "1"], "--kv-blocks must be at least 2"),
+    (["--block-size", "0"], "--block-size must be at least 1"),
+    (["--max-num-seqs", "-3"], "--max-num-seqs must be at least 1"),
+    (["--decode-batches", "0,2"], "--decode-batches must be whole numbers of at least 1"),
+    (["--prefill-lengths", "0,-5"], "--prefill-lengths must be whole numbers of at least 1"),
+    (["--timeout", "-1"], "--timeout must be a number of seconds above 0"),
+    (["--timeout", "nan"], "--timeout must be a number of seconds above 0"),
+    (["--max-error", "nan"], "--max-error must be a number of at least 0"),
+])
+def test_calibrate_checks_every_option_before_it_asks_the_engine(tmp_path, monkeypatch, args,
+                                                                 message):
+    """A calibration takes minutes. A bad option must not surface after them."""
+    from kv_routing_sim.calib import calibrate as module
+
+    monkeypatch.setattr(module, "calibrate", lambda *a, **k: pytest.fail("the engine was asked"))
+    with pytest.raises(SystemExit, match=message):
+        main(["calibrate", "--engine", "http://127.0.0.1:9", "--out", str(tmp_path / "p.json"),
+              *args])
+
+
+def test_generate_refuses_a_rate_that_gives_infinite_times(tmp_path):
+    with pytest.raises(SystemExit, match="arrival_rate must be a finite number of at least"):
+        main(["generate", "--out", str(tmp_path / "t.jsonl"), "--sessions", "3",
+              "--rate", "1e-320"])
+    assert not (tmp_path / "t.jsonl").exists()
+
+
+def test_a_run_too_large_for_memory_ends_in_one_line(small_trace, monkeypatch):
+    from kv_routing_sim import cli
+
+    def out_of_memory(*args, **kwargs):
+        raise MemoryError
+
+    monkeypatch.setattr(cli, "replay", out_of_memory)
+    with pytest.raises(SystemExit, match="needs more memory than this machine has"):
+        main(["replay", str(small_trace)])
+
+
+def test_crossover_refuses_a_fleet_that_would_not_fit_in_memory(monkeypatch):
+    from kv_routing_sim import cli
+
+    monkeypatch.setattr(cli, "crossover_sweep", lambda *a, **k: pytest.fail("the sweep ran"))
+    with pytest.raises(SystemExit, match="a fleet of 300,000 replicas was asked for"):
+        main(["crossover", "--replicas", "300000"])
+
