@@ -9,13 +9,12 @@ what it changes are in `docs/09-hypotheses.md`, entries of 2026-10-05.
 | `analysis.json`, `report.md` | Written by `scripts/t2_analyze.py`, committed before the grid ran: the replica counts under the first-token target and under the two-part one, the three registered rules, and the reported items. |
 | `verification.json` | Written by `scripts/t2_verify_grid.py`: 240 random cells of each grid, run again from a clean checkout. |
 
-⚠️ **The report's first line says "a dirty tree", and that is true of grids B and C.** The three
-calibrations ran one after another in one process that started on a clean tree. While B and C were
-computing, other files in the working tree were being edited; each grid's header lists the paths.
-The process had loaded the simulator before those edits and none of the files is imported by a
-grid run — but a header cannot show that. `verification.json` is the evidence instead: 720 of 720
-sampled cells, run again from a clean checkout whose `src/` is identical to the registration
-commit's, are identical to the last stored digit.
+**The three grids here were made by release 0.2.0, at a clean tree.** Their headers say so, and
+`verification.json` adds a second check: 720 of 720 sampled cells, run again from a clean
+checkout, are identical to the last stored digit. The grids of release 0.1.2 are kept in
+[`../v0.1.2/t2_two_part_slo/`](../v0.1.2/README.md), with this note as it was then. Their grids B
+and C were computed while other files were being edited, so their headers say "dirty", and their
+own `verification.json` was the evidence for them.
 
 ⚠️ **These are the model's counts, not sizing guidance.** T1 — the check of the simulator's
 per-token latency against a live engine — did not hold

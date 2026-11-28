@@ -3,8 +3,9 @@
 
     python scripts/t2_verify_grid.py      # -> artifacts/results/t2_two_part_slo/verification.json
 
-The headers of grids B and C say `git_dirty: true`, so the headers alone cannot show which
-simulator code produced them. For every calibration in configs/tpot_slo.yaml, this re-runs a seeded
+A grid's header names its commit and says whether the tree was clean, but a header alone cannot
+show which simulator code produced the numbers. (In release 0.1.2 the headers of grids B and C
+said `git_dirty: true`.) For every calibration in configs/tpot_slo.yaml, this re-runs a seeded
 random sample of the grid's cells with the current checkout, which should be clean, and compares
 the results with what is stored. The grids are deterministic, so a cell either reproduces to the
 last stored digit or the code differs. A sample keeps the check short; the full grids take about

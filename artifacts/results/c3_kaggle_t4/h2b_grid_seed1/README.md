@@ -6,6 +6,7 @@ on a real T4 in its SECOND run (C3 part 3) — added post hoc, after the first c
 
 ⚠️ `report.md`'s title and its "registered prediction" line are that script's fixed text. The
 registered test of H2b on C2's profile is [`../../h2b_c2/`](../../h2b_c2/), and it was FALSIFIED.
-What it means that the same rules hold here is in
-[`../posthoc_three_calibrations.md`](../posthoc_three_calibrations.md) and in
-`docs/09-hypotheses.md`, entry of 2026-10-05.
+With the engine of release 0.2.0 the rules fail here too. With the engine of 0.1.2 they held
+here, and those files are kept in [`../../v0.1.2/`](../../v0.1.2/README.md). The three
+calibrations side by side are in
+[`../posthoc_three_calibrations.md`](../posthoc_three_calibrations.md).
