@@ -9,8 +9,9 @@ one step at a time. In the same case the router saw the replica as idle while it
 computing, and a request was counted as finished when its last step started.
 
 Every result that the fix can change was derived again with the fixed engine, as registered in
-[`configs/rederive_0_2_0.yaml`](../../../configs/rederive_0_2_0.yaml). The new files are at their
-usual paths under `artifacts/results/`. The README says what changed.
+[`configs/rederive_0_2_0.yaml`](../../../configs/rederive_0_2_0.yaml), and H6 in
+[`configs/rederive_0_2_0_h6.yaml`](../../../configs/rederive_0_2_0_h6.yaml). The new files are at
+their usual paths under `artifacts/results/`. The README says what changed.
 
 To compute these numbers again, check out tag `v0.1.2` and run the same script, or install
 release 0.1.2 (`pip install kv-routing-sim==0.1.2`). In the current code the old engine is still

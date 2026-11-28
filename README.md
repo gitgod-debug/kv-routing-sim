@@ -86,7 +86,7 @@ Of 21 rows, 11 held (H4 only in an amended form), 4 failed, and 6 held in part o
 | **H3** | calibration error in single digits (%) on two workload shapes | ✅ held: zero error on two shapes, +0.3% on a third |
 | **H4** | the residual of a naive cache model is eviction-order skew | ✅ held, in an amended form: it is capacity skew (−11.9 points) |
 | **H5** | the cost win is one fewer replica at a fixed target | ✅⛔ in part: only for balanced prefix-affinity at low sharing |
-| **H6** | the ranking of policies does not depend on the hardware | ✅⛔ in part: the ranking moves (τ-b down to 0.51), but the direction of the flip does not. First timing model only, and stored from the engine of 0.1.2 |
+| **H6** | the ranking of policies does not depend on the hardware | ✅⛔ in part: the ranking moves (τ-b down to 0.51), but the direction of the flip does not. First timing model only |
 | **R1** | on the Mooncake trace, prefix-affinity beats session-sticky on tool-agent traffic and never on conversation | ⛔ failed: prefix-affinity did not win on tool-agent traffic. The conversation half held (it failed with the engine of 0.1.2) |
 | **R2** | on the AgentX trace, session-sticky and balanced prefix-affinity tie | ✅ held, on the first timing model |
 | **R1, R2 again** | the same two on the checked timing model: R1 fails again, R2 holds | ✅⛔ in part: R1 failed again, as predicted. R2 could not be tested as designed |
@@ -136,7 +136,7 @@ Of 21 rows, 11 held (H4 only in an amended form), 4 failed, and 6 held in part o
 | Per-token latency off the knee (T1) | within 1.07× | [`t1.json`](artifacts/results/t1_itl/t1.json) | `scripts/t1_itl_check.py` | `326fadf` |
 | GPU counts under the two-part target (T2) | a median of 2.00× the first-token counts, on each calibration | [`analysis.json`](artifacts/results/t2_two_part_slo/analysis.json) | `scripts/t2_analyze.py` | `f14fb99` |
 | GPU counts from three calibrations of one GPU type | 91 of 144 cells have a count on all three: 62 equal, 86 within one; 9 more disagree on holding the target | [`posthoc_three_calibrations.json`](artifacts/results/c3_kaggle_t4/posthoc_three_calibrations.json) | `scripts/c3_posthoc_grid.py` | `080f615` |
-| Ranking of policies across hardware (H6, engine of 0.1.2) | τ-b down to 0.51 | [`h6.json`](artifacts/results/h6_ranking/h6.json) | `scripts/run_h6.py` | `a090ca0` |
+| Ranking of policies across hardware (H6) | τ-b down to 0.51 | [`h6.json`](artifacts/results/h6_ranking/h6.json) | `scripts/run_h6.py` | `35200a9` |
 | Two published policies on a production trace (R3) | 2 of 4 held | [`analysis.json`](artifacts/results/r3_bailian/analysis.json) | `scripts/r3_analyze.py` | `20a6821` |
 | New tokens in a session | 519 of 6,800 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `eac9db9` |
 | Session-sticky, first-token target | 5 T4s, 27 tokens, ₹0.046 | [`session_cost.json`](artifacts/results/session_cost/session_cost.json) | `scripts/session_cost.py` | `eac9db9` |
@@ -179,9 +179,9 @@ decided inside that margin, so that half is "not settled" below.
 
 **Release 0.2.0 fixed a defect of the engine.** It was found on 27 November 2026. Every result
 that it could change was derived again. With 64 prompts, the answer of one calibration changed.
-The cache counts did not change. See [what changed in 0.2.0](#what-changed-in-020). Release 0.1.3
-fixed how the tool reads your own logs: their time order, missing answer lengths, repeated request
-ids and the scale of AgentX traces.
+The cache counts did not change. See [what changed in 0.2.0](#what-changed-in-020). The release
+also fixes how the tool reads your own logs, for example their time order, missing answer lengths
+and timestamps in milliseconds.
 
 **Not new.** The routing result was published first (SMetric, LMetric). NVIDIA ships a larger
 simulator for the same question. Three more simulators checked against live engines were published
@@ -205,8 +205,8 @@ time. In the same case the router saw that GPU as idle while it was still comput
 was counted as finished when its last step started, not when it ended.
 
 Every stored result that the fix can change was derived again with the fixed engine. The runs were
-registered first, in [`configs/rederive_0_2_0.yaml`](configs/rederive_0_2_0.yaml). The files of
-release 0.1.2 that changed are kept, byte for byte, in
+registered first, in [`configs/rederive_0_2_0.yaml`](configs/rederive_0_2_0.yaml), and H6 later in
+an addendum (see below). The files of release 0.1.2 that changed are kept, byte for byte, in
 [`artifacts/results/v0.1.2/`](artifacts/results/v0.1.2/README.md). The old engine is still in the
 code (`engine_version="0.1.2"`). The predictions that were registered before each GPU run were made
 with it, so the tests check them with it.
@@ -245,6 +245,12 @@ of them one part changed: H2b on calibration C, and the conversation half of R1.
   at the highest load on three calibrations of four (it was all four). Under both targets, which
   are reported and not tested there, the tie of balanced prefix-affinity and session-sticky now
   holds as well.
+- H6, on the first timing model, was derived again later (see below). Both halves keep their
+  verdicts. The ranking half still fails: τ-b goes as low as 0.51, as before. With the old engine
+  there was one point, in one rescaled regime, where the T4's choice cost at least one GPU more.
+  Now there is none. The crossover half still holds on all four rescaled regimes. In the T4
+  baseline, which its rule does not test, session-sticky now needs fewer GPUs at 64 prompts and
+  1 session/s (3 against 4). The old engine gave a tie there.
 - The eviction-time histograms of the calibration (H4). This check replays the one-token workload
   at the times the requests were sent, with the fitted timing. With the fixed engine a request
   waits when the modelled step before it lasts longer than the real one did. In two of the three
@@ -275,17 +281,22 @@ scratch run of the fixed engine had given H2b's rule as holding on all three cal
 run had only the first part of the fix. With the whole fix, the rule holds on B only. The file
 stays as it was written.
 
-**Not derived again.** H6 is stored from the engine of 0.1.2. It is not run again, as decided when
-it failed: a failed test is not repeated until it passes. Its two scripts were run once with the
-fixed engine, to see, and that run was not stored. Each half kept its verdict, and the H6 numbers
-in this README came out the same. L1 was kept by the registration, which says that its steps take
-no time. That is not exact: they take a nanosecond. So L1 was run again with the fixed engine.
-Every count came out the same, and only the run times differ, so its stored files stay. The scale
-test measures this machine. The speed probes of R1, R2 and R3 chose those tests' speeds before the
-tests were registered, so they stay as they are.
+**H6, derived again later.** The registration kept H6 on the engine of 0.1.2, because of the rule
+made when it failed: a failed test is not repeated until it passes. That rule is about running a
+test again to get a new verdict. Here the rules and the configs stay the same, and only the engine
+changes. So after a second review, H6 was derived again too, as registered in an addendum,
+[`configs/rederive_0_2_0_h6.yaml`](configs/rederive_0_2_0_h6.yaml). A scratch run during that
+review had already shown the result, and the addendum says so.
 
-**How a log is read.** Release 0.1.3 fixed the reading of a user's own log. A second review before
-this release found more gaps, and 0.2.0 closes them:
+**Not derived again.** L1 was kept by the registration, which says that its steps take no time.
+That is not exact: they take a nanosecond. So L1 was run again with the fixed engine. Every count
+came out the same, and only the run times differ, so its stored files stay. The scale test measures
+this machine. The speed probes of R1, R2 and R3 chose those tests' speeds before the tests were
+registered, so they stay as they are.
+
+**How a log is read.** A first review fixed how the tool reads a user's own log: its time order,
+missing answer lengths, repeated request ids and the scale of AgentX traces. A second review before
+this release found more gaps, and 0.2.0 closes them too:
 - A log with timestamps in milliseconds was read as seconds, which made the load a thousand times
   lower. Such a log is refused now.
 - When lines are skipped, or when a request's `max_tokens` stands in for a missing answer length,
@@ -739,8 +750,8 @@ The rule: everything in `artifacts/results/` must be reproducible by running a s
 engine is still in the code, for single runs and for the tests: `run(..., engine_version="0.1.2")`,
 or `with use_engine("0.1.2"):` in the same process. The grid scripts start worker processes, and
 from Python 3.14 on, and on macOS, those do not inherit it. To compute a grid of 0.1.2 again,
-check out tag `v0.1.2` or install release 0.1.2. The predictions that were registered before the GPU runs were
-made with the old engine, and the tests check them with it. H6 ran on it and was not run again.
+check out tag `v0.1.2` or install release 0.1.2. The predictions that were registered before the
+GPU runs were made with the old engine, and the tests check them with it.
 
 **One edit to stored outputs.** In 13 stored files of the GPU runs (Phase 3, Phase 6, C1 to C4 and
 V1), one path of vLLM's source tree is written `entrypoints/.../serving.py`, with a folder name left
